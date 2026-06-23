@@ -1,0 +1,26 @@
+{
+  "id": "grid-2up-horizontal",
+  "name": "2-Up Horizontal",
+  "category": "grid",
+  "isPremium": false,
+  "canvasAspectRatio": "1:1",
+  "cells": [
+    {
+      "id": "cell-1",
+      "type": "photo",
+      "frame": { "x": 0.0, "y": 0.0, "width": 0.5, "height": 1.0 },
+      "shape": "rectangle",
+      "borderWidth": 2.0,
+      "cornerRadius": 0.0
+    },
+    {
+      "id": "cell-2",
+      "type": "photo",
+      "frame": { "x": 0.5, "y": 0.0, "width": 0.5, "height": 1.0 },
+      "shape": "rectangle",
+      "borderWidth": 2.0,
+      "cornerRadius": 0.0
+    }
+  ],
+  "background": { "type": "solid", "color": "#FFFFFF" }
+}

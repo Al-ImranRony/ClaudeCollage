@@ -1,0 +1,192 @@
+name: ClaudeCollage
+options:
+  bundleIdPrefix: net.pixeltouch
+  deploymentTarget:
+    iOS: "16.0"
+  developmentLanguage: en
+  createIntermediateGroups: true
+  generateEmptyDirectories: true
+  groupSortPosition: top
+  xcodeVersion: "26.0"
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    SWIFT_UPCOMING_FEATURE_STRICT_CONCURRENCY: YES
+    IPHONEOS_DEPLOYMENT_TARGET: "16.0"
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    DEVELOPMENT_TEAM: ""    # filled by signing
+    CURRENT_PROJECT_VERSION: 1
+    MARKETING_VERSION: "1.0.0"
+    GENERATE_INFOPLIST_FILE: NO
+    ENABLE_MODULE_VERIFIER: YES
+
+configs:
+  Debug: debug
+  Staging: release
+  Release: release
+
+configFiles:
+  Debug: Config/Debug.xcconfig
+  Staging: Config/Staging.xcconfig
+  Release: Config/Release.xcconfig
+
+packages:
+  Firebase:
+    url: https://github.com/firebase/firebase-ios-sdk
+    minVersion: "11.0.0"
+  TelemetryDeck:
+    url: https://github.com/TelemetryDeck/SwiftSDK
+    minVersion: "2.0.0"
+
+targets:
+  ClaudeCollage:
+    type: application
+    platform: iOS
+    deploymentTarget: "16.0"
+    sources:
+      - path: ClaudeCollage
+        excludes:
+          - "**/.DS_Store"
+    resources:
+      - path: ClaudeCollage/Resources
+      - path: StoreKit/ClaudeCollage.storekit
+        optional: true
+    info:
+      path: ClaudeCollage/App/Info.plist
+      properties:
+        CFBundleDisplayName: ClaudeCollage
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSRequiresIPhoneOS: true
+        UILaunchScreen:
+          UIColorName: ""
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        NSPhotoLibraryUsageDescription: "ClaudeCollage needs access to your photos to create collages."
+        NSPhotoLibraryAddUsageDescription: "ClaudeCollage saves your finished collages to your photo library."
+        NSMicrophoneUsageDescription: "ClaudeCollage uses the microphone when recording video for your collage."
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+          UISceneConfigurations:
+            UIWindowSceneSessionRoleApplication:
+              - UISceneConfigurationName: Default Configuration
+                UISceneDelegateClassName: $(PRODUCT_MODULE_NAME).SceneDelegate
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: net.pixeltouch.claudecollage
+        TARGETED_DEVICE_FAMILY: "1,2"
+        CODE_SIGN_STYLE: Automatic
+        SUPPORTS_MACCATALYST: NO
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+    dependencies:
+      - package: Firebase
+        product: FirebaseCrashlytics
+      - package: TelemetryDeck
+        product: TelemetryDeck
+      - target: ClaudeCollageWidgets
+        embed: true
+        codeSign: true
+    scheme:
+      testTargets:
+        - ClaudeCollageTests
+        - ClaudeCollageUITests
+      gatherCoverageData: true
+      coverageTargets:
+        - ClaudeCollage
+      configVariants:
+        - Debug
+        - Staging
+        - Release
+      commandLineArguments:
+        "-StoreKitConfigurationFilePath StoreKit/ClaudeCollage.storekit": true
+
+  ClaudeCollageWidgets:
+    type: app-extension
+    platform: iOS
+    deploymentTarget: "16.0"
+    sources:
+      - path: ClaudeCollageWidgets
+    info:
+      path: ClaudeCollageWidgets/Info.plist
+      properties:
+        CFBundleDisplayName: ClaudeCollage Widgets
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: net.pixeltouch.claudecollage.widgets
+        TARGETED_DEVICE_FAMILY: "1,2"
+
+  ClaudeCollageTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "16.0"
+    sources:
+      - path: ClaudeCollageTests
+    dependencies:
+      - target: ClaudeCollage
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: net.pixeltouch.claudecollage.tests
+        GENERATE_INFOPLIST_FILE: YES
+
+  ClaudeCollageUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    deploymentTarget: "16.0"
+    sources:
+      - path: ClaudeCollageUITests
+    dependencies:
+      - target: ClaudeCollage
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: net.pixeltouch.claudecollage.uitests
+        GENERATE_INFOPLIST_FILE: YES
+
+schemes:
+  "ClaudeCollage (Dev)":
+    build:
+      targets:
+        ClaudeCollage: all
+    run:
+      config: Debug
+      storeKitConfiguration: StoreKit/ClaudeCollage.storekit
+    test:
+      config: Debug
+      gatherCoverageData: true
+      coverageTargets:
+        - ClaudeCollage
+      targets:
+        - ClaudeCollageTests
+        - ClaudeCollageUITests
+    archive:
+      config: Debug
+
+  "ClaudeCollage (Staging)":
+    build:
+      targets:
+        ClaudeCollage: all
+    run:
+      config: Staging
+    test:
+      config: Staging
+    archive:
+      config: Staging
+
+  "ClaudeCollage":
+    build:
+      targets:
+        ClaudeCollage: all
+    run:
+      config: Release
+    test:
+      config: Release
+    archive:
+      config: Release

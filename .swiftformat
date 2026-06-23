@@ -1,0 +1,20 @@
+# SwiftFormat config — ClaudeCollage
+
+--swiftversion 6.0
+--indent 4
+--maxwidth 120
+--wraparguments before-first
+--wrapparameters before-first
+--wrapcollections before-first
+--closingparen balanced
+--commas inline
+--trimwhitespace always
+--semicolons never
+--header strip
+--ifdef no-indent
+--self remove
+--stripunusedargs closure-only
+--importgrouping testable-bottom
+--xcodeindentation enabled
+
+--exclude build,DerivedData,.build,.swiftpm,Pods,**/Generated

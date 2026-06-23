@@ -1,0 +1,68 @@
+# ClaudeCollage — Fastlane lanes
+# Step 00 baseline: certs + a TestFlight beta lane.
+
+default_platform(:ios)
+
+PROJECT_FILE = "ClaudeCollage.xcodeproj"
+SCHEME_DEV     = "ClaudeCollage (Dev)"
+SCHEME_STAGING = "ClaudeCollage (Staging)"
+SCHEME_RELEASE = "ClaudeCollage"
+
+platform :ios do
+
+  desc "Sync development signing certificates and profiles"
+  lane :certs_dev do
+    match(type: "development", readonly: ENV["CI"] == "true")
+  end
+
+  desc "Sync App Store distribution certificates and profiles"
+  lane :certs_appstore do
+    match(type: "appstore", readonly: ENV["CI"] == "true")
+  end
+
+  desc "Run unit + UI tests on iPhone 16 simulator"
+  lane :tests do
+    run_tests(
+      project: PROJECT_FILE,
+      scheme: SCHEME_DEV,
+      device: "iPhone 16",
+      clean: true,
+      code_coverage: true
+    )
+  end
+
+  desc "Build Staging archive and upload to TestFlight (internal group)"
+  lane :beta do
+    certs_appstore
+    increment_build_number(xcodeproj: PROJECT_FILE)
+    build_app(
+      project: PROJECT_FILE,
+      scheme: SCHEME_STAGING,
+      configuration: "Staging",
+      export_method: "app-store",
+      clean: true
+    )
+    upload_to_testflight(
+      skip_waiting_for_build_processing: true,
+      distribute_external: false
+    )
+  end
+
+  desc "Build Release archive and submit to App Store (manual review submission)"
+  lane :release do
+    certs_appstore
+    build_app(
+      project: PROJECT_FILE,
+      scheme: SCHEME_RELEASE,
+      configuration: "Release",
+      export_method: "app-store",
+      clean: true
+    )
+    upload_to_app_store(
+      skip_metadata: false,
+      skip_screenshots: true,
+      submit_for_review: false,
+      precheck_include_in_app_purchases: false
+    )
+  end
+end

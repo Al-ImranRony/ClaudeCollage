@@ -1,0 +1,42 @@
+{
+  "id": "grid-4cell-square",
+  "name": "4-Up Square Grid",
+  "category": "grid",
+  "isPremium": false,
+  "canvasAspectRatio": "1:1",
+  "cells": [
+    {
+      "id": "cell-tl",
+      "type": "photo",
+      "frame": { "x": 0.0, "y": 0.0, "width": 0.5, "height": 0.5 },
+      "shape": "rectangle",
+      "borderWidth": 2.0,
+      "cornerRadius": 0.0
+    },
+    {
+      "id": "cell-tr",
+      "type": "photo",
+      "frame": { "x": 0.5, "y": 0.0, "width": 0.5, "height": 0.5 },
+      "shape": "rectangle",
+      "borderWidth": 2.0,
+      "cornerRadius": 0.0
+    },
+    {
+      "id": "cell-bl",
+      "type": "photo",
+      "frame": { "x": 0.0, "y": 0.5, "width": 0.5, "height": 0.5 },
+      "shape": "rectangle",
+      "borderWidth": 2.0,
+      "cornerRadius": 0.0
+    },
+    {
+      "id": "cell-br",
+      "type": "photo",
+      "frame": { "x": 0.5, "y": 0.5, "width": 0.5, "height": 0.5 },
+      "shape": "rectangle",
+      "borderWidth": 2.0,
+      "cornerRadius": 0.0
+    }
+  ],
+  "background": { "type": "solid", "color": "#FFFFFF" }
+}

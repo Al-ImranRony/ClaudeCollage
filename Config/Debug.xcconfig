@@ -1,0 +1,17 @@
+// Debug configuration — local development, StoreKit local config, verbose logging
+#include? "Local.xcconfig"
+
+ENVIRONMENT = debug
+API_BASE_URL = https:/$()/api-dev.pixeltouch.net
+
+SWIFT_ACTIVE_COMPILATION_CONDITIONS = $(inherited) DEBUG STAGING_OR_DEBUG
+GCC_PREPROCESSOR_DEFINITIONS = $(inherited) DEBUG=1
+SWIFT_OPTIMIZATION_LEVEL = -Onone
+SWIFT_COMPILATION_MODE = singlefile
+ONLY_ACTIVE_ARCH = YES
+ENABLE_TESTABILITY = YES
+
+OTHER_SWIFT_FLAGS = $(inherited) -DDEBUG -warnings-as-errors
+
+INFOPLIST_KEY_ENVIRONMENT = $(ENVIRONMENT)
+INFOPLIST_KEY_API_BASE_URL = $(API_BASE_URL)

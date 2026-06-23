@@ -1,0 +1,11 @@
+git_url("git@github.com:pixeltouch/ios-certs-private.git")
+storage_mode("git")
+
+app_identifier(["net.pixeltouch.claudecollage", "net.pixeltouch.claudecollage.widgets"])
+username("dev3@pixeltouch.net")
+
+type("development") # The default type, can be: appstore, adhoc, enterprise or development
+
+# For new machines, run:
+#   fastlane match development
+#   fastlane match appstore

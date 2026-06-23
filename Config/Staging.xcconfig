@@ -1,0 +1,14 @@
+// Staging configuration — TestFlight internal, staging CDN, real StoreKit sandbox
+#include? "Local.xcconfig"
+
+ENVIRONMENT = staging
+API_BASE_URL = https:/$()/api-staging.pixeltouch.net
+
+SWIFT_ACTIVE_COMPILATION_CONDITIONS = $(inherited) STAGING STAGING_OR_DEBUG
+SWIFT_OPTIMIZATION_LEVEL = -O
+SWIFT_COMPILATION_MODE = wholemodule
+ONLY_ACTIVE_ARCH = NO
+ENABLE_TESTABILITY = YES
+
+INFOPLIST_KEY_ENVIRONMENT = $(ENVIRONMENT)
+INFOPLIST_KEY_API_BASE_URL = $(API_BASE_URL)
