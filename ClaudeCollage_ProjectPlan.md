@@ -3,8 +3,8 @@
 **Version:** 3.0 — Final (Development / Deployment Split)
 **Date:** 2026-06-13
 **Platform:** iOS (iPhone-first, iPad-compatible)
-**Developer:** PixelTouch (pixeltouch.net)
-**Bundle ID:** `net.pixeltouch.claudecollage`
+**Developer:** Devron (devron.com)
+**Bundle ID:** `com.devron.claudecollage`
 
 ---
 
@@ -731,8 +731,8 @@ Do not start this until Part 1 is 100% done.
 **Phase 6.11 — App Store Connect Setup**
 - App name, subtitle, description, keywords (all 11 languages)
 - ASO keyword strategy: avoid "collage" alone (Pic Stitch owns it); target intent verticals — "instagram carousel maker", "photo grid for ig", "reels collage", "photo dump maker"
-- Support URL: `https://pixeltouch.net/support/claudecollage`
-- Privacy Policy URL: `https://pixeltouch.net/legal/claudecollage/privacy.html`
+- Support URL: `https://devron.com/support/claudecollage`
+- Privacy Policy URL: `https://devron.com/legal/claudecollage/privacy.html`
 - Content rights: confirm all fonts, stickers, templates licensed
 - Review notes: explain subscription model + free tier capabilities
 
@@ -847,9 +847,9 @@ docs(readme): add project setup instructions
 
 ```ruby
 # Matchfile
-git_url("git@github.com:pixeltouch/ios-certs-private.git")
-app_identifier("net.pixeltouch.claudecollage")
-username("dev3@pixeltouch.net")
+git_url("git@github.com:Al-ImranRony/ios-certs-private.git")
+app_identifier("com.devron.claudecollage")
+username("dev3@devron.com")
 ```
 
 Each developer/machine runs `fastlane match development` once. No manual certificate management.
@@ -1033,8 +1033,8 @@ enum CarouselType: String, Codable {
 
 ## 13. Immediate Next Steps (Before Writing Code)
 
-1. **Register** bundle ID `net.pixeltouch.claudecollage` in App Store Connect
-2. **Create GitHub repo** `pixeltouch/claude-collage-ios` with branch protection on `main` and `develop`
+1. **Register** bundle ID `com.devron.claudecollage` in App Store Connect
+2. **Create GitHub repo** `Al-ImranRony/ClaudeCollage` with branch protection on `main` and `develop`
 3. **Submit Featuring Nomination** in App Store Connect (12 weeks before launch — start early)
 4. **Create Xcode project** (iOS 16.0, Swift 6, Xcode 26+, **Storyboard App template** — we delete the storyboard and wire a programmatic `SceneDelegate` per Step 00; UIKit is primary)
 5. **Spike: Metal compositor** — validate 60fps live preview on iPhone 13 with a dummy 4-cell layout

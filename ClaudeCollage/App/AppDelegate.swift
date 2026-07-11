@@ -7,9 +7,6 @@
 //
 
 import UIKit
-import FirebaseCore
-import FirebaseCrashlytics
-import TelemetryDeck
 
 @main
 final class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -18,8 +15,6 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
-        configureFirebase()
-        configureTelemetryDeck()
         configureAppearance()
         return true
     }
@@ -35,32 +30,6 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
     // MARK: - Private
-
-    private func configureFirebase() {
-        // GoogleService-Info.plist is required at the project root before this runs in production.
-        // For Debug builds without the plist we skip configuration silently.
-        guard Bundle.main.path(forResource: "GoogleService-Info", ofType: "plist") != nil else {
-            #if DEBUG
-            print("[ClaudeCollage] GoogleService-Info.plist missing — Firebase disabled in this build.")
-            #endif
-            return
-        }
-        FirebaseApp.configure()
-        Crashlytics.crashlytics().setCrashlyticsCollectionEnabled(true)
-    }
-
-    private func configureTelemetryDeck() {
-        // Replace with the real app ID once the TelemetryDeck app is provisioned.
-        let appID = Bundle.main.object(forInfoDictionaryKey: "TelemetryDeckAppID") as? String ?? ""
-        guard !appID.isEmpty else {
-            #if DEBUG
-            print("[ClaudeCollage] TelemetryDeck app ID missing — analytics disabled in this build.")
-            #endif
-            return
-        }
-        let config = TelemetryDeck.Config(appID: appID)
-        TelemetryDeck.initialize(config: config)
-    }
 
     private func configureAppearance() {
         // Global UIKit appearance — kept minimal in Step 00.

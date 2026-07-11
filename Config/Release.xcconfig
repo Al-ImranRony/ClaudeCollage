@@ -2,7 +2,7 @@
 #include? "Local.xcconfig"
 
 ENVIRONMENT = production
-API_BASE_URL = https:/$()/api.pixeltouch.net
+API_BASE_URL = https:/$()/api.devron.com
 
 SWIFT_ACTIVE_COMPILATION_CONDITIONS = $(inherited) RELEASE
 SWIFT_OPTIMIZATION_LEVEL = -O

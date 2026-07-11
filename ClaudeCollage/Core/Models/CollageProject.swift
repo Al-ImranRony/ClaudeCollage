@@ -25,6 +25,10 @@ public final class CollageProject {
     @Relationship(deleteRule: .cascade) public var cells: [CollageCell]
     public var previewThumbnail: Data?
     public var exportSettings: ExportSettings
+    /// Serialized `GridEditorState` for grid-mode projects (Step 01). The
+    /// authoritative editor state lives here; `cells` above is the normalized
+    /// schema populated in later steps.
+    public var gridStateData: Data?
 
     public init(
         id: UUID = UUID(),

@@ -2,7 +2,7 @@
 #include? "Local.xcconfig"
 
 ENVIRONMENT = staging
-API_BASE_URL = https:/$()/api-staging.pixeltouch.net
+API_BASE_URL = https:/$()/api-staging.devron.com
 
 SWIFT_ACTIVE_COMPILATION_CONDITIONS = $(inherited) STAGING STAGING_OR_DEBUG
 SWIFT_OPTIMIZATION_LEVEL = -O

@@ -50,10 +50,10 @@ A single source of truth for the user's subscription tier, real-time entitlement
 - [ ] Load all 4 products at app launch:
   ```swift
   let products = try await Product.products(for: [
-      "net.pixeltouch.claudecollage.premium.weekly",
-      "net.pixeltouch.claudecollage.premium.monthly",
-      "net.pixeltouch.claudecollage.premium.yearly",
-      "net.pixeltouch.claudecollage.premium.lifetime"
+      "com.devron.claudecollage.premium.weekly",
+      "com.devron.claudecollage.premium.monthly",
+      "com.devron.claudecollage.premium.yearly",
+      "com.devron.claudecollage.premium.lifetime"
   ])
   ```
 - [ ] Handle purchase: `product.purchase()` → verify `Transaction.currentEntitlement`
@@ -318,9 +318,9 @@ Fix any failures before submission.
 - [ ] **Promotional text (170 chars):** updateable without submission — use for "New: Generative AI backgrounds!"
 - [ ] **Description (4000 chars):** structured with feature sections, social proof, monetization terms
 - [ ] **Keywords (100 chars):** strategic ASO selection (see below)
-- [ ] **Support URL:** `https://pixeltouch.net/support/claudecollage`
-- [ ] **Marketing URL:** `https://pixeltouch.net/claudecollage`
-- [ ] **Privacy Policy URL:** `https://pixeltouch.net/legal/claudecollage/privacy.html`
+- [ ] **Support URL:** `https://devron.com/support/claudecollage`
+- [ ] **Marketing URL:** `https://devron.com/claudecollage`
+- [ ] **Privacy Policy URL:** `https://devron.com/legal/claudecollage/privacy.html`
 
 ### ASO Keyword Strategy
 **Avoid:** `collage` alone (Pic Stitch + Layout dominate this keyword).

@@ -2,7 +2,7 @@
 #include? "Local.xcconfig"
 
 ENVIRONMENT = debug
-API_BASE_URL = https:/$()/api-dev.pixeltouch.net
+API_BASE_URL = https:/$()/api-dev.devron.com
 
 SWIFT_ACTIVE_COMPILATION_CONDITIONS = $(inherited) DEBUG STAGING_OR_DEBUG
 GCC_PREPROCESSOR_DEFINITIONS = $(inherited) DEBUG=1

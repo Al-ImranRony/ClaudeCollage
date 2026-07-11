@@ -23,7 +23,7 @@ This step is part of **Part 1 — Development**. Steps 00 through 05 are Develop
 - [ ] Set deployment target to **iOS 16.0**
 - [ ] Set Swift language version to **Swift 6** (Build Settings → Swift Language Version)
 - [ ] Enable strict concurrency checking (Build Settings → Swift → Strict Concurrency Checking → Complete)
-- [ ] Set bundle identifier: `net.pixeltouch.claudecollage`
+- [ ] Set bundle identifier: `com.devron.claudecollage`
 - [ ] Set app name: `ClaudeCollage` (display name can be finalized later)
 - [ ] Add app icon placeholder (1024×1024 solid color — real icon ships in Step 06 / Deployment)
 - [ ] Create three build configurations: **Debug**, **Staging**, **Release**
@@ -97,7 +97,7 @@ ClaudeCollage/
 ### Extension Targets (create stubs now; populate in Step 05)
 - [ ] Add **Widget Extension** target named `ClaudeCollageWidgets` — leave empty for now
 - [ ] Add **App Intents Extension** capability to main target — App Intents live in the main app bundle, no separate target required
-- [ ] Both extensions share an **App Group** (`group.net.pixeltouch.claudecollage`) — set up the entitlement now
+- [ ] Both extensions share an **App Group** (`group.com.devron.claudecollage`) — set up the entitlement now
 
 ### SwiftData Schema (Stub — no logic yet)
 Create stub model files now so the schema is defined before Step 01 coding:
@@ -163,9 +163,9 @@ Do NOT add any other packages yet. Add only when needed in future steps.
 - [ ] Run `fastlane init` in project root → choose "Manual setup"
 - [ ] Create `Fastlane/Matchfile`:
   ```ruby
-  git_url("git@github.com:pixeltouch/ios-certs-private.git")
-  app_identifier("net.pixeltouch.claudecollage")
-  username("dev3@pixeltouch.net")
+  git_url("git@github.com:Al-ImranRony/ios-certs-private.git")
+  app_identifier("com.devron.claudecollage")
+  username("dev3@devron.com")
   storage_mode("git")
   type("development")
   ```
@@ -213,10 +213,10 @@ Choose **Xcode Cloud** (simpler, built into Xcode) or **GitHub Actions** (more c
 - [ ] Create `StoreKit/ClaudeCollage.storekit` configuration file
 - [ ] Add 4 products:
   ```
-  net.pixeltouch.claudecollage.premium.weekly    (Auto-Renewable Subscription, $2.99/week)
-  net.pixeltouch.claudecollage.premium.monthly   (Auto-Renewable Subscription, $4.99/month)
-  net.pixeltouch.claudecollage.premium.yearly    (Auto-Renewable Subscription, $24.99/year)
-  net.pixeltouch.claudecollage.premium.lifetime  (Non-Consumable, $49.99)
+  com.devron.claudecollage.premium.weekly    (Auto-Renewable Subscription, $2.99/week)
+  com.devron.claudecollage.premium.monthly   (Auto-Renewable Subscription, $4.99/month)
+  com.devron.claudecollage.premium.yearly    (Auto-Renewable Subscription, $24.99/year)
+  com.devron.claudecollage.premium.lifetime  (Non-Consumable, $49.99)
   ```
 - [ ] Set Debug scheme to use this StoreKit configuration file
 

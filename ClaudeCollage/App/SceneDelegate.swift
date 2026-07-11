@@ -6,6 +6,7 @@
 //
 
 import UIKit
+import SwiftData
 
 final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
@@ -23,7 +24,8 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         let navigationController = UINavigationController()
         navigationController.navigationBar.prefersLargeTitles = true
 
-        let coordinator = AppCoordinator(navigationController: navigationController)
+        let container = ModelContainerFactory.makeShared()
+        let coordinator = AppCoordinator(navigationController: navigationController, container: container)
         coordinator.start()
 
         window.rootViewController = navigationController

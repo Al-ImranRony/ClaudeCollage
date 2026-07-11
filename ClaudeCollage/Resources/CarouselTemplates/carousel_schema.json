@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://pixeltouch.net/schemas/claudecollage/carousel.json",
+  "$id": "https://devron.com/schemas/claudecollage/carousel.json",
   "title": "ClaudeCollage Carousel Template",
   "description": "Schema for a SCRL-style carousel template (2–10 linked frames).",
   "type": "object",
@@ -33,7 +33,7 @@
           "index": { "type": "integer", "minimum": 0 },
           "cells": {
             "type": "array",
-            "items": { "$ref": "https://pixeltouch.net/schemas/claudecollage/template.json#/$defs/cell" }
+            "items": { "$ref": "https://devron.com/schemas/claudecollage/template.json#/$defs/cell" }
           }
         }
       }
@@ -45,6 +45,6 @@
         "overlapPixels": { "type": "integer", "minimum": 0 }
       }
     },
-    "background": { "$ref": "https://pixeltouch.net/schemas/claudecollage/template.json#/$defs/background" }
+    "background": { "$ref": "https://devron.com/schemas/claudecollage/template.json#/$defs/background" }
   }
 }

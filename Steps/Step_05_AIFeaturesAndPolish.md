@@ -121,7 +121,7 @@ final class AIService: ObservableObject {
 - [ ] Implement two widgets in the existing widget extension target:
   - **Recent Projects** widget — small/medium/large sizes; shows last 1/3/6 project thumbnails; tap → opens the project
   - **Photo of the Day** widget — small/medium; shows a curated photo from the user's library with an "Edit" button (uses `WidgetKit` Interactive Buttons, iOS 17+)
-- [ ] Use App Group `group.net.pixeltouch.claudecollage` to share data between app and widget
+- [ ] Use App Group `group.com.devron.claudecollage` to share data between app and widget
 - [ ] Refresh policy: timeline reloaded every 30 minutes + on app state changes
 - [ ] Static fallback widget for iOS 16 (non-interactive)
 
@@ -144,7 +144,7 @@ final class AIService: ObservableObject {
 
 - [ ] Add SwiftUI `dropDestination(for: Image.self)` to every cell in every editor
 - [ ] Add `draggable()` modifier to project thumbnails on the home screen (drag a project into Messages to share)
-- [ ] Support `Transferable` for `CollageProject` (custom UTI: `net.pixeltouch.claudecollage.project`)
+- [ ] Support `Transferable` for `CollageProject` (custom UTI: `com.devron.claudecollage.project`)
 - [ ] Test drag from Safari (image), Files, Photos, Messages, Notes into a cell
 
 ### Checklist — Live Activities (extends Step 04)

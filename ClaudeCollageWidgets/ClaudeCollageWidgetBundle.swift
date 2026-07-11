@@ -8,6 +8,7 @@
 import WidgetKit
 import SwiftUI
 
+@available(iOS 17.0, *)
 @main
 struct ClaudeCollageWidgetBundle: WidgetBundle {
     var body: some Widget {
@@ -15,6 +16,7 @@ struct ClaudeCollageWidgetBundle: WidgetBundle {
     }
 }
 
+@available(iOS 17.0, *)
 struct PlaceholderWidget: Widget {
     let kind: String = "PlaceholderWidget"
 
@@ -42,6 +44,7 @@ struct PlaceholderProvider: TimelineProvider {
     }
 }
 
+@available(iOS 17.0, *)
 struct PlaceholderWidgetView: View {
     let entry: PlaceholderEntry
     var body: some View {

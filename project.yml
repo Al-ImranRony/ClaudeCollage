@@ -1,8 +1,8 @@
 name: ClaudeCollage
 options:
-  bundleIdPrefix: net.pixeltouch
+  bundleIdPrefix: com.devron
   deploymentTarget:
-    iOS: "16.0"
+    iOS: "17.0"
   developmentLanguage: en
   createIntermediateGroups: true
   generateEmptyDirectories: true
@@ -14,7 +14,7 @@ settings:
     SWIFT_VERSION: "6.0"
     SWIFT_STRICT_CONCURRENCY: complete
     SWIFT_UPCOMING_FEATURE_STRICT_CONCURRENCY: YES
-    IPHONEOS_DEPLOYMENT_TARGET: "16.0"
+    IPHONEOS_DEPLOYMENT_TARGET: "17.0"
     ENABLE_USER_SCRIPT_SANDBOXING: YES
     DEVELOPMENT_TEAM: ""    # filled by signing
     CURRENT_PROJECT_VERSION: 1
@@ -32,27 +32,17 @@ configFiles:
   Staging: Config/Staging.xcconfig
   Release: Config/Release.xcconfig
 
-packages:
-  Firebase:
-    url: https://github.com/firebase/firebase-ios-sdk
-    minVersion: "11.0.0"
-  TelemetryDeck:
-    url: https://github.com/TelemetryDeck/SwiftSDK
-    minVersion: "2.0.0"
-
 targets:
   ClaudeCollage:
     type: application
     platform: iOS
-    deploymentTarget: "16.0"
+    deploymentTarget: "17.0"
     sources:
       - path: ClaudeCollage
         excludes:
           - "**/.DS_Store"
     resources:
       - path: ClaudeCollage/Resources
-      - path: StoreKit/ClaudeCollage.storekit
-        optional: true
     info:
       path: ClaudeCollage/App/Info.plist
       properties:
@@ -80,16 +70,12 @@ targets:
                 UISceneDelegateClassName: $(PRODUCT_MODULE_NAME).SceneDelegate
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: net.pixeltouch.claudecollage
+        PRODUCT_BUNDLE_IDENTIFIER: com.devron.claudecollage
         TARGETED_DEVICE_FAMILY: "1,2"
         CODE_SIGN_STYLE: Automatic
         SUPPORTS_MACCATALYST: NO
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     dependencies:
-      - package: Firebase
-        product: FirebaseCrashlytics
-      - package: TelemetryDeck
-        product: TelemetryDeck
       - target: ClaudeCollageWidgets
         embed: true
         codeSign: true
@@ -100,17 +86,11 @@ targets:
       gatherCoverageData: true
       coverageTargets:
         - ClaudeCollage
-      configVariants:
-        - Debug
-        - Staging
-        - Release
-      commandLineArguments:
-        "-StoreKitConfigurationFilePath StoreKit/ClaudeCollage.storekit": true
 
   ClaudeCollageWidgets:
     type: app-extension
     platform: iOS
-    deploymentTarget: "16.0"
+    deploymentTarget: "17.0"
     sources:
       - path: ClaudeCollageWidgets
     info:
@@ -121,33 +101,33 @@ targets:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: net.pixeltouch.claudecollage.widgets
+        PRODUCT_BUNDLE_IDENTIFIER: com.devron.claudecollage.widgets
         TARGETED_DEVICE_FAMILY: "1,2"
 
   ClaudeCollageTests:
     type: bundle.unit-test
     platform: iOS
-    deploymentTarget: "16.0"
+    deploymentTarget: "17.0"
     sources:
       - path: ClaudeCollageTests
     dependencies:
       - target: ClaudeCollage
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: net.pixeltouch.claudecollage.tests
+        PRODUCT_BUNDLE_IDENTIFIER: com.devron.claudecollage.tests
         GENERATE_INFOPLIST_FILE: YES
 
   ClaudeCollageUITests:
     type: bundle.ui-testing
     platform: iOS
-    deploymentTarget: "16.0"
+    deploymentTarget: "17.0"
     sources:
       - path: ClaudeCollageUITests
     dependencies:
       - target: ClaudeCollage
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: net.pixeltouch.claudecollage.uitests
+        PRODUCT_BUNDLE_IDENTIFIER: com.devron.claudecollage.uitests
         GENERATE_INFOPLIST_FILE: YES
 
 schemes:
@@ -157,7 +137,6 @@ schemes:
         ClaudeCollage: all
     run:
       config: Debug
-      storeKitConfiguration: StoreKit/ClaudeCollage.storekit
     test:
       config: Debug
       gatherCoverageData: true
