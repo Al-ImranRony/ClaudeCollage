@@ -17,6 +17,13 @@
 import Foundation
 import CoreGraphics
 
+/// Carries a `CGImage` across concurrency domains. `CGImage` is immutable and
+/// safe to read from any thread, so transporting one is safe even though the
+/// type isn't formally `Sendable`.
+private struct SendableImage: @unchecked Sendable {
+    let cgImage: CGImage
+}
+
 @MainActor
 public final class GridEditorViewModel {
 
@@ -62,8 +69,13 @@ public final class GridEditorViewModel {
     // MARK: - Layout / appearance edits (undoable commits)
 
     public func setTemplate(_ template: GridTemplate) {
-        guard template != state.template else { return }
-        commit { $0.applyTemplate(template) }
+        setLayout(.grid(template))
+    }
+
+    /// Switches the whole layout (grid or polygon). Undoable.
+    public func setLayout(_ layout: CollageLayout) {
+        guard layout != state.layout else { return }
+        commit { $0.applyLayout(layout) }
     }
 
     public func previewBorderWidth(_ width: Double) {
@@ -96,6 +108,12 @@ public final class GridEditorViewModel {
             $0.cells[index].transform = CellTransform()
             $0.cells[index].filters = CellFilters()
         }
+    }
+
+    /// Applies (or clears) a user-drawn custom boundary on one cell. Undoable.
+    public func setCustomClip(_ clip: CellClipShape?, forCellAt index: Int) {
+        guard state.cells.indices.contains(index), state.cells[index].customClip != clip else { return }
+        commit { $0.cells[index].customClip = clip }
     }
 
     public func clearCell(at index: Int) {
@@ -163,13 +181,17 @@ public final class GridEditorViewModel {
 
     /// The lightweight display model for the GPU canvas.
     func canvasModel() -> CanvasModel {
-        let frames = engine.layout(for: state.template, canvasSize: canvasSize, borderWidth: CGFloat(state.borderWidth))
+        let frames = engine.layout(for: state.layout, canvasSize: canvasSize, borderWidth: CGFloat(state.borderWidth))
+        // Polygon shapes render edge-to-edge; corner radius only applies to grids.
+        let radius = state.layout.isPolygon ? 0 : CGFloat(state.cornerRadius)
         let cells: [CanvasCellModel] = frames.enumerated().map { index, frame in
-            CanvasCellModel(
+            let custom = index < state.cells.count ? state.cells[index].customClip : nil
+            return CanvasCellModel(
                 image: displayImage(forCellAt: index),
                 frame: frame.frame,
                 transform: index < state.cells.count ? state.cells[index].transform : CellTransform(),
-                cornerRadius: CGFloat(state.cornerRadius)
+                cornerRadius: custom == nil ? radius : 0,
+                clipShape: custom ?? frame.clipShape
             )
         }
         return CanvasModel(canvasSize: canvasSize, background: state.background, cells: cells)
@@ -222,13 +244,16 @@ public final class GridEditorViewModel {
     }
 
     private func makeRenderRequest() -> RenderRequest {
-        let frames = engine.layout(for: state.template, canvasSize: canvasSize, borderWidth: CGFloat(state.borderWidth))
+        let frames = engine.layout(for: state.layout, canvasSize: canvasSize, borderWidth: CGFloat(state.borderWidth))
+        let radius = state.layout.isPolygon ? 0 : CGFloat(state.cornerRadius)
         let cells: [RenderCell] = frames.enumerated().map { index, frame in
-            RenderCell(
+            let custom = index < state.cells.count ? state.cells[index].customClip : nil
+            return RenderCell(
                 frame: frame.frame,
                 image: displayImage(forCellAt: index),
                 transform: index < state.cells.count ? state.cells[index].transform : CellTransform(),
-                cornerRadius: CGFloat(state.cornerRadius)
+                cornerRadius: custom == nil ? radius : 0,
+                clipShape: custom ?? frame.clipShape
             )
         }
         return RenderRequest(canvasSize: canvasSize, background: state.background, cells: cells)
@@ -256,15 +281,24 @@ public final class GridEditorViewModel {
             return
         }
         guard let source = sourceImages[id] else { return }
+        let boxedSource = SendableImage(cgImage: source)
 
-        let work = DispatchWorkItem { [weak self] in
-            let result = ImageFilterProcessor.shared.apply(filters, to: source)
-            DispatchQueue.main.async {
+        // The work item is explicitly @Sendable. Without it, Swift 6 (complete
+        // concurrency) infers this closure as @MainActor-isolated from the
+        // enclosing actor, and running a main-actor closure on the background
+        // `filterQueue` trips the runtime executor check → crash. Marking it
+        // @Sendable keeps the heavy Core Image work genuinely off-actor; the
+        // state mutation hops back via an explicit @MainActor Task.
+        let work = DispatchWorkItem { @Sendable [weak self] in
+            let boxedResult = SendableImage(
+                cgImage: ImageFilterProcessor.shared.apply(filters, to: boxedSource.cgImage)
+            )
+            Task { @MainActor in
                 guard let self,
                       self.state.cells.indices.contains(index),
                       self.state.cells[index].imageID == id,
                       self.state.cells[index].filters == filters else { return }
-                self.filteredImages[id] = result
+                self.filteredImages[id] = boxedResult.cgImage
                 self.onCellImageChanged?(index)
             }
         }

@@ -25,7 +25,7 @@ final class HomeViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         title = "ClaudeCollage"
-        view.backgroundColor = .systemBackground
+        view.backgroundColor = Theme.Color.background
         navigationController?.navigationBar.prefersLargeTitles = true
 
         let addButton = UIBarButtonItem(
@@ -85,7 +85,7 @@ final class HomeViewController: UIViewController {
         let layout = UICollectionViewCompositionalLayout(section: section)
 
         let view = UICollectionView(frame: .zero, collectionViewLayout: layout)
-        view.backgroundColor = .systemBackground
+        view.backgroundColor = Theme.Color.background
         view.dataSource = self
         view.delegate = self
         view.register(ProjectCardCell.self, forCellWithReuseIdentifier: ProjectCardCell.reuseID)
@@ -143,12 +143,17 @@ final class ProjectCardCell: UICollectionViewCell {
 
         imageView.contentMode = .scaleAspectFill
         imageView.clipsToBounds = true
-        imageView.layer.cornerRadius = 14
-        imageView.backgroundColor = .secondarySystemBackground
+        imageView.layer.cornerRadius = Theme.Radius.lg
+        imageView.layer.cornerCurve = .continuous
+        imageView.backgroundColor = Theme.Color.controlFill
         imageView.translatesAutoresizingMaskIntoConstraints = false
 
-        dateLabel.font = .preferredFont(forTextStyle: .caption1)
-        dateLabel.textColor = .secondaryLabel
+        // Soft elevation sits on the (non-clipping) contentView, behind the
+        // rounded image. The shadow path is set in layoutSubviews.
+        contentView.applyCardShadow()
+
+        dateLabel.font = Theme.Typography.caption
+        dateLabel.textColor = Theme.Color.textSecondary
         dateLabel.translatesAutoresizingMaskIntoConstraints = false
 
         contentView.addSubview(imageView)
@@ -167,6 +172,30 @@ final class ProjectCardCell: UICollectionViewCell {
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        contentView.layer.shadowPath = UIBezierPath(
+            roundedRect: imageView.frame, cornerRadius: Theme.Radius.lg
+        ).cgPath
+    }
+
+    /// A subtle scale-down while the card is pressed, springing back on release.
+    override var isHighlighted: Bool {
+        didSet {
+            guard isHighlighted != oldValue else { return }
+            UIView.animate(
+                withDuration: Theme.Motion.quick,
+                delay: 0,
+                usingSpringWithDamping: Theme.Motion.springDamping,
+                initialSpringVelocity: Theme.Motion.springVelocity,
+                options: [.allowUserInteraction, .beginFromCurrentState]
+            ) {
+                self.transform = self.isHighlighted
+                    ? CGAffineTransform(scaleX: 0.96, y: 0.96) : .identity
+            }
+        }
+    }
 
     func configure(with summary: ProjectSummary) {
         imageView.image = summary.thumbnail
@@ -190,29 +219,38 @@ final class HomeEmptyStateView: UIView {
     override init(frame: CGRect) {
         super.init(frame: frame)
 
-        let icon = UIImageView(image: UIImage(systemName: "square.grid.2x2"))
-        icon.tintColor = .tertiaryLabel
+        let symbolConfig = UIImage.SymbolConfiguration(pointSize: 52, weight: .regular)
+        let icon = UIImageView(image: UIImage(systemName: "square.grid.2x2.fill", withConfiguration: symbolConfig))
+        icon.tintColor = Theme.Color.accent
         icon.contentMode = .scaleAspectFit
-        icon.heightAnchor.constraint(equalToConstant: 56).isActive = true
+        icon.heightAnchor.constraint(equalToConstant: 64).isActive = true
 
         let title = UILabel()
         title.text = "No collages yet"
-        title.font = .preferredFont(forTextStyle: .title2)
+        title.font = Theme.Typography.title2
+        title.textColor = Theme.Color.textPrimary
         title.textAlignment = .center
 
         let subtitle = UILabel()
         subtitle.text = "Create your first grid collage to get started."
-        subtitle.font = .preferredFont(forTextStyle: .body)
-        subtitle.textColor = .secondaryLabel
+        subtitle.font = Theme.Typography.body
+        subtitle.textColor = Theme.Color.textSecondary
         subtitle.numberOfLines = 0
         subtitle.textAlignment = .center
 
         var config = UIButton.Configuration.filled()
         config.title = "New Collage"
         config.image = UIImage(systemName: "plus")
-        config.imagePadding = 6
+        config.imagePadding = 8
         config.cornerStyle = .large
+        config.baseBackgroundColor = Theme.Color.accent
+        config.baseForegroundColor = Theme.Color.textOnAccent
+        config.contentInsets = NSDirectionalEdgeInsets(top: 14, leading: 22, bottom: 14, trailing: 22)
+        config.attributedTitle = AttributedString(
+            "New Collage", attributes: AttributeContainer([.font: Theme.Typography.button])
+        )
         let button = UIButton(configuration: config, primaryAction: UIAction { [weak self] _ in
+            Haptics.tap()
             self?.onCreate?()
         })
 

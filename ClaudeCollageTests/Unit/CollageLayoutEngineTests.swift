@@ -82,6 +82,49 @@ final class CollageLayoutEngineTests: XCTestCase {
         XCTAssertEqual(first, second)
     }
 
+    // MARK: - Polygon layouts (Step 02)
+
+    func testDiagonalLeftProducesTwoCells() {
+        let cells = engine.polygonLayout(for: .diagonalLeft, canvasSize: canvas)
+        XCTAssertEqual(cells.count, 2)
+    }
+
+    func testDiagonalCellPathsAreClosed() {
+        let cells = engine.polygonLayout(for: .diagonalLeft, canvasSize: canvas)
+        for cell in cells {
+            let path = cell.clipShape.path(in: cell.frame)
+            XCTAssertFalse(path.isEmpty, "Every polygon cell must yield a non-empty path")
+        }
+    }
+
+    func testHexagonGridProducesSevenCells() {
+        let cells = engine.polygonLayout(for: .hexagonGrid, canvasSize: canvas)
+        XCTAssertEqual(cells.count, 7)
+    }
+
+    func testPolygonCellsDoNotOverlap() {
+        // The diagonal split tiles the canvas: away from the shared boundary
+        // (the main diagonal, y = x), every interior point belongs to exactly
+        // one cell — never two.
+        let cells = engine.polygonLayout(for: .diagonalLeft, canvasSize: canvas)
+        let paths = cells.map { $0.clipShape.path(in: $0.frame) }
+
+        let step = canvas.width / 20
+        var sampled = 0
+        for i in 1 ..< 20 {
+            for j in 1 ..< 20 {
+                let x = CGFloat(i) * step
+                let y = CGFloat(j) * step
+                // Skip points near the y = x boundary to avoid shared-edge ties.
+                guard abs(x - y) > step else { continue }
+                let hits = paths.filter { $0.contains(CGPoint(x: x, y: y)) }.count
+                XCTAssertEqual(hits, 1, "Point (\(x),\(y)) should belong to exactly one cell, not \(hits)")
+                sampled += 1
+            }
+        }
+        XCTAssertGreaterThan(sampled, 0)
+    }
+
     // MARK: - Undo stack
 
     func testUndoStackPushAndPop() {

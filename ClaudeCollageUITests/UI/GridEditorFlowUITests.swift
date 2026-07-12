@@ -52,4 +52,39 @@ final class GridEditorFlowUITests: XCTestCase {
             "Back should return to Home"
         )
     }
+
+    /// Step 02 — switches the editor to Shapes mode and applies a polygon layout,
+    /// capturing a screenshot of the masked canvas.
+    @MainActor
+    func testShapesModeRendersPolygonLayout() throws {
+        let app = XCUIApplication()
+        app.launch()
+
+        let addButton = app.buttons["newProjectButton"]
+        XCTAssertTrue(addButton.waitForExistence(timeout: 5))
+        addButton.tap()
+        XCTAssertTrue(app.navigationBars["Grid Collage"].waitForExistence(timeout: 5))
+
+        // Flip the Grid/Shapes segmented control to "Shapes".
+        let shapes = app.buttons["Shapes"]
+        XCTAssertTrue(shapes.waitForExistence(timeout: 5), "Shapes segment should exist")
+        shapes.tap()
+
+        // The shape picker should now be populated; tap a couple of shapes so the
+        // canvas re-masks, then screenshot the result.
+        let shot1 = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        shot1.name = "ShapesMode_Diagonal"
+        shot1.lifetime = .keepAlways
+        add(shot1)
+
+        // Scroll the shape strip and pick a later shape (hexagon/honeycomb).
+        let cells = app.collectionViews.cells
+        if cells.count > 4 {
+            cells.element(boundBy: 4).tap()
+        }
+        let shot2 = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        shot2.name = "ShapesMode_Hexagon"
+        shot2.lifetime = .keepAlways
+        add(shot2)
+    }
 }

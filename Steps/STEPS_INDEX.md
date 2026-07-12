@@ -18,13 +18,16 @@ Do not start Part 2 until Part 1 is 100% complete.
 |------|------|-------------|-----------|--------|
 | **00** | `Step_00_ProjectSetup.md` | Xcode project, Git, CI/CD, tooling | 1–2 | ✅ Verified — builds + tests green on Xcode 26.5 / iPhone 16 sim |
 | **01** | `Step_01_GridCollage.md` | Rectangular grid collage editor | 3–7 | ✅ Core complete — 8/8 unit tests + UI flow green; editor runs in sim (see Step 01 notes below) |
-| **02** | `Step_02_PolygonCollage.md` | Polygon & custom shape collage | 8–12 | ⬜ Not started |
+| **02** | `Step_02_PolygonCollage.md` | Polygon & custom shape collage | 8–12 | 🟡 Core complete — 9 shapes + masked canvas/export + typed parser + premium bezier editor; 12/12 new tests green (29 total). See Step 02 notes below |
 | **03a** | `Step_03a_StandardTemplates.md` | Frame/story template editor | 13–17 | ⬜ Not started |
 | **03b** | `Step_03b_CarouselTemplates.md` | SCRL-style carousel mode | 18–22 | ⬜ Not started |
 | **04** | `Step_04_VideoCollage.md` | Video collage + universal export | 23–30 | ⬜ Not started |
 | **05** | `Step_05_AIFeaturesAndPolish.md` | AI features, App Intents, widgets, polish | 31–35 | ⬜ Not started |
+| **05b** | `Step_05b_VisualDesignExcellence.md` | Visual design excellence + app icon (orange/Claude theme, SCRL-grade per-screen redesign) | 35–37 | ⬜ Not started — **design foundation already laid (2026-07-13)** |
 
-**End of Part 1:** App is feature-complete and polished — runs end-to-end in the simulator at the quality bar of SCRL. No monetization yet, no localization, no App Store assets. Those live in Part 2.
+**End of Part 1:** App is feature-complete and visually indistinguishable from a chart-topping App Store app (SCRL-grade) — runs end-to-end in the simulator with a finished orange/white brand identity, a custom app icon, and a polished per-screen design. No monetization yet, no localization, no App Store assets. Those live in Part 2.
+
+> **Note (2026-07-13):** A lightweight **design foundation** (`Core/DesignSystem/` — `Theme`, `Haptics`, `AppAppearance`) was established right after Step 01 so Steps 02–05 inherit an on-brand orange/white look instead of raw system defaults. The *comprehensive* SCRL-grade visual pass — custom app icon, per-screen redesign, motion, and brilliant use of the orange theme — is consolidated into **Step 05b**, executed once all screens exist. See `Step_05b_VisualDesignExcellence.md` for the full brief.
 
 ### Step 01 — decisions & deviations (2026-07-11)
 - **Renderer:** Core Graphics compositor (`CollageRenderer`) instead of Metal for now. `CanvasView` displays the composited `CGImage` and is structured so a Metal/CAMetalLayer backend can drop in during Step 02's polygon stencil work. All done-criteria met (60fps target not measured headless).
@@ -34,6 +37,16 @@ Do not start Part 2 until Part 1 is 100% complete.
 - **Home:** plain UIKit `HomeViewController` gallery; the SwiftUI shell wrapper is deferred to Step 05 polish.
 - **Deferred to later:** live-preview at true 60fps via Metal (Step 02), per-cell drag-preview polish for swap (functional long-press→tap-to-swap works now).
 - **Gotcha fixed:** `ModelContext` does not retain its `ModelContainer` — `ProjectStore` must hold the container strongly or the SQLite store disconnects and the next fetch traps.
+
+### Step 02 — decisions & deviations (2026-07-13)
+- **Geometry model:** introduced a unified `CollageLayout` enum (`.grid` | `.polygon`) as the state's single source of truth (replaces bare `GridTemplate`); backward-compatible `GridEditorState` decoding keeps Step 01 saved projects loading. Cell boundaries are described *parametrically* by `CellClipShape` (rectangle/ellipse/polygon/custom, normalized points) — the `CGPath` is generated on demand, so `CellFrame` stays `Sendable`/`Codable` (no stored `CGPath`).
+- **Rendering:** instead of the plan's Metal stencil, polygon clipping uses a `CAShapeLayer` mask on the existing GPU cell views (fits the Step 01 layer tree) and a `CGPath` clip in the Core Graphics export renderer — preview and export share the same generated path, so they match. (Metal remains a future swap.)
+- **9 polygon layouts** implemented in `PolygonTemplate` (diagonals ×2, triangle peak, 4-way fan, 7-hex honeycomb, circle halo, double circle, arrows ×2). Tiling layouts partition exactly; circle/arrow layouts are background+overlay styles by design.
+- **Typed template parser** (`TemplateParser` + `CollageTemplate`) shipped early (was slated for 03a) because polygons need `shape` parsing. Reads the existing schema's `shape` field (not a new `shapeType`); unknown/missing shape → `.rectangle`, frame values clamped 0…1, `canvasAspectRatio` is the only hard-required field.
+- **Premium bezier editor** (`BezierEditorViewController`) — tap/drag/hold to trace a closed boundary with snap guides; gated by a lightweight `EntitlementStore` (free by default; real StoreKit is Step 06). Applies a per-cell `EditorCellState.customClip` (v1: cell 0).
+- **UI:** Grid/Shapes segmented control swaps the layout picker ↔ shape picker; both drive `setLayout`. Uses the new orange design tokens.
+- **Deferred (v1 limitations):** polygon border/gap (renders edge-to-edge); bezier curve smoothing (straight segments); the 10-file polygon JSON *catalog* + editor wiring (that feeds Step 03a's gallery — parser + inline-JSON tests cover the parsing now); on-device seam/AA visual QA + Instruments memory profile.
+- **Tests:** 12 new (4 polygon geometry + 8 parser), all green; 29 unit tests total pass. App builds + launches on iPhone 16 sim.
 
 ### Step 01 — performance architecture (must carry into every editor)
 The first cut recomposited the whole canvas on the CPU per gesture frame and held full-resolution photos in RAM — laggy and memory-heavy. The corrected model, which Steps 02–05 must follow:

@@ -23,6 +23,7 @@ struct CanvasCellModel {
     let frame: CGRect          // reference-canvas px (engine output, incl. border)
     var transform: CellTransform
     let cornerRadius: CGFloat  // reference-canvas px
+    var clipShape: CellClipShape = .rectangle
 }
 
 /// The full canvas display model.
@@ -72,6 +73,7 @@ final class CanvasView: UIView {
         // Content (images) is set only here — never in the per-frame layout pass.
         for (index, cell) in model.cells.enumerated() where cellViews.indices.contains(index) {
             cellViews[index].setImage(cell.image)
+            cellViews[index].setClipShape(cell.clipShape)
         }
         layoutCanvas()
     }
@@ -148,6 +150,15 @@ final class CellContentView: UIView {
     private let imageView = UIImageView()
     private let placeholder = UIImageView(image: UIImage(systemName: "plus"))
 
+    /// The cell boundary. `.rectangle` uses the fast layer-cornerRadius path with
+    /// no mask; any other shape installs a `CAShapeLayer` mask rebuilt on layout.
+    private var clipShape: CellClipShape = .rectangle
+    private lazy var shapeMask: CAShapeLayer = {
+        let mask = CAShapeLayer()
+        mask.fillColor = UIColor.white.cgColor
+        return mask
+    }()
+
     override init(frame: CGRect) {
         super.init(frame: frame)
         clipsToBounds = true
@@ -178,6 +189,33 @@ final class CellContentView: UIView {
         let side = min(bounds.width, bounds.height) * 0.22
         placeholder.bounds = CGRect(x: 0, y: 0, width: side, height: side)
         placeholder.center = CGPoint(x: bounds.midX, y: bounds.midY)
+
+        updateMask()
+    }
+
+    /// Installs (or removes) the shape mask. Non-rectangular cells clip to a
+    /// `CAShapeLayer` path — this fits the existing GPU layer tree with no change
+    /// to how pan/zoom transforms are applied.
+    func setClipShape(_ shape: CellClipShape) {
+        guard shape != clipShape else { return }
+        clipShape = shape
+        if shape.isRectangle {
+            layer.mask = nil
+        } else {
+            layer.mask = shapeMask
+        }
+        setNeedsLayout()
+    }
+
+    private func updateMask() {
+        guard !clipShape.isRectangle, bounds.width > 0 else { return }
+        // Path is generated fresh from the current bounds — no implicit animation,
+        // so the mask tracks resize/rotation crisply.
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        shapeMask.frame = bounds
+        shapeMask.path = clipShape.path(in: bounds)
+        CATransaction.commit()
     }
 
     func setImage(_ image: CGImage?) {

@@ -21,12 +21,20 @@ public struct RenderCell: Sendable {
     public let image: CGImage?
     public let transform: CellTransform
     public let cornerRadius: CGFloat
+    public let clipShape: CellClipShape
 
-    public init(frame: CGRect, image: CGImage?, transform: CellTransform, cornerRadius: CGFloat) {
+    public init(
+        frame: CGRect,
+        image: CGImage?,
+        transform: CellTransform,
+        cornerRadius: CGFloat,
+        clipShape: CellClipShape = .rectangle
+    ) {
         self.frame = frame
         self.image = image
         self.transform = transform
         self.cornerRadius = cornerRadius
+        self.clipShape = clipShape
     }
 }
 
@@ -68,10 +76,15 @@ public final class CollageRenderer: @unchecked Sendable {
             for cell in request.cells where cell.frame.width > 0 && cell.frame.height > 0 {
                 cg.saveGState()
 
-                let clip: UIBezierPath = cell.cornerRadius > 0
-                    ? UIBezierPath(roundedRect: cell.frame, cornerRadius: cell.cornerRadius)
-                    : UIBezierPath(rect: cell.frame)
-                clip.addClip()
+                // Clip to the cell's shape (rectangle / rounded-rect / polygon /
+                // ellipse). The parametric shape regenerates the exact path the
+                // live canvas mask used, so export matches the preview.
+                if cell.clipShape.isRectangle, cell.cornerRadius <= 0 {
+                    UIBezierPath(rect: cell.frame).addClip()
+                } else {
+                    cg.addPath(cell.clipShape.path(in: cell.frame, cornerRadius: cell.cornerRadius))
+                    cg.clip()
+                }
 
                 if let cgImage = cell.image {
                     draw(image: UIImage(cgImage: cgImage), in: cell.frame, transform: cell.transform, context: cg)

@@ -20,7 +20,12 @@ final class GridEditorViewController: UIViewController {
 
     // UI
     private let canvasView = CanvasView()
-    private lazy var layoutPicker = LayoutPickerView(selected: viewModel.state.template)
+    private lazy var layoutModeControl = UISegmentedControl(items: ["Grid", "Shapes"])
+    private lazy var layoutPicker = LayoutPickerView(selected: viewModel.state.layout.gridTemplate ?? .twoUpHorizontal)
+    private lazy var shapePicker = ShapePickerView(selected: viewModel.state.layout.polygonTemplate)
+    private lazy var customShapeButton = makeCustomShapeButton()
+    /// The row wrapping `customShapeButton`; shown only in Shapes mode.
+    private var customShapeRow: UIStackView?
     private lazy var backgroundPicker = BackgroundPickerView(selected: viewModel.state.background)
     private let borderSlider = UISlider()
     private let cornerSlider = UISlider()
@@ -103,9 +108,31 @@ final class GridEditorViewController: UIViewController {
         let borderRow = labelledSlider("Border", slider: borderSlider, systemImage: "square.dashed")
         let cornerRow = labelledSlider("Corners", slider: cornerSlider, systemImage: "rotate.left")
 
+        // Grid / Shapes mode switch. Selecting a segment reveals the matching
+        // picker; both drive the same `setLayout` on the view model.
+        layoutModeControl.selectedSegmentIndex = viewModel.state.layout.isPolygon ? 1 : 0
+        layoutModeControl.selectedSegmentTintColor = Theme.Color.accent
+        layoutModeControl.setTitleTextAttributes([.foregroundColor: Theme.Color.textOnAccent], for: .selected)
+        layoutModeControl.addTarget(self, action: #selector(layoutModeChanged), for: .valueChanged)
+        let modeRow = UIStackView(arrangedSubviews: [layoutModeControl])
+        modeRow.isLayoutMarginsRelativeArrangement = true
+        modeRow.layoutMargins = UIEdgeInsets(top: 0, left: 16, bottom: 2, right: 16)
+
+        shapePicker.isHidden = !viewModel.state.layout.isPolygon
+        layoutPicker.isHidden = viewModel.state.layout.isPolygon
+
+        let customRow = UIStackView(arrangedSubviews: [customShapeButton])
+        customRow.isLayoutMarginsRelativeArrangement = true
+        customRow.layoutMargins = UIEdgeInsets(top: 0, left: 16, bottom: 2, right: 16)
+        customRow.isHidden = !viewModel.state.layout.isPolygon
+        customShapeRow = customRow
+
         let controlsStack = UIStackView(arrangedSubviews: [
             sectionLabel("Layout"),
+            modeRow,
             layoutPicker,
+            shapePicker,
+            customRow,
             borderRow,
             cornerRow,
             sectionLabel("Background"),
@@ -116,7 +143,10 @@ final class GridEditorViewController: UIViewController {
         controlsStack.translatesAutoresizingMaskIntoConstraints = false
 
         layoutPicker.onSelect = { [weak self] template in
-            self?.viewModel.setTemplate(template)
+            self?.viewModel.setLayout(.grid(template))
+        }
+        shapePicker.onSelect = { [weak self] polygon in
+            self?.viewModel.setLayout(.polygon(polygon))
         }
         backgroundPicker.onSelect = { [weak self] background in
             self?.viewModel.setBackground(background)
@@ -208,8 +238,35 @@ final class GridEditorViewController: UIViewController {
     private func syncControls() {
         borderSlider.value = Float(viewModel.state.borderWidth)
         cornerSlider.value = Float(viewModel.state.cornerRadius)
-        layoutPicker.setSelected(viewModel.state.template)
+        let layout = viewModel.state.layout
+        layoutModeControl.selectedSegmentIndex = layout.isPolygon ? 1 : 0
+        layoutPicker.isHidden = layout.isPolygon
+        shapePicker.isHidden = !layout.isPolygon
+        customShapeRow?.isHidden = !layout.isPolygon
+        if let grid = layout.gridTemplate { layoutPicker.setSelected(grid) }
+        shapePicker.setSelected(layout.polygonTemplate)
         backgroundPicker.setSelected(viewModel.state.background)
+    }
+
+    /// Toggles the Grid/Shapes picker and applies that mode's default layout so
+    /// the canvas immediately reflects the switch.
+    @objc private func layoutModeChanged() {
+        let showShapes = layoutModeControl.selectedSegmentIndex == 1
+        Haptics.selectionChanged()
+        UIView.animate(withDuration: Theme.Motion.quick) {
+            self.layoutPicker.isHidden = showShapes
+            self.shapePicker.isHidden = !showShapes
+            self.customShapeRow?.isHidden = !showShapes
+        }
+        if showShapes {
+            let polygon = viewModel.state.layout.polygonTemplate ?? .diagonalLeft
+            viewModel.setLayout(.polygon(polygon))
+            shapePicker.setSelected(polygon)
+        } else {
+            let grid = viewModel.state.layout.gridTemplate ?? .twoUpHorizontal
+            viewModel.setLayout(.grid(grid))
+            layoutPicker.setSelected(grid)
+        }
     }
 
     @objc private func borderChanged() {
@@ -224,6 +281,57 @@ final class GridEditorViewController: UIViewController {
     /// drag finishes.
     @objc private func sliderReleased() {
         viewModel.commitInteractiveChange()
+    }
+
+    // MARK: - Custom shape (premium)
+
+    private func makeCustomShapeButton() -> UIButton {
+        var config = UIButton.Configuration.tinted()
+        config.title = "Custom Shape"
+        config.image = UIImage(systemName: "lasso")
+        config.imagePadding = 6
+        config.cornerStyle = .large
+        config.baseForegroundColor = Theme.Color.accent
+        config.baseBackgroundColor = Theme.Color.accent
+        // A subtle "PRO" affordance until the user unlocks premium.
+        if !EntitlementStore.shared.isPremiumUnlocked {
+            config.image = UIImage(systemName: "lock.fill")
+        }
+        return UIButton(configuration: config, primaryAction: UIAction { [weak self] _ in
+            self?.customShapeTapped()
+        })
+    }
+
+    private func customShapeTapped() {
+        guard EntitlementStore.shared.isPremiumUnlocked else {
+            Haptics.warning()
+            let alert = UIAlertController(
+                title: "Premium Feature",
+                message: "Custom shapes let you trace your own cell boundary. Unlock with ClaudeCollage Premium.",
+                preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: "Not Now", style: .cancel))
+            alert.addAction(UIAlertAction(title: "Learn More", style: .default) { [weak self] _ in
+                // The paywall ships in Step 06; for now, surface intent.
+                self?.showToast("Premium paywall coming soon")
+            })
+            present(alert, animated: true)
+            return
+        }
+        presentBezierEditor()
+    }
+
+    private func presentBezierEditor() {
+        let editor = BezierEditorViewController()
+        editor.onFinish = { [weak self] clip in
+            guard let self, let clip else { return }
+            // v1 applies the custom boundary to the first cell (the whole canvas
+            // for a single-cell layout).
+            self.viewModel.setCustomClip(clip, forCellAt: 0)
+            self.showToast("Custom shape applied")
+        }
+        let nav = UINavigationController(rootViewController: editor)
+        nav.modalPresentationStyle = .fullScreen
+        present(nav, animated: true)
     }
 
     // MARK: - Canvas taps

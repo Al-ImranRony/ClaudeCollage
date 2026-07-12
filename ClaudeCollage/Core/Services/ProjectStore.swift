@@ -86,8 +86,8 @@ final class ProjectStore {
             return new
         }()
 
-        project.mode = .grid
-        project.templateID = state.template.rawValue
+        project.mode = state.layout.isPolygon ? .polygon : .grid
+        project.templateID = state.layout.persistID
         project.canvasSize = viewModel.canvasSize
         project.gridStateData = stateData
         project.previewThumbnail = thumbnailData

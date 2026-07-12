@@ -14,11 +14,12 @@ extension UIViewController {
         let label = PaddingLabel()
         label.text = message
         label.textColor = .white
-        label.font = .preferredFont(forTextStyle: .subheadline)
+        label.font = Theme.Typography.subheadline
         label.numberOfLines = 0
         label.textAlignment = .center
-        label.backgroundColor = UIColor.black.withAlphaComponent(0.82)
-        label.layer.cornerRadius = 14
+        label.backgroundColor = UIColor(white: 0.08, alpha: 0.9)
+        label.layer.cornerRadius = Theme.Radius.md
+        label.layer.cornerCurve = .continuous
         label.clipsToBounds = true
         label.alpha = 0
         label.translatesAutoresizingMaskIntoConstraints = false

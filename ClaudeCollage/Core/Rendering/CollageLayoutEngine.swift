@@ -114,18 +114,73 @@ public enum GridTemplate: String, Codable, Sendable, CaseIterable {
 
 /// The resolved, absolute-pixel geometry of a single cell.
 ///
-/// `shape` is always `.rectangle` in Step 01. `clipPath` (for polygon cells)
-/// is introduced in Step 02, so it is intentionally absent here to keep the
-/// value type `Equatable`/`Sendable` without wrapping a non-`Sendable` `CGPath`.
+/// `clipShape` describes the cell boundary parametrically (`.rectangle` for grid
+/// cells, a polygon/ellipse for shape cells). The concrete `CGPath` is generated
+/// on demand from `(clipShape, frame)`, so this value type stays `Equatable` /
+/// `Sendable` / `Codable` without wrapping a non-`Sendable` `CGPath`.
 public struct CellFrame: Equatable, Sendable, Identifiable {
     public let id: String
     public let frame: CGRect
     public let shape: CellShape
+    public let clipShape: CellClipShape
 
-    public init(id: String, frame: CGRect, shape: CellShape = .rectangle) {
+    public init(
+        id: String,
+        frame: CGRect,
+        shape: CellShape = .rectangle,
+        clipShape: CellClipShape = .rectangle
+    ) {
         self.id = id
         self.frame = frame
         self.shape = shape
+        self.clipShape = clipShape
+    }
+}
+
+/// A collage layout — either a rectangular grid or a polygon/shape layout.
+/// This is the single source of truth the editor state stores; future steps
+/// (templates, carousel) extend the family here.
+public enum CollageLayout: Equatable, Sendable, Codable {
+    case grid(GridTemplate)
+    case polygon(PolygonTemplate)
+
+    public var cellCount: Int {
+        switch self {
+        case let .grid(template): return template.cellCount
+        case let .polygon(template): return template.cellCount
+        }
+    }
+
+    public var displayName: String {
+        switch self {
+        case let .grid(template): return template.displayName
+        case let .polygon(template): return template.displayName
+        }
+    }
+
+    /// True for polygon/shape layouts (which render edge-to-edge, ignoring the
+    /// rectangular border inset that only makes sense for grids).
+    public var isPolygon: Bool {
+        if case .polygon = self { return true }
+        return false
+    }
+
+    public var gridTemplate: GridTemplate? {
+        if case let .grid(template) = self { return template }
+        return nil
+    }
+
+    public var polygonTemplate: PolygonTemplate? {
+        if case let .polygon(template) = self { return template }
+        return nil
+    }
+
+    /// Stable identifier for persistence (`CollageProject.templateID`).
+    public var persistID: String {
+        switch self {
+        case let .grid(template): return "grid.\(template.rawValue)"
+        case let .polygon(template): return "polygon.\(template.rawValue)"
+        }
     }
 }
 
@@ -170,8 +225,59 @@ public struct CollageLayoutEngine: Sendable {
             return CellFrame(
                 id: "\(template.rawValue)-\(index)",
                 frame: clamped,
-                shape: .rectangle
+                shape: .rectangle,
+                clipShape: .rectangle
             )
+        }
+    }
+
+    /// Resolves any `CollageLayout` (grid or polygon) into absolute-pixel cells.
+    public func layout(
+        for layout: CollageLayout,
+        canvasSize: CGSize,
+        borderWidth: CGFloat = 0
+    ) -> [CellFrame] {
+        switch layout {
+        case let .grid(template):
+            return self.layout(for: template, canvasSize: canvasSize, borderWidth: borderWidth)
+        case let .polygon(template):
+            // Polygon layouts render edge-to-edge; the rectangular border inset
+            // does not apply (v1). The shape's own gaps provide separation.
+            return polygonLayout(for: template, canvasSize: canvasSize)
+        }
+    }
+
+    /// Resolves a polygon template into absolute-pixel cell frames + clip shapes.
+    ///
+    /// Each cell's `frame` is its bounding box in canvas pixels; `clipShape`
+    /// carries the boundary, still normalized within that box, ready to become a
+    /// `CGPath` at render time.
+    public func polygonLayout(
+        for template: PolygonTemplate,
+        canvasSize: CGSize
+    ) -> [CellFrame] {
+        template.normalizedCells.enumerated().map { index, cell in
+            let frame = CGRect(
+                x: cell.rect.minX * canvasSize.width,
+                y: cell.rect.minY * canvasSize.height,
+                width: cell.rect.width * canvasSize.width,
+                height: cell.rect.height * canvasSize.height
+            )
+            return CellFrame(
+                id: "\(template.rawValue)-\(index)",
+                frame: frame,
+                shape: shapeTag(for: cell.clip),
+                clipShape: cell.clip
+            )
+        }
+    }
+
+    private func shapeTag(for clip: CellClipShape) -> CellShape {
+        switch clip {
+        case .rectangle: return .rectangle
+        case .ellipse: return .circle
+        case .polygon: return .triangle
+        case .custom: return .custom
         }
     }
 }

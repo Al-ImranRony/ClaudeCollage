@@ -28,8 +28,11 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         let coordinator = AppCoordinator(navigationController: navigationController, container: container)
         coordinator.start()
 
+        AppAppearance.apply(to: window)
         window.rootViewController = navigationController
         window.makeKeyAndVisible()
+
+        Haptics.prepare()
 
         self.window = window
         self.appCoordinator = coordinator
