@@ -57,6 +57,10 @@ final class GridEditorViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         title = "Grid Collage"
+        // Editor screens use a compact inline bar — large titles belong on
+        // browse/list screens (Home). This reclaims ~52pt for the controls area
+        // and keeps the canvas visually front-and-center.
+        navigationItem.largeTitleDisplayMode = .never
         view.backgroundColor = .systemBackground
         setupNavigationBar()
         setupLayout()

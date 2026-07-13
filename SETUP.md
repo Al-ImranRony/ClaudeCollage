@@ -39,9 +39,9 @@ xcodegen generate
 
 # 3. Open Xcode and run
 open ClaudeCollage.xcodeproj
-# In Xcode: select the ClaudeCollage target → Signing & Capabilities →
-#   "Automatically manage signing" ✓, Team → your Personal Team.
-# Repeat for ClaudeCollageWidgets.
+# Signing is baked into project.yml (DEVELOPMENT_TEAM), so the team is already
+# set on both targets after `xcodegen generate` — no need to re-select it each time.
+# To use a different team, change DEVELOPMENT_TEAM in project.yml and regenerate.
 # Then Cmd+R on the iPhone 16 simulator.
 ```
 
