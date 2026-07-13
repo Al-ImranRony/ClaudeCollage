@@ -45,22 +45,45 @@ public struct CollageTemplate: Sendable, Equatable, Decodable {
     }
 }
 
+/// The role a template cell plays. Step 02 templates were all `.photo`; Step 03a
+/// introduces text/sticker/art/spacer zones. Unknown/missing → `.photo` so older
+/// and malformed templates keep loading.
+public enum TemplateZoneType: String, Sendable, Equatable, Codable, CaseIterable {
+    case photo
+    case text
+    case sticker
+    case art          // decorative, non-interactive artwork baked from the template
+    case spacer       // empty padding
+
+    public init(raw: String?) {
+        self = raw.flatMap(TemplateZoneType.init(rawValue:)) ?? .photo
+    }
+}
+
 public struct TemplateCell: Sendable, Equatable, Decodable {
     public let id: String
     public let type: String
+    public let zoneType: TemplateZoneType
     public let frame: CGRect        // clamped to the unit square
     public let shape: CellShape     // `.rectangle` when missing/unknown
     public let borderWidth: Double
     public let cornerRadius: Double
+    /// Present only for `.text` zones — the default styling + placeholder string
+    /// the editor seeds when the user first taps the zone.
+    public let textStyle: TextOverlay?
+    /// Present only for `.sticker` zones — the bundled sticker id to preload, if any.
+    public let stickerID: String?
 
     private enum CodingKeys: String, CodingKey {
         case id, type, frame, shape, borderWidth, cornerRadius
+        case text, fontName, fontSize, color, alignment, stickerID
     }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         self.id = try c.decodeIfPresent(String.self, forKey: .id) ?? UUID().uuidString
         self.type = try c.decodeIfPresent(String.self, forKey: .type) ?? "photo"
+        self.zoneType = TemplateZoneType(raw: self.type)
 
         let rawFrame = try c.decodeIfPresent(TemplateFrame.self, forKey: .frame) ?? TemplateFrame()
         self.frame = rawFrame.clampedRect
@@ -71,6 +94,35 @@ public struct TemplateCell: Sendable, Equatable, Decodable {
 
         self.borderWidth = try c.decodeIfPresent(Double.self, forKey: .borderWidth) ?? 0
         self.cornerRadius = try c.decodeIfPresent(Double.self, forKey: .cornerRadius) ?? 0
+
+        // Text zones seed a `TextOverlay`. Any styling fields present in the JSON
+        // override the sensible defaults; absent fields fall back gracefully. The
+        // zone's normalized `frame` becomes the overlay frame.
+        if self.zoneType == .text {
+            let alignment = (try c.decodeIfPresent(String.self, forKey: .alignment))
+                .flatMap(TextOverlay.Alignment.init(rawValue:)) ?? .center
+            var overlay = TextOverlay(
+                text: (try? c.decodeIfPresent(String.self, forKey: .text)) ?? "",
+                alignment: alignment,
+                frame: self.frame
+            )
+            if let fontName = try? c.decodeIfPresent(String.self, forKey: .fontName) {
+                overlay.fontName = fontName
+            }
+            if let fontSize = try? c.decodeIfPresent(Double.self, forKey: .fontSize) {
+                overlay.fontSize = fontSize
+            }
+            if let color = try? c.decodeIfPresent(String.self, forKey: .color) {
+                overlay.colorHex = color
+            }
+            self.textStyle = overlay
+        } else {
+            self.textStyle = nil
+        }
+
+        self.stickerID = self.zoneType == .sticker
+            ? (try? c.decodeIfPresent(String.self, forKey: .stickerID)) ?? nil
+            : nil
     }
 }
 

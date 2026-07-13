@@ -141,6 +141,61 @@ final class TemplateParserTests: XCTestCase {
         XCTAssertTrue(template.isPremium)
     }
 
+    // MARK: - Step 03a: zone typing + canvas sizing
+
+    func testTextZoneParsesCorrectly() throws {
+        let template = try parser.parse(data: data("""
+        {
+          "id": "t", "name": "T", "category": "story", "isPremium": false,
+          "canvasAspectRatio": "9:16",
+          "cells": [
+            { "id": "headline", "type": "text",
+              "frame": { "x": 0.1, "y": 0.1, "width": 0.8, "height": 0.2 } }
+          ],
+          "background": { "type": "solid", "color": "#FFFFFF" }
+        }
+        """))
+
+        let cell = template.cells[0]
+        XCTAssertEqual(cell.zoneType, .text)
+        // Text zones seed a default-styled TextOverlay bound to the zone frame.
+        let style = try XCTUnwrap(cell.textStyle)
+        XCTAssertEqual(style.alignment, .center)
+        XCTAssertEqual(style.fontSize, 18, accuracy: 0.001)
+        XCTAssertEqual(style.colorHex, "#000000")
+        XCTAssertEqual(style.frame.origin.x, 0.1, accuracy: 0.001)
+        XCTAssertNil(cell.stickerID)
+    }
+
+    func testStickerZoneParsesCorrectly() throws {
+        let template = try parser.parse(data: data("""
+        {
+          "id": "t", "name": "T", "category": "celebration", "isPremium": false,
+          "canvasAspectRatio": "1:1",
+          "cells": [
+            { "id": "star", "type": "sticker", "stickerID": "celebration.star",
+              "frame": { "x": 0.7, "y": 0.7, "width": 0.2, "height": 0.2 } }
+          ],
+          "background": { "type": "solid", "color": "#FFFFFF" }
+        }
+        """))
+
+        let cell = template.cells[0]
+        XCTAssertEqual(cell.zoneType, .sticker)
+        XCTAssertEqual(cell.stickerID, "celebration.star")
+        XCTAssertNil(cell.textStyle)
+    }
+
+    func testCanvasAspectRatioMapsToSize() {
+        XCTAssertEqual(CanvasSize.size(forAspectRatio: "1:1"), CGSize(width: 1080, height: 1080))
+        XCTAssertEqual(CanvasSize.size(forAspectRatio: "9:16"), CGSize(width: 1080, height: 1920))
+        XCTAssertEqual(CanvasSize.size(forAspectRatio: "4:5"), CGSize(width: 1080, height: 1350))
+        XCTAssertEqual(CanvasSize.size(forAspectRatio: "16:9"), CGSize(width: 1920, height: 1080))
+        // Malformed strings fall back to a square rather than a zero canvas.
+        XCTAssertEqual(CanvasSize.size(forAspectRatio: "garbage"), CGSize(width: 1080, height: 1080))
+        XCTAssertEqual(CanvasPreset(aspectRatio: "9:16"), .story)
+    }
+
     func testTemplateCellCountMatchesJSON() throws {
         let template = try parser.parse(data: data("""
         {

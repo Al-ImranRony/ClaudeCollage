@@ -19,7 +19,7 @@ Do not start Part 2 until Part 1 is 100% complete.
 | **00** | `Step_00_ProjectSetup.md` | Xcode project, Git, CI/CD, tooling | 1–2 | ✅ Verified — builds + tests green on Xcode 26.5 / iPhone 16 sim |
 | **01** | `Step_01_GridCollage.md` | Rectangular grid collage editor | 3–7 | ✅ Core complete — 8/8 unit tests + UI flow green; editor runs in sim (see Step 01 notes below) |
 | **02** | `Step_02_PolygonCollage.md` | Polygon & custom shape collage | 8–12 | 🟡 Core complete — 9 shapes + masked canvas/export + typed parser + premium bezier editor; 12/12 new tests green (29 total). See Step 02 notes below |
-| **03a** | `Step_03a_StandardTemplates.md` | Frame/story template editor | 13–17 | ⬜ Not started |
+| **03a** | `Step_03a_StandardTemplates.md` | Frame/story template editor | 13–17 | 🟡 Slice 1 (foundation) complete — `TemplateService` + `CanvasPreset` + zone typing (`TemplateZoneType`, text/sticker) + 6 new tests (37 total green). Gallery UI, editor, text/sticker/freeform, and 30 template JSONs remain. See Step 03a notes below |
 | **03b** | `Step_03b_CarouselTemplates.md` | SCRL-style carousel mode | 18–22 | ⬜ Not started |
 | **04** | `Step_04_VideoCollage.md` | Video collage + universal export | 23–30 | ⬜ Not started |
 | **05** | `Step_05_AIFeaturesAndPolish.md` | AI features, App Intents, widgets, polish | 31–35 | ⬜ Not started |
@@ -47,6 +47,14 @@ Do not start Part 2 until Part 1 is 100% complete.
 - **UI:** Grid/Shapes segmented control swaps the layout picker ↔ shape picker; both drive `setLayout`. Uses the new orange design tokens.
 - **Deferred (v1 limitations):** polygon border/gap (renders edge-to-edge); bezier curve smoothing (straight segments); the 10-file polygon JSON *catalog* + editor wiring (that feeds Step 03a's gallery — parser + inline-JSON tests cover the parsing now); on-device seam/AA visual QA + Instruments memory profile.
 - **Tests:** 12 new (4 polygon geometry + 8 parser), all green; 29 unit tests total pass. App builds + launches on iPhone 16 sim.
+
+### Step 03a — decisions & deviations (2026-07-14)
+- **Slice 1 of ~7 (foundation only).** This step is large (~5 weeks); it is being executed in vertical slices. Slice 1 delivers the data/service layer everything else builds on — no UI yet.
+- **`TemplateService`** (`Core/Services/`, `@MainActor`): `loadBundledTemplates()` scans the bundle (Templates subdir → root fallback, skips the JSON schema, drops anything that fails to parse), `thumbnail(for:maxDimension:)` renders via the Step 01 `CollageRenderer` and caches to memory + disk (`Caches/TemplateThumbnails`), `isPremium(_:)` / `canOpen(_:)` gate on `EntitlementStore` (real StoreKit is Step 06). `renderRequest(for:)` maps a template's normalized cells into a fitted canvas — reuses the renderer, no layout code duplicated.
+- **`CanvasPreset`** (`Core/Models/`): the 4 fixed presets + pure `CanvasSize` math. Sizing rule: shorter side normalized to 1080 px (1:1→1080², 4:5→1080×1350, 9:16→1080×1920, 16:9→1920×1080); malformed ratios fall back to a square, never a zero canvas.
+- **Zone typing** on `TemplateParser`: added `TemplateZoneType` (photo/text/sticker/art/spacer, unknown→photo) and extended `TemplateCell` with `zoneType`, an optional default-styled `TextOverlay` for text zones, and `stickerID` for sticker zones — backward-compatible with Step 02's photo-only templates.
+- **Tests:** +6 (3 parser: text/sticker zone + aspect→size; 3 service integration: bundled load, thumbnail-within-2s, premium gate). 29 → **37 total green** on iPhone 17 / iOS 26.5.
+- **Found (pre-existing, out of scope):** the export options `UIAlertController` presents as a **popover with no Cancel** on iPhone 17 / iOS 26.5 (honors the `popoverPresentationController.barButtonItem` anchor). Functional (tap-outside dismisses) but non-standard for iPhone; flagged for a separate fix. The Step 02 `PolygonQAUITests` was updated to dismiss via the popover region.
 
 ### Step 01 — performance architecture (must carry into every editor)
 The first cut recomposited the whole canvas on the CPU per gesture frame and held full-resolution photos in RAM — laggy and memory-heavy. The corrected model, which Steps 02–05 must follow:
