@@ -470,25 +470,33 @@ final class GridEditorViewController: UIViewController {
     }
 
     private func saveToPhotos(_ data: Data) {
-        PHPhotoLibrary.requestAuthorization(for: .addOnly) { [weak self] status in
-            DispatchQueue.main.async {
-                guard let self else { return }
-                guard status == .authorized || status == .limited else {
-                    self.showAlert("No Photos Access", "Enable photo library access in Settings to save your collage.")
-                    return
+        // PhotoKit invokes these completion handlers on a BACKGROUND queue. Their
+        // closure parameters are non-Sendable, so under Swift 6 complete
+        // concurrency the compiler infers them as @MainActor-isolated (inheriting
+        // this view controller's actor). The moment PhotoKit runs them off-main,
+        // the runtime executor assertion (`dispatch_assert_queue`) trips → crash.
+        // Marking each @Sendable keeps them genuinely non-isolated; all UI/state
+        // work hops back explicitly via `Task { @MainActor in … }`. Same fix as
+        // GridEditorViewModel.scheduleFilter.
+        PHPhotoLibrary.requestAuthorization(for: .addOnly) { @Sendable [weak self] status in
+            guard status == .authorized || status == .limited else {
+                Task { @MainActor in
+                    self?.showAlert("No Photos Access", "Enable photo library access in Settings to save your collage.")
                 }
-                PHPhotoLibrary.shared().performChanges {
-                    let request = PHAssetCreationRequest.forAsset()
-                    request.addResource(with: .photo, data: data, options: nil)
-                } completionHandler: { success, _ in
-                    DispatchQueue.main.async {
-                        if success {
-                            self.notify(.success)
-                            self.showToast("Saved to Photos")
-                        } else {
-                            self.notify(.error)
-                            self.showAlert("Save Failed", "The collage could not be saved to Photos.")
-                        }
+                return
+            }
+            PHPhotoLibrary.shared().performChanges {
+                let request = PHAssetCreationRequest.forAsset()
+                request.addResource(with: .photo, data: data, options: nil)
+            } completionHandler: { @Sendable success, _ in
+                Task { @MainActor in
+                    guard let self else { return }
+                    if success {
+                        self.notify(.success)
+                        self.showToast("Saved to Photos")
+                    } else {
+                        self.notify(.error)
+                        self.showAlert("Save Failed", "The collage could not be saved to Photos.")
                     }
                 }
             }
