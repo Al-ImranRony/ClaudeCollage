@@ -27,6 +27,7 @@ final class AppCoordinator {
         let home = HomeViewController()
         home.summariesProvider = { [weak self] in self?.store.listSummaries() ?? [] }
         home.onNewProject = { [weak self] in self?.startNewGridProject() }
+        home.onBrowseTemplates = { [weak self] in self?.showTemplateGallery() }
         home.onOpenProject = { [weak self] id in self?.openProject(id: id) }
         home.onDeleteProject = { [weak self] id in self?.store.delete(id: id) }
         homeViewController = home
@@ -39,6 +40,41 @@ final class AppCoordinator {
         let viewModel = GridEditorViewModel()
         attachAutosave(to: viewModel)
         // Persist immediately so the project appears in the gallery on return.
+        store.save(viewModel)
+        pushEditor(with: viewModel)
+    }
+
+    private func showTemplateGallery() {
+        let gallery = TemplateGalleryViewController(service: .shared)
+        gallery.onSelectTemplate = { [weak self] template in self?.openTemplate(template) }
+        navigationController.pushViewController(gallery, animated: true)
+    }
+
+    /// Opens a (free or unlocked) template. Pure photo-grid templates map onto
+    /// the Step 01 grid editor; anything richer (text/sticker/art zones, shaped
+    /// cells) waits for the template editor of a later 03a slice.
+    private func openTemplate(_ template: CollageTemplate) {
+        guard let grid = TemplateService.gridTemplate(matching: template) else {
+            let alert = UIAlertController(
+                title: "Coming Soon",
+                message: "This template uses zones the editor doesn't support yet. The template editor arrives in an upcoming update.",
+                preferredStyle: .alert
+            )
+            alert.addAction(UIAlertAction(title: "OK", style: .default))
+            navigationController.present(alert, animated: true)
+            return
+        }
+
+        let state = GridEditorState(
+            layout: .grid(grid),
+            borderWidth: template.cells.first.map { max($0.borderWidth, 0) } ?? 8,
+            background: template.background
+        )
+        let viewModel = GridEditorViewModel(
+            canvasSize: CanvasSize.size(forAspectRatio: template.canvasAspectRatio),
+            state: state
+        )
+        attachAutosave(to: viewModel)
         store.save(viewModel)
         pushEditor(with: viewModel)
     }

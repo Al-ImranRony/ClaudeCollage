@@ -62,9 +62,11 @@ final class PolygonQAUITests: XCTestCase {
             XCTAssertTrue(app.navigationBars["Grid Collage"].exists, "No crash after selecting shape \(i)")
         }
 
-        // Undo / redo across layout changes.
-        let undo = app.navigationBars.buttons.element(boundBy: 0)
-        if undo.exists { undo.tap(); undo.tap() }
+        // Undo / redo across layout changes. Target the identifier — positional
+        // nav-bar indexes resolve to the Back button (index 0) and popped the
+        // editor in earlier revisions of this test.
+        let undo = app.buttons["undoButton"]
+        if undo.exists, undo.isEnabled { undo.tap(); undo.tap() }
         attach(app, "04_after_undo")
         XCTAssertTrue(app.navigationBars["Grid Collage"].exists, "No crash after undo")
 
@@ -87,7 +89,8 @@ final class PolygonQAUITests: XCTestCase {
         }
 
         // Export sheet appears for a polygon collage.
-        let exportButton = app.navigationBars.buttons.element(boundBy: app.navigationBars.buttons.count - 1)
+        let exportButton = app.buttons["exportButton"]
+        XCTAssertTrue(exportButton.waitForExistence(timeout: 3), "Export button present")
         exportButton.tap()
         let exportSheet = app.sheets["Export Collage"].firstMatch
         let exportAlert = app.alerts["Export Collage"].firstMatch

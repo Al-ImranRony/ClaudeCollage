@@ -77,14 +77,20 @@ final class GridEditorViewController: UIViewController {
             image: UIImage(systemName: "arrow.uturn.backward"),
             style: .plain, target: self, action: #selector(undoTapped)
         )
+        undo.accessibilityIdentifier = "undoButton"
+        undo.accessibilityLabel = "Undo"
         let redo = UIBarButtonItem(
             image: UIImage(systemName: "arrow.uturn.forward"),
             style: .plain, target: self, action: #selector(redoTapped)
         )
+        redo.accessibilityIdentifier = "redoButton"
+        redo.accessibilityLabel = "Redo"
         let export = UIBarButtonItem(
             image: UIImage(systemName: "square.and.arrow.up"),
             style: .plain, target: self, action: #selector(exportTapped)
         )
+        export.accessibilityIdentifier = "exportButton"
+        export.accessibilityLabel = "Export"
         undoItem = undo
         redoItem = redo
         navigationItem.rightBarButtonItems = [export, redo, undo]

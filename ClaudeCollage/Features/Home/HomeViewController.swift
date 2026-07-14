@@ -15,6 +15,7 @@ final class HomeViewController: UIViewController {
     // Wired by AppCoordinator.
     var summariesProvider: (() -> [ProjectSummary])?
     var onNewProject: (() -> Void)?
+    var onBrowseTemplates: (() -> Void)?
     var onOpenProject: ((UUID) -> Void)?
     var onDeleteProject: ((UUID) -> Void)?
 
@@ -34,7 +35,14 @@ final class HomeViewController: UIViewController {
         )
         addButton.accessibilityIdentifier = "newProjectButton"
         addButton.accessibilityLabel = "New Collage"
-        navigationItem.rightBarButtonItem = addButton
+
+        let templatesButton = UIBarButtonItem(
+            image: UIImage(systemName: "rectangle.3.group"),
+            style: .plain, target: self, action: #selector(templatesTapped)
+        )
+        templatesButton.accessibilityIdentifier = "templatesButton"
+        templatesButton.accessibilityLabel = "Templates"
+        navigationItem.rightBarButtonItems = [addButton, templatesButton]
 
         collectionView.translatesAutoresizingMaskIntoConstraints = false
         emptyStateView.translatesAutoresizingMaskIntoConstraints = false
@@ -69,6 +77,11 @@ final class HomeViewController: UIViewController {
 
     @objc private func newTapped() {
         onNewProject?()
+    }
+
+    @objc private func templatesTapped() {
+        Haptics.tap()
+        onBrowseTemplates?()
     }
 
     private func makeCollectionView() -> UICollectionView {

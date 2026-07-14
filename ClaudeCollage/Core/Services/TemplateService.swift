@@ -136,6 +136,39 @@ public final class TemplateService {
         return RenderRequest(canvasSize: canvas, background: template.background, cells: cells)
     }
 
+    // MARK: - Grid matching
+
+    /// If the template is a pure photo grid whose cells exactly tile one of the
+    /// Step 01 `GridTemplate` layouts, returns that layout so the grid editor
+    /// can open it today. Templates with text/sticker/art/spacer zones or
+    /// non-rectangular cells need the template editor and return `nil`.
+    public nonisolated static func gridTemplate(matching template: CollageTemplate) -> GridTemplate? {
+        guard !template.cells.isEmpty,
+              template.cells.allSatisfy({ $0.zoneType == .photo && $0.shape == .rectangle })
+        else { return nil }
+
+        let frames = template.cells.map(\.frame)
+        return GridTemplate.allCases.first { candidate in
+            var remaining = candidate.normalizedCells
+            guard remaining.count == frames.count else { return false }
+            // Order-insensitive: each template cell must consume exactly one
+            // layout cell within tolerance.
+            for frame in frames {
+                guard let index = remaining.firstIndex(where: { approximatelyEqual($0, frame) })
+                else { return false }
+                remaining.remove(at: index)
+            }
+            return true
+        }
+    }
+
+    private nonisolated static func approximatelyEqual(
+        _ a: CGRect, _ b: CGRect, tolerance: CGFloat = 0.001
+    ) -> Bool {
+        abs(a.minX - b.minX) <= tolerance && abs(a.minY - b.minY) <= tolerance
+            && abs(a.width - b.width) <= tolerance && abs(a.height - b.height) <= tolerance
+    }
+
     // MARK: - Helpers
 
     /// Maps a template's declared `CellShape` to the renderer's parametric clip.

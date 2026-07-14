@@ -34,7 +34,8 @@ final class ExportSaveUITests: XCTestCase {
         XCTAssertTrue(app.navigationBars["Grid Collage"].waitForExistence(timeout: 8), "Editor pushes")
 
         // Open the export options (a popover on iPhone/iOS 26) and pick a format.
-        let exportButton = app.navigationBars.buttons.element(boundBy: app.navigationBars.buttons.count - 1)
+        let exportButton = app.buttons["exportButton"]
+        XCTAssertTrue(exportButton.waitForExistence(timeout: 4), "Export button present")
         exportButton.tap()
         let jpeg = app.buttons["JPEG · High"]
         XCTAssertTrue(jpeg.waitForExistence(timeout: 4), "Export options presented")
