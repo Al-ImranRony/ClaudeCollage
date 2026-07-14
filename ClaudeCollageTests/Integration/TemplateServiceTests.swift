@@ -81,4 +81,32 @@ final class TemplateServiceTests: XCTestCase {
         store.setPremiumUnlocked(true)
         XCTAssertTrue(service.canOpen(premium), "Unlocked user should open a premium template")
     }
+
+    func testThumbnailFingerprintTracksContentChanges() throws {
+        let original = try makeTemplate("""
+        { "id": "fp", "name": "FP", "canvasAspectRatio": "1:1",
+          "cells": [{ "type": "photo", "frame": { "x": 0, "y": 0, "width": 0.5, "height": 1 } }] }
+        """)
+        let sameContent = try makeTemplate("""
+        { "id": "fp", "name": "Renamed But Same Look", "canvasAspectRatio": "1:1",
+          "cells": [{ "type": "photo", "frame": { "x": 0, "y": 0, "width": 0.5, "height": 1 } }] }
+        """)
+        let movedCell = try makeTemplate("""
+        { "id": "fp", "name": "FP", "canvasAspectRatio": "1:1",
+          "cells": [{ "type": "photo", "frame": { "x": 0.1, "y": 0, "width": 0.5, "height": 1 } }] }
+        """)
+
+        // Deterministic across template instances (unlike seeded Hashable) …
+        XCTAssertEqual(
+            TemplateService.contentFingerprint(of: original),
+            TemplateService.contentFingerprint(of: sameContent),
+            "Fingerprint covers rendered appearance, not the display name"
+        )
+        // … and changes when the rendered geometry changes, busting stale
+        // on-disk thumbnails for re-authored templates.
+        XCTAssertNotEqual(
+            TemplateService.contentFingerprint(of: original),
+            TemplateService.contentFingerprint(of: movedCell)
+        )
+    }
 }

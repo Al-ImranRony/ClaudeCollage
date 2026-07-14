@@ -143,11 +143,13 @@ public struct CellFrame: Equatable, Sendable, Identifiable {
 public enum CollageLayout: Equatable, Sendable, Codable {
     case grid(GridTemplate)
     case polygon(PolygonTemplate)
+    case template(TemplateLayout)
 
     public var cellCount: Int {
         switch self {
         case let .grid(template): return template.cellCount
         case let .polygon(template): return template.cellCount
+        case let .template(template): return template.cells.count
         }
     }
 
@@ -155,6 +157,7 @@ public enum CollageLayout: Equatable, Sendable, Codable {
         switch self {
         case let .grid(template): return template.displayName
         case let .polygon(template): return template.displayName
+        case let .template(template): return template.name
         }
     }
 
@@ -175,11 +178,17 @@ public enum CollageLayout: Equatable, Sendable, Codable {
         return nil
     }
 
+    public var templateLayout: TemplateLayout? {
+        if case let .template(template) = self { return template }
+        return nil
+    }
+
     /// Stable identifier for persistence (`CollageProject.templateID`).
     public var persistID: String {
         switch self {
         case let .grid(template): return "grid.\(template.rawValue)"
         case let .polygon(template): return "polygon.\(template.rawValue)"
+        case let .template(template): return "template.\(template.templateID)"
         }
     }
 }
@@ -244,6 +253,43 @@ public struct CollageLayoutEngine: Sendable {
             // Polygon layouts render edge-to-edge; the rectangular border inset
             // does not apply (v1). The shape's own gaps provide separation.
             return polygonLayout(for: template, canvasSize: canvasSize)
+        case let .template(template):
+            return templateLayout(for: template, canvasSize: canvasSize, borderWidth: borderWidth)
+        }
+    }
+
+    /// Resolves a standard template's photo cells into absolute-pixel frames.
+    ///
+    /// Rectangular cells take the same border inset as grid cells (templates are
+    /// authored edge-to-edge, the user's border slider provides the gap); shaped
+    /// cells render edge-to-edge like polygon layouts.
+    public func templateLayout(
+        for template: TemplateLayout,
+        canvasSize: CGSize,
+        borderWidth: CGFloat = 0
+    ) -> [CellFrame] {
+        let inset = max(0, borderWidth) / 2
+
+        return template.cells.enumerated().map { index, cell in
+            let scaled = CGRect(
+                x: cell.frame.minX * canvasSize.width,
+                y: cell.frame.minY * canvasSize.height,
+                width: cell.frame.width * canvasSize.width,
+                height: cell.frame.height * canvasSize.height
+            )
+            let insetRect = cell.clip.isRectangle ? scaled.insetBy(dx: inset, dy: inset) : scaled
+            let clamped = CGRect(
+                x: insetRect.origin.x,
+                y: insetRect.origin.y,
+                width: max(0, insetRect.width),
+                height: max(0, insetRect.height)
+            )
+            return CellFrame(
+                id: "\(template.templateID)-\(index)",
+                frame: clamped,
+                shape: shapeTag(for: cell.clip),
+                clipShape: cell.clip
+            )
         }
     }
 

@@ -55,4 +55,26 @@ final class TemplateGalleryUITests: XCTestCase {
                       "Free grid template opens the grid editor")
         attach("03_template_opened_in_editor")
     }
+
+    @MainActor
+    func testNonGridTemplateOpensViaTemplateLayout() throws {
+        let app = XCUIApplication()
+        app.launch()
+
+        app.buttons["templatesButton"].tap()
+        XCTAssertTrue(app.navigationBars["Templates"].waitForExistence(timeout: 5), "Gallery pushes")
+
+        // The Minimal chip isolates the offset-duo design, which doesn't match
+        // any stock grid — it must open through the `.template` layout path.
+        let minimalChip = app.collectionViews["categoryChips"].staticTexts["Minimal"]
+        XCTAssertTrue(minimalChip.waitForExistence(timeout: 5), "Minimal chip present")
+        minimalChip.tap()
+        let grid = app.collectionViews["templateGalleryGrid"]
+        XCTAssertTrue(grid.cells.firstMatch.waitForExistence(timeout: 5), "Minimal category has a template")
+        grid.cells.firstMatch.tap()
+
+        XCTAssertTrue(app.navigationBars["Grid Collage"].waitForExistence(timeout: 5),
+                      "Non-grid template opens in the editor via .template layout")
+        attach("04_template_layout_in_editor")
+    }
 }

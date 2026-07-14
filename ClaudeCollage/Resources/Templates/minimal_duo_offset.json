@@ -1,0 +1,26 @@
+{
+  "id": "minimal-duo-offset",
+  "name": "Minimal Duo",
+  "category": "minimal",
+  "isPremium": false,
+  "canvasAspectRatio": "1:1",
+  "cells": [
+    {
+      "id": "hero",
+      "type": "photo",
+      "frame": { "x": 0.06, "y": 0.06, "width": 0.62, "height": 0.88 },
+      "shape": "rectangle",
+      "borderWidth": 0.0,
+      "cornerRadius": 0.0
+    },
+    {
+      "id": "accent",
+      "type": "photo",
+      "frame": { "x": 0.72, "y": 0.39, "width": 0.22, "height": 0.22 },
+      "shape": "circle",
+      "borderWidth": 0.0,
+      "cornerRadius": 0.0
+    }
+  ],
+  "background": { "type": "solid", "color": "#F7F6F4" }
+}

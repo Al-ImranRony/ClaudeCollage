@@ -177,6 +177,7 @@ final class TemplateGalleryViewController: UIViewController {
         view.showsHorizontalScrollIndicator = false
         view.dataSource = self
         view.delegate = self
+        view.accessibilityIdentifier = "categoryChips"
         view.register(CategoryChipCell.self, forCellWithReuseIdentifier: CategoryChipCell.reuseID)
         return view
     }

@@ -88,7 +88,9 @@ public final class TemplateService {
     /// shared `CollageRenderer` and cached in memory + on disk. Photo zones show
     /// the empty-cell placeholder (there is no user imagery yet).
     public func thumbnail(for template: CollageTemplate, maxDimension: CGFloat = 300) -> CGImage? {
-        let key = "\(template.id)@\(Int(maxDimension))"
+        // The key carries a content fingerprint so a re-authored template (same
+        // id, new geometry/background) never serves its stale cached thumbnail.
+        let key = "\(template.id)-\(Self.contentFingerprint(of: template))@\(Int(maxDimension))"
         if let cached = thumbnailCache[key] { return cached }
         if let disk = loadDiskThumbnail(key: key) {
             thumbnailCache[key] = disk
@@ -169,12 +171,45 @@ public final class TemplateService {
             && abs(a.width - b.width) <= tolerance && abs(a.height - b.height) <= tolerance
     }
 
+    /// A deterministic digest (FNV-1a over the thumbnail-relevant fields) that
+    /// changes whenever the rendered appearance would. Swift's `Hashable` is
+    /// per-process seeded, so it can't key an on-disk cache.
+    nonisolated static func contentFingerprint(of template: CollageTemplate) -> String {
+        var hash: UInt64 = 0xcbf2_9ce4_8422_2325
+        func mix(_ value: String) {
+            for byte in value.utf8 { hash = (hash ^ UInt64(byte)) &* 0x0000_0100_0000_01b3 }
+        }
+        mix(template.canvasAspectRatio)
+        mix(String(describing: template.background))
+        for cell in template.cells {
+            mix("\(cell.type)|\(cell.shape.rawValue)|\(cell.cornerRadius)|")
+            mix("\(cell.frame.minX),\(cell.frame.minY),\(cell.frame.width),\(cell.frame.height);")
+        }
+        return String(hash, radix: 36)
+    }
+
+    // MARK: - Editor layout
+
+    /// The editable geometry for a template: its photo zones become editor cells
+    /// (the `.template` case of `CollageLayout`). Text/sticker/art/spacer zones
+    /// are editor overlays handled by later 03a slices and are not included.
+    public nonisolated static func editorLayout(for template: CollageTemplate) -> TemplateLayout {
+        TemplateLayout(
+            templateID: template.id,
+            name: template.name,
+            aspectRatio: template.canvasAspectRatio,
+            cells: template.cells
+                .filter { $0.zoneType == .photo }
+                .map { TemplateLayoutCell(frame: $0.frame, clip: clipShape(for: $0.shape)) }
+        )
+    }
+
     // MARK: - Helpers
 
     /// Maps a template's declared `CellShape` to the renderer's parametric clip.
     /// Polygon shapes need per-template point data (a later editor concern); for
     /// the catalog they clip to their bounding rectangle.
-    static func clipShape(for shape: CellShape) -> CellClipShape {
+    nonisolated static func clipShape(for shape: CellShape) -> CellClipShape {
         switch shape {
         case .circle, .oval: return .ellipse
         default: return .rectangle

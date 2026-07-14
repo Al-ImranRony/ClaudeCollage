@@ -50,23 +50,34 @@ final class AppCoordinator {
         navigationController.pushViewController(gallery, animated: true)
     }
 
-    /// Opens a (free or unlocked) template. Pure photo-grid templates map onto
-    /// the Step 01 grid editor; anything richer (text/sticker/art zones, shaped
-    /// cells) waits for the template editor of a later 03a slice.
+    /// Opens a (free or unlocked) template in the editor. Templates that exactly
+    /// tile a stock grid open as that grid (so the layout picker highlights it);
+    /// everything else opens as a `.template` layout with the authored geometry.
+    /// Text/sticker/art zones are overlays owned by later 03a slices — today
+    /// only the photo zones are editable.
     private func openTemplate(_ template: CollageTemplate) {
-        guard let grid = TemplateService.gridTemplate(matching: template) else {
-            let alert = UIAlertController(
-                title: "Coming Soon",
-                message: "This template uses zones the editor doesn't support yet. The template editor arrives in an upcoming update.",
-                preferredStyle: .alert
-            )
-            alert.addAction(UIAlertAction(title: "OK", style: .default))
-            navigationController.present(alert, animated: true)
-            return
+        let layout: CollageLayout
+        if let grid = TemplateService.gridTemplate(matching: template) {
+            layout = .grid(grid)
+        } else {
+            let templateLayout = TemplateService.editorLayout(for: template)
+            guard !templateLayout.cells.isEmpty else {
+                // No photo zones at all (e.g. a text-only design) — nothing the
+                // editor can do with it until the text-zone slice lands.
+                let alert = UIAlertController(
+                    title: "Coming Soon",
+                    message: "This template has no photo areas yet supported by the editor. Text and sticker editing arrive in an upcoming update.",
+                    preferredStyle: .alert
+                )
+                alert.addAction(UIAlertAction(title: "OK", style: .default))
+                navigationController.present(alert, animated: true)
+                return
+            }
+            layout = .template(templateLayout)
         }
 
         let state = GridEditorState(
-            layout: .grid(grid),
+            layout: layout,
             borderWidth: template.cells.first.map { max($0.borderWidth, 0) } ?? 8,
             background: template.background
         )
