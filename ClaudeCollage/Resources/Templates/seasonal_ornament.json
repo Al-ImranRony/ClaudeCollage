@@ -1,0 +1,20 @@
+{
+  "id": "seasonal-ornament",
+  "name": "Ornament",
+  "category": "seasonal",
+  "isPremium": true,
+  "canvasAspectRatio": "1:1",
+  "cells": [
+    { "id": "center", "type": "photo", "shape": "circle",
+      "frame": { "x": 0.30, "y": 0.30, "width": 0.40, "height": 0.40 } },
+    { "id": "tl", "type": "photo", "shape": "rectangle",
+      "frame": { "x": 0.05, "y": 0.05, "width": 0.20, "height": 0.20 } },
+    { "id": "tr", "type": "photo", "shape": "rectangle",
+      "frame": { "x": 0.75, "y": 0.05, "width": 0.20, "height": 0.20 } },
+    { "id": "bl", "type": "photo", "shape": "rectangle",
+      "frame": { "x": 0.05, "y": 0.75, "width": 0.20, "height": 0.20 } },
+    { "id": "br", "type": "photo", "shape": "rectangle",
+      "frame": { "x": 0.75, "y": 0.75, "width": 0.20, "height": 0.20 } }
+  ],
+  "background": { "type": "solid", "color": "#1F2A24" }
+}

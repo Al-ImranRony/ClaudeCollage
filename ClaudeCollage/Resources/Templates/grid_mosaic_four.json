@@ -1,0 +1,18 @@
+{
+  "id": "grid-mosaic-four",
+  "name": "Mosaic 4",
+  "category": "grid",
+  "isPremium": false,
+  "canvasAspectRatio": "1:1",
+  "cells": [
+    { "id": "hero", "type": "photo", "shape": "rectangle",
+      "frame": { "x": 0.0, "y": 0.0, "width": 0.6667, "height": 1.0 } },
+    { "id": "r1", "type": "photo", "shape": "rectangle",
+      "frame": { "x": 0.6667, "y": 0.0, "width": 0.3333, "height": 0.3333 } },
+    { "id": "r2", "type": "photo", "shape": "rectangle",
+      "frame": { "x": 0.6667, "y": 0.3333, "width": 0.3333, "height": 0.3334 } },
+    { "id": "r3", "type": "photo", "shape": "rectangle",
+      "frame": { "x": 0.6667, "y": 0.6667, "width": 0.3333, "height": 0.3333 } }
+  ],
+  "background": { "type": "solid", "color": "#FFFFFF" }
+}

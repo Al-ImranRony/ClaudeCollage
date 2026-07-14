@@ -1,0 +1,16 @@
+{
+  "id": "travel-horizon-split",
+  "name": "Horizon Split",
+  "category": "travel",
+  "isPremium": false,
+  "canvasAspectRatio": "16:9",
+  "cells": [
+    { "id": "sky", "type": "photo", "shape": "rectangle",
+      "frame": { "x": 0.0, "y": 0.0, "width": 1.0, "height": 0.60 } },
+    { "id": "left", "type": "photo", "shape": "rectangle",
+      "frame": { "x": 0.0, "y": 0.60, "width": 0.50, "height": 0.40 } },
+    { "id": "right", "type": "photo", "shape": "rectangle",
+      "frame": { "x": 0.50, "y": 0.60, "width": 0.50, "height": 0.40 } }
+  ],
+  "background": { "type": "solid", "color": "#FFFFFF" }
+}

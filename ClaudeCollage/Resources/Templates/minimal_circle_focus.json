@@ -1,0 +1,14 @@
+{
+  "id": "minimal-circle-focus",
+  "name": "Circle Focus",
+  "category": "minimal",
+  "isPremium": true,
+  "canvasAspectRatio": "1:1",
+  "cells": [
+    { "id": "focus", "type": "photo", "shape": "circle",
+      "frame": { "x": 0.25, "y": 0.18, "width": 0.50, "height": 0.50 } },
+    { "id": "strip", "type": "photo", "shape": "rectangle",
+      "frame": { "x": 0.25, "y": 0.74, "width": 0.50, "height": 0.12 } }
+  ],
+  "background": { "type": "solid", "color": "#FAF8F5" }
+}

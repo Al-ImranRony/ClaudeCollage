@@ -1,0 +1,14 @@
+{
+  "id": "story-split-tall",
+  "name": "Split Tall",
+  "category": "story",
+  "isPremium": false,
+  "canvasAspectRatio": "9:16",
+  "cells": [
+    { "id": "left", "type": "photo", "shape": "rectangle",
+      "frame": { "x": 0.05, "y": 0.06, "width": 0.43, "height": 0.88 } },
+    { "id": "right", "type": "photo", "shape": "rectangle",
+      "frame": { "x": 0.52, "y": 0.06, "width": 0.43, "height": 0.88 } }
+  ],
+  "background": { "type": "solid", "color": "#F2EFEA" }
+}

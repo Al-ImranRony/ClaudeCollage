@@ -1,0 +1,14 @@
+{
+  "id": "minimal-split-air",
+  "name": "Split Air",
+  "category": "minimal",
+  "isPremium": false,
+  "canvasAspectRatio": "1:1",
+  "cells": [
+    { "id": "left", "type": "photo", "shape": "rectangle",
+      "frame": { "x": 0.08, "y": 0.12, "width": 0.40, "height": 0.76 } },
+    { "id": "right", "type": "photo", "shape": "rectangle",
+      "frame": { "x": 0.52, "y": 0.12, "width": 0.40, "height": 0.76 } }
+  ],
+  "background": { "type": "solid", "color": "#F7F6F4" }
+}

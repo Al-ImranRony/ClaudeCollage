@@ -1,0 +1,18 @@
+{
+  "id": "story-moments",
+  "name": "Moments",
+  "category": "story",
+  "isPremium": true,
+  "canvasAspectRatio": "9:16",
+  "cells": [
+    { "id": "tl", "type": "photo", "shape": "rectangle",
+      "frame": { "x": 0.07, "y": 0.10, "width": 0.40, "height": 0.36 } },
+    { "id": "tr", "type": "photo", "shape": "rectangle",
+      "frame": { "x": 0.53, "y": 0.10, "width": 0.40, "height": 0.36 } },
+    { "id": "bl", "type": "photo", "shape": "rectangle",
+      "frame": { "x": 0.07, "y": 0.54, "width": 0.40, "height": 0.36 } },
+    { "id": "br", "type": "photo", "shape": "rectangle",
+      "frame": { "x": 0.53, "y": 0.54, "width": 0.40, "height": 0.36 } }
+  ],
+  "background": { "type": "solid", "color": "#FFF9F3" }
+}

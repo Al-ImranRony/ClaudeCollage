@@ -1,0 +1,14 @@
+{
+  "id": "minimal-tower",
+  "name": "Tower",
+  "category": "minimal",
+  "isPremium": false,
+  "canvasAspectRatio": "4:5",
+  "cells": [
+    { "id": "top", "type": "photo", "shape": "rectangle",
+      "frame": { "x": 0.16, "y": 0.08, "width": 0.68, "height": 0.40 } },
+    { "id": "bottom", "type": "photo", "shape": "rectangle",
+      "frame": { "x": 0.16, "y": 0.52, "width": 0.68, "height": 0.40 } }
+  ],
+  "background": { "type": "solid", "color": "#F5F2EE" }
+}

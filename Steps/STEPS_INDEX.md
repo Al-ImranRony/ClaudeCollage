@@ -19,7 +19,7 @@ Do not start Part 2 until Part 1 is 100% complete.
 | **00** | `Step_00_ProjectSetup.md` | Xcode project, Git, CI/CD, tooling | 1–2 | ✅ Verified — builds + tests green on Xcode 26.5 / iPhone 16 sim |
 | **01** | `Step_01_GridCollage.md` | Rectangular grid collage editor | 3–7 | ✅ Core complete — 8/8 unit tests + UI flow green; editor runs in sim (see Step 01 notes below) |
 | **02** | `Step_02_PolygonCollage.md` | Polygon & custom shape collage | 8–12 | 🟡 Core complete — 9 shapes + masked canvas/export + typed parser + premium bezier editor; 12/12 new tests green (29 total). See Step 02 notes below |
-| **03a** | `Step_03a_StandardTemplates.md` | Frame/story template editor | 13–17 | 🟡 Slices 1–3 complete — foundation, Template Gallery UI, and the `.template` collage layout (any photo-zone template opens in the editor with authored geometry — no duplicated machinery). 50 unit + 7 UI tests green. Text-zone editor, sticker system, freeform canvas, and the 30-template catalog remain. See Step 03a notes below |
+| **03a** | `Step_03a_StandardTemplates.md` | Frame/story template editor | 13–17 | 🟡 Slices 1–4 complete — foundation, Template Gallery UI, `.template` collage layout, and catalog v1 (21 bundled templates across all 5 categories & 4 canvas presets, 4 premium). 53 unit + 7 UI tests green. Text-zone editor, sticker system, freeform canvas, and the remaining ~9 text/sticker templates remain. See Step 03a notes below |
 | **03b** | `Step_03b_CarouselTemplates.md` | SCRL-style carousel mode | 18–22 | ⬜ Not started |
 | **04** | `Step_04_VideoCollage.md` | Video collage + universal export | 23–30 | ⬜ Not started |
 | **05** | `Step_05_AIFeaturesAndPolish.md` | AI features, App Intents, widgets, polish | 31–35 | ⬜ Not started |
@@ -73,6 +73,12 @@ Do not start Part 2 until Part 1 is 100% complete.
 - **Known cosmetic quirk:** with a `.template` layout active, the editor's layout picker still highlights its default grid chip (the picker has no "none" state); tapping a grid chip intentionally switches layouts, preserving photos. Revisit in the template-editor-chrome slice / Step 05b.
 - **Tests:** +5 unit (`TemplateLayoutTests`: zone mapping, engine scaling/inset rules, accessors, state Codable round-trip) +1 fingerprint test +1 UI (`testNonGridTemplateOpensViaTemplateLayout`). **50 unit + 7 UI green.**
 - **Sim flake pattern (environment, recurring):** back-to-back full UI runs intermittently wedge SpringBoard ("Application failed preflight checks / Busy", every test failing at a uniform ~10.7s) → `simctl shutdown all`, erase if persistent. After an **erase**, the first `ExportSaveUITests` run can fail on the slow first-boot Photos-prompt round-trip; it passes on re-run.
+
+### Step 03a slice 4 — bundled template catalog v1 (2026-07-15)
+- **21 bundled templates** (18 new JSONs): Minimal 6 (Solo Frame, Tower, Gallery Trio, Split Air, Duo, Circle Focus★), Story 4 (Stack Trio, Hero Strip, Split Tall, Moments★), Grid 5 (2-Up, 4-Up, Filmstrip, Mosaic 4, Six Airy), Travel 3 (Panorama Row, Horizon Split, Postcard★), Seasonal 3 (Bloom, Quartet, Ornament★). ★ = `isPremium` (4 total) exercising the crown badge + paywall placeholder. Every canvas preset (1:1, 4:5, 9:16, 16:9) has templates.
+- **Deliberately photo-only.** The spec's full 30 include text/sticker-zone designs; those ship *with* the text-zone and sticker slices so their thumbnails/editing don't misrepresent (the renderer draws photo/art zones only today). Circle cells on non-square canvases are authored with pixel-square frames (normalized h = w × canvasW/canvasH).
+- **New `TemplateCatalogTests`:** catalog integrity (unique ids — the diffable gallery would silently drop duplicates; categories map to gallery chips; aspects map to a `CanvasPreset` so nothing is unreachable; ≥1 photo zone each; no zero-size cells), every-preset-populated, and the done-criterion **full-catalog thumbnail render < 1.5 s**.
+- Gallery UI test updated: Story preset now asserts populated cards; the empty state is asserted via an impossible filter combination (Story ∩ Minimal). **53 unit + 7 UI green.**
 
 ### Step 01 — performance architecture (must carry into every editor)
 The first cut recomposited the whole canvas on the CPU per gesture frame and held full-resolution photos in RAM — laggy and memory-heavy. The corrected model, which Steps 02–05 must follow:

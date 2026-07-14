@@ -1,0 +1,12 @@
+{
+  "id": "minimal-solo-frame",
+  "name": "Solo Frame",
+  "category": "minimal",
+  "isPremium": false,
+  "canvasAspectRatio": "1:1",
+  "cells": [
+    { "id": "hero", "type": "photo", "shape": "rectangle",
+      "frame": { "x": 0.14, "y": 0.14, "width": 0.72, "height": 0.72 } }
+  ],
+  "background": { "type": "solid", "color": "#FBFAF8" }
+}

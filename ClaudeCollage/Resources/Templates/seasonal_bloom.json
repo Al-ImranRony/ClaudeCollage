@@ -1,0 +1,16 @@
+{
+  "id": "seasonal-bloom",
+  "name": "Bloom",
+  "category": "seasonal",
+  "isPremium": false,
+  "canvasAspectRatio": "1:1",
+  "cells": [
+    { "id": "one", "type": "photo", "shape": "circle",
+      "frame": { "x": 0.04, "y": 0.04, "width": 0.30, "height": 0.30 } },
+    { "id": "two", "type": "photo", "shape": "circle",
+      "frame": { "x": 0.35, "y": 0.35, "width": 0.30, "height": 0.30 } },
+    { "id": "three", "type": "photo", "shape": "circle",
+      "frame": { "x": 0.66, "y": 0.66, "width": 0.30, "height": 0.30 } }
+  ],
+  "background": { "type": "solid", "color": "#FDF3F1" }
+}

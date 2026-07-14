@@ -1,0 +1,16 @@
+{
+  "id": "story-hero-strip",
+  "name": "Hero Strip",
+  "category": "story",
+  "isPremium": false,
+  "canvasAspectRatio": "9:16",
+  "cells": [
+    { "id": "hero", "type": "photo", "shape": "rectangle",
+      "frame": { "x": 0.06, "y": 0.05, "width": 0.88, "height": 0.58 } },
+    { "id": "left", "type": "photo", "shape": "rectangle",
+      "frame": { "x": 0.06, "y": 0.67, "width": 0.42, "height": 0.24 } },
+    { "id": "right", "type": "photo", "shape": "rectangle",
+      "frame": { "x": 0.52, "y": 0.67, "width": 0.42, "height": 0.24 } }
+  ],
+  "background": { "type": "solid", "color": "#1B1B1E" }
+}

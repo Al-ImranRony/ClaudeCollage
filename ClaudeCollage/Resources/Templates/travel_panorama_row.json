@@ -1,0 +1,16 @@
+{
+  "id": "travel-panorama-row",
+  "name": "Panorama Row",
+  "category": "travel",
+  "isPremium": false,
+  "canvasAspectRatio": "16:9",
+  "cells": [
+    { "id": "hero", "type": "photo", "shape": "rectangle",
+      "frame": { "x": 0.04, "y": 0.10, "width": 0.58, "height": 0.80 } },
+    { "id": "top", "type": "photo", "shape": "rectangle",
+      "frame": { "x": 0.66, "y": 0.10, "width": 0.30, "height": 0.38 } },
+    { "id": "bottom", "type": "photo", "shape": "rectangle",
+      "frame": { "x": 0.66, "y": 0.52, "width": 0.30, "height": 0.38 } }
+  ],
+  "background": { "type": "solid", "color": "#EFE9DF" }
+}

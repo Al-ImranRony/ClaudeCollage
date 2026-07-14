@@ -39,13 +39,20 @@ final class TemplateGalleryUITests: XCTestCase {
         XCTAssertTrue(grid.cells.firstMatch.waitForExistence(timeout: 5), "Gallery shows template cards")
         attach("01_gallery_square")
 
-        // Story has no bundled templates yet → the empty state explains why.
+        // The Story preset has its own catalog templates.
         app.buttons["Story"].tap()
-        let emptyLabel = app.staticTexts["galleryEmptyLabel"]
-        XCTAssertTrue(emptyLabel.waitForExistence(timeout: 3), "Empty state for a preset with no templates")
-        attach("02_gallery_story_empty")
+        XCTAssertTrue(grid.cells.firstMatch.waitForExistence(timeout: 3), "Story preset shows templates")
+        attach("02_gallery_story")
 
-        // Back to Square; category chip filtering keeps the grid templates visible.
+        // Story ∩ Minimal is an impossible combination → explanatory empty state.
+        let minimalChip = app.collectionViews["categoryChips"].staticTexts["Minimal"]
+        XCTAssertTrue(minimalChip.waitForExistence(timeout: 3), "Minimal chip present")
+        minimalChip.tap()
+        let emptyLabel = app.staticTexts["galleryEmptyLabel"]
+        XCTAssertTrue(emptyLabel.waitForExistence(timeout: 3), "Empty state when filters match nothing")
+
+        // Back to Square + All; the grid templates return.
+        app.collectionViews["categoryChips"].staticTexts["All"].tap()
         app.buttons["Square"].tap()
         XCTAssertTrue(grid.cells.firstMatch.waitForExistence(timeout: 3), "Square templates return")
 

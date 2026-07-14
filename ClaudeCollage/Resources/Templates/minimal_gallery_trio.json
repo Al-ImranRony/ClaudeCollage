@@ -1,0 +1,16 @@
+{
+  "id": "minimal-gallery-trio",
+  "name": "Gallery Trio",
+  "category": "minimal",
+  "isPremium": false,
+  "canvasAspectRatio": "4:5",
+  "cells": [
+    { "id": "hero", "type": "photo", "shape": "rectangle",
+      "frame": { "x": 0.10, "y": 0.08, "width": 0.80, "height": 0.52 } },
+    { "id": "left", "type": "photo", "shape": "rectangle",
+      "frame": { "x": 0.10, "y": 0.64, "width": 0.38, "height": 0.28 } },
+    { "id": "right", "type": "photo", "shape": "rectangle",
+      "frame": { "x": 0.52, "y": 0.64, "width": 0.38, "height": 0.28 } }
+  ],
+  "background": { "type": "solid", "color": "#FFFFFF" }
+}

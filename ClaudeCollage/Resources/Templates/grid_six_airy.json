@@ -1,0 +1,22 @@
+{
+  "id": "grid-six-airy",
+  "name": "Six Airy",
+  "category": "grid",
+  "isPremium": false,
+  "canvasAspectRatio": "4:5",
+  "cells": [
+    { "id": "tl", "type": "photo", "shape": "rectangle",
+      "frame": { "x": 0.06, "y": 0.05, "width": 0.41, "height": 0.27 } },
+    { "id": "tr", "type": "photo", "shape": "rectangle",
+      "frame": { "x": 0.53, "y": 0.05, "width": 0.41, "height": 0.27 } },
+    { "id": "ml", "type": "photo", "shape": "rectangle",
+      "frame": { "x": 0.06, "y": 0.36, "width": 0.41, "height": 0.27 } },
+    { "id": "mr", "type": "photo", "shape": "rectangle",
+      "frame": { "x": 0.53, "y": 0.36, "width": 0.41, "height": 0.27 } },
+    { "id": "bl", "type": "photo", "shape": "rectangle",
+      "frame": { "x": 0.06, "y": 0.67, "width": 0.41, "height": 0.27 } },
+    { "id": "br", "type": "photo", "shape": "rectangle",
+      "frame": { "x": 0.53, "y": 0.67, "width": 0.41, "height": 0.27 } }
+  ],
+  "background": { "type": "solid", "color": "#F7F6F4" }
+}

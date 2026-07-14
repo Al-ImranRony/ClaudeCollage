@@ -1,0 +1,16 @@
+{
+  "id": "story-stack-trio",
+  "name": "Stack Trio",
+  "category": "story",
+  "isPremium": false,
+  "canvasAspectRatio": "9:16",
+  "cells": [
+    { "id": "one", "type": "photo", "shape": "rectangle",
+      "frame": { "x": 0.08, "y": 0.06, "width": 0.84, "height": 0.26 } },
+    { "id": "two", "type": "photo", "shape": "rectangle",
+      "frame": { "x": 0.08, "y": 0.37, "width": 0.84, "height": 0.26 } },
+    { "id": "three", "type": "photo", "shape": "rectangle",
+      "frame": { "x": 0.08, "y": 0.68, "width": 0.84, "height": 0.26 } }
+  ],
+  "background": { "type": "solid", "color": "#FFFFFF" }
+}

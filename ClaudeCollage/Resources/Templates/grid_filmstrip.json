@@ -1,0 +1,16 @@
+{
+  "id": "grid-filmstrip",
+  "name": "Filmstrip",
+  "category": "grid",
+  "isPremium": false,
+  "canvasAspectRatio": "4:5",
+  "cells": [
+    { "id": "one", "type": "photo", "shape": "rectangle",
+      "frame": { "x": 0.0, "y": 0.0, "width": 1.0, "height": 0.3333 } },
+    { "id": "two", "type": "photo", "shape": "rectangle",
+      "frame": { "x": 0.0, "y": 0.3333, "width": 1.0, "height": 0.3334 } },
+    { "id": "three", "type": "photo", "shape": "rectangle",
+      "frame": { "x": 0.0, "y": 0.6667, "width": 1.0, "height": 0.3333 } }
+  ],
+  "background": { "type": "solid", "color": "#FFFFFF" }
+}

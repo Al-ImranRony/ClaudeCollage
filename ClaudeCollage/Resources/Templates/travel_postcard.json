@@ -1,0 +1,16 @@
+{
+  "id": "travel-postcard",
+  "name": "Postcard",
+  "category": "travel",
+  "isPremium": true,
+  "canvasAspectRatio": "4:5",
+  "cells": [
+    { "id": "vista", "type": "photo", "shape": "rectangle",
+      "frame": { "x": 0.08, "y": 0.06, "width": 0.84, "height": 0.55 } },
+    { "id": "detail", "type": "photo", "shape": "rectangle",
+      "frame": { "x": 0.08, "y": 0.66, "width": 0.60, "height": 0.26 } },
+    { "id": "stamp", "type": "photo", "shape": "circle",
+      "frame": { "x": 0.72, "y": 0.70, "width": 0.20, "height": 0.16 } }
+  ],
+  "background": { "type": "solid", "color": "#F3EBDD" }
+}
