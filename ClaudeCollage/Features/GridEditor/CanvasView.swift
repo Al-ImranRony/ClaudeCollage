@@ -67,11 +67,26 @@ final class CanvasView: UIView {
     /// On-screen points per reference point (contentContainer.width / canvasSize.width).
     private(set) var referenceScaleFactor: CGFloat = 1
 
+    /// Snap-alignment guide lines drawn above everything during a sticker drag.
+    private let snapGuideLayer = CAShapeLayer()
+
+    /// Detail-editing magnification of the collage content (1…3). A view aid only —
+    /// not part of the collage state, so it never persists or exports.
+    private(set) var canvasZoom: CGFloat = 1
+
     override init(frame: CGRect) {
         super.init(frame: frame)
         backgroundColor = .clear
         contentContainer.clipsToBounds = false
         addSubview(contentContainer)
+
+        snapGuideLayer.strokeColor = Theme.Color.accent.cgColor
+        snapGuideLayer.lineWidth = 1
+        snapGuideLayer.lineDashPattern = [4, 4]
+        snapGuideLayer.fillColor = UIColor.clear.cgColor
+        snapGuideLayer.zPosition = 10_000    // above cells, text, and stickers
+        snapGuideLayer.isHidden = true
+        contentContainer.layer.addSublayer(snapGuideLayer)
     }
 
     @available(*, unavailable)
@@ -151,6 +166,9 @@ final class CanvasView: UIView {
                 self?.onStickerDeleted?(id)
             }
             view.onSelected = { [weak self] id in self?.selectStickerFromTap(id) }
+            view.onGuidesChanged = { [weak self] vx, hy in
+                self?.updateSnapGuides(verticalX: vx, horizontalY: hy)
+            }
             view.isSelected = overlay.id == selectedStickerID
             contentContainer.addSubview(view)
             return view
@@ -183,6 +201,10 @@ final class CanvasView: UIView {
     private func layoutCanvas() {
         guard let model, model.canvasSize.width > 0 else { return }
 
+        // Frame math must run with an identity transform (setting .frame under a
+        // non-identity transform is undefined); the zoom transform is re-applied
+        // after positioning.
+        contentContainer.transform = .identity
         let square = AVMakeRect(aspectRatio: model.canvasSize, insideRect: bounds)
         contentContainer.frame = square
         contentContainer.backgroundColor = UIColor(background: model.background)
@@ -203,6 +225,7 @@ final class CanvasView: UIView {
 
         layoutOverlays()
         layoutStickers()
+        applyZoomTransform()
     }
 
     /// Positions each text overlay view (normalized frame → on-screen points) and
@@ -228,6 +251,50 @@ final class CanvasView: UIView {
         for (index, overlay) in model.stickerOverlays.enumerated() where stickerViews.indices.contains(index) {
             stickerViews[index].apply(overlay: overlay, in: size)
         }
+    }
+
+    // MARK: - Snap guides
+
+    /// Draws (or clears) the alignment guide lines at the given normalized
+    /// positions, spanning the full collage rect. Called live during a drag.
+    func updateSnapGuides(verticalX: [CGFloat], horizontalY: [CGFloat]) {
+        let size = contentContainer.bounds.size
+        guard size.width > 0, (!verticalX.isEmpty || !horizontalY.isEmpty) else {
+            snapGuideLayer.isHidden = true
+            return
+        }
+        let path = UIBezierPath()
+        for x in verticalX {
+            let px = x * size.width
+            path.move(to: CGPoint(x: px, y: 0))
+            path.addLine(to: CGPoint(x: px, y: size.height))
+        }
+        for y in horizontalY {
+            let py = y * size.height
+            path.move(to: CGPoint(x: 0, y: py))
+            path.addLine(to: CGPoint(x: size.width, y: py))
+        }
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        snapGuideLayer.frame = contentContainer.bounds
+        snapGuideLayer.path = path.cgPath
+        snapGuideLayer.isHidden = false
+        CATransaction.commit()
+    }
+
+    // MARK: - Canvas zoom (detail editing)
+
+    /// Magnifies the collage content around its centre, clamped to 1…3×. A view aid
+    /// for detail editing — the collage geometry, state, and export are untouched.
+    func setCanvasZoom(_ scale: CGFloat) {
+        canvasZoom = min(max(scale, 1), 3)
+        applyZoomTransform()
+    }
+
+    private func applyZoomTransform() {
+        contentContainer.transform = canvasZoom == 1
+            ? .identity
+            : CGAffineTransform(scaleX: canvasZoom, y: canvasZoom)
     }
 
     // MARK: - Sticker selection
@@ -452,6 +519,11 @@ final class StickerOverlayView: UIView {
     var onCommitted: (() -> Void)?
     var onDeleted: ((UUID) -> Void)?
     var onSelected: ((UUID) -> Void)?
+    /// Reports the engaged snap guides (normalized x's, y's) so the canvas can draw
+    /// them; an empty pair clears them.
+    var onGuidesChanged: (([CGFloat], [CGFloat]) -> Void)?
+
+    private var wasSnapped = false
 
     var isSelected: Bool = false {
         didSet { selectionLayer.isHidden = !isSelected }
@@ -534,12 +606,27 @@ final class StickerOverlayView: UIView {
             let translation = gesture.translation(in: container)
             gesture.setTranslation(.zero, in: container)
             center = CGPoint(x: center.x + translation.x, y: center.y + translation.y)
+            applySnap(in: container.bounds.size)
             emitChange()
         case .ended, .cancelled, .failed:
+            wasSnapped = false
+            onGuidesChanged?([], [])
             onCommitted?()
         default:
             break
         }
+    }
+
+    /// Snaps the current centre to alignment guides (canvas centre + thirds) and
+    /// reports which engaged, with a light tick the moment one grabs.
+    private func applySnap(in size: CGSize) {
+        guard size.width > 0, size.height > 0 else { return }
+        let normalized = CGPoint(x: center.x / size.width, y: center.y / size.height)
+        let snap = SnapEngine.snap(center: normalized)
+        center = CGPoint(x: snap.center.x * size.width, y: snap.center.y * size.height)
+        if snap.didSnap, !wasSnapped { Haptics.boundary() }
+        wasSnapped = snap.didSnap
+        onGuidesChanged?(snap.verticalGuides, snap.horizontalGuides)
     }
 
     @objc private func handlePinch(_ gesture: UIPinchGestureRecognizer) {

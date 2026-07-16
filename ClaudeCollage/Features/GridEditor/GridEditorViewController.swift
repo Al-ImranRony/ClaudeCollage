@@ -34,6 +34,9 @@ final class GridEditorViewController: UIViewController {
     private var redoItem: UIBarButtonItem?
 
     private var gestureController: CellGestureController?
+    /// Pinch that magnifies the canvas for detail editing — gated (via the delegate)
+    /// to touches on empty canvas background so it never fights cell/sticker pinch.
+    private var canvasZoomPinch: UIPinchGestureRecognizer?
 
     /// Reused for off-main-thread export compositing.
     private let compositor = CollageRenderer()
@@ -216,6 +219,28 @@ final class GridEditorViewController: UIViewController {
         let longPress = UILongPressGestureRecognizer(target: self, action: #selector(canvasLongPressed))
         longPress.minimumPressDuration = 0.45
         canvasView.addGestureRecognizer(longPress)
+
+        // Pinch to zoom the canvas for detail editing. Its delegate rejects touches
+        // that land on a cell or sticker, so those keep their own pinch-to-scale.
+        let zoomPinch = UIPinchGestureRecognizer(target: self, action: #selector(canvasZoomPinched))
+        zoomPinch.delegate = self
+        canvasView.addGestureRecognizer(zoomPinch)
+        canvasZoomPinch = zoomPinch
+    }
+
+    @objc private func canvasZoomPinched(_ gesture: UIPinchGestureRecognizer) {
+        switch gesture.state {
+        case .changed:
+            canvasView.setCanvasZoom(canvasView.canvasZoom * gesture.scale)
+            gesture.scale = 1
+        case .ended, .cancelled, .failed:
+            // Settle back to 1× if the user pinched (nearly) all the way out.
+            if canvasView.canvasZoom < 1.05 {
+                UIView.animate(withDuration: Theme.Motion.quick) { self.canvasView.setCanvasZoom(1) }
+            }
+        default:
+            break
+        }
     }
 
     private func bindViewModel() {
@@ -729,6 +754,31 @@ extension GridEditorViewController: PHPickerViewControllerDelegate {
                 self?.viewModel.setImage(cgImage, forCellAt: index)
             }
         }
+    }
+}
+
+// MARK: - UIGestureRecognizerDelegate (canvas zoom gating)
+
+extension GridEditorViewController: UIGestureRecognizerDelegate {
+
+    /// The zoom pinch only accepts touches on empty canvas background — never on a
+    /// cell or sticker, which own their own gestures.
+    func gestureRecognizer(
+        _ gestureRecognizer: UIGestureRecognizer,
+        shouldReceive touch: UITouch
+    ) -> Bool {
+        guard gestureRecognizer === canvasZoomPinch else { return true }
+        let point = touch.location(in: canvasView)
+        return canvasView.cellIndex(at: point) == nil && canvasView.stickerID(at: point) == nil
+    }
+
+    /// Let the zoom pinch coexist with the cell/sticker recognizers rather than
+    /// cancelling them.
+    func gestureRecognizer(
+        _ gestureRecognizer: UIGestureRecognizer,
+        shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer
+    ) -> Bool {
+        true
     }
 }
 

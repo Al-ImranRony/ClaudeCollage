@@ -27,6 +27,7 @@ final class AppCoordinator {
         let home = HomeViewController()
         home.summariesProvider = { [weak self] in self?.store.listSummaries() ?? [] }
         home.onNewProject = { [weak self] in self?.startNewGridProject() }
+        home.onNewFreeform = { [weak self] size in self?.startFreeformProject(size: size) }
         home.onBrowseTemplates = { [weak self] in self?.showTemplateGallery() }
         home.onOpenProject = { [weak self] id in self?.openProject(id: id) }
         home.onDeleteProject = { [weak self] id in self?.store.delete(id: id) }
@@ -40,6 +41,29 @@ final class AppCoordinator {
         let viewModel = GridEditorViewModel()
         attachAutosave(to: viewModel)
         // Persist immediately so the project appears in the gallery on return.
+        store.save(viewModel)
+        pushEditor(with: viewModel)
+    }
+
+    /// Starts a blank collage on a user-defined canvas size (Step 03a slice 7).
+    /// One full-bleed photo cell on a `.template` layout, so it inherits the whole
+    /// editor stack (photos, text, stickers, snap guides, zoom, export) at an
+    /// arbitrary aspect ratio.
+    private func startFreeformProject(size: CGSize) {
+        let clamped = CGSize(
+            width: min(max(size.width.rounded(), 100), 4000),
+            height: min(max(size.height.rounded(), 100), 4000)
+        )
+        let ratio = "\(Int(clamped.width)):\(Int(clamped.height))"
+        let layout = CollageLayout.template(TemplateLayout(
+            templateID: "freeform",
+            name: "Freeform",
+            aspectRatio: ratio,
+            cells: [TemplateLayoutCell(frame: CGRect(x: 0, y: 0, width: 1, height: 1))]
+        ))
+        let state = GridEditorState(layout: layout, borderWidth: 0, background: .white)
+        let viewModel = GridEditorViewModel(canvasSize: clamped, state: state)
+        attachAutosave(to: viewModel)
         store.save(viewModel)
         pushEditor(with: viewModel)
     }

@@ -15,6 +15,7 @@ final class HomeViewController: UIViewController {
     // Wired by AppCoordinator.
     var summariesProvider: (() -> [ProjectSummary])?
     var onNewProject: (() -> Void)?
+    var onNewFreeform: ((CGSize) -> Void)?
     var onBrowseTemplates: (() -> Void)?
     var onOpenProject: ((UUID) -> Void)?
     var onDeleteProject: ((UUID) -> Void)?
@@ -42,7 +43,14 @@ final class HomeViewController: UIViewController {
         )
         templatesButton.accessibilityIdentifier = "templatesButton"
         templatesButton.accessibilityLabel = "Templates"
-        navigationItem.rightBarButtonItems = [addButton, templatesButton]
+
+        let freeformButton = UIBarButtonItem(
+            image: UIImage(systemName: "aspectratio"),
+            style: .plain, target: self, action: #selector(freeformTapped)
+        )
+        freeformButton.accessibilityIdentifier = "freeformButton"
+        freeformButton.accessibilityLabel = "Custom Size"
+        navigationItem.rightBarButtonItems = [addButton, templatesButton, freeformButton]
 
         collectionView.translatesAutoresizingMaskIntoConstraints = false
         emptyStateView.translatesAutoresizingMaskIntoConstraints = false
@@ -82,6 +90,35 @@ final class HomeViewController: UIViewController {
     @objc private func templatesTapped() {
         Haptics.tap()
         onBrowseTemplates?()
+    }
+
+    /// Prompts for a custom canvas size (100–4000 px) and starts a freeform collage.
+    @objc private func freeformTapped() {
+        Haptics.tap()
+        let alert = UIAlertController(
+            title: "Custom Canvas",
+            message: "Enter a size in pixels (100–4000).",
+            preferredStyle: .alert
+        )
+        alert.addTextField { field in
+            field.placeholder = "Width"
+            field.text = "1080"
+            field.keyboardType = .numberPad
+            field.accessibilityIdentifier = "freeformWidthField"
+        }
+        alert.addTextField { field in
+            field.placeholder = "Height"
+            field.text = "1080"
+            field.keyboardType = .numberPad
+            field.accessibilityIdentifier = "freeformHeightField"
+        }
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        alert.addAction(UIAlertAction(title: "Create", style: .default) { [weak self, weak alert] _ in
+            let width = Double(alert?.textFields?[0].text ?? "") ?? 1080
+            let height = Double(alert?.textFields?[1].text ?? "") ?? 1080
+            self?.onNewFreeform?(CGSize(width: width, height: height))
+        })
+        present(alert, animated: true)
     }
 
     private func makeCollectionView() -> UICollectionView {
