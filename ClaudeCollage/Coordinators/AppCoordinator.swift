@@ -76,13 +76,15 @@ final class AppCoordinator {
             layout = .template(templateLayout)
         }
 
-        // Text zones become editable overlays layered on the same editor (Step 03a
-        // slice 5). Their default styling + normalized frames come from the parser.
+        // Text + sticker zones become editable overlays layered on the same editor
+        // (Step 03a slices 5–6). Their styling / symbols + normalized frames come
+        // from the parser and the sticker catalog.
         let state = GridEditorState(
             layout: layout,
             borderWidth: template.cells.first.map { max($0.borderWidth, 0) } ?? 8,
             background: template.background,
-            textOverlays: template.cells.compactMap(\.textStyle)
+            textOverlays: template.cells.compactMap(\.textStyle),
+            stickerOverlays: TemplateService.stickerOverlays(for: template)
         )
         let viewModel = GridEditorViewModel(
             canvasSize: CanvasSize.size(forAspectRatio: template.canvasAspectRatio),

@@ -1,0 +1,20 @@
+{
+  "id": "grid-celebrate",
+  "name": "Party Grid",
+  "category": "grid",
+  "isPremium": false,
+  "canvasAspectRatio": "1:1",
+  "cells": [
+    { "id": "c1", "type": "photo", "shape": "rectangle",
+      "frame": { "x": 0.02, "y": 0.02, "width": 0.48, "height": 0.48 } },
+    { "id": "c2", "type": "photo", "shape": "rectangle",
+      "frame": { "x": 0.5, "y": 0.02, "width": 0.48, "height": 0.48 } },
+    { "id": "c3", "type": "photo", "shape": "rectangle",
+      "frame": { "x": 0.02, "y": 0.5, "width": 0.48, "height": 0.48 } },
+    { "id": "c4", "type": "photo", "shape": "rectangle",
+      "frame": { "x": 0.5, "y": 0.5, "width": 0.48, "height": 0.48 } },
+    { "id": "s1", "type": "sticker", "stickerID": "celebration.star",
+      "frame": { "x": 0.42, "y": 0.42, "width": 0.16, "height": 0.16 } }
+  ],
+  "background": { "type": "solid", "color": "#FFFFFF" }
+}

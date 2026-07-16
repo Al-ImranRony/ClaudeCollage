@@ -1,0 +1,14 @@
+{
+  "id": "minimal-sticker-accent",
+  "name": "Accent Mark",
+  "category": "minimal",
+  "isPremium": false,
+  "canvasAspectRatio": "1:1",
+  "cells": [
+    { "id": "hero", "type": "photo", "shape": "rectangle",
+      "frame": { "x": 0.16, "y": 0.16, "width": 0.68, "height": 0.68 } },
+    { "id": "s1", "type": "sticker", "stickerID": "basic.sparkles",
+      "frame": { "x": 0.72, "y": 0.08, "width": 0.16, "height": 0.16 } }
+  ],
+  "background": { "type": "solid", "color": "#FBFAF8" }
+}

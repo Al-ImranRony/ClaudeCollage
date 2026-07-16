@@ -1,0 +1,22 @@
+{
+  "id": "birthday-confetti",
+  "name": "Confetti Party",
+  "category": "birthday",
+  "isPremium": false,
+  "canvasAspectRatio": "4:5",
+  "cells": [
+    { "id": "photo", "type": "photo", "shape": "rectangle",
+      "frame": { "x": 0.08, "y": 0.14, "width": 0.84, "height": 0.56 } },
+    { "id": "greeting", "type": "text", "shape": "rectangle",
+      "frame": { "x": 0.06, "y": 0.74, "width": 0.88, "height": 0.13 },
+      "text": "Let's Celebrate", "fontName": "ChalkboardSE-Bold", "fontSize": 96,
+      "color": "#E86A2A", "alignment": "center" },
+    { "id": "s1", "type": "sticker", "stickerID": "celebration.popper",
+      "frame": { "x": 0.04, "y": 0.05, "width": 0.2, "height": 0.2 } },
+    { "id": "s2", "type": "sticker", "stickerID": "celebration.balloons",
+      "frame": { "x": 0.78, "y": 0.04, "width": 0.18, "height": 0.18 } },
+    { "id": "s3", "type": "sticker", "stickerID": "celebration.cake",
+      "frame": { "x": 0.8, "y": 0.62, "width": 0.16, "height": 0.16 } }
+  ],
+  "background": { "type": "solid", "color": "#FFF7EF" }
+}

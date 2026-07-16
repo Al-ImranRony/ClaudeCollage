@@ -150,6 +150,43 @@ public final class GridEditorViewModel {
         onTextOverlaysChanged?()
     }
 
+    // MARK: - Sticker overlays (Step 03a slice 6)
+
+    /// The sticker overlays layered above the cells + text.
+    public var stickerOverlays: [StickerOverlay] { state.stickerOverlays }
+
+    /// Adds a sticker (from the picker) at the canvas centre. Undoable; returns the
+    /// new sticker's id so the editor can select it.
+    @discardableResult
+    public func addSticker(_ overlay: StickerOverlay) -> UUID {
+        commit { $0.stickerOverlays.append(overlay) }
+        return overlay.id
+    }
+
+    /// Adds a fresh, editable text overlay at the canvas centre — the "add text"
+    /// affordance (templates seed their own text zones). Undoable; returns its id.
+    @discardableResult
+    public func addTextOverlay(_ overlay: TextOverlay) -> UUID {
+        commit { $0.textOverlays.append(overlay) }
+        return overlay.id
+    }
+
+    /// Live sticker edit (drag / pinch / rotate) — replaces the overlay in place
+    /// with no undo snapshot and no canvas rebuild (the sticker view moves itself
+    /// on the GPU). The editor commits one snapshot via `commitInteractiveChange()`
+    /// when the gesture ends.
+    public func previewStickerOverlay(_ overlay: StickerOverlay) {
+        guard let index = state.stickerOverlays.firstIndex(where: { $0.id == overlay.id }),
+              state.stickerOverlays[index] != overlay else { return }
+        state.stickerOverlays[index] = overlay
+    }
+
+    /// Removes a sticker (double-tap delete). Undoable.
+    public func removeSticker(id: UUID) {
+        guard state.stickerOverlays.contains(where: { $0.id == id }) else { return }
+        commit { $0.stickerOverlays.removeAll { $0.id == id } }
+    }
+
     /// Live filter update from the filter panel — no undo snapshot; the filtered
     /// image is recomputed asynchronously and delivered via `onCellImageChanged`.
     public func previewFilters(_ filters: CellFilters, forCellAt index: Int) {
@@ -219,7 +256,8 @@ public final class GridEditorViewModel {
             )
         }
         return CanvasModel(canvasSize: canvasSize, background: state.background,
-                           cells: cells, textOverlays: state.textOverlays)
+                           cells: cells, textOverlays: state.textOverlays,
+                           stickerOverlays: state.stickerOverlays)
     }
 
     // MARK: - Rendering (one-shot only)
@@ -285,7 +323,8 @@ public final class GridEditorViewModel {
         // reference, so the font scale is 1 (a downscaled export/thumbnail applies
         // its own raster scale in `render`, leaving these coordinates untouched).
         return RenderRequest(canvasSize: canvasSize, background: state.background,
-                             cells: cells, textOverlays: state.textOverlays, textFontScale: 1)
+                             cells: cells, textOverlays: state.textOverlays, textFontScale: 1,
+                             stickerOverlays: state.stickerOverlays)
     }
 
     /// Recomputes filtered images for all cells after an undo/redo/restore.

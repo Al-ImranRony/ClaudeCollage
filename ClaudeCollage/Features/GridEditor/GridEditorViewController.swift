@@ -167,7 +167,13 @@ final class GridEditorViewController: UIViewController {
         scroll.showsVerticalScrollIndicator = false
         scroll.addSubview(controlsStack)
 
+        // A compact "add overlay" bar between the canvas and the controls: drop a
+        // fresh text zone or open the sticker picker. This is also the "add
+        // arbitrary text" affordance deferred from slice 5.
+        let addBar = makeAddOverlayBar()
+
         view.addSubview(canvasView)
+        view.addSubview(addBar)
         view.addSubview(scroll)
 
         // The canvas is a fixed 1:1 square (matching the default Instagram-post
@@ -181,7 +187,11 @@ final class GridEditorViewController: UIViewController {
             canvasView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
             canvasSquare,
 
-            scroll.topAnchor.constraint(equalTo: canvasView.bottomAnchor, constant: 8),
+            addBar.topAnchor.constraint(equalTo: canvasView.bottomAnchor, constant: 8),
+            addBar.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
+            addBar.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
+
+            scroll.topAnchor.constraint(equalTo: addBar.bottomAnchor, constant: 8),
             scroll.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             scroll.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             scroll.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
@@ -220,6 +230,19 @@ final class GridEditorViewController: UIViewController {
         viewModel.onTextOverlaysChanged = { [weak self] in
             guard let self else { return }
             self.canvasView.updateTextOverlays(self.viewModel.textOverlays)
+        }
+
+        // Stickers manage their own geometry on the GPU during a gesture; the view
+        // model records it (no snapshot) and commits one on gesture end.
+        canvasView.onStickerChanged = { [weak self] overlay in
+            self?.viewModel.previewStickerOverlay(overlay)
+        }
+        canvasView.onStickerCommitted = { [weak self] in
+            self?.viewModel.commitInteractiveChange()
+        }
+        canvasView.onStickerDeleted = { [weak self] id in
+            self?.viewModel.removeSticker(id: id)
+            self?.showToast("Sticker removed")
         }
     }
 
@@ -353,6 +376,11 @@ final class GridEditorViewController: UIViewController {
     @objc private func canvasTapped(_ gesture: UITapGestureRecognizer) {
         let point = gesture.location(in: canvasView)
 
+        // Stickers handle their own taps (select / double-tap delete). A tap on a
+        // sticker is theirs; anything else clears the sticker selection.
+        if canvasView.stickerID(at: point) != nil { return }
+        canvasView.deselectSticker()
+
         // Text zones sit above the photo cells, so a tap that lands on one edits
         // the text — unless a photo swap is mid-flight (that targets cells).
         if pendingSwapSource == nil, let overlayID = canvasView.overlayID(at: point) {
@@ -453,6 +481,82 @@ final class GridEditorViewController: UIViewController {
         }
         Haptics.selectionChanged()
         present(host, animated: true)
+    }
+
+    // MARK: - Add overlays (text / stickers)
+
+    private func makeAddOverlayBar() -> UIView {
+        let textButton = makeAddButton(
+            title: "Text", systemImage: "textformat", identifier: "addTextButton",
+            action: #selector(addTextTapped))
+        let stickerButton = makeAddButton(
+            title: "Sticker", systemImage: "face.smiling", identifier: "addStickerButton",
+            action: #selector(addStickerTapped))
+        let row = UIStackView(arrangedSubviews: [textButton, stickerButton])
+        row.axis = .horizontal
+        row.distribution = .fillEqually
+        row.spacing = 12
+        row.translatesAutoresizingMaskIntoConstraints = false
+        return row
+    }
+
+    private func makeAddButton(
+        title: String, systemImage: String, identifier: String, action: Selector
+    ) -> UIButton {
+        var config = UIButton.Configuration.tinted()
+        config.title = title
+        config.image = UIImage(systemName: systemImage)
+        config.imagePadding = 6
+        config.cornerStyle = .large
+        config.baseForegroundColor = Theme.Color.accent
+        config.baseBackgroundColor = Theme.Color.accent
+        let button = UIButton(configuration: config)
+        button.accessibilityIdentifier = identifier
+        button.addTarget(self, action: action, for: .touchUpInside)
+        return button
+    }
+
+    /// Adds a fresh text zone at the canvas centre and opens the styling sheet so
+    /// the user can type immediately.
+    @objc private func addTextTapped() {
+        Haptics.tap()
+        let overlay = TextOverlay(
+            text: "Your text",
+            colorHex: onLightBackground ? "#1A1A1C" : "#FFFFFF",
+            frame: CGRect(x: 0.12, y: 0.42, width: 0.76, height: 0.16)
+        )
+        let id = viewModel.addTextOverlay(overlay)
+        presentTextStyleSheet(for: id)
+    }
+
+    /// Opens the sticker picker; the chosen sticker becomes a selected canvas overlay.
+    @objc private func addStickerTapped() {
+        Haptics.tap()
+        let picker = StickerPickerViewController.sheet { [weak self] entry in
+            self?.addSticker(from: entry)
+        }
+        present(picker, animated: true)
+    }
+
+    private func addSticker(from entry: StickerEntry) {
+        let overlay = StickerOverlay(
+            stickerID: entry.id,
+            symbolName: entry.symbol,
+            colorHex: entry.colorHex
+        )
+        let id = viewModel.addSticker(overlay)   // commits → canvas rebuilds
+        canvasView.setSelectedSticker(id)        // highlight the freshly-added sticker
+        Haptics.success()
+        showToast("Drag to position · double-tap to remove")
+    }
+
+    /// Whether the current canvas background is light (so a new text zone defaults
+    /// to a readable dark colour, else white).
+    private var onLightBackground: Bool {
+        var r: CGFloat = 1, g: CGFloat = 1, b: CGFloat = 1, a: CGFloat = 1
+        UIColor(background: viewModel.state.background).getRed(&r, green: &g, blue: &b, alpha: &a)
+        // Rec. 601 luma; > 0.6 reads as a light surface.
+        return (0.299 * r + 0.587 * g + 0.114 * b) > 0.6
     }
 
     // MARK: - Photo import
@@ -632,7 +736,10 @@ extension GridEditorViewController: PHPickerViewControllerDelegate {
 
 extension GridEditorViewController: CellGestureControllerDelegate {
     func cellIndex(at point: CGPoint) -> Int? {
-        canvasView.cellIndex(at: point)
+        // A touch that lands on a sticker belongs to that sticker's own gestures,
+        // not to the cell underneath — so the canvas cell pan/pinch stays inert.
+        if canvasView.stickerID(at: point) != nil { return nil }
+        return canvasView.cellIndex(at: point)
     }
 
     func currentTransform(forCellAt index: Int) -> CellTransform {

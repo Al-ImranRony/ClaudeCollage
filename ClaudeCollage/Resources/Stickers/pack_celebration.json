@@ -1,0 +1,27 @@
+{
+  "id": "celebration",
+  "name": "Celebration",
+  "symbol": "party.popper.fill",
+  "stickers": [
+    { "id": "celebration.popper", "symbol": "party.popper.fill", "name": "Popper", "color": "#E86A2A" },
+    { "id": "celebration.sparkles", "symbol": "sparkles", "name": "Sparkles", "color": "#F5C542" },
+    { "id": "celebration.star", "symbol": "star.fill", "name": "Star", "color": "#F5C542" },
+    { "id": "celebration.starcircle", "symbol": "star.circle.fill", "name": "Star Badge", "color": "#F29B3C" },
+    { "id": "celebration.heart", "symbol": "heart.fill", "name": "Heart", "color": "#C0405B" },
+    { "id": "celebration.heartcircle", "symbol": "heart.circle.fill", "name": "Heart Badge", "color": "#C0405B" },
+    { "id": "celebration.gift", "symbol": "gift.fill", "name": "Gift", "color": "#2E7D5B" },
+    { "id": "celebration.balloon", "symbol": "balloon.fill", "name": "Balloon", "color": "#C0405B" },
+    { "id": "celebration.balloons", "symbol": "balloon.2.fill", "name": "Balloons", "color": "#7A4FB0" },
+    { "id": "celebration.cake", "symbol": "birthday.cake.fill", "name": "Cake", "color": "#F29B3C" },
+    { "id": "celebration.crown", "symbol": "crown.fill", "name": "Crown", "color": "#F5C542" },
+    { "id": "celebration.clap", "symbol": "hands.clap.fill", "name": "Applause", "color": "#F29B3C" },
+    { "id": "celebration.trophy", "symbol": "trophy.fill", "name": "Trophy", "color": "#F5C542" },
+    { "id": "celebration.medal", "symbol": "medal.fill", "name": "Medal", "color": "#E86A2A" },
+    { "id": "celebration.wine", "symbol": "wineglass.fill", "name": "Cheers", "color": "#C0405B" },
+    { "id": "celebration.cup", "symbol": "cup.and.saucer.fill", "name": "Coffee", "color": "#3A3A3C" },
+    { "id": "celebration.mic", "symbol": "music.mic", "name": "Mic", "color": "#7A4FB0" },
+    { "id": "celebration.camera", "symbol": "camera.fill", "name": "Camera", "color": "#3A3A3C" },
+    { "id": "celebration.ticket", "symbol": "ticket.fill", "name": "Ticket", "color": "#2F6FB0" },
+    { "id": "celebration.flag", "symbol": "flag.checkered", "name": "Finish", "color": "#3A3A3C" }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "id": "nature",
+  "name": "Nature",
+  "symbol": "leaf.fill",
+  "stickers": [
+    { "id": "nature.leaf", "symbol": "leaf.fill", "name": "Leaf", "color": "#2E7D5B" },
+    { "id": "nature.sun", "symbol": "sun.max.fill", "name": "Sun", "color": "#F5C542" },
+    { "id": "nature.moon", "symbol": "moon.fill", "name": "Moon", "color": "#F29B3C" },
+    { "id": "nature.moonstars", "symbol": "moon.stars.fill", "name": "Night", "color": "#7A4FB0" },
+    { "id": "nature.cloud", "symbol": "cloud.fill", "name": "Cloud", "color": "#8A8A8E" },
+    { "id": "nature.rain", "symbol": "cloud.rain.fill", "name": "Rain", "color": "#2F6FB0" },
+    { "id": "nature.suncloud", "symbol": "cloud.sun.fill", "name": "Partly Sunny", "color": "#F29B3C" },
+    { "id": "nature.storm", "symbol": "cloud.bolt.rain.fill", "name": "Storm", "color": "#3A3A3C" },
+    { "id": "nature.snow", "symbol": "snowflake", "name": "Snow", "color": "#2F6FB0" },
+    { "id": "nature.wind", "symbol": "wind", "name": "Wind", "color": "#8A8A8E" },
+    { "id": "nature.drop", "symbol": "drop.fill", "name": "Drop", "color": "#2F6FB0" },
+    { "id": "nature.flame", "symbol": "flame.fill", "name": "Campfire", "color": "#E86A2A" },
+    { "id": "nature.sunrise", "symbol": "sunrise.fill", "name": "Sunrise", "color": "#F5C542" },
+    { "id": "nature.sunset", "symbol": "sunset.fill", "name": "Sunset", "color": "#E86A2A" },
+    { "id": "nature.tornado", "symbol": "tornado", "name": "Tornado", "color": "#3A3A3C" },
+    { "id": "nature.humidity", "symbol": "humidity.fill", "name": "Humidity", "color": "#2F6FB0" },
+    { "id": "nature.mountain", "symbol": "mountain.2.fill", "name": "Mountains", "color": "#2E7D5B" },
+    { "id": "nature.tree", "symbol": "tree.fill", "name": "Tree", "color": "#2E7D5B" },
+    { "id": "nature.pawprint", "symbol": "pawprint.fill", "name": "Paw", "color": "#F29B3C" },
+    { "id": "nature.bird", "symbol": "bird.fill", "name": "Bird", "color": "#2F6FB0" }
+  ]
+}

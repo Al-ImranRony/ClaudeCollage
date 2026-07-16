@@ -33,6 +33,8 @@ struct CanvasModel {
     var cells: [CanvasCellModel]
     /// Text zones layered above the cells (normalized frames). Step 03a slice 5.
     var textOverlays: [TextOverlay] = []
+    /// Sticker overlays layered above the text (normalized). Step 03a slice 6.
+    var stickerOverlays: [StickerOverlay] = []
 }
 
 final class CanvasView: UIView {
@@ -44,7 +46,23 @@ final class CanvasView: UIView {
     /// Text zones, layered above the cells. Kept in a separate view array so text
     /// edits never rebuild the (heavier) photo cell views.
     private var overlayViews: [TextOverlayView] = []
+    /// Sticker overlays, layered above the text. Interactive (each owns its
+    /// move/resize/rotate/delete gestures), unlike the non-interactive cells/text
+    /// which the view controller hit-tests.
+    private var stickerViews: [StickerOverlayView] = []
+    private var selectedStickerID: UUID?
     private var model: CanvasModel?
+
+    // MARK: - Sticker callbacks (wired by the view controller)
+
+    /// A sticker moved/resized/rotated mid-gesture (live, no undo snapshot yet).
+    var onStickerChanged: ((StickerOverlay) -> Void)?
+    /// A sticker gesture finished — record one undo snapshot.
+    var onStickerCommitted: (() -> Void)?
+    /// A sticker was double-tapped to delete.
+    var onStickerDeleted: ((UUID) -> Void)?
+    /// A sticker was tapped (selected), or `nil` when selection was cleared.
+    var onStickerSelected: ((UUID?) -> Void)?
 
     /// On-screen points per reference point (contentContainer.width / canvasSize.width).
     private(set) var referenceScaleFactor: CGFloat = 1
@@ -81,6 +99,7 @@ final class CanvasView: UIView {
             cellViews[index].setClipShape(cell.clipShape)
         }
         rebuildOverlayViewsIfNeeded(count: model.textOverlays.count)
+        rebuildStickerViews(model.stickerOverlays)
         layoutCanvas()
     }
 
@@ -89,7 +108,17 @@ final class CanvasView: UIView {
     func updateTextOverlays(_ overlays: [TextOverlay]) {
         model?.textOverlays = overlays
         rebuildOverlayViewsIfNeeded(count: overlays.count)
+        // Keep stickers above the (possibly re-fronted) text views.
+        stickerViews.forEach { contentContainer.bringSubviewToFront($0) }
         layoutOverlays()
+    }
+
+    /// Lightweight path for sticker add/delete/undo: rebuild the sticker view pool
+    /// and reposition, without touching the photo cell or text views.
+    func updateStickerOverlays(_ overlays: [StickerOverlay]) {
+        model?.stickerOverlays = overlays
+        rebuildStickerViews(overlays)
+        layoutStickers()
     }
 
     /// Rebuilds the overlay view pool when the overlay count changes, always
@@ -102,6 +131,27 @@ final class CanvasView: UIView {
         overlayViews.forEach { $0.removeFromSuperview() }
         overlayViews = (0..<count).map { _ in
             let view = TextOverlayView()
+            contentContainer.addSubview(view)
+            return view
+        }
+    }
+
+    /// Rebuilds the interactive sticker view pool from the model, wiring each
+    /// view's gesture callbacks back out through this canvas. Always rebuilt (not
+    /// pooled by count) because each view is bound to a specific sticker id — cheap,
+    /// since stickers are few and light.
+    private func rebuildStickerViews(_ overlays: [StickerOverlay]) {
+        stickerViews.forEach { $0.removeFromSuperview() }
+        stickerViews = overlays.map { overlay in
+            let view = StickerOverlayView(overlay: overlay)
+            view.onChanged = { [weak self] updated in self?.onStickerChanged?(updated) }
+            view.onCommitted = { [weak self] in self?.onStickerCommitted?() }
+            view.onDeleted = { [weak self] id in
+                if self?.selectedStickerID == id { self?.selectedStickerID = nil }
+                self?.onStickerDeleted?(id)
+            }
+            view.onSelected = { [weak self] id in self?.selectStickerFromTap(id) }
+            view.isSelected = overlay.id == selectedStickerID
             contentContainer.addSubview(view)
             return view
         }
@@ -152,6 +202,7 @@ final class CanvasView: UIView {
         }
 
         layoutOverlays()
+        layoutStickers()
     }
 
     /// Positions each text overlay view (normalized frame → on-screen points) and
@@ -165,6 +216,53 @@ final class CanvasView: UIView {
             overlayViews[index].frame = TextRendering.frame(for: overlay, in: size)
             overlayViews[index].configure(with: overlay, fontScale: referenceScaleFactor)
         }
+    }
+
+    /// Positions each sticker view from its normalized model at the current
+    /// container size. The interactive views mutate their own geometry mid-gesture;
+    /// this runs on discrete rebuilds and bounds changes (rotation, resize).
+    private func layoutStickers() {
+        guard let model else { return }
+        let size = contentContainer.bounds.size
+        guard size.width > 0 else { return }
+        for (index, overlay) in model.stickerOverlays.enumerated() where stickerViews.indices.contains(index) {
+            stickerViews[index].apply(overlay: overlay, in: size)
+        }
+    }
+
+    // MARK: - Sticker selection
+
+    /// Marks one sticker selected (or clears selection with `nil`) and updates the
+    /// selection chrome on every sticker view. Does not notify the delegate.
+    func setSelectedSticker(_ id: UUID?) {
+        selectedStickerID = id
+        for view in stickerViews { view.isSelected = view.stickerID == id }
+    }
+
+    /// Clears any sticker selection and notifies the delegate.
+    func deselectSticker() {
+        guard selectedStickerID != nil else { return }
+        setSelectedSticker(nil)
+        onStickerSelected?(nil)
+    }
+
+    /// The id of the topmost sticker whose (rotated) view contains `point`
+    /// (this view's coordinates), if any.
+    func stickerID(at point: CGPoint) -> UUID? {
+        let local = convert(point, to: contentContainer)
+        for view in stickerViews.reversed() where view.frame.contains(local) {
+            return view.stickerID
+        }
+        return nil
+    }
+
+    private func selectStickerFromTap(_ id: UUID) {
+        setSelectedSticker(id)
+        // Bring the tapped sticker to the front so overlapping stickers cycle.
+        if let view = stickerViews.first(where: { $0.stickerID == id }) {
+            contentContainer.bringSubviewToFront(view)
+        }
+        onStickerSelected?(id)
     }
 
     // MARK: - Hit testing
@@ -330,5 +428,188 @@ final class TextOverlayView: UIView {
     override func layoutSubviews() {
         super.layoutSubviews()
         label.frame = bounds
+    }
+}
+
+// MARK: - Sticker overlay view
+
+/// One sticker on the canvas: a tinted SF Symbol (drawn via `StickerRendering`, so
+/// the live view matches the export) that the user can drag, pinch, rotate, and
+/// double-tap to delete. Unlike text, stickers are freely positioned, so each view
+/// owns its gestures and reports normalized geometry back through closures.
+final class StickerOverlayView: UIView {
+
+    let stickerID: UUID
+    private var overlay: StickerOverlay
+    private let imageView = UIImageView()
+    private let selectionLayer = CAShapeLayer()
+
+    /// Points-per-container-point that normalization divides by — the superview
+    /// (the canvas content container) is the reference frame.
+    private var containerSize: CGSize { superview?.bounds.size ?? bounds.size }
+
+    var onChanged: ((StickerOverlay) -> Void)?
+    var onCommitted: (() -> Void)?
+    var onDeleted: ((UUID) -> Void)?
+    var onSelected: ((UUID) -> Void)?
+
+    var isSelected: Bool = false {
+        didSet { selectionLayer.isHidden = !isSelected }
+    }
+
+    init(overlay: StickerOverlay) {
+        self.stickerID = overlay.id
+        self.overlay = overlay
+        super.init(frame: .zero)
+
+        backgroundColor = .clear
+        imageView.contentMode = .scaleAspectFit
+        imageView.isUserInteractionEnabled = false
+        addSubview(imageView)
+
+        selectionLayer.fillColor = UIColor.clear.cgColor
+        selectionLayer.strokeColor = Theme.Color.accent.cgColor
+        selectionLayer.lineDashPattern = [5, 4]
+        selectionLayer.lineWidth = 1.5
+        selectionLayer.isHidden = true
+        layer.addSublayer(selectionLayer)
+
+        installGestures()
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
+
+    /// Positions the view from its normalized model at the given container size and
+    /// re-renders the symbol crisply at the resolved point side.
+    func apply(overlay: StickerOverlay, in containerSize: CGSize) {
+        self.overlay = overlay
+        let side = max(8, CGFloat(overlay.sizeNorm) * containerSize.width)
+        // Set bounds with an identity transform, then re-apply the rotation, so the
+        // rotation composes cleanly with the new size (mirrors CellContentView).
+        transform = .identity
+        bounds = CGRect(x: 0, y: 0, width: side, height: side)
+        center = CGPoint(x: CGFloat(overlay.centerX) * containerSize.width,
+                         y: CGFloat(overlay.centerY) * containerSize.height)
+        transform = CGAffineTransform(rotationAngle: CGFloat(overlay.rotation))
+        refreshImage(side: side)
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        imageView.frame = bounds
+        selectionLayer.frame = bounds
+        selectionLayer.path = UIBezierPath(
+            roundedRect: bounds.insetBy(dx: 1, dy: 1), cornerRadius: 6
+        ).cgPath
+    }
+
+    private func refreshImage(side: CGFloat) {
+        imageView.image = StickerRendering.image(for: overlay, sidePx: side)
+    }
+
+    // MARK: - Gestures
+
+    private func installGestures() {
+        let pan = UIPanGestureRecognizer(target: self, action: #selector(handlePan))
+        let pinch = UIPinchGestureRecognizer(target: self, action: #selector(handlePinch))
+        let rotate = UIRotationGestureRecognizer(target: self, action: #selector(handleRotate))
+        let tap = UITapGestureRecognizer(target: self, action: #selector(handleTap))
+        let doubleTap = UITapGestureRecognizer(target: self, action: #selector(handleDoubleTap))
+        doubleTap.numberOfTapsRequired = 2
+        tap.require(toFail: doubleTap)
+        for recognizer in [pan, pinch, rotate, tap, doubleTap] as [UIGestureRecognizer] {
+            recognizer.delegate = self
+            addGestureRecognizer(recognizer)
+        }
+        isUserInteractionEnabled = true
+    }
+
+    @objc private func handlePan(_ gesture: UIPanGestureRecognizer) {
+        guard let container = superview else { return }
+        switch gesture.state {
+        case .began:
+            select()
+        case .changed:
+            let translation = gesture.translation(in: container)
+            gesture.setTranslation(.zero, in: container)
+            center = CGPoint(x: center.x + translation.x, y: center.y + translation.y)
+            emitChange()
+        case .ended, .cancelled, .failed:
+            onCommitted?()
+        default:
+            break
+        }
+    }
+
+    @objc private func handlePinch(_ gesture: UIPinchGestureRecognizer) {
+        guard let container = superview else { return }
+        switch gesture.state {
+        case .began:
+            select()
+        case .changed:
+            let minSide = container.bounds.width * 0.06
+            let maxSide = container.bounds.width * 1.6
+            let newSide = min(max(bounds.width * gesture.scale, minSide), maxSide)
+            gesture.scale = 1
+            bounds = CGRect(x: 0, y: 0, width: newSide, height: newSide)
+            emitChange()
+        case .ended, .cancelled, .failed:
+            refreshImage(side: bounds.width)   // re-render crisply at the final size
+            onCommitted?()
+        default:
+            break
+        }
+    }
+
+    @objc private func handleRotate(_ gesture: UIRotationGestureRecognizer) {
+        switch gesture.state {
+        case .began:
+            select()
+        case .changed:
+            transform = transform.rotated(by: gesture.rotation)
+            gesture.rotation = 0
+            emitChange()
+        case .ended, .cancelled, .failed:
+            onCommitted?()
+        default:
+            break
+        }
+    }
+
+    @objc private func handleTap() {
+        select()
+    }
+
+    @objc private func handleDoubleTap() {
+        Haptics.warning()
+        onDeleted?(stickerID)
+    }
+
+    private func select() {
+        if !isSelected { onSelected?(stickerID) }
+    }
+
+    /// Reports the view's current geometry back as a normalized overlay.
+    private func emitChange() {
+        let size = containerSize
+        guard size.width > 0, size.height > 0 else { return }
+        var updated = overlay
+        updated.centerX = Double(center.x / size.width)
+        updated.centerY = Double(center.y / size.height)
+        updated.sizeNorm = Double(bounds.width / size.width)
+        updated.rotation = Double(atan2(transform.b, transform.a))
+        overlay = updated
+        onChanged?(updated)
+    }
+}
+
+extension StickerOverlayView: UIGestureRecognizerDelegate {
+    // Move + pinch + rotate must compose on the same sticker simultaneously.
+    func gestureRecognizer(
+        _ gestureRecognizer: UIGestureRecognizer,
+        shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer
+    ) -> Bool {
+        true
     }
 }

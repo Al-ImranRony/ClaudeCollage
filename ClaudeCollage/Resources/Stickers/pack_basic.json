@@ -1,0 +1,27 @@
+{
+  "id": "basic",
+  "name": "Basic",
+  "symbol": "heart.fill",
+  "stickers": [
+    { "id": "basic.heart", "symbol": "heart.fill", "name": "Heart", "color": "#C0405B" },
+    { "id": "basic.star", "symbol": "star.fill", "name": "Star", "color": "#F5C542" },
+    { "id": "basic.bolt", "symbol": "bolt.fill", "name": "Bolt", "color": "#F29B3C" },
+    { "id": "basic.flame", "symbol": "flame.fill", "name": "Flame", "color": "#E86A2A" },
+    { "id": "basic.crown", "symbol": "crown.fill", "name": "Crown", "color": "#F5C542" },
+    { "id": "basic.sparkles", "symbol": "sparkles", "name": "Sparkles", "color": "#F29B3C" },
+    { "id": "basic.thumbsup", "symbol": "hand.thumbsup.fill", "name": "Thumbs Up", "color": "#2F6FB0" },
+    { "id": "basic.seal", "symbol": "checkmark.seal.fill", "name": "Verified", "color": "#2E7D5B" },
+    { "id": "basic.bell", "symbol": "bell.fill", "name": "Bell", "color": "#F5C542" },
+    { "id": "basic.tag", "symbol": "tag.fill", "name": "Tag", "color": "#E86A2A" },
+    { "id": "basic.pin", "symbol": "pin.fill", "name": "Pin", "color": "#C0405B" },
+    { "id": "basic.camera", "symbol": "camera.fill", "name": "Camera", "color": "#3A3A3C" },
+    { "id": "basic.music", "symbol": "music.note", "name": "Music", "color": "#7A4FB0" },
+    { "id": "basic.bubble", "symbol": "bubble.right.fill", "name": "Bubble", "color": "#2F6FB0" },
+    { "id": "basic.quote", "symbol": "quote.bubble.fill", "name": "Quote", "color": "#8A8A8E" },
+    { "id": "basic.location", "symbol": "location.fill", "name": "Location", "color": "#2F6FB0" },
+    { "id": "basic.paperplane", "symbol": "paperplane.fill", "name": "Send", "color": "#2E7D5B" },
+    { "id": "basic.gift", "symbol": "gift.fill", "name": "Gift", "color": "#C0405B" },
+    { "id": "basic.flag", "symbol": "flag.fill", "name": "Flag", "color": "#E86A2A" },
+    { "id": "basic.bookmark", "symbol": "bookmark.fill", "name": "Bookmark", "color": "#F29B3C" }
+  ]
+}

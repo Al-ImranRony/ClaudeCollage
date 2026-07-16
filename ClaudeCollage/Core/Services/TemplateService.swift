@@ -141,7 +141,29 @@ public final class TemplateService {
         let textOverlays = template.cells.compactMap(\.textStyle)
 
         return RenderRequest(canvasSize: canvas, background: template.background,
-                             cells: cells, textOverlays: textOverlays, textFontScale: scale)
+                             cells: cells, textOverlays: textOverlays, textFontScale: scale,
+                             stickerOverlays: Self.stickerOverlays(for: template))
+    }
+
+    // MARK: - Sticker seeding
+
+    /// Resolves a template's sticker zones into concrete `StickerOverlay`s (symbol +
+    /// colour from the sticker catalog, geometry from the zone frame). Used to seed
+    /// the editor and to preview stickers in gallery thumbnails.
+    public static func stickerOverlays(for template: CollageTemplate) -> [StickerOverlay] {
+        template.cells.compactMap { cell in
+            guard cell.zoneType == .sticker, let id = cell.stickerID else { return nil }
+            let entry = StickerCatalog.shared.entry(for: id)
+            // Size uses the zone width as a fraction of the canvas width (stickers
+            // are square in pixels — see StickerOverlay).
+            return StickerOverlay(
+                stickerID: id,
+                symbolName: entry?.symbol ?? "star.fill",
+                colorHex: entry?.colorHex ?? "#E86A2A",
+                center: CGPoint(x: cell.frame.midX, y: cell.frame.midY),
+                sizeNorm: Double(cell.frame.width)
+            )
+        }
     }
 
     // MARK: - Grid matching
@@ -188,7 +210,7 @@ public final class TemplateService {
         mix(template.canvasAspectRatio)
         mix(String(describing: template.background))
         for cell in template.cells {
-            mix("\(cell.type)|\(cell.shape.rawValue)|\(cell.cornerRadius)|")
+            mix("\(cell.type)|\(cell.shape.rawValue)|\(cell.cornerRadius)|\(cell.stickerID ?? "")|")
             mix("\(cell.frame.minX),\(cell.frame.minY),\(cell.frame.width),\(cell.frame.height);")
             // Text zones now render into the thumbnail, so their content + styling
             // must move the fingerprint or an edited caption would serve a stale image.

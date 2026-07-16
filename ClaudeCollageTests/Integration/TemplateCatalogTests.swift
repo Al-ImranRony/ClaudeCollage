@@ -26,7 +26,7 @@ final class TemplateCatalogTests: XCTestCase {
         let service = TemplateService(bundle: appBundle)
         let templates = service.loadBundledTemplates()
 
-        XCTAssertGreaterThanOrEqual(templates.count, 21, "Catalog v1 ships 21 templates")
+        XCTAssertGreaterThanOrEqual(templates.count, 30, "Done criteria: 30 bundled templates")
         XCTAssertEqual(
             Set(templates.map(\.id)).count, templates.count,
             "Template ids must be unique — the gallery's diffable data source drops duplicates"

@@ -56,6 +56,11 @@ public struct GridEditorState: Equatable, Sendable, Codable {
     /// template's text zones and edited in place. Part of this snapshot, so text
     /// edits participate in undo/redo and autosave exactly like the photo cells.
     public var textOverlays: [TextOverlay]
+    /// Sticker overlays layered above the photo cells (Step 03a slice 6). Added
+    /// from the sticker picker or seeded from a template's sticker zones; freely
+    /// moved / resized / rotated. Also part of this snapshot, so they ride the
+    /// same undo/redo + autosave as text.
+    public var stickerOverlays: [StickerOverlay]
 
     public init(
         layout: CollageLayout = .grid(.twoUpHorizontal),
@@ -63,7 +68,8 @@ public struct GridEditorState: Equatable, Sendable, Codable {
         cornerRadius: Double = 0,
         background: CollageBackground = .white,
         cells: [EditorCellState]? = nil,
-        textOverlays: [TextOverlay] = []
+        textOverlays: [TextOverlay] = [],
+        stickerOverlays: [StickerOverlay] = []
     ) {
         self.layout = layout
         self.borderWidth = borderWidth
@@ -71,6 +77,7 @@ public struct GridEditorState: Equatable, Sendable, Codable {
         self.background = background
         self.cells = cells ?? Array(repeating: EditorCellState(), count: layout.cellCount)
         self.textOverlays = textOverlays
+        self.stickerOverlays = stickerOverlays
     }
 
     /// Convenience for grid callers / tests.
@@ -95,7 +102,7 @@ public struct GridEditorState: Equatable, Sendable, Codable {
     // MARK: - Codable (backward compatible)
 
     private enum CodingKeys: String, CodingKey {
-        case layout, template, borderWidth, cornerRadius, background, cells, textOverlays
+        case layout, template, borderWidth, cornerRadius, background, cells, textOverlays, stickerOverlays
     }
 
     public init(from decoder: Decoder) throws {
@@ -117,6 +124,8 @@ public struct GridEditorState: Equatable, Sendable, Codable {
         // Absent in Step 01–04 project blobs → an empty overlay list, so saved
         // projects keep loading unchanged.
         self.textOverlays = try container.decodeIfPresent([TextOverlay].self, forKey: .textOverlays) ?? []
+        // Absent before slice 6 → no stickers, so pre-sticker projects keep loading.
+        self.stickerOverlays = try container.decodeIfPresent([StickerOverlay].self, forKey: .stickerOverlays) ?? []
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -127,5 +136,6 @@ public struct GridEditorState: Equatable, Sendable, Codable {
         try container.encode(background, forKey: .background)
         try container.encode(cells, forKey: .cells)
         try container.encode(textOverlays, forKey: .textOverlays)
+        try container.encode(stickerOverlays, forKey: .stickerOverlays)
     }
 }
