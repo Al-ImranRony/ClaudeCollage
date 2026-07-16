@@ -1,0 +1,18 @@
+{
+  "id": "travel-passport",
+  "name": "Passport",
+  "category": "travel",
+  "isPremium": true,
+  "canvasAspectRatio": "9:16",
+  "cells": [
+    { "id": "hero", "type": "photo", "shape": "rectangle",
+      "frame": { "x": 0.06, "y": 0.06, "width": 0.88, "height": 0.6 } },
+    { "id": "strip", "type": "photo", "shape": "rectangle",
+      "frame": { "x": 0.06, "y": 0.68, "width": 0.88, "height": 0.12 } },
+    { "id": "place", "type": "text", "shape": "rectangle",
+      "frame": { "x": 0.06, "y": 0.83, "width": 0.88, "height": 0.09 },
+      "text": "LISBON · PORTUGAL", "fontName": "HelveticaNeue-Bold", "fontSize": 72,
+      "color": "#FFFFFF", "alignment": "center" }
+  ],
+  "background": { "type": "solid", "color": "#20303A" }
+}

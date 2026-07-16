@@ -40,6 +40,10 @@ public final class GridEditorViewModel {
     /// controller updates just that cell.
     public var onCellImageChanged: ((Int) -> Void)?
 
+    /// A text overlay's content/style changed (live typing or the styling sheet).
+    /// The view controller refreshes just the overlay layers — no cell rebuild.
+    public var onTextOverlaysChanged: (() -> Void)?
+
     /// A committed change — persistence auto-saves (debounced by the caller).
     public var onCommit: ((GridEditorViewModel) -> Void)?
 
@@ -126,6 +130,26 @@ public final class GridEditorViewModel {
         commit { $0.cells.swapAt(a, b) }
     }
 
+    // MARK: - Text overlays (Step 03a slice 5)
+
+    /// The text zones layered above the cells.
+    public var textOverlays: [TextOverlay] { state.textOverlays }
+
+    /// Looks up an overlay by id (the editor identifies the tapped zone by id).
+    public func textOverlay(id: UUID) -> TextOverlay? {
+        state.textOverlays.first { $0.id == id }
+    }
+
+    /// Live text edit (typing / dragging a style slider) — replaces the overlay in
+    /// place with no undo snapshot, and notifies the overlay-only refresh path. The
+    /// editor commits one snapshot via `commitInteractiveChange()` when editing ends.
+    public func previewTextOverlay(_ overlay: TextOverlay) {
+        guard let index = state.textOverlays.firstIndex(where: { $0.id == overlay.id }),
+              state.textOverlays[index] != overlay else { return }
+        state.textOverlays[index] = overlay
+        onTextOverlaysChanged?()
+    }
+
     /// Live filter update from the filter panel — no undo snapshot; the filtered
     /// image is recomputed asynchronously and delivered via `onCellImageChanged`.
     public func previewFilters(_ filters: CellFilters, forCellAt index: Int) {
@@ -194,7 +218,8 @@ public final class GridEditorViewModel {
                 clipShape: custom ?? frame.clipShape
             )
         }
-        return CanvasModel(canvasSize: canvasSize, background: state.background, cells: cells)
+        return CanvasModel(canvasSize: canvasSize, background: state.background,
+                           cells: cells, textOverlays: state.textOverlays)
     }
 
     // MARK: - Rendering (one-shot only)
@@ -256,7 +281,11 @@ public final class GridEditorViewModel {
                 clipShape: custom ?? frame.clipShape
             )
         }
-        return RenderRequest(canvasSize: canvasSize, background: state.background, cells: cells)
+        // Text renders at reference-canvas point sizes: the project canvas IS the
+        // reference, so the font scale is 1 (a downscaled export/thumbnail applies
+        // its own raster scale in `render`, leaving these coordinates untouched).
+        return RenderRequest(canvasSize: canvasSize, background: state.background,
+                             cells: cells, textOverlays: state.textOverlays, textFontScale: 1)
     }
 
     /// Recomputes filtered images for all cells after an undo/redo/restore.

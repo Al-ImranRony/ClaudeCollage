@@ -47,8 +47,12 @@
         },
         "borderWidth": { "type": "number", "minimum": 0, "maximum": 20 },
         "cornerRadius": { "type": "number", "minimum": 0 },
-        "defaultText": { "type": "string" },
-        "fontStyle": { "type": "string" }
+        "text": { "type": "string", "description": "text zones: the default caption/headline string" },
+        "fontName": { "type": "string", "description": "text zones: PostScript font name, e.g. AvenirNext-Bold" },
+        "fontSize": { "type": "number", "minimum": 1, "description": "text zones: point size on the reference canvas (short side 1080px)" },
+        "color": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$", "description": "text zones: fill colour" },
+        "alignment": { "type": "string", "enum": ["leading", "center", "trailing", "justified"] },
+        "stickerID": { "type": "string", "description": "sticker zones: bundled sticker id" }
       }
     },
     "background": {

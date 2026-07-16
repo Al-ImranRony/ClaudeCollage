@@ -161,7 +161,8 @@ final class TemplateParserTests: XCTestCase {
         // Text zones seed a default-styled TextOverlay bound to the zone frame.
         let style = try XCTUnwrap(cell.textStyle)
         XCTAssertEqual(style.alignment, .center)
-        XCTAssertEqual(style.fontSize, 18, accuracy: 0.001)
+        // Font size omitted in JSON → the TextOverlay default (reference-canvas pts).
+        XCTAssertEqual(style.fontSize, 64, accuracy: 0.001)
         XCTAssertEqual(style.colorHex, "#000000")
         XCTAssertEqual(style.frame.origin.x, 0.1, accuracy: 0.001)
         XCTAssertNil(cell.stickerID)

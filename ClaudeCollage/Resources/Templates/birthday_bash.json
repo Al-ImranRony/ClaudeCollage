@@ -1,0 +1,16 @@
+{
+  "id": "birthday-bash",
+  "name": "Birthday Bash",
+  "category": "birthday",
+  "isPremium": false,
+  "canvasAspectRatio": "1:1",
+  "cells": [
+    { "id": "photo", "type": "photo", "shape": "rectangle",
+      "frame": { "x": 0.08, "y": 0.1, "width": 0.84, "height": 0.6 } },
+    { "id": "greeting", "type": "text", "shape": "rectangle",
+      "frame": { "x": 0.05, "y": 0.72, "width": 0.9, "height": 0.16 },
+      "text": "Happy Birthday!", "fontName": "ChalkboardSE-Bold", "fontSize": 104,
+      "color": "#E86A2A", "alignment": "center" }
+  ],
+  "background": { "type": "solid", "color": "#FFF7EF" }
+}

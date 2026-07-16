@@ -1,0 +1,16 @@
+{
+  "id": "seasonal-greeting",
+  "name": "Season's Greeting",
+  "category": "seasonal",
+  "isPremium": false,
+  "canvasAspectRatio": "1:1",
+  "cells": [
+    { "id": "photo", "type": "photo", "shape": "rectangle",
+      "frame": { "x": 0.08, "y": 0.08, "width": 0.84, "height": 0.62 } },
+    { "id": "greeting", "type": "text", "shape": "rectangle",
+      "frame": { "x": 0.06, "y": 0.74, "width": 0.88, "height": 0.14 },
+      "text": "Happy Holidays", "fontName": "Georgia-Bold", "fontSize": 92,
+      "color": "#B23A2E", "alignment": "center" }
+  ],
+  "background": { "type": "solid", "color": "#F7F1E7" }
+}

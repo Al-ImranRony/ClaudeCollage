@@ -43,11 +43,25 @@ public struct RenderRequest: Sendable {
     public let canvasSize: CGSize
     public let background: CollageBackground
     public let cells: [RenderCell]
+    /// Text zones drawn (in order) above the cells. Frames are normalized (0…1);
+    /// the renderer resolves them against `canvasSize`.
+    public let textOverlays: [TextOverlay]
+    /// Scales the overlays' reference-canvas point sizes to `canvasSize`
+    /// (`canvasSize.height / referenceCanvas.height`). 1 for a full-res export.
+    public let textFontScale: CGFloat
 
-    public init(canvasSize: CGSize, background: CollageBackground, cells: [RenderCell]) {
+    public init(
+        canvasSize: CGSize,
+        background: CollageBackground,
+        cells: [RenderCell],
+        textOverlays: [TextOverlay] = [],
+        textFontScale: CGFloat = 1
+    ) {
         self.canvasSize = canvasSize
         self.background = background
         self.cells = cells
+        self.textOverlays = textOverlays
+        self.textFontScale = textFontScale
     }
 }
 
@@ -93,6 +107,16 @@ public final class CollageRenderer: @unchecked Sendable {
                 }
 
                 cg.restoreGState()
+            }
+
+            // Text zones composite on top of the photo cells, in authoring order.
+            for overlay in request.textOverlays {
+                TextRendering.draw(
+                    overlay,
+                    in: TextRendering.frame(for: overlay, in: request.canvasSize),
+                    fontScale: request.textFontScale,
+                    context: cg
+                )
             }
         }
         return output.cgImage

@@ -82,6 +82,48 @@ final class TemplateServiceTests: XCTestCase {
         XCTAssertTrue(service.canOpen(premium), "Unlocked user should open a premium template")
     }
 
+    // MARK: - Step 03a slice 5: text zones
+
+    /// A photo+text template must route through the `.template` editor path (its
+    /// text zone stops it matching a pure photo grid) and expose its text zones as
+    /// seedable overlays with normalized frames.
+    func testTextTemplateSeedsOverlaysAndRoutesToTemplateLayout() throws {
+        let template = try makeTemplate("""
+        {
+          "id": "story-x", "name": "Story X", "category": "story", "isPremium": false,
+          "canvasAspectRatio": "9:16",
+          "cells": [
+            { "id": "hero", "type": "photo", "shape": "rectangle",
+              "frame": { "x": 0.06, "y": 0.06, "width": 0.88, "height": 0.5 } },
+            { "id": "headline", "type": "text", "shape": "rectangle",
+              "frame": { "x": 0.08, "y": 0.62, "width": 0.84, "height": 0.14 },
+              "text": "Your Story", "fontName": "AvenirNext-Bold", "fontSize": 120,
+              "color": "#FFFFFF", "alignment": "center" }
+          ],
+          "background": { "type": "solid", "color": "#161618" }
+        }
+        """)
+
+        // Seeded overlays come from the parser's text zones.
+        let overlays = template.cells.compactMap(\.textStyle)
+        XCTAssertEqual(overlays.count, 1)
+        XCTAssertEqual(overlays[0].text, "Your Story")
+        XCTAssertEqual(overlays[0].fontName, "AvenirNext-Bold")
+        XCTAssertEqual(overlays[0].colorHex, "#FFFFFF")
+
+        // A text zone means it is not a pure photo grid → `.template` editor path.
+        XCTAssertNil(TemplateService.gridTemplate(matching: template))
+        let layout = TemplateService.editorLayout(for: template)
+        XCTAssertEqual(layout.cells.count, 1, "Only the photo zone becomes an editor cell")
+
+        // The render request carries the text overlays so the thumbnail previews them.
+        let service = TemplateService(bundle: appBundle)
+        let request = service.renderRequest(for: template, maxDimension: 300)
+        XCTAssertEqual(request.textOverlays.count, 1)
+        XCTAssertGreaterThan(request.textFontScale, 0)
+        XCTAssertNotNil(service.thumbnail(for: template), "Text template thumbnail must render")
+    }
+
     func testThumbnailFingerprintTracksContentChanges() throws {
         let original = try makeTemplate("""
         { "id": "fp", "name": "FP", "canvasAspectRatio": "1:1",

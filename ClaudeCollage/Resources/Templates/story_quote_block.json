@@ -1,0 +1,20 @@
+{
+  "id": "story-quote-block",
+  "name": "Quote Block",
+  "category": "story",
+  "isPremium": false,
+  "canvasAspectRatio": "9:16",
+  "cells": [
+    { "id": "hero", "type": "photo", "shape": "rectangle",
+      "frame": { "x": 0.06, "y": 0.06, "width": 0.88, "height": 0.5 } },
+    { "id": "headline", "type": "text", "shape": "rectangle",
+      "frame": { "x": 0.08, "y": 0.62, "width": 0.84, "height": 0.14 },
+      "text": "Your Story", "fontName": "AvenirNext-Bold", "fontSize": 120,
+      "color": "#FFFFFF", "alignment": "center" },
+    { "id": "caption", "type": "text", "shape": "rectangle",
+      "frame": { "x": 0.08, "y": 0.78, "width": 0.84, "height": 0.09 },
+      "text": "Tap to add a caption", "fontName": "AvenirNext-Regular", "fontSize": 52,
+      "color": "#B8B8BE", "alignment": "center" }
+  ],
+  "background": { "type": "solid", "color": "#161618" }
+}

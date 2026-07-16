@@ -1,0 +1,16 @@
+{
+  "id": "story-caption-hero",
+  "name": "Caption Hero",
+  "category": "story",
+  "isPremium": false,
+  "canvasAspectRatio": "9:16",
+  "cells": [
+    { "id": "hero", "type": "photo", "shape": "rectangle",
+      "frame": { "x": 0.05, "y": 0.05, "width": 0.9, "height": 0.78 } },
+    { "id": "title", "type": "text", "shape": "rectangle",
+      "frame": { "x": 0.08, "y": 0.85, "width": 0.84, "height": 0.1 },
+      "text": "MOMENTS", "fontName": "Futura-Bold", "fontSize": 100,
+      "color": "#1B1B1E", "alignment": "center" }
+  ],
+  "background": { "type": "solid", "color": "#F3EFE9" }
+}

@@ -108,8 +108,9 @@ public final class TemplateService {
 
     /// Builds a `RenderRequest` for the template fitted into a `maxDimension` box
     /// (longest side = `maxDimension`), preserving the authored aspect ratio.
-    /// Only visual zones (photo / art) become render cells — text, sticker and
-    /// spacer zones are interactive overlays handled by the editor.
+    /// Photo / art zones become render cells; text zones render as overlays so the
+    /// gallery thumbnail previews the template's typography. Sticker and spacer
+    /// zones remain purely interactive and are omitted.
     public func renderRequest(for template: CollageTemplate, maxDimension: CGFloat = 300) -> RenderRequest {
         let native = CanvasSize.size(forAspectRatio: template.canvasAspectRatio)
         let longest = max(native.width, native.height, 1)
@@ -135,7 +136,12 @@ public final class TemplateService {
                 )
             }
 
-        return RenderRequest(canvasSize: canvas, background: template.background, cells: cells)
+        // The thumbnail canvas is `native × scale`, so the overlays' reference-canvas
+        // point sizes scale by the same factor.
+        let textOverlays = template.cells.compactMap(\.textStyle)
+
+        return RenderRequest(canvasSize: canvas, background: template.background,
+                             cells: cells, textOverlays: textOverlays, textFontScale: scale)
     }
 
     // MARK: - Grid matching
@@ -184,6 +190,12 @@ public final class TemplateService {
         for cell in template.cells {
             mix("\(cell.type)|\(cell.shape.rawValue)|\(cell.cornerRadius)|")
             mix("\(cell.frame.minX),\(cell.frame.minY),\(cell.frame.width),\(cell.frame.height);")
+            // Text zones now render into the thumbnail, so their content + styling
+            // must move the fingerprint or an edited caption would serve a stale image.
+            if let t = cell.textStyle {
+                mix("txt:\(t.text)|\(t.fontName)|\(t.fontSize)|\(t.colorHex)|\(t.alignmentRaw)")
+                mix("|\(t.letterSpacing)|\(t.lineHeight)|\(t.opacity)|\(t.isBold)\(t.isItalic)\(t.isUnderlined);")
+            }
         }
         return String(hash, radix: 36)
     }

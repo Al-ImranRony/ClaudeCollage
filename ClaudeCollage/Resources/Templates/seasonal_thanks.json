@@ -1,0 +1,16 @@
+{
+  "id": "seasonal-thanks",
+  "name": "Give Thanks",
+  "category": "seasonal",
+  "isPremium": false,
+  "canvasAspectRatio": "4:5",
+  "cells": [
+    { "id": "photo", "type": "photo", "shape": "rectangle",
+      "frame": { "x": 0.07, "y": 0.06, "width": 0.86, "height": 0.66 } },
+    { "id": "greeting", "type": "text", "shape": "rectangle",
+      "frame": { "x": 0.07, "y": 0.76, "width": 0.86, "height": 0.11 },
+      "text": "Give Thanks", "fontName": "Futura-Bold", "fontSize": 96,
+      "color": "#5B3A1E", "alignment": "center" }
+  ],
+  "background": { "type": "solid", "color": "#EFE2CE" }
+}

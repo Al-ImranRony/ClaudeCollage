@@ -217,6 +217,10 @@ final class GridEditorViewController: UIViewController {
             guard let self else { return }
             self.canvasView.setImage(self.viewModel.displayImage(forCellAt: index), forCellAt: index)
         }
+        viewModel.onTextOverlaysChanged = { [weak self] in
+            guard let self else { return }
+            self.canvasView.updateTextOverlays(self.viewModel.textOverlays)
+        }
     }
 
     // MARK: - Rendering
@@ -348,6 +352,14 @@ final class GridEditorViewController: UIViewController {
 
     @objc private func canvasTapped(_ gesture: UITapGestureRecognizer) {
         let point = gesture.location(in: canvasView)
+
+        // Text zones sit above the photo cells, so a tap that lands on one edits
+        // the text — unless a photo swap is mid-flight (that targets cells).
+        if pendingSwapSource == nil, let overlayID = canvasView.overlayID(at: point) {
+            presentTextStyleSheet(for: overlayID)
+            return
+        }
+
         guard let index = cellIndex(at: point) else { return }
 
         if let source = pendingSwapSource {
@@ -414,6 +426,32 @@ final class GridEditorViewController: UIViewController {
             sheet.detents = [.medium(), .large()]
             sheet.prefersGrabberVisible = true
         }
+        present(host, animated: true)
+    }
+
+    // MARK: - Text zones
+
+    /// Opens the styling bottom sheet for the tapped text overlay. Live edits
+    /// stream to the canvas via `previewTextOverlay`; dismissing commits one undo
+    /// snapshot.
+    private func presentTextStyleSheet(for id: UUID) {
+        guard let overlay = viewModel.textOverlay(id: id) else { return }
+        let panel = TextStyleSheet(
+            overlay: overlay,
+            onChange: { [weak self] updated in self?.viewModel.previewTextOverlay(updated) },
+            onDone: { [weak self] in
+                self?.viewModel.commitInteractiveChange()
+                self?.dismiss(animated: true)
+            }
+        )
+        let host = UIHostingController(rootView: panel)
+        host.modalPresentationStyle = .pageSheet
+        if let sheet = host.sheetPresentationController {
+            sheet.detents = [.medium(), .large()]
+            sheet.prefersGrabberVisible = true
+            sheet.prefersScrollingExpandsWhenScrolledToEdge = false
+        }
+        Haptics.selectionChanged()
         present(host, animated: true)
     }
 

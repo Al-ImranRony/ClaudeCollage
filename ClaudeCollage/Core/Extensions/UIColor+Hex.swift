@@ -44,4 +44,13 @@ public extension UIColor {
     convenience init(background: CollageBackground) {
         self.init(hex: background.hex)
     }
+
+    /// Emits an uppercase `#RRGGBB` string (alpha dropped — opacity is stored
+    /// separately on `TextOverlay`). Used to persist a colour picked in the UI.
+    var hexStringRGB: String {
+        var red: CGFloat = 0, green: CGFloat = 0, blue: CGFloat = 0, alpha: CGFloat = 0
+        guard getRed(&red, green: &green, blue: &blue, alpha: &alpha) else { return "#000000" }
+        func channel(_ v: CGFloat) -> Int { Int((min(max(v, 0), 1) * 255).rounded()) }
+        return String(format: "#%02X%02X%02X", channel(red), channel(green), channel(blue))
+    }
 }

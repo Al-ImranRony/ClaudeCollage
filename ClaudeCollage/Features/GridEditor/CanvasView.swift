@@ -31,6 +31,8 @@ struct CanvasModel {
     let canvasSize: CGSize     // reference px (e.g. 1080×1080)
     let background: CollageBackground
     var cells: [CanvasCellModel]
+    /// Text zones layered above the cells (normalized frames). Step 03a slice 5.
+    var textOverlays: [TextOverlay] = []
 }
 
 final class CanvasView: UIView {
@@ -39,6 +41,9 @@ final class CanvasView: UIView {
     /// shows through the gaps between cells.
     private let contentContainer = UIView()
     private var cellViews: [CellContentView] = []
+    /// Text zones, layered above the cells. Kept in a separate view array so text
+    /// edits never rebuild the (heavier) photo cell views.
+    private var overlayViews: [TextOverlayView] = []
     private var model: CanvasModel?
 
     /// On-screen points per reference point (contentContainer.width / canvasSize.width).
@@ -75,7 +80,31 @@ final class CanvasView: UIView {
             cellViews[index].setImage(cell.image)
             cellViews[index].setClipShape(cell.clipShape)
         }
+        rebuildOverlayViewsIfNeeded(count: model.textOverlays.count)
         layoutCanvas()
+    }
+
+    /// Lightweight path for text-only edits (typing / styling): refresh the overlay
+    /// views without touching the photo cell views or re-wrapping their CGImages.
+    func updateTextOverlays(_ overlays: [TextOverlay]) {
+        model?.textOverlays = overlays
+        rebuildOverlayViewsIfNeeded(count: overlays.count)
+        layoutOverlays()
+    }
+
+    /// Rebuilds the overlay view pool when the overlay count changes, always
+    /// keeping them layered above the photo cells.
+    private func rebuildOverlayViewsIfNeeded(count: Int) {
+        guard count != overlayViews.count else {
+            overlayViews.forEach { contentContainer.bringSubviewToFront($0) }
+            return
+        }
+        overlayViews.forEach { $0.removeFromSuperview() }
+        overlayViews = (0..<count).map { _ in
+            let view = TextOverlayView()
+            contentContainer.addSubview(view)
+            return view
+        }
     }
 
     /// Fast path: apply one cell's transform during a gesture (GPU only). Keeps
@@ -121,6 +150,21 @@ final class CanvasView: UIView {
             view.layer.cornerRadius = cell.cornerRadius * factor
             view.setGeometryTransform(cell.transform, factor: factor)
         }
+
+        layoutOverlays()
+    }
+
+    /// Positions each text overlay view (normalized frame → on-screen points) and
+    /// re-renders its attributed text at the current scale. The live font scale is
+    /// the same `referenceScaleFactor` used for cell geometry, so on-screen point
+    /// sizes track the reference-canvas point sizes that export uses.
+    private func layoutOverlays() {
+        guard let model else { return }
+        let size = contentContainer.bounds.size
+        for (index, overlay) in model.textOverlays.enumerated() where overlayViews.indices.contains(index) {
+            overlayViews[index].frame = TextRendering.frame(for: overlay, in: size)
+            overlayViews[index].configure(with: overlay, fontScale: referenceScaleFactor)
+        }
     }
 
     // MARK: - Hit testing
@@ -132,6 +176,19 @@ final class CanvasView: UIView {
     func cellIndex(at point: CGPoint) -> Int? {
         let local = convert(point, to: contentContainer)
         return cellViews.firstIndex { $0.frame.contains(local) }
+    }
+
+    /// The id of the topmost text overlay containing `point` (this view's
+    /// coordinates), if any. Text sits above the cells, so the editor tests this
+    /// first when a tap lands.
+    func overlayID(at point: CGPoint) -> UUID? {
+        guard let model else { return nil }
+        let local = convert(point, to: contentContainer)
+        for (index, overlay) in model.textOverlays.enumerated().reversed()
+        where overlayViews.indices.contains(index) && overlayViews[index].frame.contains(local) {
+            return overlay.id
+        }
+        return nil
     }
 
     /// A cell's on-screen rect (this view's coordinates), for popover anchoring.
@@ -240,5 +297,38 @@ final class CellContentView: UIView {
         )
         .rotated(by: CGFloat(transform.rotationRadians))
         .scaledBy(x: CGFloat(transform.zoom), y: CGFloat(transform.zoom))
+    }
+}
+
+// MARK: - Text overlay view
+
+/// One text zone on the canvas. A vertically-centring UILabel that renders the
+/// exact attributed string `TextRendering` produces, so the live preview matches
+/// the Core Graphics export. Non-interactive — the editor hit-tests it via
+/// `CanvasView.overlayID(at:)` and drives edits through the view model.
+final class TextOverlayView: UIView {
+
+    private let label = UILabel()
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        isUserInteractionEnabled = false
+        backgroundColor = .clear
+        clipsToBounds = true
+        label.numberOfLines = 0
+        label.lineBreakMode = .byWordWrapping
+        addSubview(label)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
+
+    func configure(with overlay: TextOverlay, fontScale: CGFloat) {
+        label.attributedText = TextRendering.attributedString(for: overlay, fontScale: fontScale)
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        label.frame = bounds
     }
 }
