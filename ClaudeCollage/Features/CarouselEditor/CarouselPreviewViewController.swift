@@ -13,6 +13,10 @@ import UIKit
 
 final class CarouselPreviewViewController: UIViewController {
 
+    /// Wired by the editor to run the real image-set export (full-resolution). When
+    /// nil, the export button shows a coming-soon notice.
+    var onExport: (() -> Void)?
+
     private let images: [UIImage?]
     private let aspectRatio: CGFloat          // width / height
     private var currentIndex: Int
@@ -179,12 +183,15 @@ final class CarouselPreviewViewController: UIViewController {
     @objc private func closeTapped() { dismiss(animated: true) }
 
     @objc private func exportTapped() {
-        let alert = UIAlertController(
-            title: "Export",
-            message: "Carousel export (image set + video slideshow) arrives in an upcoming update.",
-            preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "OK", style: .default))
-        present(alert, animated: true)
+        guard let onExport else {
+            let alert = UIAlertController(
+                title: "Export", message: "Export isn't available here.", preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: "OK", style: .default))
+            present(alert, animated: true)
+            return
+        }
+        // Hand back to the editor (which has the view model + full-res renderer).
+        dismiss(animated: true) { onExport() }
     }
 
     @objc private func toggleChrome() {

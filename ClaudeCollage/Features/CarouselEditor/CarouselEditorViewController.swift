@@ -260,11 +260,49 @@ final class CarouselEditorViewController: UIViewController {
             ? viewModel.canvasSize.width / viewModel.canvasSize.height : 1
         let preview = CarouselPreviewViewController(
             images: images, aspectRatio: aspect, startIndex: viewModel.currentIndex)
+        preview.onExport = { [weak self] in self?.exportImageSet() }
         present(preview, animated: true)
     }
 
     @objc private func exportTapped() {
-        showComingSoon(title: "Export", message: "Carousel export (image set + video slideshow) arrives in an upcoming update.")
+        let sheet = UIAlertController(title: "Export Carousel", message: nil, preferredStyle: .actionSheet)
+        sheet.addAction(UIAlertAction(title: "Export as Images (ZIP)", style: .default) { [weak self] _ in
+            self?.exportImageSet()
+        })
+        sheet.addAction(UIAlertAction(title: "Export as Video", style: .default) { [weak self] _ in
+            self?.showComingSoon(title: "Video Export",
+                                 message: "Video slideshow export arrives with the video collage step.")
+        })
+        sheet.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        sheet.popoverPresentationController?.barButtonItem = navigationItem.rightBarButtonItems?.first
+        present(sheet, animated: true)
+    }
+
+    /// Renders every frame full-resolution, zips them as frame_NN.jpg, and offers the
+    /// archive via the share sheet (save to Files / AirDrop / etc.).
+    private func exportImageSet() {
+        let images: [CGImage] = viewModel.frames.compactMap { frame in
+            let vm = GridEditorViewModel(canvasSize: viewModel.canvasSize, state: frame.state)
+            vm.restore(state: frame.state, images: viewModel.imagesSnapshot())
+            return vm.renderExport()
+        }
+        guard !images.isEmpty else {
+            showComingSoon(title: "Export Failed", message: "There are no frames to export.")
+            return
+        }
+        do {
+            let dir = FileManager.default.temporaryDirectory
+                .appendingPathComponent("CarouselExport", isDirectory: true)
+            try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            let zipURL = try CarouselExporter().exportImageSet(
+                images: images, baseName: "Carousel", into: dir)
+            let share = UIActivityViewController(activityItems: [zipURL], applicationActivities: nil)
+            share.popoverPresentationController?.barButtonItem = navigationItem.rightBarButtonItems?.first
+            present(share, animated: true)
+        } catch {
+            showComingSoon(title: "Export Failed",
+                           message: "Couldn't create the image set. Please try again.")
+        }
     }
 
     private func showComingSoon(title: String, message: String) {
