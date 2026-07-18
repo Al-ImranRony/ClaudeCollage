@@ -128,9 +128,21 @@ final class AppCoordinator {
     ) {
         let viewModel = CarouselEditorViewModel(
             frames: frames, images: images, canvasSize: canvasSize, carouselType: type)
+        attachCarouselAutosave(to: viewModel)
+        store.saveCarousel(viewModel)   // persist immediately so it lands on Home
+        presentCarouselEditor(viewModel: viewModel)
+    }
+
+    private func presentCarouselEditor(viewModel: CarouselEditorViewModel) {
         let editor = CarouselEditorViewController(viewModel: viewModel)
         editor.onEditFrame = { [weak self] frameVM in self?.pushEditor(with: frameVM) }
         navigationController.pushViewController(editor, animated: true)
+    }
+
+    private func attachCarouselAutosave(to viewModel: CarouselEditorViewModel) {
+        viewModel.onCommit = { [weak self] viewModel in
+            self?.store.scheduleSaveCarousel(viewModel)
+        }
     }
 
     private func showTemplateGallery() {
@@ -185,6 +197,13 @@ final class AppCoordinator {
     }
 
     private func openProject(id: UUID) {
+        // Carousel projects resume into the carousel editor; everything else is a
+        // grid/template/polygon project in the grid editor.
+        if let carouselVM = store.loadCarouselViewModel(id: id) {
+            attachCarouselAutosave(to: carouselVM)
+            presentCarouselEditor(viewModel: carouselVM)
+            return
+        }
         guard let viewModel = store.loadViewModel(id: id) else { return }
         attachAutosave(to: viewModel)
         pushEditor(with: viewModel)

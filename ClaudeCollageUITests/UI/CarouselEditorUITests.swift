@@ -53,6 +53,28 @@ final class CarouselEditorUITests: XCTestCase {
     }
 
     @MainActor
+    func testCarouselResumesFromHome() {
+        let app = XCUIApplication()
+        openCarousel(app)
+        // Add a 4th frame so the resumed carousel is distinguishable from a fresh one.
+        app.buttons["addFrameButton"].tap()
+        XCTAssertEqual(app.collectionViews["carouselFrameStrip"].cells.count, 4)
+
+        // Back to Home — the carousel is autosaved and appears in the gallery.
+        app.navigationBars["Carousel"].buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(app.navigationBars["ClaudeCollage"].waitForExistence(timeout: 8))
+
+        // The most-recent project is the carousel just made; reopening resumes it.
+        let card = app.collectionViews.cells.element(boundBy: 0)
+        XCTAssertTrue(card.waitForExistence(timeout: 5), "Home shows the saved carousel")
+        card.tap()
+        XCTAssertTrue(app.navigationBars["Carousel"].waitForExistence(timeout: 8),
+                      "Reopening resumes the carousel editor")
+        XCTAssertEqual(app.collectionViews["carouselFrameStrip"].cells.count, 4,
+                       "The 4-frame carousel resumed with its frames intact")
+    }
+
+    @MainActor
     func testTappingFrameOpensEditorAndReturns() {
         let app = XCUIApplication()
         openCarousel(app)

@@ -29,6 +29,10 @@ public final class CollageProject {
     /// authoritative editor state lives here; `cells` above is the normalized
     /// schema populated in later steps.
     public var gridStateData: Data?
+    /// Serialized `[CarouselFrame]` for carousel-mode projects (Step 03b). Each
+    /// frame carries its own `GridEditorState`; photos live on disk as JPEGs keyed
+    /// by image id, exactly like grid projects.
+    public var carouselData: Data?
 
     public init(
         id: UUID = UUID(),

@@ -19,6 +19,7 @@ struct ProjectSummary: Identifiable, Sendable {
     let id: UUID
     let updatedAt: Date
     let thumbnail: UIImage?
+    let mode: CollageMode
 }
 
 @MainActor
@@ -44,7 +45,8 @@ final class ProjectStore {
             ProjectSummary(
                 id: project.id,
                 updatedAt: project.updatedAt,
-                thumbnail: project.previewThumbnail.flatMap(UIImage.init(data:))
+                thumbnail: project.previewThumbnail.flatMap(UIImage.init(data:)),
+                mode: project.mode
             )
         }
     }
@@ -74,7 +76,8 @@ final class ProjectStore {
         let projectID = viewModel.projectID
         let state = viewModel.state
 
-        writeImages(viewModel.sourceImageSnapshot(), forProject: projectID, referencedBy: state)
+        writeImages(viewModel.sourceImageSnapshot(), forProject: projectID,
+                    referenced: referencedImageIDs(in: state))
 
         let stateData = try? JSONEncoder().encode(state)
         let thumbnailData = makeThumbnailData(from: viewModel)
@@ -111,9 +114,72 @@ final class ProjectStore {
             canvasSize: project.canvasSize,
             state: state
         )
-        let images = loadImages(forProject: project.id, referencedBy: state)
+        let images = loadImages(forProject: project.id, referenced: referencedImageIDs(in: state))
         viewModel.restore(state: state, images: images)
         return viewModel
+    }
+
+    // MARK: - Carousel save / load (Step 03b)
+
+    /// Debounced carousel save (mirrors `scheduleSave`).
+    func scheduleSaveCarousel(_ viewModel: CarouselEditorViewModel) {
+        pendingSave?.cancel()
+        let work = DispatchWorkItem { [weak self] in self?.saveCarousel(viewModel) }
+        pendingSave = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4, execute: work)
+    }
+
+    /// Persists a carousel: writes every frame's referenced photos to disk, encodes
+    /// the frame array + a frame-0 gallery thumbnail, and upserts the record.
+    func saveCarousel(_ viewModel: CarouselEditorViewModel) {
+        pendingSave?.cancel()
+        pendingSave = nil
+
+        let projectID = viewModel.projectID
+        let frames = viewModel.frames
+        writeImages(viewModel.imagesSnapshot(), forProject: projectID,
+                    referenced: referencedImageIDs(in: frames))
+
+        let framesData = try? JSONEncoder().encode(frames)
+        let thumbnailData = carouselThumbnailData(viewModel)
+
+        let project = fetchProject(id: projectID) ?? {
+            let new = CollageProject(mode: .carousel, canvasSize: viewModel.canvasSize)
+            new.id = projectID
+            context.insert(new)
+            return new
+        }()
+
+        project.mode = .carousel
+        project.carouselType = viewModel.carouselType
+        project.frameCount = frames.count
+        project.canvasSize = viewModel.canvasSize
+        project.carouselData = framesData
+        project.previewThumbnail = thumbnailData
+        project.updatedAt = Date()
+
+        try? context.save()
+    }
+
+    /// Rehydrates a saved carousel into a view model (frames + decoded images).
+    func loadCarouselViewModel(id: UUID) -> CarouselEditorViewModel? {
+        guard let project = fetchProject(id: id), project.mode == .carousel,
+              let data = project.carouselData,
+              let frames = try? JSONDecoder().decode([CarouselFrame].self, from: data) else {
+            return nil
+        }
+        let images = loadImages(forProject: id, referenced: referencedImageIDs(in: frames))
+        return CarouselEditorViewModel(
+            frames: frames, images: images, canvasSize: project.canvasSize,
+            carouselType: project.carouselType ?? .matched, projectID: project.id)
+    }
+
+    private func carouselThumbnailData(_ viewModel: CarouselEditorViewModel) -> Data? {
+        guard let first = viewModel.frames.first else { return nil }
+        let vm = GridEditorViewModel(canvasSize: viewModel.canvasSize, state: first.state)
+        vm.restore(state: first.state, images: viewModel.imagesSnapshot())
+        guard let cgImage = vm.renderThumbnail(maxDimension: 320) else { return nil }
+        return UIImage(cgImage: cgImage).jpegData(compressionQuality: 0.8)
     }
 
     // MARK: - Delete
@@ -140,12 +206,11 @@ final class ProjectStore {
     private func writeImages(
         _ images: [UUID: CGImage],
         forProject projectID: UUID,
-        referencedBy state: GridEditorState
+        referenced: Set<UUID>
     ) {
         let directory = imagesDirectory(projectID)
         try? fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
 
-        let referenced = Set(state.cells.compactMap { $0.imageID })
         for id in referenced {
             let url = directory.appendingPathComponent("\(id.uuidString).jpg")
             guard !fileManager.fileExists(atPath: url.path), let cgImage = images[id] else { continue }
@@ -157,11 +222,11 @@ final class ProjectStore {
 
     private func loadImages(
         forProject projectID: UUID,
-        referencedBy state: GridEditorState
+        referenced: Set<UUID>
     ) -> [UUID: CGImage] {
         let directory = imagesDirectory(projectID)
         var result: [UUID: CGImage] = [:]
-        for id in state.cells.compactMap({ $0.imageID }) {
+        for id in referenced {
             let url = directory.appendingPathComponent("\(id.uuidString).jpg")
             // Decode straight to the display cap — never materialize full-res.
             if let cgImage = ImageDownsampler.downsample(url: url) {
@@ -169,6 +234,14 @@ final class ProjectStore {
             }
         }
         return result
+    }
+
+    private func referencedImageIDs(in state: GridEditorState) -> Set<UUID> {
+        Set(state.cells.compactMap { $0.imageID })
+    }
+
+    private func referencedImageIDs(in frames: [CarouselFrame]) -> Set<UUID> {
+        Set(frames.flatMap { $0.state.cells.compactMap { $0.imageID } })
     }
 
     private func makeThumbnailData(from viewModel: GridEditorViewModel) -> Data? {
