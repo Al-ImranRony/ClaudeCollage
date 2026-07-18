@@ -32,6 +32,28 @@ public struct CarouselBuild {
     }
 }
 
+/// The choices the carousel type selector produces for a new carousel. Frame count
+/// is clamped to the valid 2…10 range on init.
+public struct CarouselStartConfig: Equatable, Sendable {
+    public var type: CarouselType
+    public var frameCount: Int
+    public var splitAxis: SplitAxis
+    public var aspectRatio: String
+
+    public init(type: CarouselType, frameCount: Int,
+                splitAxis: SplitAxis = .horizontal, aspectRatio: String = "4:5") {
+        self.type = type
+        self.frameCount = min(max(frameCount, 2), CarouselService.maxFrames)
+        self.splitAxis = splitAxis
+        self.aspectRatio = aspectRatio
+    }
+
+    /// The split-axis control applies to panoramic carousels only.
+    public var showsSplitAxis: Bool { type == .panoramic }
+    /// Grid-preview derives its frame count from the source grid, so no count picker.
+    public var showsFrameCount: Bool { type != .gridPreview }
+}
+
 /// A single styling change that `syncEdit` can broadcast to every frame.
 public enum StyleChange: Equatable, Sendable {
     case backgroundColor(CollageBackground)
@@ -166,6 +188,34 @@ public struct CarouselService {
                 )
                 return CarouselFrame(index: position, state: state)
             }
+    }
+
+    /// Builds a fresh, empty carousel the user fills in — one full-bleed photo cell
+    /// per frame for matched, plus a bottom caption zone for scroll-through. Frame
+    /// count is clamped to 2…10. (Panoramic starts from a split image and grid-preview
+    /// from a grid, so they use their own builders.)
+    public func blankCarousel(
+        type: CarouselType, frameCount: Int, aspectRatio: String
+    ) -> [CarouselFrame] {
+        let count = min(max(frameCount, 2), Self.maxFrames)
+        return (0..<count).map { i in
+            let cells: [TemplateLayoutCell]
+            var textOverlays: [TextOverlay] = []
+            switch type {
+            case .scrollThrough:
+                cells = [TemplateLayoutCell(frame: CGRect(x: 0, y: 0, width: 1, height: 0.74))]
+                textOverlays = [TextOverlay(
+                    text: "", frame: CGRect(x: 0.06, y: 0.79, width: 0.88, height: 0.16))]
+            default:
+                cells = [TemplateLayoutCell(frame: CGRect(x: 0, y: 0, width: 1, height: 1))]
+            }
+            let layout = CollageLayout.template(TemplateLayout(
+                templateID: "carousel-\(type.rawValue)-\(i)", name: "Frame \(i + 1)",
+                aspectRatio: aspectRatio, cells: cells))
+            let state = GridEditorState(
+                layout: layout, borderWidth: 0, background: .white, textOverlays: textOverlays)
+            return CarouselFrame(index: i, state: state)
+        }
     }
 
     /// Builds a grid-preview carousel: frame 0 is the whole grid as authored, and each

@@ -16,12 +16,17 @@ final class CarouselEditorUITests: XCTestCase {
         continueAfterFailure = false
     }
 
+    /// Opens the carousel editor via the type selector, accepting its defaults
+    /// (matched, 3 frames).
     @MainActor
     private func openCarousel(_ app: XCUIApplication) {
         app.launch()
         let carousel = app.buttons["carouselButton"]
         XCTAssertTrue(carousel.waitForExistence(timeout: 8), "Home shows the Carousel button")
         carousel.tap()
+        let create = app.buttons["carouselCreateButton"]
+        XCTAssertTrue(create.waitForExistence(timeout: 8), "The type selector is presented")
+        create.tap()
         XCTAssertTrue(app.navigationBars["Carousel"].waitForExistence(timeout: 8),
                       "Carousel editor pushes")
     }

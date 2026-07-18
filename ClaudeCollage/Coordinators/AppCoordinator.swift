@@ -10,6 +10,7 @@
 
 import UIKit
 import SwiftData
+import SwiftUI
 
 @MainActor
 final class AppCoordinator {
@@ -17,6 +18,8 @@ final class AppCoordinator {
     private let navigationController: UINavigationController
     private let store: ProjectStore
     private weak var homeViewController: HomeViewController?
+    /// Retains the panoramic PHPicker delegate for the life of the pick.
+    private var panoramicPicker: PanoramicSourcePicker?
 
     init(navigationController: UINavigationController, container: ModelContainer) {
         self.navigationController = navigationController
@@ -69,30 +72,64 @@ final class AppCoordinator {
         pushEditor(with: viewModel)
     }
 
-    /// Starts a new carousel and pushes the carousel editor. v1 seeds a 3-frame
-    /// matched carousel at 4:5 (sync-edit on by default); the SwiftUI type selector
-    /// + panoramic source picker land in a later 03b slice. Editing a frame pushes
-    /// the existing grid editor (see CarouselEditorViewController).
+    /// Presents the SwiftUI carousel type selector; the chosen `CarouselStartConfig`
+    /// is turned into frames (via the slice-3 builders) and pushed into the carousel
+    /// editor. Panoramic first picks a wide source photo to split.
     private func startCarousel() {
-        let aspect = "4:5"
-        let canvasSize = CanvasSize.size(forAspectRatio: aspect)
-        let frames = (0..<3).map { index in
-            CarouselFrame(index: index, state: GridEditorState(
-                layout: .template(TemplateLayout(
-                    templateID: "carousel-matched-\(index)", name: "Frame \(index + 1)",
-                    aspectRatio: aspect,
-                    cells: [TemplateLayoutCell(frame: CGRect(x: 0, y: 0, width: 1, height: 1))]
-                )),
-                borderWidth: 0, background: .white
-            ))
-        }
-        let viewModel = CarouselEditorViewModel(
-            frames: frames, canvasSize: canvasSize, carouselType: .matched
+        let selector = CarouselTypeSelectorView(
+            onCreate: { [weak self] config in
+                self?.navigationController.dismiss(animated: true) {
+                    self?.beginCarousel(config: config)
+                }
+            },
+            onCancel: { [weak self] in self?.navigationController.dismiss(animated: true) }
         )
-        let editor = CarouselEditorViewController(viewModel: viewModel)
-        editor.onEditFrame = { [weak self] frameVM in
-            self?.pushEditor(with: frameVM)
+        let host = UIHostingController(rootView: selector)
+        host.view.accessibilityIdentifier = "carouselTypeSelector"
+        navigationController.present(host, animated: true)
+    }
+
+    private func beginCarousel(config: CarouselStartConfig) {
+        let canvasSize = CanvasSize.size(forAspectRatio: config.aspectRatio)
+        let service = CarouselService()
+        switch config.type {
+        case .matched, .scrollThrough:
+            let frames = service.blankCarousel(
+                type: config.type, frameCount: config.frameCount, aspectRatio: config.aspectRatio)
+            presentCarouselEditor(frames: frames, images: [:], canvasSize: canvasSize, type: config.type)
+        case .gridPreview:
+            // v1 seeds a default 4-up grid; picking an existing grid project as the
+            // source is a follow-up. Frame count derives from the grid.
+            let grid = GridEditorState(template: .fourSquare)
+            let frames = service.buildGridPreviewCarousel(from: grid, aspectRatio: config.aspectRatio)
+            presentCarouselEditor(frames: frames, images: [:], canvasSize: canvasSize, type: .gridPreview)
+        case .panoramic:
+            pickPanoramicSource(config: config, canvasSize: canvasSize)
         }
+    }
+
+    private func pickPanoramicSource(config: CarouselStartConfig, canvasSize: CGSize) {
+        let picker = PanoramicSourcePicker { [weak self] image in
+            guard let self else { return }
+            self.panoramicPicker = nil
+            guard let image else { return }
+            let build = CarouselService().buildPanoramicCarousel(
+                from: image, frameCount: config.frameCount, axis: config.splitAxis,
+                aspectRatio: config.aspectRatio)
+            self.presentCarouselEditor(
+                frames: build.frames, images: build.images, canvasSize: canvasSize, type: .panoramic)
+        }
+        panoramicPicker = picker
+        navigationController.present(picker.makePicker(), animated: true)
+    }
+
+    private func presentCarouselEditor(
+        frames: [CarouselFrame], images: [UUID: CGImage], canvasSize: CGSize, type: CarouselType
+    ) {
+        let viewModel = CarouselEditorViewModel(
+            frames: frames, images: images, canvasSize: canvasSize, carouselType: type)
+        let editor = CarouselEditorViewController(viewModel: viewModel)
+        editor.onEditFrame = { [weak self] frameVM in self?.pushEditor(with: frameVM) }
         navigationController.pushViewController(editor, animated: true)
     }
 
