@@ -20,7 +20,7 @@ Do not start Part 2 until Part 1 is 100% complete.
 | **01** | `Step_01_GridCollage.md` | Rectangular grid collage editor | 3–7 | ✅ Core complete — 8/8 unit tests + UI flow green; editor runs in sim (see Step 01 notes below) |
 | **02** | `Step_02_PolygonCollage.md` | Polygon & custom shape collage | 8–12 | 🟡 Core complete — 9 shapes + masked canvas/export + typed parser + premium bezier editor; 12/12 new tests green (29 total). See Step 02 notes below |
 | **03a** | `Step_03a_StandardTemplates.md` | Frame/story template editor | 13–17 | ✅ Complete (2026-07-17) — all 7 slices done: foundation, gallery, `.template` layout, catalog (33 templates), text-zone editor, sticker system, freeform + snap. All done-criteria met. **77 unit/integration + 7 UI tests green.** See Step 03a notes below |
-| **03b** | `Step_03b_CarouselTemplates.md` | SCRL-style carousel mode | 18–22 | 🟡 In progress — slices 1–7 done (…+ image-set ZIP export). 123 unit+int + 17 UI green. Remaining: video-slideshow export (needs Step 04) + carousel persistence. See Step 03b notes below |
+| **03b** | `Step_03b_CarouselTemplates.md` | SCRL-style carousel mode | 18–22 | 🟢 Core complete — slices 1–8 done (…+ persistence/resume). All done-criteria met **except video-slideshow export, deferred to Step 04's VideoComposer** (the plan itself ties it there). 127 unit+int + 18 UI green. See Step 03b notes below |
 | **04** | `Step_04_VideoCollage.md` | Video collage + universal export | 23–30 | ⬜ Not started |
 | **05** | `Step_05_AIFeaturesAndPolish.md` | AI features, App Intents, widgets, polish | 31–35 | ⬜ Not started |
 | **05b** | `Step_05b_VisualDesignExcellence.md` | Visual design excellence + app icon (orange/Claude theme, SCRL-grade per-screen redesign) | 35–37 | ⬜ Not started — **design foundation already laid (2026-07-13)** |
@@ -162,6 +162,14 @@ Do not start Part 2 until Part 1 is 100% complete.
 - **Preview player's export** now routes back to the editor's full-res export (`dismiss` → `onExport`) instead of a placeholder.
 - **Tests:** +3 unit +1 `CarouselExportUITests` (offers both image + video options; the system share sheet isn't driven headlessly). **123 unit+integration + 17 UI green.**
 - **Remaining in 03b:** video-slideshow export (deferred to Step 04), carousel **persistence/resume** (still in-memory), and the optional bundled-carousel-template gallery.
+
+### Step 03b slice 8 — carousel persistence + resume (2026-07-18)
+- **`CollageProject.carouselData`** (`Data?`): serialized `[CarouselFrame]` (each frame is a `GridEditorState`). Photos live on disk as JPEGs keyed by image id, shared across frames — same on-disk scheme as grid projects. Adding an optional property is a SwiftData lightweight-migration-safe change.
+- **`ProjectStore`**: `saveCarousel` / `scheduleSaveCarousel` (0.4s debounce, mirrors grid) / `loadCarouselViewModel` + a frame-0 gallery thumbnail. The image write/load helpers were **generalized to an explicit `Set<UUID>`** of referenced ids (grid = its cells' ids; carousel = the union across all frames). `ProjectSummary` gained `mode` so the gallery can distinguish carousels.
+- **`AppCoordinator`**: creating a carousel **saves it immediately** (so it lands on Home) and attaches debounced autosave; **`openProject` routes by record type** — `loadCarouselViewModel` first (returns nil for non-carousels → falls through to the grid editor). Frame edits commit back to the carousel VM on return from the grid editor, which triggers autosave.
+- **Tests:** +4 `CarouselPersistenceTests` (frames/type/per-frame-state round-trip, tagged-carousel-in-summaries, photos-reload-from-disk, grid≠carousel) +1 `CarouselEditorUITests` resume flow (create → +frame → Home → reopen → **4 frames intact**). `GridEditorFlowUITests` still green (grid resume unaffected by the routing change). **127 unit+integration + 18 UI green.**
+- **Step 03b done-criteria:** all four types create end-to-end; panoramic edge alignment unit-proven; navigator reorder/add/delete with undo; sync-edit; native swipe preview; **image-set ZIP export**; persistence/resume — all met. **Only video-slideshow export remains, and the plan ties it to Step 04's `VideoComposer`** (not yet built) → deferred there. Panoramic photo-pick is manual QA (system PHPicker).
+- **Note:** `project.yml` was reformatted by a tool during this slice (DEVELOPMENT_TEAM quotes/comment stripped) — the signing value `G9AZVLUA7S` is preserved; benign.
 
 ### Step 01 — performance architecture (must carry into every editor)
 The first cut recomposited the whole canvas on the CPU per gesture frame and held full-resolution photos in RAM — laggy and memory-heavy. The corrected model, which Steps 02–05 must follow:
