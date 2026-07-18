@@ -150,6 +150,15 @@ public final class GridEditorViewModel {
         onTextOverlaysChanged?()
     }
 
+    /// Live text drag — replaces the overlay in place with no undo snapshot and no
+    /// canvas rebuild (the text view moves itself on the GPU, mirroring stickers).
+    /// The editor commits one snapshot via `commitInteractiveChange()` on drag end.
+    public func moveTextOverlay(_ overlay: TextOverlay) {
+        guard let index = state.textOverlays.firstIndex(where: { $0.id == overlay.id }),
+              state.textOverlays[index] != overlay else { return }
+        state.textOverlays[index] = overlay
+    }
+
     // MARK: - Sticker overlays (Step 03a slice 6)
 
     /// The sticker overlays layered above the cells + text.

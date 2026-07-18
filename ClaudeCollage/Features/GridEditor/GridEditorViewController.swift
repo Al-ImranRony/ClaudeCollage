@@ -45,6 +45,18 @@ final class GridEditorViewController: UIViewController {
     private var pendingPhotoCellIndex: Int?
     private var pendingSwapSource: Int?
 
+    /// The nav controller's back-swipe recognizers we've taken over (there can be
+    /// more than the public `interactivePopGestureRecognizer` — iOS also ships a
+    /// full-width "contentSwipe" sibling), plus each one's original delegate so we
+    /// restore them cleanly when the editor leaves the screen.
+    private var managedPopRecognizers: [UIGestureRecognizer] = []
+    private var originalPopDelegates: [ObjectIdentifier: UIGestureRecognizerDelegate] = [:]
+
+    /// A back-swipe may only begin within this many points of the screen's left edge.
+    /// Restricts iOS's full-width "contentSwipe" recognizer to true edge swipes, so a
+    /// horizontal content/slider drag anywhere else never pops the editor.
+    private let backSwipeEdgeBand: CGFloat = 24
+
     // MARK: - Init
 
     init(viewModel: GridEditorViewModel) {
@@ -71,6 +83,58 @@ final class GridEditorViewController: UIViewController {
         bindViewModel()
         refreshToolbar()
         reconfigureCanvas()
+    }
+
+    // The interactive back-swipe fires from the screen's left edge, which overlaps the
+    // canvas — a left→right content drag would race it and pop the editor. While this
+    // editor is on screen we take over the delegate of EVERY nav back-swipe recognizer
+    // so we can reject touches that begin on the canvas (see the delegate extension).
+    //
+    // Two subtleties, both discovered empirically:
+    //  • `interactivePopGestureRecognizer` only exposes the *edge* recognizer; iOS also
+    //    installs a full-width "contentSwipe" sibling on the same container view that
+    //    drives the pop too. We must gate both, so we sweep the container's recognizers
+    //    for every one of the same private class.
+    //  • This MUST run in viewDidAppear, not viewWillAppear: UINavigationController
+    //    resets those delegates as the push transition completes (after viewWillAppear),
+    //    silently clobbering an override installed earlier.
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        guard managedPopRecognizers.isEmpty,
+              let pop = navigationController?.interactivePopGestureRecognizer else { return }
+        let popClass: AnyClass = type(of: pop)
+        let recognizers = navigationController?.view.gestureRecognizers?
+            .filter { $0.isKind(of: popClass) } ?? [pop]
+        for recognizer in recognizers {
+            if let original = recognizer.delegate {
+                originalPopDelegates[ObjectIdentifier(recognizer)] = original
+            }
+            recognizer.delegate = self
+            managedPopRecognizers.append(recognizer)
+        }
+    }
+
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        for recognizer in managedPopRecognizers where recognizer.delegate === self {
+            recognizer.delegate = originalPopDelegates[ObjectIdentifier(recognizer)]
+        }
+        managedPopRecognizers.removeAll()
+        originalPopDelegates.removeAll()
+    }
+
+    /// True for any nav back-swipe recognizer we've taken over.
+    private func isManagedPopRecognizer(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        managedPopRecognizers.contains { $0 === gestureRecognizer }
+    }
+
+    /// A back-swipe is allowed only from the screen's left-edge band and never from a
+    /// touch that begins on the canvas — the single rule that keeps edge-swipe-back
+    /// working while blocking both canvas drags and horizontal control drags.
+    private func backSwipeAllowed(fromScreenX screenX: CGFloat, canvasPoint: CGPoint) -> Bool {
+        guard (navigationController?.viewControllers.count ?? 0) > 1 else { return false }
+        guard screenX <= backSwipeEdgeBand else { return false }
+        return !canvasView.bounds.contains(canvasPoint)
     }
 
     // MARK: - Setup
@@ -269,6 +333,20 @@ final class GridEditorViewController: UIViewController {
             self?.viewModel.removeSticker(id: id)
             self?.showToast("Sticker removed")
         }
+
+        // Text zones drag themselves on the GPU during a gesture (like stickers); the
+        // view model records the move without a snapshot and commits one on drag end.
+        // A plain tap opens the styling sheet.
+        canvasView.onTextChanged = { [weak self] overlay in
+            self?.viewModel.moveTextOverlay(overlay)
+        }
+        canvasView.onTextCommitted = { [weak self] in
+            self?.viewModel.commitInteractiveChange()
+        }
+        canvasView.onTextTapped = { [weak self] id in
+            guard let self, self.pendingSwapSource == nil else { return }
+            self.presentTextStyleSheet(for: id)
+        }
     }
 
     // MARK: - Rendering
@@ -406,13 +484,8 @@ final class GridEditorViewController: UIViewController {
         if canvasView.stickerID(at: point) != nil { return }
         canvasView.deselectSticker()
 
-        // Text zones sit above the photo cells, so a tap that lands on one edits
-        // the text — unless a photo swap is mid-flight (that targets cells).
-        if pendingSwapSource == nil, let overlayID = canvasView.overlayID(at: point) {
-            presentTextStyleSheet(for: overlayID)
-            return
-        }
-
+        // Text zones own their own tap (→ styling sheet) and drag now, so a tap that
+        // lands on one is handled by the overlay view, not here.
         guard let index = cellIndex(at: point) else { return }
 
         if let source = pendingSwapSource {
@@ -761,15 +834,39 @@ extension GridEditorViewController: PHPickerViewControllerDelegate {
 
 extension GridEditorViewController: UIGestureRecognizerDelegate {
 
-    /// The zoom pinch only accepts touches on empty canvas background — never on a
-    /// cell or sticker, which own their own gestures.
+    /// Gates two recognizers by where the touch lands:
+    /// • the zoom pinch only accepts touches on empty canvas background;
+    /// • the back-swipe is rejected for ANY touch that begins on the canvas — the
+    ///   whole canvas is an editing surface, so a drag there is never a back gesture.
+    ///   Back-swipe only survives outside the canvas (the screen's left edge in the
+    ///   nav bar / controls area).
     func gestureRecognizer(
         _ gestureRecognizer: UIGestureRecognizer,
         shouldReceive touch: UITouch
     ) -> Bool {
-        guard gestureRecognizer === canvasZoomPinch else { return true }
         let point = touch.location(in: canvasView)
-        return canvasView.cellIndex(at: point) == nil && canvasView.stickerID(at: point) == nil
+
+        if isManagedPopRecognizer(gestureRecognizer) {
+            return backSwipeAllowed(fromScreenX: touch.location(in: view).x, canvasPoint: point)
+        }
+        guard gestureRecognizer === canvasZoomPinch else { return true }
+        return canvasView.cellIndex(at: point) == nil
+            && canvasView.stickerID(at: point) == nil
+            && canvasView.overlayID(at: point) == nil
+    }
+
+    /// Overriding the pop recognizer's delegate means we must re-supply the default
+    /// "only swipe back when there's something to pop" rule, or the root screen can
+    /// wedge. We additionally require the swipe to *begin outside the canvas* — a
+    /// second guard alongside `shouldReceive`, since `shouldBegin` sees the actual
+    /// gesture start. Other recognizers begin as usual.
+    func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        guard isManagedPopRecognizer(gestureRecognizer) else { return true }
+        // The where-did-it-start gate lives in `shouldReceive` (evaluated at touch-down,
+        // when the location is the true start). Here we only re-supply the default
+        // "something to pop" rule — `location(in:)` at begin-time has already drifted
+        // rightward for the full-width swipe, so it can't be trusted for the band check.
+        return (navigationController?.viewControllers.count ?? 0) > 1
     }
 
     /// Let the zoom pinch coexist with the cell/sticker recognizers rather than
@@ -786,9 +883,10 @@ extension GridEditorViewController: UIGestureRecognizerDelegate {
 
 extension GridEditorViewController: CellGestureControllerDelegate {
     func cellIndex(at point: CGPoint) -> Int? {
-        // A touch that lands on a sticker belongs to that sticker's own gestures,
-        // not to the cell underneath — so the canvas cell pan/pinch stays inert.
+        // A touch that lands on a sticker or a text zone belongs to that overlay's own
+        // gestures, not the cell underneath — so the canvas cell pan/pinch stays inert.
         if canvasView.stickerID(at: point) != nil { return nil }
+        if canvasView.overlayID(at: point) != nil { return nil }
         return canvasView.cellIndex(at: point)
     }
 

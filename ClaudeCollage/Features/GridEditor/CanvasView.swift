@@ -64,6 +64,15 @@ final class CanvasView: UIView {
     /// A sticker was tapped (selected), or `nil` when selection was cleared.
     var onStickerSelected: ((UUID?) -> Void)?
 
+    // MARK: - Text callbacks (wired by the view controller)
+
+    /// A text zone was dragged mid-gesture (live, no undo snapshot yet).
+    var onTextChanged: ((TextOverlay) -> Void)?
+    /// A text drag finished — record one undo snapshot.
+    var onTextCommitted: (() -> Void)?
+    /// A text zone was tapped — open its styling sheet.
+    var onTextTapped: ((UUID) -> Void)?
+
     /// On-screen points per reference point (contentContainer.width / canvasSize.width).
     private(set) var referenceScaleFactor: CGFloat = 1
 
@@ -146,6 +155,12 @@ final class CanvasView: UIView {
         overlayViews.forEach { $0.removeFromSuperview() }
         overlayViews = (0..<count).map { _ in
             let view = TextOverlayView()
+            view.onChanged = { [weak self] overlay in self?.onTextChanged?(overlay) }
+            view.onCommitted = { [weak self] in self?.onTextCommitted?() }
+            view.onTapped = { [weak self] id in self?.onTextTapped?(id) }
+            view.onGuidesChanged = { [weak self] vx, hy in
+                self?.updateSnapGuides(verticalX: vx, horizontalY: hy)
+            }
             contentContainer.addSubview(view)
             return view
         }
@@ -469,32 +484,137 @@ final class CellContentView: UIView {
 
 /// One text zone on the canvas. A vertically-centring UILabel that renders the
 /// exact attributed string `TextRendering` produces, so the live preview matches
-/// the Core Graphics export. Non-interactive — the editor hit-tests it via
-/// `CanvasView.overlayID(at:)` and drives edits through the view model.
+/// the Core Graphics export. Interactive: a pan drags it around the canvas (with
+/// the same alignment snapping as stickers) and a tap opens its styling sheet.
 final class TextOverlayView: UIView {
 
     private let label = UILabel()
+    private let selectionLayer = CAShapeLayer()
+
+    /// The overlay this view currently renders — set on `configure` and mutated as
+    /// the view drags itself, so its emitted geometry always carries the right id.
+    private var overlay: TextOverlay?
+
+    /// The finger's true (unsnapped) centre during a drag; snapping is layered on
+    /// top of this as a display magnet so the zone never feels "stuck" to a guide.
+    private var dragRawCenter: CGPoint = .zero
+    private var wasSnapped = false
+
+    var onChanged: ((TextOverlay) -> Void)?
+    var onCommitted: (() -> Void)?
+    var onTapped: ((UUID) -> Void)?
+    /// Reports the engaged snap guides (normalized x's, y's); an empty pair clears them.
+    var onGuidesChanged: (([CGFloat], [CGFloat]) -> Void)?
+
+    private var isDragging: Bool = false {
+        didSet { selectionLayer.isHidden = !isDragging }
+    }
 
     override init(frame: CGRect) {
         super.init(frame: frame)
-        isUserInteractionEnabled = false
+        isUserInteractionEnabled = true
         backgroundColor = .clear
         clipsToBounds = true
         label.numberOfLines = 0
         label.lineBreakMode = .byWordWrapping
         addSubview(label)
+
+        selectionLayer.fillColor = UIColor.clear.cgColor
+        selectionLayer.strokeColor = Theme.Color.accent.cgColor
+        selectionLayer.lineDashPattern = [5, 4]
+        selectionLayer.lineWidth = 1.5
+        selectionLayer.isHidden = true
+        layer.addSublayer(selectionLayer)
+
+        installGestures()
     }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
 
     func configure(with overlay: TextOverlay, fontScale: CGFloat) {
+        self.overlay = overlay
         label.attributedText = TextRendering.attributedString(for: overlay, fontScale: fontScale)
     }
 
     override func layoutSubviews() {
         super.layoutSubviews()
         label.frame = bounds
+        selectionLayer.frame = bounds
+        selectionLayer.path = UIBezierPath(
+            roundedRect: bounds.insetBy(dx: 1, dy: 1), cornerRadius: 6
+        ).cgPath
+    }
+
+    // MARK: - Gestures
+
+    private func installGestures() {
+        let pan = UIPanGestureRecognizer(target: self, action: #selector(handlePan))
+        let tap = UITapGestureRecognizer(target: self, action: #selector(handleTap))
+        for recognizer in [pan, tap] as [UIGestureRecognizer] {
+            recognizer.delegate = self
+            addGestureRecognizer(recognizer)
+        }
+    }
+
+    @objc private func handlePan(_ gesture: UIPanGestureRecognizer) {
+        guard let container = superview else { return }
+        switch gesture.state {
+        case .began:
+            isDragging = true
+            dragRawCenter = center
+        case .changed:
+            let translation = gesture.translation(in: container)
+            gesture.setTranslation(.zero, in: container)
+            dragRawCenter.x += translation.x
+            dragRawCenter.y += translation.y
+            center = snappedCenter(for: dragRawCenter, in: container.bounds.size)
+            emitChange(in: container.bounds.size)
+        case .ended, .cancelled, .failed:
+            isDragging = false
+            wasSnapped = false
+            onGuidesChanged?([], [])
+            onCommitted?()
+        default:
+            break
+        }
+    }
+
+    @objc private func handleTap() {
+        if let id = overlay?.id { onTapped?(id) }
+    }
+
+    /// Snaps a raw (unsnapped) centre to the alignment guides and returns the centre
+    /// to display, reporting which guides engaged plus a light tick as one grabs.
+    private func snappedCenter(for raw: CGPoint, in size: CGSize) -> CGPoint {
+        guard size.width > 0, size.height > 0 else { return raw }
+        let normalized = CGPoint(x: raw.x / size.width, y: raw.y / size.height)
+        let snap = SnapEngine.snap(center: normalized)
+        if snap.didSnap, !wasSnapped { Haptics.boundary() }
+        wasSnapped = snap.didSnap
+        onGuidesChanged?(snap.verticalGuides, snap.horizontalGuides)
+        return CGPoint(x: snap.center.x * size.width, y: snap.center.y * size.height)
+    }
+
+    /// Reports the view's current centre back as a normalized overlay (origin =
+    /// centre − half the normalized size), leaving size/style untouched.
+    private func emitChange(in size: CGSize) {
+        guard var updated = overlay, size.width > 0, size.height > 0 else { return }
+        updated.frameX = Double(center.x / size.width) - updated.frameWidth / 2
+        updated.frameY = Double(center.y / size.height) - updated.frameHeight / 2
+        overlay = updated
+        onChanged?(updated)
+    }
+}
+
+extension TextOverlayView: UIGestureRecognizerDelegate {
+    // Let the drag coexist with the canvas recognizers rather than cancelling them
+    // (the editor's cell pan already treats a touch on a text zone as inert).
+    func gestureRecognizer(
+        _ gestureRecognizer: UIGestureRecognizer,
+        shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer
+    ) -> Bool {
+        true
     }
 }
 
@@ -524,6 +644,9 @@ final class StickerOverlayView: UIView {
     var onGuidesChanged: (([CGFloat], [CGFloat]) -> Void)?
 
     private var wasSnapped = false
+    /// The finger's true (unsnapped) centre during a drag; snapping is layered on
+    /// top of this as a display magnet so the sticker never feels stuck to a guide.
+    private var dragRawCenter: CGPoint = .zero
 
     var isSelected: Bool = false {
         didSet { selectionLayer.isHidden = !isSelected }
@@ -602,11 +725,16 @@ final class StickerOverlayView: UIView {
         switch gesture.state {
         case .began:
             select()
+            dragRawCenter = center
         case .changed:
             let translation = gesture.translation(in: container)
             gesture.setTranslation(.zero, in: container)
-            center = CGPoint(x: center.x + translation.x, y: center.y + translation.y)
-            applySnap(in: container.bounds.size)
+            // Track the finger's true (unsnapped) position; the snap is applied as a
+            // pure display magnet on top of it, so the sticker never sticks — once the
+            // finger moves past the threshold the view follows it immediately.
+            dragRawCenter.x += translation.x
+            dragRawCenter.y += translation.y
+            center = snappedCenter(for: dragRawCenter, in: container.bounds.size)
             emitChange()
         case .ended, .cancelled, .failed:
             wasSnapped = false
@@ -617,16 +745,17 @@ final class StickerOverlayView: UIView {
         }
     }
 
-    /// Snaps the current centre to alignment guides (canvas centre + thirds) and
-    /// reports which engaged, with a light tick the moment one grabs.
-    private func applySnap(in size: CGSize) {
-        guard size.width > 0, size.height > 0 else { return }
-        let normalized = CGPoint(x: center.x / size.width, y: center.y / size.height)
+    /// Snaps a raw (unsnapped) centre to alignment guides (canvas centre + thirds)
+    /// and returns the centre to display, reporting which guides engaged with a light
+    /// tick the moment one grabs.
+    private func snappedCenter(for raw: CGPoint, in size: CGSize) -> CGPoint {
+        guard size.width > 0, size.height > 0 else { return raw }
+        let normalized = CGPoint(x: raw.x / size.width, y: raw.y / size.height)
         let snap = SnapEngine.snap(center: normalized)
-        center = CGPoint(x: snap.center.x * size.width, y: snap.center.y * size.height)
         if snap.didSnap, !wasSnapped { Haptics.boundary() }
         wasSnapped = snap.didSnap
         onGuidesChanged?(snap.verticalGuides, snap.horizontalGuides)
+        return CGPoint(x: snap.center.x * size.width, y: snap.center.y * size.height)
     }
 
     @objc private func handlePinch(_ gesture: UIPinchGestureRecognizer) {
