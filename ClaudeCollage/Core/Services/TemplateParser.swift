@@ -144,7 +144,9 @@ private struct TemplateFrame: Decodable {
     }
 }
 
-private struct TemplateBackground: Decodable {
+// Internal (not private): the carousel template parser reuses this same solid/
+// gradient → CollageBackground mapping so both catalogs decode backgrounds identically.
+struct TemplateBackground: Decodable {
     let type: String
     let color: String?
     let colors: [String]?

@@ -151,4 +151,36 @@ final class TemplateServiceTests: XCTestCase {
             TemplateService.contentFingerprint(of: movedCell)
         )
     }
+
+    // MARK: - Step 03b slice 2: bundled carousel templates
+
+    /// The bundled carousel catalog loads from its own subdirectory, is kept
+    /// separate from the standard template gallery, and never mistakes the JSON
+    /// schema for a template.
+    func testCarouselTemplatesLoadFromBundle() {
+        let service = TemplateService(bundle: appBundle)
+        let loaded = service.loadBundledCarouselTemplates()
+        XCTAssertGreaterThanOrEqual(loaded.count, 15,
+            "Expected at least 15 bundled carousel templates, found \(loaded.count)")
+        XCTAssertEqual(loaded.count, service.carouselTemplates.count)
+        XCTAssertFalse(loaded.contains { $0.id == "carousel_schema" },
+            "The JSON Schema file must never be parsed as a carousel template")
+        // Every bundled carousel declares a valid type and 2–10 frames.
+        for template in loaded {
+            XCTAssertTrue((2...10).contains(template.frameCount),
+                "\(template.id) frameCount \(template.frameCount) out of range")
+            XCTAssertEqual(template.frames.count, template.frameCount,
+                "\(template.id) frames array must match its declared frameCount")
+        }
+        // Carousel templates must not leak into the standard photo-template gallery.
+        let standardIDs = Set(service.loadBundledTemplates().map(\.id))
+        XCTAssertTrue(loaded.allSatisfy { !standardIDs.contains($0.id) })
+    }
+
+    func testAllFourCarouselTypesRepresentedInBundle() {
+        let service = TemplateService(bundle: appBundle)
+        let types = Set(service.loadBundledCarouselTemplates().map(\.carouselType))
+        XCTAssertEqual(types, Set(CarouselType.allCases),
+            "The bundle should ship at least one template of every carousel type")
+    }
 }

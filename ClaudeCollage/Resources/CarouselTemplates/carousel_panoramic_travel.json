@@ -1,0 +1,64 @@
+{
+  "id": "carousel-panoramic-travel",
+  "name": "Wanderlust Pano",
+  "category": "travel",
+  "isPremium": false,
+  "carouselType": "panoramic",
+  "canvasAspectRatio": "4:5",
+  "frameCount": 3,
+  "frames": [
+    {
+      "index": 0,
+      "cells": [
+        {
+          "type": "photo",
+          "shape": "rectangle",
+          "frame": {
+            "x": 0,
+            "y": 0,
+            "width": 1,
+            "height": 1
+          }
+        }
+      ]
+    },
+    {
+      "index": 1,
+      "cells": [
+        {
+          "type": "photo",
+          "shape": "rectangle",
+          "frame": {
+            "x": 0,
+            "y": 0,
+            "width": 1,
+            "height": 1
+          }
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "cells": [
+        {
+          "type": "photo",
+          "shape": "rectangle",
+          "frame": {
+            "x": 0,
+            "y": 0,
+            "width": 1,
+            "height": 1
+          }
+        }
+      ]
+    }
+  ],
+  "panoramicSource": {
+    "splitAxis": "horizontal",
+    "overlapPixels": 0
+  },
+  "background": {
+    "type": "solid",
+    "color": "#000000"
+  }
+}

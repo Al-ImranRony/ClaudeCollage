@@ -1,0 +1,165 @@
+{
+  "id": "carousel-story-tutorial",
+  "name": "Tutorial Steps",
+  "category": "tutorial",
+  "isPremium": false,
+  "carouselType": "scrollThrough",
+  "canvasAspectRatio": "9:16",
+  "frameCount": 5,
+  "frames": [
+    {
+      "index": 0,
+      "cells": [
+        {
+          "type": "photo",
+          "shape": "rectangle",
+          "frame": {
+            "x": 0,
+            "y": 0,
+            "width": 1,
+            "height": 0.74
+          }
+        },
+        {
+          "type": "text",
+          "shape": "rectangle",
+          "frame": {
+            "x": 0.06,
+            "y": 0.79,
+            "width": 0.88,
+            "height": 0.16
+          },
+          "text": "Step 1",
+          "fontName": "AvenirNext-Bold",
+          "fontSize": 84,
+          "color": "#FFFFFF",
+          "alignment": "center"
+        }
+      ]
+    },
+    {
+      "index": 1,
+      "cells": [
+        {
+          "type": "photo",
+          "shape": "rectangle",
+          "frame": {
+            "x": 0,
+            "y": 0,
+            "width": 1,
+            "height": 0.74
+          }
+        },
+        {
+          "type": "text",
+          "shape": "rectangle",
+          "frame": {
+            "x": 0.06,
+            "y": 0.79,
+            "width": 0.88,
+            "height": 0.16
+          },
+          "text": "Step 2",
+          "fontName": "AvenirNext-Bold",
+          "fontSize": 84,
+          "color": "#FFFFFF",
+          "alignment": "center"
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "cells": [
+        {
+          "type": "photo",
+          "shape": "rectangle",
+          "frame": {
+            "x": 0,
+            "y": 0,
+            "width": 1,
+            "height": 0.74
+          }
+        },
+        {
+          "type": "text",
+          "shape": "rectangle",
+          "frame": {
+            "x": 0.06,
+            "y": 0.79,
+            "width": 0.88,
+            "height": 0.16
+          },
+          "text": "Step 3",
+          "fontName": "AvenirNext-Bold",
+          "fontSize": 84,
+          "color": "#FFFFFF",
+          "alignment": "center"
+        }
+      ]
+    },
+    {
+      "index": 3,
+      "cells": [
+        {
+          "type": "photo",
+          "shape": "rectangle",
+          "frame": {
+            "x": 0,
+            "y": 0,
+            "width": 1,
+            "height": 0.74
+          }
+        },
+        {
+          "type": "text",
+          "shape": "rectangle",
+          "frame": {
+            "x": 0.06,
+            "y": 0.79,
+            "width": 0.88,
+            "height": 0.16
+          },
+          "text": "Step 4",
+          "fontName": "AvenirNext-Bold",
+          "fontSize": 84,
+          "color": "#FFFFFF",
+          "alignment": "center"
+        }
+      ]
+    },
+    {
+      "index": 4,
+      "cells": [
+        {
+          "type": "photo",
+          "shape": "rectangle",
+          "frame": {
+            "x": 0,
+            "y": 0,
+            "width": 1,
+            "height": 0.74
+          }
+        },
+        {
+          "type": "text",
+          "shape": "rectangle",
+          "frame": {
+            "x": 0.06,
+            "y": 0.79,
+            "width": 0.88,
+            "height": 0.16
+          },
+          "text": "Step 5",
+          "fontName": "AvenirNext-Bold",
+          "fontSize": 84,
+          "color": "#FFFFFF",
+          "alignment": "center"
+        }
+      ]
+    }
+  ],
+  "background": {
+    "type": "solid",
+    "color": "#101014"
+  }
+}

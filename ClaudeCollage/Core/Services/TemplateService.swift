@@ -23,11 +23,18 @@ public final class TemplateService {
 
     private let bundle: Bundle
     private let parser = TemplateParser()
+    private let carouselParser = CarouselTemplateParser()
     private let renderer = CollageRenderer()
     private let entitlements: EntitlementStore
 
     /// All successfully-parsed bundled templates, populated by `loadBundledTemplates()`.
     public private(set) var templates: [CollageTemplate] = []
+
+    /// All successfully-parsed bundled carousel templates (Step 03b), populated by
+    /// `loadBundledCarouselTemplates()`. Kept separate from `templates` — carousel
+    /// templates live in their own bundle subdirectory and drive the carousel editor,
+    /// not the standard gallery.
+    public private(set) var carouselTemplates: [CarouselTemplate] = []
 
     /// In-memory thumbnail cache, backed by an on-disk PNG cache that survives
     /// relaunches.
@@ -47,7 +54,14 @@ public final class TemplateService {
     public func loadBundledTemplates() -> [CollageTemplate] {
         let urls = bundledTemplateURLs()
         let parsed: [CollageTemplate] = urls.compactMap { url in
-            guard url.lastPathComponent != "template_schema.json",
+            // Skip the JSON schema and any carousel template. Carousel JSONs also
+            // carry a top-level `canvasAspectRatio`, so without this they'd parse as
+            // empty standard templates and pollute the gallery (resources are
+            // flattened into the bundle root, so the two catalogs are told apart by
+            // the `carousel` filename prefix, not by subdirectory).
+            let name = url.lastPathComponent
+            guard name != "template_schema.json",
+                  !name.hasPrefix("carousel"),
                   let data = try? Data(contentsOf: url),
                   let template = try? parser.parse(data: data) else { return nil }
             return template
@@ -56,6 +70,32 @@ public final class TemplateService {
             $0.isPremium == $1.isPremium ? $0.name < $1.name : (!$0.isPremium && $1.isPremium)
         }
         return templates
+    }
+
+    /// Parses every carousel template JSON in the `CarouselTemplates` subdirectory
+    /// (skipping the schema and anything that fails to parse). Idempotent. Sorted
+    /// premium-last, then by name, matching the standard catalog's stable order.
+    @discardableResult
+    public func loadBundledCarouselTemplates() -> [CarouselTemplate] {
+        // Prefer a real CarouselTemplates subdirectory if the bundle ever preserves
+        // one; today resources flatten into the root, so fall back there and select
+        // by the `carousel` filename prefix (the schema, `carousel_schema.json`, is
+        // excluded explicitly).
+        let subdirURLs = bundle.urls(forResourcesWithExtension: "json", subdirectory: "CarouselTemplates")
+        let urls = (subdirURLs?.isEmpty == false ? subdirURLs : nil)
+            ?? bundle.urls(forResourcesWithExtension: "json", subdirectory: nil)
+            ?? []
+        let parsed: [CarouselTemplate] = urls.compactMap { url in
+            let name = url.lastPathComponent
+            guard name.hasPrefix("carousel"), name != "carousel_schema.json",
+                  let data = try? Data(contentsOf: url),
+                  let template = try? carouselParser.parse(data: data) else { return nil }
+            return template
+        }
+        carouselTemplates = parsed.sorted {
+            $0.isPremium == $1.isPremium ? $0.name < $1.name : (!$0.isPremium && $1.isPremium)
+        }
+        return carouselTemplates
     }
 
     /// Templates matching a category ("All" / empty returns everything).

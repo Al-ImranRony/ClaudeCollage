@@ -1,0 +1,75 @@
+{
+  "id": "carousel-story-beforeafter",
+  "name": "Before / After",
+  "category": "story",
+  "isPremium": false,
+  "carouselType": "scrollThrough",
+  "canvasAspectRatio": "4:5",
+  "frameCount": 2,
+  "frames": [
+    {
+      "index": 0,
+      "cells": [
+        {
+          "type": "photo",
+          "shape": "rectangle",
+          "frame": {
+            "x": 0,
+            "y": 0,
+            "width": 1,
+            "height": 0.74
+          }
+        },
+        {
+          "type": "text",
+          "shape": "rectangle",
+          "frame": {
+            "x": 0.06,
+            "y": 0.79,
+            "width": 0.88,
+            "height": 0.16
+          },
+          "text": "Phase 1",
+          "fontName": "AvenirNext-Bold",
+          "fontSize": 84,
+          "color": "#FFFFFF",
+          "alignment": "center"
+        }
+      ]
+    },
+    {
+      "index": 1,
+      "cells": [
+        {
+          "type": "photo",
+          "shape": "rectangle",
+          "frame": {
+            "x": 0,
+            "y": 0,
+            "width": 1,
+            "height": 0.74
+          }
+        },
+        {
+          "type": "text",
+          "shape": "rectangle",
+          "frame": {
+            "x": 0.06,
+            "y": 0.79,
+            "width": 0.88,
+            "height": 0.16
+          },
+          "text": "Phase 2",
+          "fontName": "AvenirNext-Bold",
+          "fontSize": 84,
+          "color": "#FFFFFF",
+          "alignment": "center"
+        }
+      ]
+    }
+  ],
+  "background": {
+    "type": "solid",
+    "color": "#101014"
+  }
+}

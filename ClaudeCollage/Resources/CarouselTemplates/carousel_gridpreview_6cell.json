@@ -1,0 +1,170 @@
+{
+  "id": "carousel-gridpreview-6cell",
+  "name": "Grid Reveal 6",
+  "category": "grid",
+  "isPremium": true,
+  "carouselType": "gridPreview",
+  "canvasAspectRatio": "1:1",
+  "frameCount": 7,
+  "frames": [
+    {
+      "index": 0,
+      "cells": [
+        {
+          "type": "photo",
+          "shape": "rectangle",
+          "frame": {
+            "x": 0.0,
+            "y": 0.0,
+            "width": 0.5,
+            "height": 0.3333
+          }
+        },
+        {
+          "type": "photo",
+          "shape": "rectangle",
+          "frame": {
+            "x": 0.5,
+            "y": 0.0,
+            "width": 0.5,
+            "height": 0.3333
+          }
+        },
+        {
+          "type": "photo",
+          "shape": "rectangle",
+          "frame": {
+            "x": 0.0,
+            "y": 0.3333,
+            "width": 0.5,
+            "height": 0.3333
+          }
+        },
+        {
+          "type": "photo",
+          "shape": "rectangle",
+          "frame": {
+            "x": 0.5,
+            "y": 0.3333,
+            "width": 0.5,
+            "height": 0.3333
+          }
+        },
+        {
+          "type": "photo",
+          "shape": "rectangle",
+          "frame": {
+            "x": 0.0,
+            "y": 0.6666,
+            "width": 0.5,
+            "height": 0.3333
+          }
+        },
+        {
+          "type": "photo",
+          "shape": "rectangle",
+          "frame": {
+            "x": 0.5,
+            "y": 0.6666,
+            "width": 0.5,
+            "height": 0.3333
+          }
+        }
+      ]
+    },
+    {
+      "index": 1,
+      "cells": [
+        {
+          "type": "photo",
+          "shape": "rectangle",
+          "frame": {
+            "x": 0,
+            "y": 0,
+            "width": 1,
+            "height": 1
+          }
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "cells": [
+        {
+          "type": "photo",
+          "shape": "rectangle",
+          "frame": {
+            "x": 0,
+            "y": 0,
+            "width": 1,
+            "height": 1
+          }
+        }
+      ]
+    },
+    {
+      "index": 3,
+      "cells": [
+        {
+          "type": "photo",
+          "shape": "rectangle",
+          "frame": {
+            "x": 0,
+            "y": 0,
+            "width": 1,
+            "height": 1
+          }
+        }
+      ]
+    },
+    {
+      "index": 4,
+      "cells": [
+        {
+          "type": "photo",
+          "shape": "rectangle",
+          "frame": {
+            "x": 0,
+            "y": 0,
+            "width": 1,
+            "height": 1
+          }
+        }
+      ]
+    },
+    {
+      "index": 5,
+      "cells": [
+        {
+          "type": "photo",
+          "shape": "rectangle",
+          "frame": {
+            "x": 0,
+            "y": 0,
+            "width": 1,
+            "height": 1
+          }
+        }
+      ]
+    },
+    {
+      "index": 6,
+      "cells": [
+        {
+          "type": "photo",
+          "shape": "rectangle",
+          "frame": {
+            "x": 0,
+            "y": 0,
+            "width": 1,
+            "height": 1
+          }
+        }
+      ]
+    }
+  ],
+  "background": {
+    "type": "solid",
+    "color": "#FFFFFF"
+  }
+}
