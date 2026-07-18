@@ -191,7 +191,14 @@ public final class TemplateService {
     /// colour from the sticker catalog, geometry from the zone frame). Used to seed
     /// the editor and to preview stickers in gallery thumbnails.
     public static func stickerOverlays(for template: CollageTemplate) -> [StickerOverlay] {
-        template.cells.compactMap { cell in
+        stickerOverlays(for: template.cells)
+    }
+
+    /// Cells-based core of `stickerOverlays(for:)` — reused by the carousel builder,
+    /// which maps each carousel frame's `[TemplateCell]` (same cell type) onto a
+    /// GridEditorState.
+    public static func stickerOverlays(for cells: [TemplateCell]) -> [StickerOverlay] {
+        cells.compactMap { cell in
             guard cell.zoneType == .sticker, let id = cell.stickerID else { return nil }
             let entry = StickerCatalog.shared.entry(for: id)
             // Size uses the zone width as a fraction of the canvas width (stickers
@@ -268,11 +275,20 @@ public final class TemplateService {
     /// (the `.template` case of `CollageLayout`). Text/sticker/art/spacer zones
     /// are editor overlays handled by later 03a slices and are not included.
     public nonisolated static func editorLayout(for template: CollageTemplate) -> TemplateLayout {
+        editorLayout(templateID: template.id, name: template.name,
+                     aspectRatio: template.canvasAspectRatio, cells: template.cells)
+    }
+
+    /// Cells-based core of `editorLayout(for:)` — reused by the carousel builder so a
+    /// carousel frame's photo zones map to editor cells with no duplicated geometry.
+    public nonisolated static func editorLayout(
+        templateID: String, name: String, aspectRatio: String, cells: [TemplateCell]
+    ) -> TemplateLayout {
         TemplateLayout(
-            templateID: template.id,
-            name: template.name,
-            aspectRatio: template.canvasAspectRatio,
-            cells: template.cells
+            templateID: templateID,
+            name: name,
+            aspectRatio: aspectRatio,
+            cells: cells
                 .filter { $0.zoneType == .photo }
                 .map { TemplateLayoutCell(frame: $0.frame, clip: clipShape(for: $0.shape)) }
         )

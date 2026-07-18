@@ -16,7 +16,21 @@
 //  PanoramicStitcher and binds slices to cells) and `buildGridPreviewCarousel`.
 //
 
+import CoreGraphics
 import Foundation
+
+/// A built carousel: the frames plus the source pixels (`imageID → CGImage`) the
+/// editor must seed into its image cache. Kept as a plain struct — `CGImage` isn't
+/// `Sendable`, so a build is used within one actor (the editor), never sent across.
+public struct CarouselBuild {
+    public let frames: [CarouselFrame]
+    public let images: [UUID: CGImage]
+
+    public init(frames: [CarouselFrame], images: [UUID: CGImage] = [:]) {
+        self.frames = frames
+        self.images = images
+    }
+}
 
 /// A single styling change that `syncEdit` can broadcast to every frame.
 public enum StyleChange: Equatable, Sendable {
@@ -89,6 +103,91 @@ public struct CarouselService {
             }
             return f
         }
+    }
+
+    // MARK: - Builders
+
+    /// A single full-bleed photo cell covering the whole canvas — the frame shape
+    /// used by panoramic slices and grid-preview zoom frames.
+    private func fullBleedLayout(id: String, name: String, aspectRatio: String) -> CollageLayout {
+        .template(TemplateLayout(
+            templateID: id, name: name, aspectRatio: aspectRatio,
+            cells: [TemplateLayoutCell(frame: CGRect(x: 0, y: 0, width: 1, height: 1))]
+        ))
+    }
+
+    /// Splits a wide source image into `frameCount` linked frames, each a single
+    /// full-bleed photo cell bound to its slice. The returned `images` map (`imageID`
+    /// → slice) is what the editor seeds into its photo cache. Background rarely
+    /// shows (frames are full-bleed) but is configurable.
+    public func buildPanoramicCarousel(
+        from image: CGImage, frameCount: Int, axis: SplitAxis,
+        aspectRatio: String, background: CollageBackground = .black
+    ) -> CarouselBuild {
+        let slices = PanoramicStitcher().split(image: image, into: frameCount, axis: axis)
+        var frames: [CarouselFrame] = []
+        var images: [UUID: CGImage] = [:]
+        for (i, slice) in slices.enumerated() {
+            let imageID = UUID()
+            images[imageID] = slice
+            let state = GridEditorState(
+                layout: fullBleedLayout(id: "panoramic-\(i)", name: "Panorama \(i + 1)",
+                                        aspectRatio: aspectRatio),
+                borderWidth: 0,
+                background: background,
+                cells: [EditorCellState(imageID: imageID)]
+            )
+            frames.append(CarouselFrame(index: i, state: state))
+        }
+        return CarouselBuild(frames: frames, images: images)
+    }
+
+    /// Maps a bundled carousel template's frames onto editable `CarouselFrame`s
+    /// (matched, scroll-through, or any type). Each frame's photo zones become editor
+    /// cells and its text/sticker zones become overlays, reusing the exact
+    /// `TemplateService` mapping the single-template editor path uses — so no geometry
+    /// or seeding logic is duplicated. Frames are taken in index order and re-numbered
+    /// contiguously. `@MainActor` because sticker resolution reads the catalog.
+    @MainActor
+    public func buildCarousel(from template: CarouselTemplate) -> [CarouselFrame] {
+        template.frames
+            .sorted { $0.index < $1.index }
+            .enumerated()
+            .map { position, frame in
+                let layout = CollageLayout.template(TemplateService.editorLayout(
+                    templateID: "\(template.id)-\(position)", name: template.name,
+                    aspectRatio: template.canvasAspectRatio, cells: frame.cells))
+                let state = GridEditorState(
+                    layout: layout,
+                    borderWidth: frame.cells.first.map { max($0.borderWidth, 0) } ?? 0,
+                    background: template.background,
+                    textOverlays: frame.cells.compactMap(\.textStyle),
+                    stickerOverlays: TemplateService.stickerOverlays(for: frame.cells)
+                )
+                return CarouselFrame(index: position, state: state)
+            }
+    }
+
+    /// Builds a grid-preview carousel: frame 0 is the whole grid as authored, and each
+    /// following frame zooms into one grid cell (a full-bleed frame carrying that
+    /// cell's image + transform + filters, so the zoom matches what the user set). The
+    /// grid's images are reused by id, so no new pixels are produced.
+    public func buildGridPreviewCarousel(
+        from gridState: GridEditorState, aspectRatio: String
+    ) -> [CarouselFrame] {
+        var frames = [CarouselFrame(index: 0, state: gridState)]
+        for (i, cell) in gridState.cells.enumerated() {
+            let state = GridEditorState(
+                layout: fullBleedLayout(id: "gridpreview-\(i)", name: "Cell \(i + 1)",
+                                        aspectRatio: aspectRatio),
+                borderWidth: 0,
+                background: gridState.background,
+                cells: [EditorCellState(imageID: cell.imageID, transform: cell.transform,
+                                        filters: cell.filters)]
+            )
+            frames.append(CarouselFrame(index: i + 1, state: state))
+        }
+        return frames
     }
 
     // MARK: - Helpers
