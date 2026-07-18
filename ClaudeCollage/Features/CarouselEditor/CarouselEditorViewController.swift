@@ -249,7 +249,18 @@ final class CarouselEditorViewController: UIViewController {
     @objc private func redoTapped() { viewModel.redo() }
 
     @objc private func previewTapped() {
-        showComingSoon(title: "Preview", message: "The swipe-through preview player arrives in an upcoming update.")
+        // Render each frame once (reusing the grid renderer via a throwaway VM) and
+        // hand the images to the full-screen swipe preview.
+        let images: [UIImage?] = viewModel.frames.map { frame in
+            let vm = GridEditorViewModel(canvasSize: viewModel.canvasSize, state: frame.state)
+            vm.restore(state: frame.state, images: viewModel.imagesSnapshot())
+            return vm.renderThumbnail(maxDimension: 1080).map { UIImage(cgImage: $0) }
+        }
+        let aspect = viewModel.canvasSize.height > 0
+            ? viewModel.canvasSize.width / viewModel.canvasSize.height : 1
+        let preview = CarouselPreviewViewController(
+            images: images, aspectRatio: aspect, startIndex: viewModel.currentIndex)
+        present(preview, animated: true)
     }
 
     @objc private func exportTapped() {
