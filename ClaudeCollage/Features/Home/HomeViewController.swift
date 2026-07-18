@@ -17,6 +17,7 @@ final class HomeViewController: UIViewController {
     var onNewProject: (() -> Void)?
     var onNewFreeform: ((CGSize) -> Void)?
     var onBrowseTemplates: (() -> Void)?
+    var onNewCarousel: (() -> Void)?
     var onOpenProject: ((UUID) -> Void)?
     var onDeleteProject: ((UUID) -> Void)?
 
@@ -50,7 +51,15 @@ final class HomeViewController: UIViewController {
         )
         freeformButton.accessibilityIdentifier = "freeformButton"
         freeformButton.accessibilityLabel = "Custom Size"
-        navigationItem.rightBarButtonItems = [addButton, templatesButton, freeformButton]
+
+        let carouselButton = UIBarButtonItem(
+            image: UIImage(systemName: "rectangle.stack"),
+            style: .plain, target: self, action: #selector(carouselTapped)
+        )
+        carouselButton.accessibilityIdentifier = "carouselButton"
+        carouselButton.accessibilityLabel = "Carousel"
+
+        navigationItem.rightBarButtonItems = [addButton, templatesButton, freeformButton, carouselButton]
 
         collectionView.translatesAutoresizingMaskIntoConstraints = false
         emptyStateView.translatesAutoresizingMaskIntoConstraints = false
@@ -90,6 +99,11 @@ final class HomeViewController: UIViewController {
     @objc private func templatesTapped() {
         Haptics.tap()
         onBrowseTemplates?()
+    }
+
+    @objc private func carouselTapped() {
+        Haptics.tap()
+        onNewCarousel?()
     }
 
     /// Prompts for a custom canvas size (100–4000 px) and starts a freeform collage.

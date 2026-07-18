@@ -29,6 +29,7 @@ final class AppCoordinator {
         home.onNewProject = { [weak self] in self?.startNewGridProject() }
         home.onNewFreeform = { [weak self] size in self?.startFreeformProject(size: size) }
         home.onBrowseTemplates = { [weak self] in self?.showTemplateGallery() }
+        home.onNewCarousel = { [weak self] in self?.startCarousel() }
         home.onOpenProject = { [weak self] id in self?.openProject(id: id) }
         home.onDeleteProject = { [weak self] id in self?.store.delete(id: id) }
         homeViewController = home
@@ -66,6 +67,33 @@ final class AppCoordinator {
         attachAutosave(to: viewModel)
         store.save(viewModel)
         pushEditor(with: viewModel)
+    }
+
+    /// Starts a new carousel and pushes the carousel editor. v1 seeds a 3-frame
+    /// matched carousel at 4:5 (sync-edit on by default); the SwiftUI type selector
+    /// + panoramic source picker land in a later 03b slice. Editing a frame pushes
+    /// the existing grid editor (see CarouselEditorViewController).
+    private func startCarousel() {
+        let aspect = "4:5"
+        let canvasSize = CanvasSize.size(forAspectRatio: aspect)
+        let frames = (0..<3).map { index in
+            CarouselFrame(index: index, state: GridEditorState(
+                layout: .template(TemplateLayout(
+                    templateID: "carousel-matched-\(index)", name: "Frame \(index + 1)",
+                    aspectRatio: aspect,
+                    cells: [TemplateLayoutCell(frame: CGRect(x: 0, y: 0, width: 1, height: 1))]
+                )),
+                borderWidth: 0, background: .white
+            ))
+        }
+        let viewModel = CarouselEditorViewModel(
+            frames: frames, canvasSize: canvasSize, carouselType: .matched
+        )
+        let editor = CarouselEditorViewController(viewModel: viewModel)
+        editor.onEditFrame = { [weak self] frameVM in
+            self?.pushEditor(with: frameVM)
+        }
+        navigationController.pushViewController(editor, animated: true)
     }
 
     private func showTemplateGallery() {
