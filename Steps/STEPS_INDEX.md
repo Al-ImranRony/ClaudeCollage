@@ -20,7 +20,7 @@ Do not start Part 2 until Part 1 is 100% complete.
 | **01** | `Step_01_GridCollage.md` | Rectangular grid collage editor | 3–7 | ✅ Core complete — 8/8 unit tests + UI flow green; editor runs in sim (see Step 01 notes below) |
 | **02** | `Step_02_PolygonCollage.md` | Polygon & custom shape collage | 8–12 | 🟡 Core complete — 9 shapes + masked canvas/export + typed parser + premium bezier editor; 12/12 new tests green (29 total). See Step 02 notes below |
 | **03a** | `Step_03a_StandardTemplates.md` | Frame/story template editor | 13–17 | ✅ Complete (2026-07-17) — all 7 slices done: foundation, gallery, `.template` layout, catalog (33 templates), text-zone editor, sticker system, freeform + snap. All done-criteria met. **77 unit/integration + 7 UI tests green.** See Step 03a notes below |
-| **03b** | `Step_03b_CarouselTemplates.md` | SCRL-style carousel mode | 18–22 | 🟡 In progress — slices 1–5 done (foundation, parser/20 templates, builders, editor+navigator, type selector + panoramic picker). 115 unit+int + 14 UI green. Preview player / export / persistence next. See Step 03b notes below |
+| **03b** | `Step_03b_CarouselTemplates.md` | SCRL-style carousel mode | 18–22 | 🟡 In progress — slices 1–6 done (…+ preview player + safe-zone overlay). 120 unit+int + 16 UI green. Export + persistence next. See Step 03b notes below |
 | **04** | `Step_04_VideoCollage.md` | Video collage + universal export | 23–30 | ⬜ Not started |
 | **05** | `Step_05_AIFeaturesAndPolish.md` | AI features, App Intents, widgets, polish | 31–35 | ⬜ Not started |
 | **05b** | `Step_05b_VisualDesignExcellence.md` | Visual design excellence + app icon (orange/Claude theme, SCRL-grade per-screen redesign) | 35–37 | ⬜ Not started — **design foundation already laid (2026-07-13)** |
@@ -149,6 +149,12 @@ Do not start Part 2 until Part 1 is 100% complete.
 - **`AppCoordinator.startCarousel`** now presents the selector and routes each type through its slice-3 builder: matched/scroll-through → `blankCarousel`; grid preview → `buildGridPreviewCarousel` (default 4-up grid → 5 frames); panoramic → source picker → `buildPanoramicCarousel`. Replaces slice 4's hardcoded 3-frame seed.
 - **Tests:** +6 `CarouselStartTests` (config clamp/visibility, blank builders) +2 `CarouselTypeSelectorUITests` (matched → 3 frames; **grid preview → 5 frames, exercising the builder path end-to-end through the UI**). Existing carousel UI tests updated to enter through the selector. **115 unit+integration + 14 UI green.**
 - **v1:** grid preview seeds a default 4-up grid (choosing an existing grid project as the source is a follow-up); panoramic photo-pick is **manual QA** (system PHPicker isn't driven headlessly).
+
+### Step 03b slice 6 — preview player + safe-zone overlay (2026-07-18)
+- **`SafeZonePreset`** (`Core/Models/SafeZone.swift`): `off` / `instagramStory` / `instagramReels` / `tiktok` / `generic`, each returning the normalized (0…1) rects the platform UI covers (`coveredRegions`). Pure geometry, **preview-only — never exported**. +5 `SafeZoneTests`.
+- **`SafeZoneOverlayView`** — draws the dimmed bands over a frame image (fills the image's rect so normalized regions map straight to pixels).
+- **`CarouselPreviewViewController`** — full-screen swipe-through preview on a **`UIPageViewController` (.scroll)** for native paging physics; one rendered frame per page + optional safe-zone overlay (aspect-fit container so overlay aligns to the image). Chrome = close / `n / N` counter / safe-zone `UIMenu` / export / `UIPageControl` dots, toggled on tap (a `UIGestureRecognizerDelegate` gate ignores taps on `UIControl`s). Export shows a coming-soon notice (real export is slice 7). Presented from the editor's Preview button, which renders each frame once via a throwaway VM + the grid renderer.
+- **Tests:** +5 unit +2 `CarouselPreviewUITests` (opens showing "1 / 3" + safe-zone control; closes back to the editor). **120 unit+integration + 16 UI green.**
 
 ### Step 01 — performance architecture (must carry into every editor)
 The first cut recomposited the whole canvas on the CPU per gesture frame and held full-resolution photos in RAM — laggy and memory-heavy. The corrected model, which Steps 02–05 must follow:
