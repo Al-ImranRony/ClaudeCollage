@@ -2,23 +2,33 @@
 //  SafeZone.swift
 //  ClaudeCollage
 //
-//  Step 03b slice 6 (refined slice 8 QA) — safe-zone presets for the carousel
-//  preview. Each platform overlays chrome (status bar, caption box, action rail)
-//  that can hide part of a frame; the preview dims those regions so the user keeps
+//  Step 03b slice 6 (refined for QA) — safe-zone presets for the carousel preview.
+//  Each platform overlays chrome (status bar, caption box, action rail) that can
+//  hide part of a frame; the preview dims + labels those regions so the user keeps
 //  important content clear of them. Preview-only — never composited into an export.
 //
-//  Why the regions are defined in SCREEN space, not frame space: Story / Reels /
-//  TikTok are full-screen 9:16 surfaces. A non-9:16 carousel frame is shown
-//  letterboxed + centered on that screen, so the chrome sits at fixed *screen*
-//  positions — "the top 9% of the frame" is only right for a 9:16 frame. So each
-//  preset lists its regions in 9:16 screen-normalized space, and
-//  `coveredRegions(forFrameAspect:)` projects them onto the actual frame, dropping
-//  any chrome that lands in the letterbox (outside the image). Result: the bands sit
-//  where the platform UI truly is for every aspect, and wider feed frames correctly
-//  show less (or none) of the full-screen chrome.
+//  Two design points:
+//   • Regions are authored in 9:16 SCREEN space (Story/Reels/TikTok are full-screen
+//     9:16 surfaces). A non-9:16 frame shows letterboxed + centered there, so
+//     `coveredZones(forFrameAspect:)` projects each zone onto the frame's real aspect
+//     and drops chrome that lands in the letterbox — the bands then sit where the UI
+//     truly is for every aspect.
+//   • Each zone carries a LABEL ("Caption", "Actions", …) so the dimmed area reads as
+//     an intentional platform-UI region, not a stray rectangle.
 //
 
 import CoreGraphics
+
+/// One region a platform's UI covers, plus what sits there.
+public struct SafeZoneRegion: Equatable, Sendable {
+    public let rect: CGRect          // normalized (0…1)
+    public let label: String
+
+    public init(rect: CGRect, label: String) {
+        self.rect = rect
+        self.label = label
+    }
+}
 
 public enum SafeZonePreset: String, CaseIterable, Sendable {
     case none
@@ -40,69 +50,78 @@ public enum SafeZonePreset: String, CaseIterable, Sendable {
         }
     }
 
-    /// Regions the platform UI covers, in **9:16 screen-normalized** space (0…1).
-    /// Values follow each app's published full-screen safe areas.
-    public var screenRegions: [CGRect] {
+    /// The UI zones this platform overlays, in 9:16 screen-normalized space. Values
+    /// follow each app's published full-screen safe areas (1080×1920 reference).
+    public var screenZones: [SafeZoneRegion] {
         switch self {
         case .none:
             return []
         case .instagramStory:
-            // Profile + close row up top; "Send message" reply bar along the bottom.
+            // ~250px top (profile + close) and ~250px bottom (reply bar) on 1920.
             return [
-                CGRect(x: 0, y: 0, width: 1, height: 0.11),
-                CGRect(x: 0, y: 0.87, width: 1, height: 0.13),
+                SafeZoneRegion(rect: CGRect(x: 0, y: 0, width: 1, height: 0.13), label: "Profile"),
+                SafeZoneRegion(rect: CGRect(x: 0, y: 0.87, width: 1, height: 0.13), label: "Reply bar"),
             ]
         case .instagramReels:
-            // Right action rail (like / comment / share / audio) + a bottom band for
-            // the caption, handle, and audio ticker.
+            // ~220px right action rail; ~420px bottom (caption + audio + CTA). The
+            // caption band stops at the rail so the two tile into a clean L.
             return [
-                CGRect(x: 0.84, y: 0.40, width: 0.16, height: 0.48),
-                CGRect(x: 0, y: 0.82, width: 0.84, height: 0.18),
+                SafeZoneRegion(rect: CGRect(x: 0.80, y: 0.42, width: 0.20, height: 0.46), label: "Actions"),
+                SafeZoneRegion(rect: CGRect(x: 0, y: 0.78, width: 0.80, height: 0.22), label: "Caption"),
             ]
         case .tiktok:
-            // Similar to Reels but a taller right rail and a slightly taller caption.
+            // ~120px right rail (taller icon stack); ~483px bottom (username + caption).
             return [
-                CGRect(x: 0.86, y: 0.34, width: 0.14, height: 0.52),
-                CGRect(x: 0, y: 0.80, width: 0.86, height: 0.20),
+                SafeZoneRegion(rect: CGRect(x: 0.85, y: 0.38, width: 0.15, height: 0.50), label: "Actions"),
+                SafeZoneRegion(rect: CGRect(x: 0, y: 0.75, width: 0.85, height: 0.25), label: "Caption"),
             ]
         case .generic:
             // Conservative top + bottom bars covering most short-form platforms.
             return [
-                CGRect(x: 0, y: 0, width: 1, height: 0.09),
-                CGRect(x: 0, y: 0.90, width: 1, height: 0.10),
+                SafeZoneRegion(rect: CGRect(x: 0, y: 0, width: 1, height: 0.10), label: "Top UI"),
+                SafeZoneRegion(rect: CGRect(x: 0, y: 0.87, width: 1, height: 0.13), label: "Bottom UI"),
             ]
         }
     }
 
-    /// The screen regions projected onto a frame of the given aspect (width / height),
-    /// as it appears aspect-fit + centered on the 9:16 screen. Regions that fall in the
-    /// letterbox (outside the frame) are dropped; partly-covered regions are clipped.
-    public func coveredRegions(forFrameAspect aspect: CGFloat) -> [CGRect] {
-        let regions = screenRegions
-        guard aspect > 0, !regions.isEmpty else { return regions }
+    /// The screen zones projected onto a frame of the given aspect (width / height) as
+    /// it appears aspect-fit + centered on the 9:16 screen. Zones fully in the
+    /// letterbox are dropped; partly-covered zones are clipped to the frame.
+    public func coveredZones(forFrameAspect aspect: CGFloat) -> [SafeZoneRegion] {
+        let zones = screenZones
+        guard aspect > 0, !zones.isEmpty else { return zones }
+        return zones.compactMap { zone in
+            guard let rect = Self.project(zone.rect, ontoFrameAspect: aspect) else { return nil }
+            return SafeZoneRegion(rect: rect, label: zone.label)
+        }
+    }
 
-        if aspect >= Self.screenAspect {
-            // Frame is wider than the screen → fit by width, vertical letterbox.
-            let frameHeight = Self.screenAspect / aspect          // fraction of screen height
+    /// Convenience — just the projected rectangles (used by geometry tests).
+    public func coveredRegions(forFrameAspect aspect: CGFloat) -> [CGRect] {
+        coveredZones(forFrameAspect: aspect).map(\.rect)
+    }
+
+    /// Maps a screen-space rect onto a frame of `aspect`, or nil if it lands wholly in
+    /// the letterbox/pillarbox.
+    private static func project(_ region: CGRect, ontoFrameAspect aspect: CGFloat) -> CGRect? {
+        if aspect >= screenAspect {
+            // Frame wider than screen → fit by width, vertical letterbox.
+            let frameHeight = screenAspect / aspect
             let top = (1 - frameHeight) / 2
-            return regions.compactMap { region in
-                let y0 = max(region.minY, top)
-                let y1 = min(region.maxY, top + frameHeight)
-                guard y1 > y0 else { return nil }                 // entirely in the letterbox
-                return CGRect(x: region.minX, y: (y0 - top) / frameHeight,
-                              width: region.width, height: (y1 - y0) / frameHeight)
-            }
+            let y0 = max(region.minY, top)
+            let y1 = min(region.maxY, top + frameHeight)
+            guard y1 > y0 else { return nil }
+            return CGRect(x: region.minX, y: (y0 - top) / frameHeight,
+                          width: region.width, height: (y1 - y0) / frameHeight)
         } else {
-            // Frame is taller than the screen → fit by height, horizontal pillarbox.
-            let frameWidth = aspect / Self.screenAspect           // fraction of screen width
+            // Frame taller than screen → fit by height, horizontal pillarbox.
+            let frameWidth = aspect / screenAspect
             let left = (1 - frameWidth) / 2
-            return regions.compactMap { region in
-                let x0 = max(region.minX, left)
-                let x1 = min(region.maxX, left + frameWidth)
-                guard x1 > x0 else { return nil }
-                return CGRect(x: (x0 - left) / frameWidth, y: region.minY,
-                              width: (x1 - x0) / frameWidth, height: region.height)
-            }
+            let x0 = max(region.minX, left)
+            let x1 = min(region.maxX, left + frameWidth)
+            guard x1 > x0 else { return nil }
+            return CGRect(x: (x0 - left) / frameWidth, y: region.minY,
+                          width: (x1 - x0) / frameWidth, height: region.height)
         }
     }
 }
