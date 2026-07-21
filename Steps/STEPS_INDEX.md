@@ -21,7 +21,7 @@ Do not start Part 2 until Part 1 is 100% complete.
 | **02** | `Step_02_PolygonCollage.md` | Polygon & custom shape collage | 8–12 | 🟡 Core complete — 9 shapes + masked canvas/export + typed parser + premium bezier editor; 12/12 new tests green (29 total). See Step 02 notes below |
 | **03a** | `Step_03a_StandardTemplates.md` | Frame/story template editor | 13–17 | ✅ Complete (2026-07-17) — all 7 slices done: foundation, gallery, `.template` layout, catalog (33 templates), text-zone editor, sticker system, freeform + snap. All done-criteria met. **77 unit/integration + 7 UI tests green.** See Step 03a notes below |
 | **03b** | `Step_03b_CarouselTemplates.md` | SCRL-style carousel mode | 18–22 | 🟢 Core complete — slices 1–8 done (…+ persistence/resume). All done-criteria met **except video-slideshow export, deferred to Step 04's VideoComposer** (the plan itself ties it there). 127 unit+int + 18 UI green. See Step 03b notes below |
-| **04** | `Step_04_VideoCollage.md` | Video collage + universal export | 23–30 | ⬜ Not started |
+| **04** | `Step_04_VideoCollage.md` | Video collage + universal export | 23–30 | 🟡 In progress — slice 1 done (export engine foundation: `ExportPreset` + `ImageExporter` + `VideoComposer` direct-AVAssetWriter; 6 spec integration tests + 9 preset tests green). See Step 04 notes below |
 | **05** | `Step_05_AIFeaturesAndPolish.md` | AI features, App Intents, widgets, polish | 31–35 | ⬜ Not started |
 | **05b** | `Step_05b_VisualDesignExcellence.md` | Visual design excellence + app icon (orange/Claude theme, SCRL-grade per-screen redesign) | 35–37 | ⬜ Not started — **design foundation already laid (2026-07-13)** |
 
@@ -170,6 +170,22 @@ Do not start Part 2 until Part 1 is 100% complete.
 - **Tests:** +4 `CarouselPersistenceTests` (frames/type/per-frame-state round-trip, tagged-carousel-in-summaries, photos-reload-from-disk, grid≠carousel) +1 `CarouselEditorUITests` resume flow (create → +frame → Home → reopen → **4 frames intact**). `GridEditorFlowUITests` still green (grid resume unaffected by the routing change). **127 unit+integration + 18 UI green.**
 - **Step 03b done-criteria:** all four types create end-to-end; panoramic edge alignment unit-proven; navigator reorder/add/delete with undo; sync-edit; native swipe preview; **image-set ZIP export**; persistence/resume — all met. **Only video-slideshow export remains, and the plan ties it to Step 04's `VideoComposer`** (not yet built) → deferred there. Panoramic photo-pick is manual QA (system PHPicker).
 - **Note:** `project.yml` was reformatted by a tool during this slice (DEVELOPMENT_TEAM quotes/comment stripped) — the signing value `G9AZVLUA7S` is preserved; benign.
+
+### Step 04 — slice plan (2026-07-22)
+Step 04 is large (~8 wks, two deliverables: Video Collage editor + Universal Export system). Executed in vertical slices like 03a/03b:
+1. **Export engine foundation (no UI)** — `ExportPreset` + `ImageExporter` + `VideoComposer` (direct AVAssetWriter slideshow). ✅ done below.
+2. `UniversalExportSheetView` (SwiftUI) wired into Grid/Template/Carousel editors (image + carousel-video paths); unblocks 03b's deferred carousel video export end-to-end.
+3. Video cells — `AVURLAsset` load, `AVMutableComposition` assembly, per-cell affine-transform layout, trim/loop/mute/volume.
+4. Transitions + text/sticker overlays baked via `AVVideoCompositionCoreAnimationTool`; mixed photo+video.
+5. `VideoEditorViewController` + `VideoCanvasView` (AVPlayerLayer) + per-cell controls + background music mixing.
+6. Save-to-Photos / Quick Share / progress + Cancel / Live Activity / beat-sync.
+
+### Step 04 slice 1 — export engine foundation (2026-07-22)
+- **`ExportPreset`** (`Core/Models/ExportPreset.swift`): pure value type backing Section 1 of the export sheet. `preset(for: ExportSettings.Platform)` returns the enforced aspect + target pixel size + media kind + default video/image format per the spec table: Story/TikTok/WhatsApp = 1080×1920 (9:16), YouTube = 1920×1080, **Twitter/X = 1280×720 (720p, intentionally lower)**, IG Post = 1080×1080, Print = 4:3 JPEG **image-only**, Custom = no enforced size/aspect (`nil`) + media `.both`. `matchesCanvas(aspectRatio:)` drives the "resize canvas?" mismatch warning (Custom matches anything). +9 `ExportPresetTests`.
+- **`ImageExporter`** (`Core/Services/ImageExporter.swift`): encodes a composited `CGImage` → JPEG(quality)/PNG via `CGImageDestination`, at `.full`/`.half`/`.custom(size)` resolution. Pure; caller owns save/share. (Section 2 image path.)
+- **`VideoComposer`** (`Core/Rendering/VideoComposer.swift`): the video export engine. `renderSlideshow(frames:size:secondsPerFrame:fps:codec:container:to:progress:)` writes a still-per-page slideshow **directly via `AVAssetWriter` + `AVAssetWriterInputPixelBufferAdaptor`** — NO `AVAssetExportSession` (avoids SCRL's resample-softening bug). 32BGRA pixel buffers, aspect-fill draw, H.264/MP4 default (HEVC/MOV premium later). Runs on a private `DispatchQueue`, bridged to async via a checked continuation; `finishWriting` awaited through a `DispatchSemaphore` (no non-Sendable capture). **This is the deferred 03b carousel video-export engine** — slice 2 wires it in. Because editors always hand it a fully-composited frame, "all overlays baked in" is structural.
+- **Tests:** the spec's 6 `ExportServiceTests` (image dimensions / JPEG-quality→size / PNG lossless round-trip / MP4 produced+1 track / dims match preset / composited pixels survive to the file via `AVAssetReader` readback) + 9 `ExportPresetTests`. **143 unit+integration + 18 UI green** (+15 unit/int this slice; no existing production code touched — purely additive).
+- **Deviations/notes:** slideshow appends each frame at 30fps for `secondsPerFrame` (guarantees the last frame a real duration); video *cells* (AVAsset trim/audio) and transitions are later slices. Print preset's "300 DPI equivalent" uses the app's 1080-short-side sizing rule (`CanvasSize`) for now.
 
 ### Step 01 — performance architecture (must carry into every editor)
 The first cut recomposited the whole canvas on the CPU per gesture frame and held full-resolution photos in RAM — laggy and memory-heavy. The corrected model, which Steps 02–05 must follow:
