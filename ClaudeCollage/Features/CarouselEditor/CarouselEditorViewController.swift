@@ -20,12 +20,13 @@
 //  layout is realized as navigator → push-to-edit (robust + reuses the editor
 //  unmodified); reorder is via a context menu (Move Left/Right) rather than
 //  long-press drag; sync-edit broadcasts a frame's background + border to all frames
-//  on return (live font sync is a follow-up); the carousel is in-memory (no
-//  resume/persistence yet). Preview + export are wired to a "coming soon" notice
-//  until their slices land.
+//  on return (live font sync is a follow-up). Persistence/resume landed in slice 8;
+//  Preview is a full-screen page player (slice 6); Export presents the Universal
+//  Export sheet (Step 04 slice 2) — image set, per-frame Photos, and slideshow video.
 //
 
 import UIKit
+import SwiftUI
 
 final class CarouselEditorViewController: UIViewController {
 
@@ -265,27 +266,138 @@ final class CarouselEditorViewController: UIViewController {
     }
 
     @objc private func exportTapped() {
-        let sheet = UIAlertController(title: "Export Carousel", message: nil, preferredStyle: .actionSheet)
-        sheet.addAction(UIAlertAction(title: "Export as Images (ZIP)", style: .default) { [weak self] _ in
-            self?.exportImageSet()
-        })
-        sheet.addAction(UIAlertAction(title: "Export as Video", style: .default) { [weak self] _ in
-            self?.showComingSoon(title: "Video Export",
-                                 message: "Video slideshow export arrives with the video collage step.")
-        })
-        sheet.addAction(UIAlertAction(title: "Cancel", style: .cancel))
-        sheet.popoverPresentationController?.barButtonItem = navigationItem.rightBarButtonItems?.first
-        present(sheet, animated: true)
+        let capabilities = ExportCapabilities(
+            canvasSize: viewModel.canvasSize,
+            canvasAspect: CanvasSize.aspectString(for: viewModel.canvasSize),
+            supportsVideo: true,
+            isPremium: EntitlementStore.shared.isPremiumUnlocked)
+        let sheet = UniversalExportSheetView(
+            capabilities: capabilities,
+            onSaveToPhotos: { [weak self] options in
+                if options.media == .video { self?.exportVideo(options, share: false) }
+                else { self?.saveImagesToPhotos(options) }
+            },
+            onQuickShare: { [weak self] options in
+                if options.media == .video { self?.exportVideo(options, share: true) }
+                else { self?.dismiss(animated: true) { self?.exportImageSet() } }
+            },
+            onCancel: { [weak self] in self?.dismiss(animated: true) })
+        let host = UIHostingController(rootView: sheet)
+        host.modalPresentationStyle = .pageSheet
+        if let presentation = host.sheetPresentationController {
+            presentation.detents = [.medium(), .large()]
+            presentation.prefersGrabberVisible = true
+        }
+        present(host, animated: true)
+    }
+
+    /// Renders every frame full-resolution via a throwaway grid VM (reusing the
+    /// editor's exact composite so preview == export).
+    private func renderFrames() -> [CGImage] {
+        viewModel.frames.compactMap { frame in
+            let vm = GridEditorViewModel(canvasSize: viewModel.canvasSize, state: frame.state)
+            vm.restore(state: frame.state, images: viewModel.imagesSnapshot())
+            return vm.renderExport()
+        }
+    }
+
+    /// Composes the frames into a slideshow video (direct AVAssetWriter) and either
+    /// saves it to Photos or opens the share sheet. This is Step 03b's deferred
+    /// carousel video export, now delivered through Step 04's `VideoComposer`.
+    private func exportVideo(_ options: ExportOptions, share: Bool) {
+        dismiss(animated: true) { [weak self] in
+            guard let self else { return }
+            let frames = self.renderFrames()
+            guard !frames.isEmpty else {
+                self.showComingSoon(title: "Export Failed", message: "There are no frames to export.")
+                return
+            }
+            let spinner = self.presentSpinner("Exporting video…")
+            let size = options.videoPixelSize(canvasSize: self.viewModel.canvasSize)
+            let ext = options.videoContainer == .mov ? "mov" : "mp4"
+            let url = FileManager.default.temporaryDirectory
+                .appendingPathComponent("Carousel-\(UUID().uuidString).\(ext)")
+            Task { @MainActor in
+                do {
+                    try await VideoComposer().renderSlideshow(
+                        frames: frames, size: size, secondsPerFrame: 2.0,
+                        codec: options.videoCodec, container: options.videoContainer, to: url)
+                    if share {
+                        spinner.dismiss(animated: true) { self.shareURL(url) }
+                    } else {
+                        try await PhotoLibrarySaver().saveVideo(at: url)
+                        spinner.dismiss(animated: true) {
+                            self.notify(.success)
+                            self.showToast("Saved to Photos")
+                        }
+                    }
+                } catch {
+                    spinner.dismiss(animated: true) {
+                        self.notify(.error)
+                        self.showComingSoon(title: "Export Failed",
+                                            message: "The video couldn't be created. Please try again.")
+                    }
+                }
+            }
+        }
+    }
+
+    /// Saves each frame to Photos as an individual image asset.
+    private func saveImagesToPhotos(_ options: ExportOptions) {
+        dismiss(animated: true) { [weak self] in
+            guard let self else { return }
+            let frames = self.renderFrames()
+            guard !frames.isEmpty else {
+                self.showComingSoon(title: "Export Failed", message: "There are no frames to export.")
+                return
+            }
+            let spinner = self.presentSpinner("Saving…")
+            Task { @MainActor in
+                do {
+                    let saver = PhotoLibrarySaver()
+                    for frame in frames {
+                        let data = try ImageExporter().encode(
+                            frame, format: options.imageExporterFormat, resolution: options.imageResolution)
+                        try await saver.saveImage(data)
+                    }
+                    spinner.dismiss(animated: true) {
+                        self.notify(.success)
+                        self.showToast("Saved \(frames.count) images")
+                    }
+                } catch {
+                    spinner.dismiss(animated: true) {
+                        self.notify(.error)
+                        self.showComingSoon(title: "Save Failed", message: "Couldn't save to Photos.")
+                    }
+                }
+            }
+        }
+    }
+
+    private func presentSpinner(_ message: String) -> UIAlertController {
+        let alert = UIAlertController(title: nil, message: message, preferredStyle: .alert)
+        let indicator = UIActivityIndicatorView(style: .medium)
+        indicator.translatesAutoresizingMaskIntoConstraints = false
+        indicator.startAnimating()
+        alert.view.addSubview(indicator)
+        NSLayoutConstraint.activate([
+            indicator.centerXAnchor.constraint(equalTo: alert.view.centerXAnchor),
+            indicator.bottomAnchor.constraint(equalTo: alert.view.bottomAnchor, constant: -20),
+        ])
+        present(alert, animated: true)
+        return alert
+    }
+
+    private func shareURL(_ url: URL) {
+        let share = UIActivityViewController(activityItems: [url], applicationActivities: nil)
+        share.popoverPresentationController?.barButtonItem = navigationItem.rightBarButtonItems?.first
+        present(share, animated: true)
     }
 
     /// Renders every frame full-resolution, zips them as frame_NN.jpg, and offers the
     /// archive via the share sheet (save to Files / AirDrop / etc.).
     private func exportImageSet() {
-        let images: [CGImage] = viewModel.frames.compactMap { frame in
-            let vm = GridEditorViewModel(canvasSize: viewModel.canvasSize, state: frame.state)
-            vm.restore(state: frame.state, images: viewModel.imagesSnapshot())
-            return vm.renderExport()
-        }
+        let images = renderFrames()
         guard !images.isEmpty else {
             showComingSoon(title: "Export Failed", message: "There are no frames to export.")
             return

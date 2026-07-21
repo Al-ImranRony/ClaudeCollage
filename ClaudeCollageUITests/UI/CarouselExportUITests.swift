@@ -31,10 +31,13 @@ final class CarouselExportUITests: XCTestCase {
         openCarousel(app)
         app.buttons["carouselExportButton"].tap()
 
-        let images = app.buttons["Export as Images (ZIP)"]
-        XCTAssertTrue(images.waitForExistence(timeout: 5), "Export offers an image-set option")
-        XCTAssertTrue(app.buttons["Export as Video"].exists, "Export offers a video option")
-        // (The ZIP build is verified in CarouselExporterTests; the system share sheet
-        // isn't driven headlessly, so we stop at confirming the options are offered.)
+        // The Universal Export sheet appears; a carousel is video-capable, so it
+        // offers a Video media option alongside Save to Photos / Quick Share.
+        let save = app.buttons["exportSaveButton"]
+        XCTAssertTrue(save.waitForExistence(timeout: 5), "Universal Export sheet presented")
+        XCTAssertTrue(app.buttons["Video"].exists, "Carousel export offers a video option")
+        XCTAssertTrue(app.buttons["exportShareButton"].exists, "Export offers Quick Share")
+        // (Image-set ZIP is verified in CarouselExporterTests; the video pipeline in
+        // ExportServiceTests. The system Photos/share flows aren't driven headlessly.)
     }
 }

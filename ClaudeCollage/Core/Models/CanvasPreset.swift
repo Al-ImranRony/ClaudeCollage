@@ -81,6 +81,17 @@ public enum CanvasSize {
         return (w, h)
     }
 
+    /// The reduced "w:h" aspect for a concrete pixel size (e.g. 1080×1920 → "9:16"),
+    /// so it compares equal to a preset's authored ratio via `matchesCanvas`.
+    public static func aspectString(for size: CGSize) -> String {
+        let w = Int(size.width.rounded()), h = Int(size.height.rounded())
+        guard w > 0, h > 0 else { return "1:1" }
+        let g = gcd(w, h)
+        return "\(w / g):\(h / g)"
+    }
+
+    private static func gcd(_ a: Int, _ b: Int) -> Int { b == 0 ? a : gcd(b, a % b) }
+
     /// A canonical "w:h" form for comparison (e.g. "1.0 : 1" → "1:1").
     static func normalize(_ ratio: String) -> String {
         guard let (w, h) = parse(ratio) else { return ratio }

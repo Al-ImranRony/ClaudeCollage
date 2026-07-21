@@ -33,13 +33,13 @@ final class ExportSaveUITests: XCTestCase {
         addButton.tap()
         XCTAssertTrue(app.navigationBars["Grid Collage"].waitForExistence(timeout: 8), "Editor pushes")
 
-        // Open the export options (a popover on iPhone/iOS 26) and pick a format.
+        // Open the Universal Export sheet and save to Photos (image-only for grid).
         let exportButton = app.buttons["exportButton"]
         XCTAssertTrue(exportButton.waitForExistence(timeout: 4), "Export button present")
         exportButton.tap()
-        let jpeg = app.buttons["JPEG · High"]
-        XCTAssertTrue(jpeg.waitForExistence(timeout: 4), "Export options presented")
-        jpeg.tap()
+        let save = app.buttons["exportSaveButton"]
+        XCTAssertTrue(save.waitForExistence(timeout: 4), "Export sheet presented")
+        save.tap()
 
         // Answer the "Add to Photos" prompt if the sim hasn't granted it yet.
         // (Granting resolves authorization → the completion handler fires on a

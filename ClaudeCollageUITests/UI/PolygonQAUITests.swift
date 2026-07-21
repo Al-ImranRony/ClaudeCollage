@@ -88,28 +88,18 @@ final class PolygonQAUITests: XCTestCase {
             XCTFail("Custom Shape button missing in Shapes mode")
         }
 
-        // Export sheet appears for a polygon collage.
+        // The Universal Export sheet appears for a polygon collage.
         let exportButton = app.buttons["exportButton"]
         XCTAssertTrue(exportButton.waitForExistence(timeout: 3), "Export button present")
         exportButton.tap()
-        let exportSheet = app.sheets["Export Collage"].firstMatch
-        let exportAlert = app.alerts["Export Collage"].firstMatch
-        let shown = exportSheet.waitForExistence(timeout: 3) || exportAlert.waitForExistence(timeout: 1)
-        XCTAssertTrue(shown, "Export options presented")
+        XCTAssertTrue(app.buttons["exportSaveButton"].waitForExistence(timeout: 4), "Export options presented")
         attach(app, "07_export_sheet")
-        // Dismiss. On iPhone/iOS 26 the export options present as a POPOVER
-        // (anchored to the export bar button), which by design omits the Cancel
-        // action — a popover is dismissed by tapping outside it. Fall back to a
-        // Cancel button for the classic bottom-sheet presentation on other
-        // devices/OSes.
-        let cancel = exportSheet.buttons["Cancel"].firstMatch
+        // Dismiss the sheet via its Cancel button (swipe-down fallback).
+        let cancel = app.buttons["exportCancelButton"]
         if cancel.waitForExistence(timeout: 2) {
             cancel.tap()
-        } else if app.otherElements["PopoverDismissRegion"].waitForExistence(timeout: 1) {
-            app.otherElements["PopoverDismissRegion"].tap()
         } else {
-            // Last resort: tap an empty area away from the popover.
-            app.coordinate(withNormalizedOffset: CGVector(dx: 0.15, dy: 0.30)).tap()
+            app.swipeDown(velocity: .fast)
         }
 
         // Back to Home — project saved without crashing.

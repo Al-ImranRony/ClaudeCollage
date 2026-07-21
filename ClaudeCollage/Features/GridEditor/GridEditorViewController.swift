@@ -672,47 +672,73 @@ final class GridEditorViewController: UIViewController {
     // MARK: - Export
 
     @objc private func exportTapped() {
-        let sheet = UIAlertController(title: "Export Collage", message: "Save to your Photos library.", preferredStyle: .actionSheet)
-        sheet.addAction(UIAlertAction(title: "JPEG · High", style: .default) { [weak self] _ in
-            self?.export(format: .jpeg, quality: 0.9)
-        })
-        sheet.addAction(UIAlertAction(title: "JPEG · Maximum", style: .default) { [weak self] _ in
-            self?.export(format: .jpeg, quality: 1.0)
-        })
-        sheet.addAction(UIAlertAction(title: "PNG · Lossless", style: .default) { [weak self] _ in
-            self?.export(format: .png, quality: 1.0)
-        })
-        sheet.addAction(UIAlertAction(title: "Cancel", style: .cancel))
-        sheet.popoverPresentationController?.barButtonItem = navigationItem.rightBarButtonItems?.first
-        present(sheet, animated: true)
+        let capabilities = ExportCapabilities(
+            canvasSize: viewModel.canvasSize,
+            canvasAspect: CanvasSize.aspectString(for: viewModel.canvasSize),
+            supportsVideo: false,
+            isPremium: EntitlementStore.shared.isPremiumUnlocked)
+        let sheet = UniversalExportSheetView(
+            capabilities: capabilities,
+            onSaveToPhotos: { [weak self] options in self?.performImageExport(options, share: false) },
+            onQuickShare: { [weak self] options in self?.performImageExport(options, share: true) },
+            onCancel: { [weak self] in self?.dismiss(animated: true) })
+        let host = UIHostingController(rootView: sheet)
+        host.modalPresentationStyle = .pageSheet
+        if let presentation = host.sheetPresentationController {
+            presentation.detents = [.medium(), .large()]
+            presentation.prefersGrabberVisible = true
+        }
+        present(host, animated: true)
     }
 
-    private enum ExportFormat { case jpeg, png }
-
-    private func export(format: ExportFormat, quality: CGFloat) {
-        let spinner = presentSpinner()
-        // Build the (Sendable) request on the main actor, then composite +
-        // encode entirely off the main thread so the UI never blocks.
-        let request = viewModel.exportRequest()
-        let compositor = self.compositor
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            let cgImage = compositor.render(request, scale: 1)
-            let data: Data? = cgImage.flatMap { image in
-                let uiImage = UIImage(cgImage: image)
-                return format == .png ? uiImage.pngData() : uiImage.jpegData(compressionQuality: quality)
-            }
-            DispatchQueue.main.async {
-                guard let self else { return }
-                spinner.dismiss(animated: true) {
-                    guard let data else {
-                        self.notify(.error)
-                        self.showAlert("Export failed", "Could not render the collage.")
-                        return
+    /// Renders the canvas full-resolution off the main thread, encodes it per the
+    /// export options, then saves to Photos or opens the share sheet.
+    private func performImageExport(_ options: ExportOptions, share: Bool) {
+        dismiss(animated: true) { [weak self] in
+            guard let self else { return }
+            let spinner = self.presentSpinner()
+            // Build the (Sendable) request on the main actor, then composite +
+            // encode entirely off the main thread so the UI never blocks.
+            let request = self.viewModel.exportRequest()
+            let compositor = self.compositor
+            DispatchQueue.global(qos: .userInitiated).async {
+                let cgImage = compositor.render(request, scale: 1)
+                let data: Data? = cgImage.flatMap {
+                    try? ImageExporter().encode($0, format: options.imageExporterFormat,
+                                               resolution: options.imageResolution)
+                }
+                DispatchQueue.main.async {
+                    spinner.dismiss(animated: true) {
+                        guard let data else {
+                            self.notify(.error)
+                            self.showAlert("Export failed", "Could not render the collage.")
+                            return
+                        }
+                        if share {
+                            self.shareData(data, fileExtension: options.imageFormat == .png ? "png" : "jpg")
+                        } else {
+                            self.saveToPhotos(data)
+                        }
                     }
-                    self.saveToPhotos(data)
                 }
             }
         }
+    }
+
+    /// Writes `data` to a temp file and opens the iOS share sheet (Quick Share).
+    private func shareData(_ data: Data, fileExtension: String) {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("Collage-\(UUID().uuidString).\(fileExtension)")
+        do {
+            try data.write(to: url)
+        } catch {
+            notify(.error)
+            showAlert("Share failed", "Could not prepare the file to share.")
+            return
+        }
+        let share = UIActivityViewController(activityItems: [url], applicationActivities: nil)
+        share.popoverPresentationController?.barButtonItem = navigationItem.rightBarButtonItems?.first
+        present(share, animated: true)
     }
 
     private func saveToPhotos(_ data: Data) {
