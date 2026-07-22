@@ -42,4 +42,36 @@ public enum VideoCompositionMath {
         guard !isMuted else { return 0 }
         return Float(min(1, max(0, volume)))
     }
+
+    // MARK: - Transitions
+
+    /// The opacity a cell's intro transition starts from (ramping to 1). Only the
+    /// crossfade fades in; slide/zoom stay fully opaque and animate the transform.
+    public static func transitionStartOpacity(_ style: CellTransition.Style) -> Float {
+        style == .crossfade ? 0 : 1
+    }
+
+    /// The transform a cell's intro transition starts from (ramping to `base`, its
+    /// resting placement). Slides begin offset by a cell width; zoom begins at 0.9×
+    /// scale about the cell centre.
+    public static func transitionStartTransform(
+        style: CellTransition.Style,
+        base: CGAffineTransform,
+        cell: CGRect
+    ) -> CGAffineTransform {
+        switch style {
+        case .crossfade:
+            return base
+        case .slideLeft:  // enters from the right, sliding left into place
+            return base.concatenating(CGAffineTransform(translationX: cell.width, y: 0))
+        case .slideRight: // enters from the left, sliding right into place
+            return base.concatenating(CGAffineTransform(translationX: -cell.width, y: 0))
+        case .zoomIn:
+            let scale: CGFloat = 0.9
+            let scaleAboutCentre = CGAffineTransform(translationX: cell.midX, y: cell.midY)
+                .scaledBy(x: scale, y: scale)
+                .translatedBy(x: -cell.midX, y: -cell.midY)
+            return base.concatenating(scaleAboutCentre)
+        }
+    }
 }

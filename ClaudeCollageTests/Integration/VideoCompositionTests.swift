@@ -152,7 +152,105 @@ final class VideoCompositionTests: XCTestCase {
         XCTAssertGreaterThan(bottom.b, 150); XCTAssertLessThan(bottom.r, 90)// bottom cell = blue
     }
 
+    // MARK: - Overlay baking (composited at write-time in export)
+
+    func testStickerOverlayBakesIntoExport() async throws {
+        let red = try await makeSolidVideo(r: 220, g: 30, b: 30, seconds: 1)
+        // A green square sticker in the TOP region (centre y = 0.25), over red video.
+        let sticker = StickerOverlay(symbolName: "square.fill", colorHex: "#20E020",
+                                     center: CGPoint(x: 0.5, y: 0.25), sizeNorm: 0.5)
+        let cell = VideoCompositionCell(asset: AVURLAsset(url: red), frame: unit(160))
+        let bundle = try await VideoComposer().buildComposition(
+            cells: [cell], canvasSize: sq(160), stickerOverlays: [sticker])
+        let out = tempURL(ext: "mp4")
+        try await VideoComposer().export(bundle: bundle, to: out)
+
+        let top = try await filePixel(out, x: 80, y: 40)     // inside the sticker box
+        let bottom = try await filePixel(out, x: 80, y: 135) // below it → bare video
+        XCTAssertGreaterThan(top.g, 120, "green sticker baked into the exported top region")
+        XCTAssertLessThan(top.r, 120)
+        XCTAssertGreaterThan(bottom.r, 150, "video (red) shows where no overlay covers")
+        XCTAssertLessThan(bottom.g, 120)
+    }
+
+    // MARK: - Transitions (layer-instruction ramps)
+
+    func testCrossfadeAddsOpacityRamp() async throws {
+        let v = try await makeSolidVideo(r: 200, g: 200, b: 200, seconds: 1)
+        let cell = VideoCompositionCell(asset: AVURLAsset(url: v), frame: unit(160),
+                                        transition: CellTransition(style: .crossfade, duration: 0.5))
+        let bundle = try await VideoComposer().buildComposition(cells: [cell], canvasSize: sq(160))
+        let layer = try XCTUnwrap(firstLayerInstruction(bundle))
+        var start: Float = -1, end: Float = -1
+        var range = CMTimeRange.zero
+        XCTAssertTrue(layer.getOpacityRamp(for: .zero, startOpacity: &start, endOpacity: &end, timeRange: &range))
+        XCTAssertEqual(start, 0, accuracy: 1e-4)
+        XCTAssertEqual(end, 1, accuracy: 1e-4)
+    }
+
+    func testSlideAddsTransformRamp() async throws {
+        let v = try await makeSolidVideo(r: 200, g: 200, b: 200, seconds: 1)
+        let cell = VideoCompositionCell(asset: AVURLAsset(url: v), frame: unit(160),
+                                        transition: CellTransition(style: .slideLeft, duration: 0.5))
+        let bundle = try await VideoComposer().buildComposition(cells: [cell], canvasSize: sq(160))
+        let layer = try XCTUnwrap(firstLayerInstruction(bundle))
+        var start = CGAffineTransform.identity, end = CGAffineTransform.identity
+        var range = CMTimeRange.zero
+        XCTAssertTrue(layer.getTransformRamp(for: .zero, start: &start, end: &end, timeRange: &range))
+        XCTAssertNotEqual(start, end, "slide ramps the transform from an offset to rest")
+    }
+
+    func testCrossfadeFirstFrameShowsBackground() async throws {
+        // A white cell with a crossfade is (near) transparent at t=0 → dark bg.
+        let white = try await makeSolidVideo(r: 235, g: 235, b: 235, seconds: 1)
+        let cell = VideoCompositionCell(asset: AVURLAsset(url: white), frame: unit(160),
+                                        transition: CellTransition(style: .crossfade, duration: 0.5))
+        let bundle = try await VideoComposer().buildComposition(cells: [cell], canvasSize: sq(160))
+        let px = try await compositedPixel(bundle, x: 80, y: 80)
+        XCTAssertLessThan(px.r, 90, "crossfade starts transparent → dark at t=0")
+        XCTAssertLessThan(px.g, 90)
+        XCTAssertLessThan(px.b, 90)
+    }
+
+    func testNoTransitionIsFullyOpaque() async throws {
+        let v = try await makeSolidVideo(r: 200, g: 200, b: 200, seconds: 1)
+        let cell = VideoCompositionCell(asset: AVURLAsset(url: v), frame: unit(160))
+        let bundle = try await VideoComposer().buildComposition(cells: [cell], canvasSize: sq(160))
+        let layer = try XCTUnwrap(firstLayerInstruction(bundle))
+        var start: Float = -1, end: Float = -1
+        var range = CMTimeRange.zero
+        XCTAssertFalse(layer.getOpacityRamp(for: .zero, startOpacity: &start, endOpacity: &end, timeRange: &range),
+                       "a cell with no transition has no opacity ramp")
+    }
+
+    // MARK: - Mixed photo + video
+
+    func testMixedPhotoAndVideoComposition() async throws {
+        let redVideo = try await makeSolidVideo(r: 230, g: 20, b: 20, seconds: 2) // left, drives duration
+        let bluePhoto = solidImage(160, r: 20, g: 20, b: 230)                     // right, still photo
+        let videoCell = VideoCompositionCell(asset: AVURLAsset(url: redVideo),
+                                             frame: CGRect(x: 0, y: 0, width: 80, height: 160))
+        let stillURL = tempURL(ext: "mp4")
+        let photoCell = try await VideoComposer().photoCell(
+            image: bluePhoto, frame: CGRect(x: 80, y: 0, width: 80, height: 160), to: stillURL)
+
+        let bundle = try await VideoComposer().buildComposition(cells: [videoCell, photoCell], canvasSize: sq(160))
+        let tracks = try await bundle.composition.loadTracks(withMediaType: .video)
+        XCTAssertEqual(tracks.count, 2, "photo cell joins the composition as a video track")
+        XCTAssertEqual(bundle.duration.seconds, 2.0, accuracy: 0.15, "duration follows the 2s video; the photo loops")
+
+        let left = try await compositedPixel(bundle, x: 40, y: 80)    // video → red
+        let right = try await compositedPixel(bundle, x: 120, y: 80)  // photo → blue
+        XCTAssertGreaterThan(left.r, 150); XCTAssertLessThan(left.b, 90)
+        XCTAssertGreaterThan(right.b, 150); XCTAssertLessThan(right.r, 90)
+    }
+
     // MARK: - Fixtures & helpers
+
+    private func firstLayerInstruction(_ bundle: VideoCompositionBundle) -> AVVideoCompositionLayerInstruction? {
+        (bundle.videoComposition.instructions.first as? AVVideoCompositionInstruction)?.layerInstructions.first
+    }
+
 
     private func sq(_ side: CGFloat) -> CGSize { CGSize(width: side, height: side) }
     private func unit(_ side: CGFloat) -> CGRect { CGRect(x: 0, y: 0, width: side, height: side) }
@@ -306,6 +404,29 @@ final class VideoCompositionTests: XCTestCase {
         guard let sample = output.copyNextSampleBuffer(),
               let buffer = CMSampleBufferGetImageBuffer(sample) else {
             throw NSError(domain: "readback", code: 1)
+        }
+        CVPixelBufferLockBaseAddress(buffer, .readOnly)
+        defer { CVPixelBufferUnlockBaseAddress(buffer, .readOnly) }
+        let base = CVPixelBufferGetBaseAddress(buffer)!.assumingMemoryBound(to: UInt8.self)
+        let bpr = CVPixelBufferGetBytesPerRow(buffer)
+        let i = y * bpr + x * 4
+        return (r: base[i + 2], g: base[i + 1], b: base[i])   // BGRA
+    }
+
+    /// Reads the first frame's BGRA pixel at (x, y) from a plain exported video file
+    /// (no video composition — overlays are already baked in).
+    private func filePixel(_ url: URL, x: Int, y: Int) async throws -> (r: UInt8, g: UInt8, b: UInt8) {
+        let asset = AVURLAsset(url: url)
+        let track = try await asset.loadTracks(withMediaType: .video).first!
+        let reader = try AVAssetReader(asset: asset)
+        let output = AVAssetReaderTrackOutput(
+            track: track,
+            outputSettings: [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA])
+        reader.add(output)
+        reader.startReading()
+        guard let sample = output.copyNextSampleBuffer(),
+              let buffer = CMSampleBufferGetImageBuffer(sample) else {
+            throw NSError(domain: "filereadback", code: 1)
         }
         CVPixelBufferLockBaseAddress(buffer, .readOnly)
         defer { CVPixelBufferUnlockBaseAddress(buffer, .readOnly) }

@@ -57,6 +57,8 @@ public struct VideoCellState: Equatable, Sendable, Codable {
     public var volume: Double
     public var transform: CellTransform
     public var filters: CellFilters
+    /// Optional intro animation played at the start of the collage.
+    public var transition: CellTransition?
 
     public init(
         videoID: UUID? = nil,
@@ -65,7 +67,8 @@ public struct VideoCellState: Equatable, Sendable, Codable {
         isMuted: Bool = false,
         volume: Double = 1,
         transform: CellTransform = CellTransform(),
-        filters: CellFilters = CellFilters()
+        filters: CellFilters = CellFilters(),
+        transition: CellTransition? = nil
     ) {
         self.videoID = videoID
         self.trim = trim
@@ -74,12 +77,13 @@ public struct VideoCellState: Equatable, Sendable, Codable {
         self.volume = Self.clampVolume(volume)
         self.transform = transform
         self.filters = filters
+        self.transition = transition
     }
 
     private static func clampVolume(_ value: Double) -> Double { min(1, max(0, value)) }
 
     private enum CodingKeys: String, CodingKey {
-        case videoID, trim, isLooping, isMuted, volume, transform, filters
+        case videoID, trim, isLooping, isMuted, volume, transform, filters, transition
     }
 
     public init(from decoder: Decoder) throws {
@@ -91,5 +95,6 @@ public struct VideoCellState: Equatable, Sendable, Codable {
         self.volume = Self.clampVolume(try c.decodeIfPresent(Double.self, forKey: .volume) ?? 1)
         self.transform = try c.decodeIfPresent(CellTransform.self, forKey: .transform) ?? CellTransform()
         self.filters = try c.decodeIfPresent(CellFilters.self, forKey: .filters) ?? CellFilters()
+        self.transition = try c.decodeIfPresent(CellTransition.self, forKey: .transition)
     }
 }

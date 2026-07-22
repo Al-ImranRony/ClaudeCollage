@@ -9,13 +9,19 @@
 //  A layer instruction places each clip in its canvas rect (aspect-fit affine
 //  transform); an AVMutableAudioMix carries per-cell mute/volume.
 //
-//  Export of the assembled composition still flows through the slice-1 DIRECT
-//  AVAssetReader→AVAssetWriter path — no AVAssetExportSession.
+//  Step 04 slice 4 extends it: per-cell intro transitions (crossfade / slide /
+//  zoom) via layer-instruction opacity/transform ramps; `photoCell(...)` turns a
+//  photo into a looping still-video track so photos and videos mix; and `export`
+//  writes the composed video via the DIRECT AVAssetReaderVideoCompositionOutput →
+//  AVAssetWriter path (no AVAssetExportSession), drawing text/sticker overlays onto
+//  each frame at write-time (the AVVideoCompositionCoreAnimationTool path crashes
+//  the reader — see VideoCompositionBundle.overlayImage).
 //
 
 import AVFoundation
 import CoreGraphics
 import CoreMedia
+import CoreVideo
 import Foundation
 
 /// One video cell to assemble into the collage composition.
@@ -27,6 +33,8 @@ public struct VideoCompositionCell {
     public var isLooping: Bool
     public var isMuted: Bool
     public var volume: Double
+    /// Optional intro animation for this cell (applied via layer-instruction ramps).
+    public var transition: CellTransition?
 
     public init(
         asset: AVAsset,
@@ -34,7 +42,8 @@ public struct VideoCompositionCell {
         trim: VideoTrim = VideoTrim(),
         isLooping: Bool = false,
         isMuted: Bool = false,
-        volume: Double = 1
+        volume: Double = 1,
+        transition: CellTransition? = nil
     ) {
         self.asset = asset
         self.frame = frame
@@ -42,17 +51,27 @@ public struct VideoCompositionCell {
         self.isLooping = isLooping
         self.isMuted = isMuted
         self.volume = volume
+        self.transition = transition
     }
 }
 
 /// The assembled composition + its video composition (per-cell layout/transform)
 /// + audio mix (per-cell mute/volume), ready to preview or export.
+///
+/// `overlayImage` is the pre-rendered text+sticker layer (full-canvas, transparent).
+/// It is NOT part of the video composition — baking it there via
+/// `AVVideoCompositionCoreAnimationTool` crashes `AVAssetReaderVideoCompositionOutput`
+/// (no Core Animation render server in that pipeline / the simulator). Instead
+/// `export(bundle:…)` draws it onto each composited frame at write-time, and the
+/// live preview overlays it as a CALayer above the player. Either way, preview ==
+/// export because the same `VideoOverlayRenderer` image is used.
 public struct VideoCompositionBundle {
     public let composition: AVMutableComposition
     public let videoComposition: AVMutableVideoComposition
     public let audioMix: AVMutableAudioMix
     public let duration: CMTime
     public let renderSize: CGSize
+    public let overlayImage: CGImage?
 }
 
 extension VideoComposer {
@@ -60,9 +79,17 @@ extension VideoComposer {
     private static let compositionTimescale: CMTimeScale = 600
 
     /// Assembles `cells` into a collage composition sized to `canvasSize`.
+    ///
+    /// `textOverlays` / `stickerOverlays` are baked over the whole video via an
+    /// `AVVideoCompositionCoreAnimationTool`, reusing the image-export renderers so
+    /// the video matches the photo export. Any per-cell `transition` animates via
+    /// layer-instruction opacity/transform ramps at the cell's start.
     public func buildComposition(
         cells: [VideoCompositionCell],
         canvasSize: CGSize,
+        textOverlays: [TextOverlay] = [],
+        stickerOverlays: [StickerOverlay] = [],
+        textFontScale: CGFloat = 1,
         fps: Int32 = 30
     ) async throws -> VideoCompositionBundle {
         let composition = AVMutableComposition()
@@ -105,7 +132,9 @@ extension VideoComposer {
             // the cell's canvas frame is used directly — no y-flip.
             let transform = VideoCompositionMath.aspectFitTransform(
                 source: item.naturalSize, in: item.cell.frame)
-            layer.setTransform(transform, at: .zero)
+            applyPlacement(transform, transition: item.cell.transition,
+                           cellFrame: item.cell.frame, clipDuration: item.range.duration,
+                           timescale: ts, to: layer)
             layerInstructions.append(layer)
 
             if let audioTrack = item.audioTrack,
@@ -131,8 +160,146 @@ extension VideoComposer {
         let audioMix = AVMutableAudioMix()
         audioMix.inputParameters = audioParameters
 
+        let overlayImage = VideoOverlayRenderer.overlayImage(
+            textOverlays: textOverlays, stickerOverlays: stickerOverlays,
+            canvasPx: canvasSize, textFontScale: textFontScale)
+
         return VideoCompositionBundle(composition: composition, videoComposition: videoComposition,
-                                      audioMix: audioMix, duration: total, renderSize: canvasSize)
+                                      audioMix: audioMix, duration: total, renderSize: canvasSize,
+                                      overlayImage: overlayImage)
+    }
+
+    /// Turns a photo cell into a video track: renders `image` as a short still clip
+    /// (at its natural size) and wraps it as a muted, looping `VideoCompositionCell`.
+    /// `buildComposition` then aspect-fits it into `frame` and loops it to fill the
+    /// composition duration — so photos and videos mix on equal footing. The still
+    /// clip is written to `url`; the caller owns its lifetime (delete after export).
+    public func photoCell(
+        image: CGImage,
+        frame: CGRect,
+        holdSeconds: Double = 0.5,
+        to url: URL
+    ) async throws -> VideoCompositionCell {
+        try await renderSlideshow(frames: [image],
+                                  size: CGSize(width: image.width, height: image.height),
+                                  secondsPerFrame: holdSeconds, to: url)
+        return VideoCompositionCell(asset: AVURLAsset(url: url), frame: frame,
+                                    isLooping: true, isMuted: true)
+    }
+
+    /// Exports the assembled bundle to a video file via the DIRECT
+    /// `AVAssetReaderVideoCompositionOutput` → `AVAssetWriter` path (no
+    /// `AVAssetExportSession`, preserving fidelity per slice 1). Text/sticker
+    /// overlays (`bundle.overlayImage`) are drawn onto each composited frame at
+    /// write-time. Video-only for now; muxing the audio mix arrives with the export
+    /// UX slice. Runs the blocking pull loop on a private queue, bridged to async.
+    public func export(
+        bundle: VideoCompositionBundle,
+        codec: ExportSettings.VideoCodec = .h264,
+        container: ExportPreset.VideoContainer = .mp4,
+        to url: URL,
+        progress: (@Sendable (Float) -> Void)? = nil
+    ) async throws {
+        try? FileManager.default.removeItem(at: url)
+        let tracks = try await bundle.composition.loadTracks(withMediaType: .video)
+        guard !tracks.isEmpty else { throw ComposerError.noFrames }
+
+        let width = Int(bundle.renderSize.width.rounded())
+        let height = Int(bundle.renderSize.height.rounded())
+
+        let reader = try AVAssetReader(asset: bundle.composition)
+        let readerOutput = AVAssetReaderVideoCompositionOutput(
+            videoTracks: tracks,
+            videoSettings: [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA])
+        readerOutput.videoComposition = bundle.videoComposition
+        guard reader.canAdd(readerOutput) else { throw ComposerError.writerSetupFailed }
+        reader.add(readerOutput)
+
+        let fileType: AVFileType = container == .mov ? .mov : .mp4
+        let writer = try AVAssetWriter(url: url, fileType: fileType)
+        let codecType: AVVideoCodecType = codec == .hevc ? .hevc : .h264
+        let writerInput = AVAssetWriterInput(mediaType: .video, outputSettings: [
+            AVVideoCodecKey: codecType, AVVideoWidthKey: width, AVVideoHeightKey: height])
+        writerInput.expectsMediaDataInRealTime = false
+        let adaptor = AVAssetWriterInputPixelBufferAdaptor(
+            assetWriterInput: writerInput,
+            sourcePixelBufferAttributes: [
+                kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
+                kCVPixelBufferWidthKey as String: width,
+                kCVPixelBufferHeightKey as String: height])
+        guard writer.canAdd(writerInput) else { throw ComposerError.writerSetupFailed }
+        writer.add(writerInput)
+
+        let context = ExportContext(reader: reader, output: readerOutput, writer: writer,
+                                    input: writerInput, adaptor: adaptor, overlay: bundle.overlayImage,
+                                    width: width, height: height, duration: bundle.duration.seconds)
+        let exportQueue = DispatchQueue(label: "com.devron.claudecollage.videoexport")
+        try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
+            exportQueue.async {
+                do { try Self.runExport(context, progress: progress); cont.resume() }
+                catch { cont.resume(throwing: error) }
+            }
+        }
+    }
+
+    /// Carries the non-Sendable reader/writer objects into the export queue. Safe:
+    /// they're used only on that queue, never concurrently.
+    private struct ExportContext: @unchecked Sendable {
+        let reader: AVAssetReader
+        let output: AVAssetReaderVideoCompositionOutput
+        let writer: AVAssetWriter
+        let input: AVAssetWriterInput
+        let adaptor: AVAssetWriterInputPixelBufferAdaptor
+        let overlay: CGImage?
+        let width: Int
+        let height: Int
+        let duration: Double
+    }
+
+    private static func runExport(_ ctx: ExportContext, progress: (@Sendable (Float) -> Void)?) throws {
+        guard ctx.reader.startReading() else { throw ctx.reader.error ?? ComposerError.writeFailed }
+        guard ctx.writer.startWriting() else { throw ctx.writer.error ?? ComposerError.writerSetupFailed }
+        ctx.writer.startSession(atSourceTime: .zero)
+
+        while true {
+            while !ctx.input.isReadyForMoreMediaData { Thread.sleep(forTimeInterval: 0.003) }
+            guard let sample = ctx.output.copyNextSampleBuffer() else { break }
+            let pts = CMSampleBufferGetPresentationTimeStamp(sample)
+            guard let buffer = CMSampleBufferGetImageBuffer(sample) else { continue }
+            if let overlay = ctx.overlay {
+                drawOverlay(overlay, into: buffer, width: ctx.width, height: ctx.height)
+            }
+            if !ctx.adaptor.append(buffer, withPresentationTime: pts) {
+                ctx.reader.cancelReading()
+                ctx.writer.cancelWriting()
+                throw ctx.writer.error ?? ComposerError.writeFailed
+            }
+            if ctx.duration > 0 { progress?(Float(min(1, pts.seconds / ctx.duration))) }
+        }
+
+        if ctx.reader.status == .failed { throw ctx.reader.error ?? ComposerError.writeFailed }
+        ctx.input.markAsFinished()
+        let sema = DispatchSemaphore(value: 0)
+        ctx.writer.finishWriting { sema.signal() }
+        sema.wait()
+        guard ctx.writer.status == .completed else { throw ctx.writer.error ?? ComposerError.writeFailed }
+    }
+
+    /// Composites the overlay image onto a BGRA composited frame in place. The
+    /// reader's frame buffer and the `UIGraphicsImageRenderer` overlay image share
+    /// the same top-down raster orientation, so `draw` needs no CTM flip (verified
+    /// by the overlay pixel-readback test — a flip put the overlay upside down).
+    private static func drawOverlay(_ overlay: CGImage, into buffer: CVPixelBuffer, width: Int, height: Int) {
+        CVPixelBufferLockBaseAddress(buffer, [])
+        defer { CVPixelBufferUnlockBaseAddress(buffer, []) }
+        guard let base = CVPixelBufferGetBaseAddress(buffer),
+              let ctx = CGContext(
+                data: base, width: width, height: height, bitsPerComponent: 8,
+                bytesPerRow: CVPixelBufferGetBytesPerRow(buffer),
+                space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue
+                    | CGBitmapInfo.byteOrder32Little.rawValue) else { return }
+        ctx.draw(overlay, in: CGRect(x: 0, y: 0, width: width, height: height))
     }
 
     // MARK: - Helpers
@@ -143,6 +310,38 @@ extension VideoComposer {
         let audioTrack: AVAssetTrack?
         let naturalSize: CGSize
         let range: CMTimeRange
+    }
+
+    /// Sets a cell's resting placement transform, plus — if it has an intro
+    /// transition — the opacity/transform ramp that animates it in over the
+    /// transition window (clamped to the clip's length) starting at t=0.
+    private func applyPlacement(
+        _ transform: CGAffineTransform,
+        transition: CellTransition?,
+        cellFrame: CGRect,
+        clipDuration: CMTime,
+        timescale: CMTimeScale,
+        to layer: AVMutableVideoCompositionLayerInstruction
+    ) {
+        guard let transition, transition.duration > 0 else {
+            layer.setTransform(transform, at: .zero)
+            return
+        }
+        let window = CMTimeRange(
+            start: .zero,
+            duration: CMTimeMinimum(CMTime(seconds: transition.duration, preferredTimescale: timescale),
+                                    clipDuration))
+        let startTransform = VideoCompositionMath.transitionStartTransform(
+            style: transition.style, base: transform, cell: cellFrame)
+        if startTransform != transform {
+            layer.setTransformRamp(fromStart: startTransform, toEnd: transform, timeRange: window)
+        } else {
+            layer.setTransform(transform, at: .zero)
+        }
+        let startOpacity = VideoCompositionMath.transitionStartOpacity(transition.style)
+        if startOpacity != 1 {
+            layer.setOpacityRamp(fromStartOpacity: startOpacity, toEndOpacity: 1, timeRange: window)
+        }
     }
 
     /// Inserts `range` of `source` into `dest`, repeating it until `fillTo` is
