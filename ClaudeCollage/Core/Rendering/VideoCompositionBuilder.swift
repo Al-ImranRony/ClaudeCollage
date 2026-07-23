@@ -47,6 +47,10 @@ public struct VideoCompositionCell: @unchecked Sendable {
     /// Optional intro animation for this cell (applied via layer-instruction ramps).
     public var transition: CellTransition?
     public var contentMode: ContentMode
+    /// Per-cell framing within its cell: `zoom` (≥ 1) punches in, `panX`/`panY`
+    /// (−1…1) reposition. Applied to the fill crop; ignored in `.fit` mode.
+    /// Rotation is not supported for video cells (crop-based framing is axis-aligned).
+    public var transform: CellTransform
 
     public init(
         asset: AVAsset,
@@ -56,7 +60,8 @@ public struct VideoCompositionCell: @unchecked Sendable {
         isMuted: Bool = false,
         volume: Double = 1,
         transition: CellTransition? = nil,
-        contentMode: ContentMode = .fill
+        contentMode: ContentMode = .fill,
+        transform: CellTransform = CellTransform()
     ) {
         self.asset = asset
         self.frame = frame
@@ -66,6 +71,7 @@ public struct VideoCompositionCell: @unchecked Sendable {
         self.volume = volume
         self.transition = transition
         self.contentMode = contentMode
+        self.transform = transform
     }
 }
 
@@ -180,14 +186,18 @@ extension VideoComposer {
             let transform: CGAffineTransform
             switch item.cell.contentMode {
             case .fill:
-                // Cover the cell, then crop the overflow to the cell's aspect so it
-                // can't bleed into a neighbour (centred crop → origin-flip-safe).
-                transform = VideoCompositionMath.aspectFillTransform(
-                    source: item.naturalSize, in: mappedFrame)
+                // Cover the cell (fill), honouring the cell's pan/zoom framing, then
+                // clip to the source crop so nothing bleeds into a neighbour. Because
+                // framing only moves/resizes the source crop, the output always
+                // exactly fills the cell — no overflow at any zoom. (Centred at
+                // zoom 1 / pan 0 ⇒ plain fill.)
                 let cellAspect = mappedFrame.height > 0 ? mappedFrame.width / mappedFrame.height : 1
-                layer.setCropRectangle(
-                    VideoCompositionMath.fillCropRect(source: item.naturalSize, cellAspect: cellAspect),
-                    at: .zero)
+                let crop = VideoCompositionMath.framedCropRect(
+                    source: item.naturalSize, cellAspect: cellAspect,
+                    zoom: CGFloat(item.cell.transform.zoom),
+                    panX: CGFloat(item.cell.transform.panX), panY: CGFloat(item.cell.transform.panY))
+                transform = VideoCompositionMath.cropFillTransform(crop: crop, in: mappedFrame)
+                layer.setCropRectangle(crop, at: .zero)
             case .fit:
                 transform = VideoCompositionMath.aspectFitTransform(
                     source: item.naturalSize, in: mappedFrame)

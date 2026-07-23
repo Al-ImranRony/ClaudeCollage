@@ -193,6 +193,20 @@ public final class VideoEditorViewModel {
         mutateInteractive(index) { $0.transition = transition }
     }
 
+    /// Per-cell pan/zoom framing (interactive — pinch/pan gestures). `zoom` clamps to
+    /// 1…8, `panX`/`panY` to −1…1; rotation is unused for video cells.
+    public func adjustFramingInteractive(zoom: Double, panX: Double, panY: Double, forCellAt index: Int) {
+        mutateInteractive(index) {
+            $0.transform.zoom = min(8, max(1, zoom))
+            $0.transform.panX = min(1, max(-1, panX))
+            $0.transform.panY = min(1, max(-1, panY))
+        }
+    }
+
+    public func framing(forCellAt index: Int) -> CellTransform {
+        cells.indices.contains(index) ? cells[index].transform : CellTransform()
+    }
+
     /// Records the accumulated interactive edits as one undo step (and autosaves).
     /// A no-op when nothing actually changed, so opening/closing a sheet without
     /// touching a control doesn't pollute the undo history.
@@ -248,7 +262,8 @@ public final class VideoEditorViewModel {
                 isLooping: cell.isLooping,
                 isMuted: cell.isMuted,
                 volume: cell.volume,
-                transition: cell.transition)
+                transition: cell.transition,
+                transform: cell.transform)
         }
     }
 

@@ -60,6 +60,36 @@ public enum VideoCompositionMath {
         }
     }
 
+    /// The source crop rectangle for a cell with per-cell **framing** (pan/zoom).
+    /// Zoom (≥ 1) punches into the fill crop; pan (each axis clamped to −1…1) slides
+    /// the crop within the source, staying fully inside it. At zoom 1 / pan 0 this is
+    /// exactly `fillCropRect`, so framing is a superset of plain fill. Because it
+    /// only moves/resizes the *source* crop — never the output rect — a framed cell
+    /// still exactly fills its cell and never overflows a neighbour, at any zoom.
+    public static func framedCropRect(
+        source: CGSize, cellAspect: CGFloat,
+        zoom: CGFloat = 1, panX: CGFloat = 0, panY: CGFloat = 0
+    ) -> CGRect {
+        let base = fillCropRect(source: source, cellAspect: cellAspect)
+        let z = max(1, zoom)
+        let width = base.width / z
+        let height = base.height / z
+        let maxOffsetX = (source.width - width) / 2
+        let maxOffsetY = (source.height - height) / 2
+        let centreX = source.width / 2 + min(1, max(-1, panX)) * maxOffsetX
+        let centreY = source.height / 2 + min(1, max(-1, panY)) * maxOffsetY
+        return CGRect(x: centreX - width / 2, y: centreY - height / 2, width: width, height: height)
+    }
+
+    /// The layer transform that maps a source `crop` (same aspect as `cell`) onto
+    /// the cell exactly — the placement used with `framedCropRect` / `fillCropRect`.
+    public static func cropFillTransform(crop: CGRect, in cell: CGRect) -> CGAffineTransform {
+        guard crop.width > 0, crop.height > 0 else { return .identity }
+        let scale = cell.width / crop.width   // crop aspect == cell aspect ⇒ == cell.height/crop.height
+        return CGAffineTransform(a: scale, b: 0, c: 0, d: scale,
+                                 tx: cell.minX - scale * crop.minX, ty: cell.minY - scale * crop.minY)
+    }
+
     /// The composition duration is the longest cell; shorter cells either loop to
     /// fill it or simply end early (leaving background).
     public static func compositionDuration(cellDurations: [Double]) -> Double {

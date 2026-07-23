@@ -120,6 +120,52 @@ final class VideoCompositionMathTests: XCTestCase {
         XCTAssertEqual(crop, CGRect(x: 25, y: 0, width: 50, height: 100))
     }
 
+    // MARK: - Per-cell framing (pan/zoom, hardening #5)
+
+    func testFramedCropAtIdentityEqualsFill() {
+        let source = CGSize(width: 200, height: 100)
+        let framed = VideoCompositionMath.framedCropRect(source: source, cellAspect: 1)
+        let fill = VideoCompositionMath.fillCropRect(source: source, cellAspect: 1)
+        XCTAssertEqual(framed, fill, "zoom 1 / pan 0 is exactly the plain fill crop")
+    }
+
+    func testZoomShrinksTheCropAroundTheCentre() {
+        let framed = VideoCompositionMath.framedCropRect(
+            source: CGSize(width: 100, height: 100), cellAspect: 1, zoom: 2)
+        XCTAssertEqual(framed, CGRect(x: 25, y: 25, width: 50, height: 50), "2× punches into the centre")
+    }
+
+    func testZoomIsClampedToAtLeastOne() {
+        let framed = VideoCompositionMath.framedCropRect(
+            source: CGSize(width: 100, height: 100), cellAspect: 1, zoom: 0.2)
+        XCTAssertEqual(framed, VideoCompositionMath.fillCropRect(
+            source: CGSize(width: 100, height: 100), cellAspect: 1), "can't zoom out past fill")
+    }
+
+    func testPanShiftsTheCropAndStaysInsideTheSource() {
+        let source = CGSize(width: 200, height: 100)
+        // Square cell, zoom 1 → a 100×100 crop with 50px of horizontal slack each side.
+        let left = VideoCompositionMath.framedCropRect(source: source, cellAspect: 1, panX: -1)
+        let right = VideoCompositionMath.framedCropRect(source: source, cellAspect: 1, panX: 1)
+        XCTAssertEqual(left.minX, 0, accuracy: 1e-6, "pan -1 hugs the left edge")
+        XCTAssertEqual(right.maxX, 200, accuracy: 1e-6, "pan +1 hugs the right edge")
+    }
+
+    func testPanIsClampedToUnitRange() {
+        let source = CGSize(width: 200, height: 100)
+        let over = VideoCompositionMath.framedCropRect(source: source, cellAspect: 1, panX: 5)
+        let edge = VideoCompositionMath.framedCropRect(source: source, cellAspect: 1, panX: 1)
+        XCTAssertEqual(over, edge, "panning past the edge clamps")
+    }
+
+    func testCropFillTransformMapsCropOntoTheCell() {
+        let crop = CGRect(x: 50, y: 0, width: 100, height: 100)
+        let cell = CGRect(x: 0, y: 0, width: 80, height: 80)
+        let t = VideoCompositionMath.cropFillTransform(crop: crop, in: cell)
+        XCTAssertEqual(CGPoint(x: crop.minX, y: crop.minY).applying(t), CGPoint(x: cell.minX, y: cell.minY))
+        XCTAssertEqual(CGPoint(x: crop.maxX, y: crop.maxY).applying(t), CGPoint(x: cell.maxX, y: cell.maxY))
+    }
+
     // MARK: - Render-size mapping (slice 6d / export resolution)
 
     func testRenderMapIsIdentityWhenSizesMatch() {

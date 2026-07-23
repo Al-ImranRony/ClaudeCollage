@@ -164,6 +164,18 @@ final class VideoEditorViewController: UIViewController {
 
         let tap = UITapGestureRecognizer(target: self, action: #selector(canvasTapped(_:)))
         canvasView.addGestureRecognizer(tap)
+
+        // Pinch to zoom, two-finger… actually one-finger pan to reposition the
+        // SELECTED filled cell's clip within its frame (a single tap on the cell
+        // opens its controls, so pan needs two fingers to avoid conflicting).
+        let pinch = UIPinchGestureRecognizer(target: self, action: #selector(canvasPinched(_:)))
+        pinch.delegate = self
+        canvasView.addGestureRecognizer(pinch)
+        let pan = UIPanGestureRecognizer(target: self, action: #selector(canvasPanned(_:)))
+        pan.minimumNumberOfTouches = 2
+        pan.delegate = self
+        canvasView.addGestureRecognizer(pan)
+
         canvasView.isUserInteractionEnabled = true
     }
 
@@ -257,6 +269,45 @@ final class VideoEditorViewController: UIViewController {
         } else {
             presentCellControls(for: index)
         }
+    }
+
+    // MARK: - Per-cell framing gestures (#5)
+
+    /// The cell a framing gesture targets: the selected one if it holds a clip.
+    private var framingTargetIndex: Int? {
+        guard let index = viewModel.selectedIndex,
+              viewModel.cells.indices.contains(index),
+              viewModel.cells[index].videoID != nil else { return nil }
+        return index
+    }
+
+    @objc private func canvasPinched(_ gesture: UIPinchGestureRecognizer) {
+        guard let index = framingTargetIndex else { return }
+        let current = viewModel.framing(forCellAt: index)
+        let newZoom = current.zoom * Double(gesture.scale)
+        gesture.scale = 1
+        viewModel.adjustFramingInteractive(zoom: newZoom, panX: current.panX, panY: current.panY,
+                                           forCellAt: index)
+        if gesture.state == .ended || gesture.state == .cancelled { viewModel.commitInteractive() }
+    }
+
+    @objc private func canvasPanned(_ gesture: UIPanGestureRecognizer) {
+        guard let index = framingTargetIndex,
+              viewModel.cellFrames().indices.contains(index) else { return }
+        // Convert the finger translation (view points) to normalized cell-space pan.
+        let cellFrame = viewModel.cellFrames()[index].frame
+        let scale = viewModel.canvasSize.width > 0 ? canvasView.bounds.width / viewModel.canvasSize.width : 1
+        let cellW = max(1, cellFrame.width * scale)
+        let cellH = max(1, cellFrame.height * scale)
+        let t = gesture.translation(in: canvasView)
+        gesture.setTranslation(.zero, in: canvasView)
+        let current = viewModel.framing(forCellAt: index)
+        // Dragging right reveals content to the left → pan decreases.
+        let newPanX = current.panX - Double(t.x / cellW)
+        let newPanY = current.panY - Double(t.y / cellH)
+        viewModel.adjustFramingInteractive(zoom: current.zoom, panX: newPanX, panY: newPanY,
+                                           forCellAt: index)
+        if gesture.state == .ended || gesture.state == .cancelled { viewModel.commitInteractive() }
     }
 
     @objc private func undoTapped() { viewModel.undo() }
@@ -585,6 +636,16 @@ final class VideoEditorViewController: UIViewController {
         let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "OK", style: .default))
         present(alert, animated: true)
+    }
+}
+
+// MARK: - Simultaneous pinch + pan framing
+
+extension VideoEditorViewController: UIGestureRecognizerDelegate {
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
+                           shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool {
+        // Let pinch-zoom and two-finger pan drive framing together.
+        gestureRecognizer is UIPinchGestureRecognizer || other is UIPinchGestureRecognizer
     }
 }
 

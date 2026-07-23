@@ -453,6 +453,51 @@ final class VideoCompositionTests: XCTestCase {
         XCTAssertLessThan(rightNearDivider.r, 90, "the filled left cell is cropped — no red bleed")
     }
 
+    // MARK: - Per-cell pan/zoom framing (quality-hardening #5)
+
+    /// A video whose left half is `left` and right half is `right`.
+    private func makeTwoToneVideo(width: Int, height: Int,
+                                  left: (UInt8, UInt8, UInt8), right: (UInt8, UInt8, UInt8)) async throws -> URL {
+        let bpr = width * 4
+        var px = [UInt8](repeating: 0, count: bpr * height)
+        for y in 0..<height {
+            for x in 0..<width {
+                let i = y * bpr + x * 4
+                let c = x < width / 2 ? left : right
+                px[i] = c.0; px[i + 1] = c.1; px[i + 2] = c.2; px[i + 3] = 255
+            }
+        }
+        let ctx = CGContext(data: &px, width: width, height: height, bitsPerComponent: 8, bytesPerRow: bpr,
+                            space: CGColorSpaceCreateDeviceRGB(),
+                            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        let image = ctx.makeImage()!
+        let url = tempURL(ext: "mp4")
+        try await VideoComposer().renderSlideshow(frames: [image],
+                                                  size: CGSize(width: width, height: height),
+                                                  secondsPerFrame: 1, to: url)
+        return url
+    }
+
+    func testPanningACellChangesWhichPartOfTheClipIsShown() async throws {
+        // A wide left=red / right=blue clip in a square cell. Panning fully left
+        // shows red at the cell centre; panning right shows blue.
+        let source = try await makeTwoToneVideo(width: 200, height: 100,
+                                                left: (230, 30, 30), right: (30, 30, 230))
+        func centrePixel(panX: Double) async throws -> (r: UInt8, g: UInt8, b: UInt8) {
+            let cell = VideoCompositionCell(
+                asset: AVURLAsset(url: source), frame: unit(160),
+                transform: CellTransform(panX: panX))
+            let bundle = try await VideoComposer().buildComposition(cells: [cell], canvasSize: sq(160))
+            return try await compositedPixel(bundle, x: 80, y: 80)
+        }
+        let panLeft = try await centrePixel(panX: -1)
+        let panRight = try await centrePixel(panX: 1)
+        XCTAssertGreaterThan(panLeft.r, 150, "panned left → red half fills the cell")
+        XCTAssertLessThan(panLeft.b, 90)
+        XCTAssertGreaterThan(panRight.b, 150, "panned right → blue half fills the cell")
+        XCTAssertLessThan(panRight.r, 90)
+    }
+
     // MARK: - Export render size (quality-hardening #1)
 
     func testBuildRespectsAnExplicitRenderSize() async throws {
