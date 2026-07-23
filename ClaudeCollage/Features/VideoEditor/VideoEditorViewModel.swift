@@ -236,6 +236,44 @@ public final class VideoEditorViewModel {
             fps: fps)
     }
 
+    // MARK: - Beat sync (slice 6c)
+
+    public var hasMusic: Bool { music != nil }
+
+    /// Writes beat-aligned start times onto the cells' intro transitions: cell i
+    /// reveals at `startTimes[i]`. A cell that has no transition yet is given a
+    /// default crossfade so it has something to pop in with.
+    public func applyBeatSync(startTimes: [Double]) {
+        for index in cells.indices where index < startTimes.count {
+            if var transition = cells[index].transition {
+                transition.startTime = startTimes[index]
+                cells[index].transition = transition
+            } else {
+                cells[index].transition = CellTransition(
+                    style: .crossfade, duration: 0.4, startTime: startTimes[index])
+            }
+        }
+        record()
+    }
+
+    /// Plans start times from `beats` (via `BeatSyncPlanner`) and applies them.
+    public func syncToBeats(_ beats: [Double], compositionDuration: Double) {
+        let times = BeatSyncPlanner.startTimes(
+            cellCount: cellCount, beats: beats, within: compositionDuration)
+        applyBeatSync(startTimes: times)
+    }
+
+    /// Detects onsets in the current background music and syncs the cells to them.
+    /// A no-op (returns false) when there is no music to analyze.
+    @discardableResult
+    public func detectAndSyncBeats() async throws -> Bool {
+        guard let music = backgroundMusic() else { return false }
+        let beats = try await BeatDetector().detectOnsets(in: music.asset)
+        let duration = try await music.asset.load(.duration).seconds
+        syncToBeats(beats, compositionDuration: duration)
+        return true
+    }
+
     // MARK: - Persistence
 
     /// The serializable state, for `ProjectStore`.

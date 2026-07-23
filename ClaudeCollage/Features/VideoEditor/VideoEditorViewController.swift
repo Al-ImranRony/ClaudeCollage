@@ -289,6 +289,9 @@ final class VideoEditorViewController: UIViewController {
             sheet.addAction(UIAlertAction(title: "Music Volume…", style: .default) { [weak self] _ in
                 self?.presentMusicVolume()
             })
+            sheet.addAction(UIAlertAction(title: "✨ Sync Cells to Beat", style: .default) { [weak self] _ in
+                self?.syncToBeat()
+            })
             sheet.addAction(UIAlertAction(title: "Remove Music", style: .destructive) { [weak self] _ in
                 self?.viewModel.removeMusic()
                 Haptics.tap()
@@ -424,6 +427,26 @@ final class VideoEditorViewController: UIViewController {
         picker.delegate = self
         picker.allowsMultipleSelection = false
         present(picker, animated: true)
+    }
+
+    /// Detects the music's beats and staggers the cells' intro transitions onto
+    /// them (the plan's CapCut-style auto-beat-sync). Analysis is off the main
+    /// thread and shows the shared progress modal, since a long track takes a moment.
+    private func syncToBeat() {
+        let progressVC = ExportProgressViewController(title: "Finding the beat…")
+        present(progressVC, animated: true)
+        Task { @MainActor in
+            let synced = (try? await self.viewModel.detectAndSyncBeats()) ?? false
+            progressVC.dismiss(animated: true) {
+                if synced {
+                    self.notify(.success)
+                    self.showToast("Cells synced to the beat")
+                } else {
+                    self.showInfo(title: "Couldn't Sync",
+                                  message: "The music couldn't be analyzed. Try a different track.")
+                }
+            }
+        }
     }
 
     private func presentMusicVolume() {

@@ -516,8 +516,13 @@ extension VideoComposer {
     }
 
     /// Sets a cell's resting placement transform, plus — if it has an intro
-    /// transition — the opacity/transform ramp that animates it in over the
-    /// transition window (clamped to the clip's length) starting at t=0.
+    /// transition — the opacity/transform ramp that animates it in.
+    ///
+    /// The ramp window is `[startTime, startTime + duration]`. When `startTime` is 0
+    /// the cell animates in immediately (the pre-6c behaviour). When beat-sync has
+    /// pushed it later, the cell is *held* in its start state (transparent for a
+    /// crossfade, offset/scaled for slide/zoom) from t=0 until the beat, then
+    /// animates in — so it pops onto the beat.
     private func applyPlacement(
         _ transform: CGAffineTransform,
         transition: CellTransition?,
@@ -530,19 +535,25 @@ extension VideoComposer {
             layer.setTransform(transform, at: .zero)
             return
         }
+        let start = CMTime(seconds: transition.startTime, preferredTimescale: timescale)
         let window = CMTimeRange(
-            start: .zero,
+            start: start,
             duration: CMTimeMinimum(CMTime(seconds: transition.duration, preferredTimescale: timescale),
                                     clipDuration))
+        let holdsBeforeBeat = start > .zero
         let startTransform = VideoCompositionMath.transitionStartTransform(
             style: transition.style, base: transform, cell: cellFrame)
         if startTransform != transform {
+            // Hold the offset/scaled state until the beat, then ramp to rest.
+            if holdsBeforeBeat { layer.setTransform(startTransform, at: .zero) }
             layer.setTransformRamp(fromStart: startTransform, toEnd: transform, timeRange: window)
         } else {
             layer.setTransform(transform, at: .zero)
         }
         let startOpacity = VideoCompositionMath.transitionStartOpacity(transition.style)
         if startOpacity != 1 {
+            // Hold transparent until the beat, then fade in.
+            if holdsBeforeBeat { layer.setOpacity(startOpacity, at: .zero) }
             layer.setOpacityRamp(fromStartOpacity: startOpacity, toEndOpacity: 1, timeRange: window)
         }
     }

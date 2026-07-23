@@ -223,6 +223,37 @@ final class VideoCompositionTests: XCTestCase {
                        "a cell with no transition has no opacity ramp")
     }
 
+    // MARK: - Beat-synced transition start (slice 6c)
+
+    func testTransitionStartTimeShiftsTheRampWindow() async throws {
+        let v = try await makeSolidVideo(r: 200, g: 200, b: 200, seconds: 2)
+        let cell = VideoCompositionCell(
+            asset: AVURLAsset(url: v), frame: unit(160),
+            transition: CellTransition(style: .crossfade, duration: 0.5, startTime: 0.8))
+        let bundle = try await VideoComposer().buildComposition(cells: [cell], canvasSize: sq(160))
+        let layer = try XCTUnwrap(firstLayerInstruction(bundle))
+        var start: Float = -1, end: Float = -1
+        var range = CMTimeRange.zero
+        XCTAssertTrue(layer.getOpacityRamp(for: CMTime(seconds: 0.8, preferredTimescale: 600),
+                                           startOpacity: &start, endOpacity: &end, timeRange: &range))
+        XCTAssertEqual(range.start.seconds, 0.8, accuracy: 0.05, "the fade-in begins on the beat, not at t=0")
+        XCTAssertEqual(range.duration.seconds, 0.5, accuracy: 0.05)
+    }
+
+    func testCellHeldTransparentBeforeItsBeatThenVisibleAfter() async throws {
+        // A white cell that fades in at t=1.0: dark before the beat, bright after.
+        let white = try await makeSolidVideo(r: 235, g: 235, b: 235, seconds: 2)
+        let cell = VideoCompositionCell(
+            asset: AVURLAsset(url: white), frame: unit(160),
+            transition: CellTransition(style: .crossfade, duration: 0.3, startTime: 1.0))
+        let bundle = try await VideoComposer().buildComposition(cells: [cell], canvasSize: sq(160))
+
+        let before = try await compositedPixel(bundle, x: 80, y: 80, atSeconds: 0.3)
+        let after = try await compositedPixel(bundle, x: 80, y: 80, atSeconds: 1.6)
+        XCTAssertLessThan(before.r, 90, "held transparent (dark) before the beat")
+        XCTAssertGreaterThan(after.r, 150, "faded in (bright) after the beat")
+    }
+
     // MARK: - Mixed photo + video
 
     func testMixedPhotoAndVideoComposition() async throws {
@@ -715,6 +746,36 @@ final class VideoCompositionTests: XCTestCase {
         guard let sample = output.copyNextSampleBuffer(),
               let buffer = CMSampleBufferGetImageBuffer(sample) else {
             throw NSError(domain: "readback", code: 1)
+        }
+        CVPixelBufferLockBaseAddress(buffer, .readOnly)
+        defer { CVPixelBufferUnlockBaseAddress(buffer, .readOnly) }
+        let base = CVPixelBufferGetBaseAddress(buffer)!.assumingMemoryBound(to: UInt8.self)
+        let bpr = CVPixelBufferGetBytesPerRow(buffer)
+        let i = y * bpr + x * 4
+        return (r: base[i + 2], g: base[i + 1], b: base[i])   // BGRA
+    }
+
+    /// Reads the composited frame at `atSeconds` (pulls frames until the target
+    /// time is reached) and returns the BGRA pixel at (x, y). Used to prove a
+    /// beat-synced cell is held/animated at the right moment.
+    private func compositedPixel(_ bundle: VideoCompositionBundle, x: Int, y: Int,
+                                 atSeconds target: Double) async throws
+        -> (r: UInt8, g: UInt8, b: UInt8) {
+        let tracks = try await bundle.composition.loadTracks(withMediaType: .video)
+        let reader = try AVAssetReader(asset: bundle.composition)
+        let output = AVAssetReaderVideoCompositionOutput(
+            videoTracks: tracks,
+            videoSettings: [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA])
+        output.videoComposition = bundle.videoComposition
+        reader.add(output)
+        reader.startReading()
+        var chosen: CMSampleBuffer?
+        while let sample = output.copyNextSampleBuffer() {
+            chosen = sample
+            if CMSampleBufferGetPresentationTimeStamp(sample).seconds >= target { break }
+        }
+        guard let sample = chosen, let buffer = CMSampleBufferGetImageBuffer(sample) else {
+            throw NSError(domain: "readback", code: 2)
         }
         CVPixelBufferLockBaseAddress(buffer, .readOnly)
         defer { CVPixelBufferUnlockBaseAddress(buffer, .readOnly) }
