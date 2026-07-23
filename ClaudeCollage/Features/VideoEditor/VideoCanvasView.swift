@@ -49,6 +49,22 @@ final class VideoCanvasView: UIView {
     private var canvasSize: CGSize = CGSize(width: 1, height: 1)
     private var cellFrames: [CGRect] = []
 
+    // Interactive text/sticker overlay views (reused from the grid editor), layered
+    // above the player. Shown live instead of the baked `overlayImageView`, which is
+    // only used at export — so preview == export.
+    private var textViews: [TextOverlayView] = []
+    private var stickerViews: [StickerOverlayView] = []
+    private var textModels: [TextOverlay] = []
+    private var stickerModels: [StickerOverlay] = []
+
+    var onTextChanged: ((TextOverlay) -> Void)?
+    var onTextCommitted: (() -> Void)?
+    var onTextTapped: ((UUID) -> Void)?
+    var onStickerChanged: ((StickerOverlay) -> Void)?
+    var onStickerCommitted: (() -> Void)?
+    var onStickerDeleted: ((UUID) -> Void)?
+    var onStickerSelected: ((UUID) -> Void)?
+
     // MARK: - Init
 
     override init(frame: CGRect) {
@@ -107,6 +123,51 @@ final class VideoCanvasView: UIView {
         overlayImageView.isHidden = (image == nil)
     }
 
+    // MARK: - Interactive overlays
+
+    /// Pools/rebuilds the interactive text views and repositions them. Wires each
+    /// view's gesture callbacks back out through this canvas.
+    func updateTextOverlays(_ overlays: [TextOverlay]) {
+        textModels = overlays
+        if textViews.count != overlays.count {
+            textViews.forEach { $0.removeFromSuperview() }
+            textViews = overlays.map { _ in
+                let view = TextOverlayView()
+                view.onChanged = { [weak self] in self?.onTextChanged?($0) }
+                view.onCommitted = { [weak self] in self?.onTextCommitted?() }
+                view.onTapped = { [weak self] in self?.onTextTapped?($0) }
+                addSubview(view)
+                return view
+            }
+        }
+        textViews.forEach { bringSubviewToFront($0) }
+        stickerViews.forEach { bringSubviewToFront($0) }   // stickers above text
+        setNeedsLayout()
+    }
+
+    func updateStickerOverlays(_ overlays: [StickerOverlay], selected: UUID?) {
+        stickerModels = overlays
+        stickerViews.forEach { $0.removeFromSuperview() }
+        stickerViews = overlays.map { overlay in
+            let view = StickerOverlayView(overlay: overlay)
+            view.onChanged = { [weak self] in self?.onStickerChanged?($0) }
+            view.onCommitted = { [weak self] in self?.onStickerCommitted?() }
+            view.onDeleted = { [weak self] in self?.onStickerDeleted?($0) }
+            view.onSelected = { [weak self] in self?.onStickerSelected?($0) }
+            view.isSelected = overlay.id == selected
+            addSubview(view)
+            return view
+        }
+        setNeedsLayout()
+    }
+
+    /// True when an interactive text/sticker view sits under the point — the VC uses
+    /// this to skip cell-tap handling (the overlay's own gestures take the touch).
+    func hasInteractiveOverlay(at point: CGPoint) -> Bool {
+        stickerViews.contains { $0.frame.contains(point) }
+            || textViews.contains { $0.frame.contains(point) }
+    }
+
     // MARK: - Layout
 
     override func layoutSubviews() {
@@ -115,6 +176,21 @@ final class VideoCanvasView: UIView {
         let transform = canvasToView()
         for (index, cellView) in cellViews.enumerated() where cellFrames.indices.contains(index) {
             cellView.frame = cellFrames[index].applying(transform)
+        }
+        layoutOverlays()
+    }
+
+    /// Positions the interactive overlay views from their normalized models (bounds
+    /// == the canvas, so 1:1 with the composited video the player shows). Font scale
+    /// maps reference-canvas point sizes onto the on-screen size, matching export.
+    private func layoutOverlays() {
+        let fontScale = canvasSize.width > 0 ? bounds.width / canvasSize.width : 1
+        for (index, overlay) in textModels.enumerated() where textViews.indices.contains(index) {
+            textViews[index].frame = TextRendering.frame(for: overlay, in: bounds.size)
+            textViews[index].configure(with: overlay, fontScale: fontScale)
+        }
+        for (index, overlay) in stickerModels.enumerated() where stickerViews.indices.contains(index) {
+            stickerViews[index].apply(overlay: overlay, in: bounds.size)
         }
     }
 

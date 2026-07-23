@@ -143,19 +143,26 @@ final class VideoEditorViewController: UIViewController {
         emptyHintLabel.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(emptyHintLabel)
 
+        let addBar = makeAddOverlayBar()
+        view.addSubview(addBar)
+
         let aspect = viewModel.canvasSize.height > 0
             ? viewModel.canvasSize.width / viewModel.canvasSize.height : 1
 
         NSLayoutConstraint.activate([
-            canvasView.centerYAnchor.constraint(equalTo: view.safeAreaLayoutGuide.centerYAnchor, constant: -12),
+            canvasView.centerYAnchor.constraint(equalTo: view.safeAreaLayoutGuide.centerYAnchor, constant: -28),
             canvasView.leadingAnchor.constraint(greaterThanOrEqualTo: view.leadingAnchor, constant: 16),
             canvasView.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -16),
             canvasView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             canvasView.topAnchor.constraint(greaterThanOrEqualTo: view.safeAreaLayoutGuide.topAnchor, constant: 16),
             canvasView.widthAnchor.constraint(equalTo: canvasView.heightAnchor, multiplier: aspect),
 
-            emptyHintLabel.topAnchor.constraint(equalTo: canvasView.bottomAnchor, constant: 12),
+            emptyHintLabel.topAnchor.constraint(equalTo: canvasView.bottomAnchor, constant: 10),
             emptyHintLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+
+            addBar.topAnchor.constraint(equalTo: emptyHintLabel.bottomAnchor, constant: 10),
+            addBar.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
+            addBar.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
         ])
         // Prefer a large canvas but let the aspect constraint win.
         let width = canvasView.widthAnchor.constraint(equalTo: view.widthAnchor, constant: -32)
@@ -184,6 +191,17 @@ final class VideoEditorViewController: UIViewController {
             self?.refreshCanvas()
             self?.rebuildComposition()
         }
+        // Interactive overlay gestures → the view model (coalesced into one undo step).
+        canvasView.onTextChanged = { [weak self] in self?.viewModel.updateTextOverlayInteractive($0) }
+        canvasView.onTextCommitted = { [weak self] in self?.viewModel.commitInteractive() }
+        canvasView.onTextTapped = { [weak self] in self?.presentTextStyleSheet(for: $0) }
+        canvasView.onStickerChanged = { [weak self] in self?.viewModel.updateStickerInteractive($0) }
+        canvasView.onStickerCommitted = { [weak self] in self?.viewModel.commitInteractive() }
+        canvasView.onStickerDeleted = { [weak self] in
+            self?.viewModel.removeSticker(id: $0)
+            Haptics.tap()
+        }
+        canvasView.onStickerSelected = { [weak self] in self?.selectedStickerID = $0 }
     }
 
     /// Restarts the preview when it reaches the end — a collage reads better looping.
@@ -208,10 +226,16 @@ final class VideoEditorViewController: UIViewController {
             cellFrames: viewModel.cellFrames().map(\.frame),
             filled: (0 ..< viewModel.cellCount).map { viewModel.cells[$0].videoID != nil },
             selectedIndex: viewModel.selectedIndex)
-        emptyHintLabel.isHidden = viewModel.hasContent
+        canvasView.updateTextOverlays(viewModel.textOverlays)
+        canvasView.updateStickerOverlays(viewModel.stickerOverlays, selected: selectedStickerID)
+        emptyHintLabel.isHidden = viewModel.hasContent || !viewModel.textOverlays.isEmpty
+            || !viewModel.stickerOverlays.isEmpty
         undoItem.isEnabled = viewModel.canUndo
         redoItem.isEnabled = viewModel.canRedo
     }
+
+    /// The currently-selected sticker (for its selection chrome). Not undoable state.
+    private var selectedStickerID: UUID?
 
     /// Rebuilds the preview composition from the model (debounced — sliders fire fast).
     private func rebuildComposition() {
@@ -261,6 +285,10 @@ final class VideoEditorViewController: UIViewController {
 
     @objc private func canvasTapped(_ gesture: UITapGestureRecognizer) {
         let point = gesture.location(in: canvasView)
+        // A tap on a text/sticker overlay is handled by that overlay's own gestures.
+        guard !canvasView.hasInteractiveOverlay(at: point) else { return }
+        // Tapping empty canvas deselects any selected sticker.
+        if selectedStickerID != nil { selectedStickerID = nil; refreshCanvas() }
         guard let index = canvasView.cellIndex(at: point) else { return }
         viewModel.selectCell(at: index)
         Haptics.tap()
@@ -490,6 +518,77 @@ final class VideoEditorViewController: UIViewController {
         return images
     }
 
+    // MARK: - Text / sticker overlays (#7)
+
+    private func makeAddOverlayBar() -> UIView {
+        let text = makeAddButton(title: "Text", systemImage: "textformat",
+                                 identifier: "videoAddTextButton", action: #selector(addTextTapped))
+        let sticker = makeAddButton(title: "Sticker", systemImage: "face.smiling",
+                                    identifier: "videoAddStickerButton", action: #selector(addStickerTapped))
+        let row = UIStackView(arrangedSubviews: [text, sticker])
+        row.axis = .horizontal
+        row.distribution = .fillEqually
+        row.spacing = 12
+        row.translatesAutoresizingMaskIntoConstraints = false
+        return row
+    }
+
+    private func makeAddButton(title: String, systemImage: String,
+                               identifier: String, action: Selector) -> UIButton {
+        var config = UIButton.Configuration.tinted()
+        config.title = title
+        config.image = UIImage(systemName: systemImage)
+        config.imagePadding = 6
+        config.cornerStyle = .large
+        config.baseForegroundColor = Theme.Color.accent
+        config.baseBackgroundColor = Theme.Color.accent
+        let button = UIButton(configuration: config)
+        button.accessibilityIdentifier = identifier
+        button.addTarget(self, action: action, for: .touchUpInside)
+        return button
+    }
+
+    @objc private func addTextTapped() {
+        Haptics.tap()
+        let overlay = TextOverlay(
+            text: "Your text", colorHex: "#FFFFFF",
+            frame: CGRect(x: 0.12, y: 0.44, width: 0.76, height: 0.14))
+        let id = viewModel.addTextOverlay(overlay)
+        presentTextStyleSheet(for: id)
+    }
+
+    @objc private func addStickerTapped() {
+        Haptics.tap()
+        let picker = StickerPickerViewController.sheet { [weak self] entry in
+            guard let self else { return }
+            let overlay = StickerOverlay(
+                stickerID: entry.id, symbolName: entry.symbol, colorHex: entry.colorHex)
+            self.selectedStickerID = self.viewModel.addSticker(overlay)
+            Haptics.success()
+            self.showToast("Drag to position · double-tap to remove")
+        }
+        present(picker, animated: true)
+    }
+
+    private func presentTextStyleSheet(for id: UUID) {
+        guard let overlay = viewModel.textOverlay(id: id) else { return }
+        let panel = TextStyleSheet(
+            overlay: overlay,
+            onChange: { [weak self] updated in self?.viewModel.updateTextOverlayInteractive(updated) },
+            onDone: { [weak self] in
+                self?.viewModel.commitInteractive()
+                self?.dismiss(animated: true)
+            })
+        let host = UIHostingController(rootView: panel)
+        host.modalPresentationStyle = .pageSheet
+        if let sheet = host.sheetPresentationController {
+            sheet.detents = [.medium(), .large()]
+            sheet.prefersGrabberVisible = true
+            sheet.prefersScrollingExpandsWhenScrolledToEdge = false
+        }
+        present(host, animated: true)
+    }
+
     // MARK: - Music
 
     private func presentMusicPicker() {
@@ -579,7 +678,12 @@ final class VideoEditorViewController: UIViewController {
             let renderSize = options.videoPixelSize(canvasSize: self.viewModel.canvasSize)
             Task { @MainActor in
                 do {
-                    let bundle = try await self.viewModel.buildBundle(renderSize: renderSize)
+                    // Export bakes the overlays into the file (preview shows them as
+                    // interactive views instead, so preview == export).
+                    let bundle = try await self.viewModel.buildBundle(
+                        textOverlays: self.viewModel.textOverlays,
+                        stickerOverlays: self.viewModel.stickerOverlays,
+                        renderSize: renderSize)
                     try await VideoComposer().export(
                         bundle: bundle, codec: options.videoCodec,
                         container: options.videoContainer, to: url,

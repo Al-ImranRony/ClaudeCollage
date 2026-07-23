@@ -30,6 +30,8 @@ public final class VideoEditorViewModel {
         public var cells: [VideoCellState]
         public var music: BackgroundMusicState?
         public var layout: CollageLayout
+        public var textOverlays: [TextOverlay] = []
+        public var stickerOverlays: [StickerOverlay] = []
     }
 
     public let projectID: UUID
@@ -37,6 +39,11 @@ public final class VideoEditorViewModel {
     public private(set) var layout: CollageLayout
     public private(set) var cells: [VideoCellState]
     public private(set) var music: BackgroundMusicState?
+    /// Text + sticker overlays baked over the whole video on export; shown live as
+    /// interactive views over the canvas (so preview == export). Ride undo/persist
+    /// with the rest of the state.
+    public private(set) var textOverlays: [TextOverlay] = []
+    public private(set) var stickerOverlays: [StickerOverlay] = []
     public private(set) var selectedIndex: Int?
     /// Gap between cells, in canvas pixels (mirrors the grid editor's border).
     public var borderWidth: CGFloat
@@ -65,7 +72,7 @@ public final class VideoEditorViewModel {
         self.borderWidth = borderWidth
         self.projectID = projectID
         self.cells = Array(repeating: VideoCellState(), count: max(1, layout.cellCount))
-        undoStack.push(Snapshot(cells: cells, music: nil, layout: layout))
+        undoStack.push(currentSnapshot())
     }
 
     // MARK: - Accessors
@@ -211,7 +218,7 @@ public final class VideoEditorViewModel {
     /// A no-op when nothing actually changed, so opening/closing a sheet without
     /// touching a control doesn't pollute the undo history.
     public func commitInteractive() {
-        guard undoStack.current != Snapshot(cells: cells, music: music, layout: layout) else { return }
+        guard undoStack.current != currentSnapshot() else { return }
         record()
     }
 
@@ -241,6 +248,56 @@ public final class VideoEditorViewModel {
     public func removeMusic() {
         guard music != nil else { return }
         music = nil          // the decoded asset stays cached so undo can restore it
+        record()
+    }
+
+    // MARK: - Text / sticker overlays (#7)
+
+    public func textOverlay(id: UUID) -> TextOverlay? { textOverlays.first { $0.id == id } }
+
+    @discardableResult
+    public func addTextOverlay(_ overlay: TextOverlay) -> UUID {
+        textOverlays.append(overlay)
+        record()
+        return overlay.id
+    }
+
+    @discardableResult
+    public func addSticker(_ overlay: StickerOverlay) -> UUID {
+        stickerOverlays.append(overlay)
+        record()
+        return overlay.id
+    }
+
+    /// Live update from a drag / style-sheet edit — no undo step until commit.
+    public func updateTextOverlayInteractive(_ overlay: TextOverlay) {
+        guard let index = textOverlays.firstIndex(where: { $0.id == overlay.id }) else { return }
+        textOverlays[index] = overlay
+        onChanged?()
+    }
+
+    public func updateStickerInteractive(_ overlay: StickerOverlay) {
+        guard let index = stickerOverlays.firstIndex(where: { $0.id == overlay.id }) else { return }
+        stickerOverlays[index] = overlay
+        onChanged?()
+    }
+
+    /// A discrete overlay edit (e.g. a style-sheet field) — records one undo step.
+    public func updateTextOverlay(_ overlay: TextOverlay) {
+        guard let index = textOverlays.firstIndex(where: { $0.id == overlay.id }) else { return }
+        textOverlays[index] = overlay
+        record()
+    }
+
+    public func removeTextOverlay(id: UUID) {
+        guard textOverlays.contains(where: { $0.id == id }) else { return }
+        textOverlays.removeAll { $0.id == id }
+        record()
+    }
+
+    public func removeSticker(id: UUID) {
+        guard stickerOverlays.contains(where: { $0.id == id }) else { return }
+        stickerOverlays.removeAll { $0.id == id }
         record()
     }
 
@@ -337,7 +394,8 @@ public final class VideoEditorViewModel {
     /// The serializable state, for `ProjectStore`.
     public func projectData() -> VideoProjectData {
         VideoProjectData(layout: layout, cells: cells, music: music,
-                         borderWidth: Double(borderWidth))
+                         borderWidth: Double(borderWidth),
+                         textOverlays: textOverlays, stickerOverlays: stickerOverlays)
     }
 
     /// File URLs of the cached clips keyed by media id — what the store copies into
@@ -374,11 +432,13 @@ public final class VideoEditorViewModel {
             : data.cells
         music = data.music
         borderWidth = CGFloat(data.borderWidth)
+        textOverlays = data.textOverlays
+        stickerOverlays = data.stickerOverlays
         self.assets = assets
         self.musicAsset = musicAsset
         selectedIndex = nil
         undoStack.reset()
-        undoStack.push(Snapshot(cells: cells, music: music, layout: layout))
+        undoStack.push(currentSnapshot())
         onChanged?()
     }
 
@@ -414,13 +474,20 @@ public final class VideoEditorViewModel {
         cells = snapshot.cells
         music = snapshot.music
         layout = snapshot.layout
+        textOverlays = snapshot.textOverlays
+        stickerOverlays = snapshot.stickerOverlays
         if let selected = selectedIndex, selected >= cells.count { selectedIndex = nil }
         onChanged?()
         onCommit?(self)
     }
 
+    private func currentSnapshot() -> Snapshot {
+        Snapshot(cells: cells, music: music, layout: layout,
+                 textOverlays: textOverlays, stickerOverlays: stickerOverlays)
+    }
+
     private func record() {
-        undoStack.push(Snapshot(cells: cells, music: music, layout: layout))
+        undoStack.push(currentSnapshot())
         onChanged?()
         onCommit?(self)
     }

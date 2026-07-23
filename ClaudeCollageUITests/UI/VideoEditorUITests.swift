@@ -69,6 +69,20 @@ final class VideoEditorUITests: XCTestCase {
     }
 
     @MainActor
+    func testAddingTextPlacesAnEditableOverlay() {
+        let app = XCUIApplication()
+        openVideoEditor(app)
+        XCTAssertTrue(app.buttons["videoAddTextButton"].waitForExistence(timeout: 5),
+                      "the add-text button is present")
+        XCTAssertTrue(app.buttons["videoAddStickerButton"].exists, "the add-sticker button is present")
+
+        app.buttons["videoAddTextButton"].tap()
+        // Adding text opens the style sheet immediately (its Done button appears).
+        XCTAssertTrue(app.buttons["Done"].waitForExistence(timeout: 5),
+                      "the text style sheet opens for the new overlay")
+    }
+
+    @MainActor
     func testChangingLayoutChangesSlotCount() {
         let app = XCUIApplication()
         openVideoEditor(app)

@@ -233,6 +233,76 @@ final class VideoEditorViewModelTests: XCTestCase {
         XCTAssertEqual(cell?.frame.minY ?? -1, 540, accuracy: 1)
     }
 
+    // MARK: - Text / sticker overlays (#7)
+
+    func testAddTextOverlayAppendsAndIsUndoable() {
+        let vm = makeViewModel()
+        let id = vm.addTextOverlay(TextOverlay(text: "Hi"))
+        XCTAssertEqual(vm.textOverlays.count, 1)
+        XCTAssertEqual(vm.textOverlays.first?.id, id)
+        XCTAssertTrue(vm.canUndo)
+        vm.undo()
+        XCTAssertTrue(vm.textOverlays.isEmpty, "undo removes the added text")
+    }
+
+    func testAddStickerAppends() {
+        let vm = makeViewModel()
+        vm.addSticker(StickerOverlay(symbolName: "star.fill", colorHex: "#FF0000"))
+        XCTAssertEqual(vm.stickerOverlays.count, 1)
+    }
+
+    func testInteractiveTextMovesDoNotStackUndoSteps() {
+        let vm = makeViewModel()
+        let id = vm.addTextOverlay(TextOverlay(text: "A"))   // 1 undo step
+        var overlay = try! XCTUnwrap(vm.textOverlay(id: id))
+        for x in [0.2, 0.4, 0.6] {
+            overlay.frameX = x
+            vm.updateTextOverlayInteractive(overlay)         // no undo steps
+        }
+        XCTAssertEqual(vm.textOverlay(id: id)?.frameX ?? -1, 0.6, accuracy: 1e-9, "live value tracks the drag")
+        vm.undo()
+        XCTAssertTrue(vm.textOverlays.isEmpty, "a single undo removes the text — the drag didn't stack")
+    }
+
+    func testCommitInteractiveRecordsTheMoveAsOneStep() {
+        let vm = makeViewModel()
+        let id = vm.addTextOverlay(TextOverlay(text: "A"))   // frameX defaults to 0
+        var overlay = try! XCTUnwrap(vm.textOverlay(id: id))
+        overlay.frameX = 0.5
+        vm.updateTextOverlayInteractive(overlay)
+        vm.commitInteractive()
+        vm.undo()
+        XCTAssertEqual(vm.textOverlay(id: id)?.frameX ?? -1, 0, accuracy: 1e-9, "undo reverts just the move")
+    }
+
+    func testUpdateTextOverlayFromStyleSheetRecords() {
+        let vm = makeViewModel()
+        let id = vm.addTextOverlay(TextOverlay(text: "A"))
+        var overlay = try! XCTUnwrap(vm.textOverlay(id: id))
+        overlay.text = "Restyled"
+        vm.updateTextOverlay(overlay)
+        XCTAssertEqual(vm.textOverlay(id: id)?.text, "Restyled")
+    }
+
+    func testRemoveTextAndSticker() {
+        let vm = makeViewModel()
+        let tid = vm.addTextOverlay(TextOverlay(text: "A"))
+        let sid = vm.addSticker(StickerOverlay(symbolName: "star.fill", colorHex: "#FFF"))
+        vm.removeTextOverlay(id: tid)
+        vm.removeSticker(id: sid)
+        XCTAssertTrue(vm.textOverlays.isEmpty)
+        XCTAssertTrue(vm.stickerOverlays.isEmpty)
+    }
+
+    func testOverlaysAreCarriedInProjectData() {
+        let vm = makeViewModel()
+        vm.addTextOverlay(TextOverlay(text: "Hello"))
+        vm.addSticker(StickerOverlay(symbolName: "heart.fill", colorHex: "#FF0000"))
+        let data = vm.projectData()
+        XCTAssertEqual(data.textOverlays.count, 1)
+        XCTAssertEqual(data.stickerOverlays.count, 1)
+    }
+
     // MARK: - Undo / redo
 
     func testUndoRestoresPreviousCellState() {

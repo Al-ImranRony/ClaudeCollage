@@ -20,17 +20,23 @@ public struct VideoProjectData: Codable, Equatable, Sendable {
     public var cells: [VideoCellState]
     public var music: BackgroundMusicState?
     public var borderWidth: Double
+    public var textOverlays: [TextOverlay]
+    public var stickerOverlays: [StickerOverlay]
 
     public init(
         layout: CollageLayout = .grid(.twoUpVertical),
         cells: [VideoCellState] = [],
         music: BackgroundMusicState? = nil,
-        borderWidth: Double = 0
+        borderWidth: Double = 0,
+        textOverlays: [TextOverlay] = [],
+        stickerOverlays: [StickerOverlay] = []
     ) {
         self.layout = layout
         self.cells = cells
         self.music = music
         self.borderWidth = borderWidth
+        self.textOverlays = textOverlays
+        self.stickerOverlays = stickerOverlays
     }
 
     /// Every media id the project references — what the store copies to disk and
@@ -41,7 +47,9 @@ public struct VideoProjectData: Codable, Equatable, Sendable {
         return ids
     }
 
-    private enum CodingKeys: String, CodingKey { case layout, cells, music, borderWidth }
+    private enum CodingKeys: String, CodingKey {
+        case layout, cells, music, borderWidth, textOverlays, stickerOverlays
+    }
 
     /// Defensive decode, matching the rest of the project's persisted values: a
     /// blob written by an older build fills its missing fields with defaults
@@ -52,5 +60,7 @@ public struct VideoProjectData: Codable, Equatable, Sendable {
         self.cells = try c.decodeIfPresent([VideoCellState].self, forKey: .cells) ?? []
         self.music = try c.decodeIfPresent(BackgroundMusicState.self, forKey: .music)
         self.borderWidth = try c.decodeIfPresent(Double.self, forKey: .borderWidth) ?? 0
+        self.textOverlays = try c.decodeIfPresent([TextOverlay].self, forKey: .textOverlays) ?? []
+        self.stickerOverlays = try c.decodeIfPresent([StickerOverlay].self, forKey: .stickerOverlays) ?? []
     }
 }
