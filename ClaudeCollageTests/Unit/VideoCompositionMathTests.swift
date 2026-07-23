@@ -86,4 +86,31 @@ final class VideoCompositionMathTests: XCTestCase {
         XCTAssertEqual(VideoCompositionMath.effectiveVolume(isMuted: false, volume: -1), 0, accuracy: 1e-6)
         XCTAssertEqual(VideoCompositionMath.effectiveVolume(isMuted: false, volume: 0.5), 0.5, accuracy: 1e-6)
     }
+
+    // MARK: - Render-size mapping (slice 6d / export resolution)
+
+    func testRenderMapIsIdentityWhenSizesMatch() {
+        let rect = CGRect(x: 10, y: 20, width: 30, height: 40)
+        let mapped = VideoCompositionMath.renderMappedRect(
+            rect, canvas: CGSize(width: 100, height: 100), render: CGSize(width: 100, height: 100))
+        XCTAssertEqual(mapped, rect)
+    }
+
+    func testRenderMapScalesUniformlyWhenAspectsMatch() {
+        // 1080×1350 (4:5) → 2160×2700 (4K, same aspect): uniform 2× scale, no offset.
+        let cell = CGRect(x: 0, y: 675, width: 1080, height: 675)  // bottom half
+        let mapped = VideoCompositionMath.renderMappedRect(
+            cell, canvas: CGSize(width: 1080, height: 1350), render: CGSize(width: 2160, height: 2700))
+        XCTAssertEqual(mapped, CGRect(x: 0, y: 1350, width: 2160, height: 1350))
+    }
+
+    func testRenderMapLetterboxesOnAspectMismatch() {
+        // A 1:1 canvas mapped into a 9:16 render fits by width and centres vertically.
+        let full = CGRect(x: 0, y: 0, width: 100, height: 100)
+        let mapped = VideoCompositionMath.renderMappedRect(
+            full, canvas: CGSize(width: 100, height: 100), render: CGSize(width: 100, height: 200))
+        XCTAssertEqual(mapped.width, 100, accuracy: 1e-6, "fills the render width")
+        XCTAssertEqual(mapped.height, 100, accuracy: 1e-6, "aspect preserved — no vertical stretch")
+        XCTAssertEqual(mapped.minY, 50, accuracy: 1e-6, "centred vertically (letterboxed)")
+    }
 }

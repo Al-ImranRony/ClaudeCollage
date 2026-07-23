@@ -36,6 +36,19 @@ public enum VideoCompositionMath {
         cellDurations.max() ?? 0
     }
 
+    /// Maps a rect from canvas space into the render-output space, aspect-fit and
+    /// centred. Used to scale a collage up to a platform's target resolution
+    /// (1080p / 4K) at export: a uniform scale with no offset when the canvas and
+    /// render aspects match, and a centred letterbox when they don't.
+    public static func renderMappedRect(_ rect: CGRect, canvas: CGSize, render: CGSize) -> CGRect {
+        guard canvas.width > 0, canvas.height > 0 else { return rect }
+        let scale = min(render.width / canvas.width, render.height / canvas.height)
+        let offsetX = (render.width - canvas.width * scale) / 2
+        let offsetY = (render.height - canvas.height * scale) / 2
+        return CGRect(x: rect.minX * scale + offsetX, y: rect.minY * scale + offsetY,
+                      width: rect.width * scale, height: rect.height * scale)
+    }
+
     /// Per-cell audio gain for the audio mix: muted → 0, otherwise the volume
     /// clamped into 0…1.
     public static func effectiveVolume(isMuted: Bool, volume: Double) -> Float {

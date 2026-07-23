@@ -213,10 +213,20 @@ final class VideoEditorViewController: UIViewController {
             guard let self, !Task.isCancelled else { return }
             guard let bundle = try? await self.viewModel.buildBundle() else { return }
             guard !Task.isCancelled else { return }
+            // Preserve the user's place + play state so tweaking a control doesn't
+            // yank the preview back to 0:00.
+            let resumeTime = self.player.currentTime()
+            let wasPlaying = self.player.timeControlStatus == .playing
             let item = AVPlayerItem(asset: bundle.composition)
             item.videoComposition = bundle.videoComposition
             item.audioMix = bundle.audioMix
             self.player.replaceCurrentItem(with: item)
+            if resumeTime.isNumeric, resumeTime > .zero {
+                self.player.seek(to: CMTimeMinimum(resumeTime, bundle.duration),
+                                 toleranceBefore: .positiveInfinity,
+                                 toleranceAfter: .positiveInfinity) { _ in }
+            }
+            if wasPlaying { self.player.play() }
             self.canvasView.setOverlayImage(bundle.overlayImage.map { UIImage(cgImage: $0) })
             await self.refreshGalleryThumbnail()
         }
@@ -361,17 +371,11 @@ final class VideoEditorViewController: UIViewController {
                 duration: duration,
                 thumbnails: thumbnails,
                 values: values,
-                onChange: { [weak self] updated in
-                    guard let self else { return }
-                    self.viewModel.setTrim(VideoTrim(start: updated.trimStart, end: updated.trimEnd),
-                                           forCellAt: index)
-                    self.viewModel.setLooping(updated.isLooping, forCellAt: index)
-                    self.viewModel.setMuted(updated.isMuted, forCellAt: index)
-                    self.viewModel.setVolume(updated.volume, forCellAt: index)
-                    let transition = updated.transitionStyle.map {
-                        CellTransition(style: $0, duration: updated.transitionDuration)
-                    }
-                    self.viewModel.setTransition(transition, forCellAt: index)
+                onLiveChange: { [weak self] updated in
+                    self?.applyCellValues(updated, at: index, commit: false)
+                },
+                onCommit: { [weak self] updated in
+                    self?.applyCellValues(updated, at: index, commit: true)
                 },
                 onReplace: { [weak self] in
                     self?.dismiss(animated: true) { self?.presentVideoPicker(for: index) }
@@ -397,6 +401,21 @@ final class VideoEditorViewController: UIViewController {
     /// Carries the non-Sendable `AVAsset` off the main actor for thumbnailing.
     private struct AssetBox: @unchecked Sendable {
         let asset: AVAsset
+    }
+
+    /// Applies the sheet's control values to a cell. During a drag (`commit == false`)
+    /// this uses the interactive setters — live preview, no undo churn — and on the
+    /// gesture's end (`commit == true`) records the whole change as one undo step.
+    private func applyCellValues(_ v: VideoCellControlsSheet.Values, at index: Int, commit: Bool) {
+        viewModel.setTrimInteractive(VideoTrim(start: v.trimStart, end: v.trimEnd), forCellAt: index)
+        viewModel.setVolumeInteractive(v.volume, forCellAt: index)
+        viewModel.setLoopingInteractive(v.isLooping, forCellAt: index)
+        viewModel.setMutedInteractive(v.isMuted, forCellAt: index)
+        let transition = v.transitionStyle.map {
+            CellTransition(style: $0, duration: v.transitionDuration)
+        }
+        viewModel.setTransitionInteractive(transition, forCellAt: index)
+        if commit { viewModel.commitInteractive() }
     }
 
     /// Evenly spaced frame thumbnails for the trim strip. `nonisolated` so the
@@ -506,9 +525,10 @@ final class VideoEditorViewController: UIViewController {
             let ext = options.videoContainer == .mov ? "mov" : "mp4"
             let url = FileManager.default.temporaryDirectory
                 .appendingPathComponent("VideoCollage-\(UUID().uuidString).\(ext)")
+            let renderSize = options.videoPixelSize(canvasSize: self.viewModel.canvasSize)
             Task { @MainActor in
                 do {
-                    let bundle = try await self.viewModel.buildBundle()
+                    let bundle = try await self.viewModel.buildBundle(renderSize: renderSize)
                     try await VideoComposer().export(
                         bundle: bundle, codec: options.videoCodec,
                         container: options.videoContainer, to: url,

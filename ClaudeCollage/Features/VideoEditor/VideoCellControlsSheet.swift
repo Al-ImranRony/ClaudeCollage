@@ -38,13 +38,18 @@ struct VideoCellControlsSheet: View {
 
     @State private var values: Values
 
-    let onChange: (Values) -> Void
+    /// Fired continuously while a slider is dragged — live preview, no undo step.
+    let onLiveChange: (Values) -> Void
+    /// Fired at the end of a drag or on a discrete change (toggle / chip) — records
+    /// one undo step for the whole gesture.
+    let onCommit: (Values) -> Void
     let onReplace: () -> Void
     let onRemove: () -> Void
     let onClose: () -> Void
 
     init(cellNumber: Int, duration: Double, thumbnails: [UIImage], values: Values,
-         onChange: @escaping (Values) -> Void,
+         onLiveChange: @escaping (Values) -> Void,
+         onCommit: @escaping (Values) -> Void,
          onReplace: @escaping () -> Void,
          onRemove: @escaping () -> Void,
          onClose: @escaping () -> Void) {
@@ -52,7 +57,8 @@ struct VideoCellControlsSheet: View {
         self.duration = max(0.1, duration)
         self.thumbnails = thumbnails
         self._values = State(initialValue: values)
-        self.onChange = onChange
+        self.onLiveChange = onLiveChange
+        self.onCommit = onCommit
         self.onReplace = onReplace
         self.onRemove = onRemove
         self.onClose = onClose
@@ -133,16 +139,16 @@ struct VideoCellControlsSheet: View {
                 get: { values.trimStart },
                 set: { newValue in
                     values.trimStart = min(newValue, values.trimEnd - 0.1)
-                    push()
-                }), in: 0...duration)
+                    onLiveChange(values)
+                }), in: 0...duration, onEditingChanged: commitOnRelease)
                 .accessibilityIdentifier("cellTrimStartSlider")
 
             Slider(value: Binding(
                 get: { values.trimEnd },
                 set: { newValue in
                     values.trimEnd = max(newValue, values.trimStart + 0.1)
-                    push()
-                }), in: 0...duration)
+                    onLiveChange(values)
+                }), in: 0...duration, onEditingChanged: commitOnRelease)
                 .accessibilityIdentifier("cellTrimEndSlider")
         }
     }
@@ -152,7 +158,7 @@ struct VideoCellControlsSheet: View {
     private var playbackSection: some View {
         Toggle("Loop to fill", isOn: Binding(
             get: { values.isLooping },
-            set: { values.isLooping = $0; push() }))
+            set: { values.isLooping = $0; onCommit(values) }))
             .accessibilityIdentifier("cellLoopToggle")
             .tint(Color(Theme.Color.accent))
             .foregroundStyle(Color(Theme.Color.textPrimary))
@@ -163,7 +169,7 @@ struct VideoCellControlsSheet: View {
             sectionTitle("Audio")
             Toggle("Mute", isOn: Binding(
                 get: { values.isMuted },
-                set: { values.isMuted = $0; push() }))
+                set: { values.isMuted = $0; onCommit(values) }))
                 .accessibilityIdentifier("cellMuteToggle")
                 .tint(Color(Theme.Color.accent))
                 .foregroundStyle(Color(Theme.Color.textPrimary))
@@ -172,7 +178,8 @@ struct VideoCellControlsSheet: View {
                 Image(systemName: "speaker.fill")
                 Slider(value: Binding(
                     get: { values.volume },
-                    set: { values.volume = $0; push() }), in: 0...1)
+                    set: { values.volume = $0; onLiveChange(values) }),
+                    in: 0...1, onEditingChanged: commitOnRelease)
                     .accessibilityIdentifier("cellVolumeSlider")
                 Image(systemName: "speaker.wave.3.fill")
             }
@@ -200,7 +207,8 @@ struct VideoCellControlsSheet: View {
                     .foregroundStyle(Color(Theme.Color.textSecondary))
                 Slider(value: Binding(
                     get: { values.transitionDuration },
-                    set: { values.transitionDuration = $0; push() }), in: 0.1...2.0)
+                    set: { values.transitionDuration = $0; onLiveChange(values) }),
+                    in: 0.1...2.0, onEditingChanged: commitOnRelease)
                     .accessibilityIdentifier("cellTransitionDurationSlider")
             }
         }
@@ -211,7 +219,7 @@ struct VideoCellControlsSheet: View {
         return Button {
             values.transitionStyle = style
             Haptics.tap()
-            push()
+            onCommit(values)
         } label: {
             Text(label)
                 .font(.caption)
@@ -266,5 +274,8 @@ struct VideoCellControlsSheet: View {
         String(format: "%.1fs", max(0, seconds))
     }
 
-    private func push() { onChange(values) }
+    /// Slider `onEditingChanged`: commit once when the drag ends.
+    private func commitOnRelease(_ editing: Bool) {
+        if !editing { onCommit(values) }
+    }
 }

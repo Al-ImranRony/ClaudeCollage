@@ -109,6 +109,12 @@ extension VideoComposer {
     /// `AVVideoCompositionCoreAnimationTool`, reusing the image-export renderers so
     /// the video matches the photo export. Any per-cell `transition` animates via
     /// layer-instruction opacity/transform ramps at the cell's start.
+    /// - Parameter renderSize: the output pixel size. Defaults to `canvasSize` (the
+    ///   preview resolution); the export passes the platform preset's target size
+    ///   (1080p / 4K) so the written file is at the requested resolution. Cell
+    ///   frames are mapped from canvas space into the render space aspect-fit +
+    ///   centred (`VideoCompositionMath.renderMappedRect`), so a same-aspect target
+    ///   scales uniformly and a mismatched one letterboxes.
     public func buildComposition(
         cells: [VideoCompositionCell],
         canvasSize: CGSize,
@@ -116,10 +122,12 @@ extension VideoComposer {
         textOverlays: [TextOverlay] = [],
         stickerOverlays: [StickerOverlay] = [],
         textFontScale: CGFloat = 1,
-        fps: Int32 = 30
+        fps: Int32 = 30,
+        renderSize: CGSize? = nil
     ) async throws -> VideoCompositionBundle {
         let composition = AVMutableComposition()
         let ts = Self.compositionTimescale
+        let output = renderSize ?? canvasSize
 
         // 1) Resolve each cell's source tracks + trimmed range up front.
         var resolved: [ResolvedVideoCell] = []
@@ -155,11 +163,15 @@ extension VideoComposer {
             let layer = AVMutableVideoCompositionLayerInstruction(assetTrack: videoComp)
             // AVFoundation's video-composition layer transforms use the same
             // top-left origin as the canvas (verified by the placement tests), so
-            // the cell's canvas frame is used directly — no y-flip.
+            // the cell's canvas frame is used directly — no y-flip. The frame is
+            // mapped into the render output first so export honours the target
+            // resolution (identity when rendering at the canvas size).
+            let mappedFrame = VideoCompositionMath.renderMappedRect(
+                item.cell.frame, canvas: canvasSize, render: output)
             let transform = VideoCompositionMath.aspectFitTransform(
-                source: item.naturalSize, in: item.cell.frame)
+                source: item.naturalSize, in: mappedFrame)
             applyPlacement(transform, transition: item.cell.transition,
-                           cellFrame: item.cell.frame, clipDuration: item.range.duration,
+                           cellFrame: mappedFrame, clipDuration: item.range.duration,
                            timescale: ts, to: layer)
             layerInstructions.append(layer)
 
@@ -200,19 +212,21 @@ extension VideoComposer {
         instruction.layerInstructions = layerInstructions
 
         let videoComposition = AVMutableVideoComposition()
-        videoComposition.renderSize = canvasSize
+        videoComposition.renderSize = output
         videoComposition.frameDuration = CMTime(value: 1, timescale: fps)
         videoComposition.instructions = [instruction]
 
         let audioMix = AVMutableAudioMix()
         audioMix.inputParameters = audioParameters
 
+        // Rendered at the output resolution so overlays are crisp at export size and
+        // align 1:1 with the composited frames (normalized coords, so position holds).
         let overlayImage = VideoOverlayRenderer.overlayImage(
             textOverlays: textOverlays, stickerOverlays: stickerOverlays,
-            canvasPx: canvasSize, textFontScale: textFontScale)
+            canvasPx: output, textFontScale: textFontScale)
 
         return VideoCompositionBundle(composition: composition, videoComposition: videoComposition,
-                                      audioMix: audioMix, duration: total, renderSize: canvasSize,
+                                      audioMix: audioMix, duration: total, renderSize: output,
                                       overlayImage: overlayImage)
     }
 

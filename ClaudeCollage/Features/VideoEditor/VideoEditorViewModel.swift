@@ -129,6 +129,9 @@ public final class VideoEditorViewModel {
         // A freshly placed clip resets its trim — the old in/out points refer to a
         // different source and would clamp to nonsense.
         cells[index].trim = VideoTrim()
+        // Loop by default so a clip shorter than the collage fills the timeline
+        // instead of leaving a hole; the controls sheet can turn it off.
+        cells[index].isLooping = true
         record()
     }
 
@@ -160,6 +163,42 @@ public final class VideoEditorViewModel {
 
     public func setTransition(_ transition: CellTransition?, forCellAt index: Int) {
         mutate(index) { $0.transition = transition }
+    }
+
+    // MARK: - Interactive (coalesced) edits
+
+    // A continuous gesture (dragging a slider) calls the `*Interactive` setters,
+    // which update the live value + preview but record NO undo step and trigger NO
+    // autosave; `commitInteractive()` at the gesture's end records the whole gesture
+    // as a single undo step. Mirrors the grid editor's silent-drag + commit pattern
+    // so one slider drag isn't 50 undo entries and doesn't churn autosave.
+
+    public func setVolumeInteractive(_ volume: Double, forCellAt index: Int) {
+        mutateInteractive(index) { $0.volume = min(1, max(0, volume)) }
+    }
+
+    public func setTrimInteractive(_ trim: VideoTrim, forCellAt index: Int) {
+        mutateInteractive(index) { $0.trim = trim }
+    }
+
+    public func setLoopingInteractive(_ isLooping: Bool, forCellAt index: Int) {
+        mutateInteractive(index) { $0.isLooping = isLooping }
+    }
+
+    public func setMutedInteractive(_ isMuted: Bool, forCellAt index: Int) {
+        mutateInteractive(index) { $0.isMuted = isMuted }
+    }
+
+    public func setTransitionInteractive(_ transition: CellTransition?, forCellAt index: Int) {
+        mutateInteractive(index) { $0.transition = transition }
+    }
+
+    /// Records the accumulated interactive edits as one undo step (and autosaves).
+    /// A no-op when nothing actually changed, so opening/closing a sheet without
+    /// touching a control doesn't pollute the undo history.
+    public func commitInteractive() {
+        guard undoStack.current != Snapshot(cells: cells, music: music, layout: layout) else { return }
+        record()
     }
 
     // MARK: - Background music
@@ -222,10 +261,13 @@ public final class VideoEditorViewModel {
 
     /// Assembles the composition for BOTH the live preview and the export, so what
     /// plays is what gets written.
+    /// - Parameter renderSize: pass the export's target pixel size to write at that
+    ///   resolution; omit for the preview (renders at the canvas size).
     public func buildBundle(
         textOverlays: [TextOverlay] = [],
         stickerOverlays: [StickerOverlay] = [],
-        fps: Int32 = 30
+        fps: Int32 = 30,
+        renderSize: CGSize? = nil
     ) async throws -> VideoCompositionBundle {
         try await VideoComposer().buildComposition(
             cells: compositionCells(),
@@ -233,7 +275,8 @@ public final class VideoEditorViewModel {
             music: backgroundMusic(),
             textOverlays: textOverlays,
             stickerOverlays: stickerOverlays,
-            fps: fps)
+            fps: fps,
+            renderSize: renderSize)
     }
 
     // MARK: - Beat sync (slice 6c)
@@ -342,6 +385,14 @@ public final class VideoEditorViewModel {
         guard cells.indices.contains(index) else { return }
         change(&cells[index])
         record()
+    }
+
+    /// Applies a cell change for live feedback only — updates the value + notifies
+    /// the view (preview), but records no undo step and triggers no autosave.
+    private func mutateInteractive(_ index: Int, _ change: (inout VideoCellState) -> Void) {
+        guard cells.indices.contains(index) else { return }
+        change(&cells[index])
+        onChanged?()
     }
 
     private func apply(_ snapshot: Snapshot) {

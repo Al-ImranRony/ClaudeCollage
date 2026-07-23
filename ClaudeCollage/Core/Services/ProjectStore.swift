@@ -32,6 +32,10 @@ final class ProjectStore {
     private let container: ModelContainer
     private var context: ModelContext { container.mainContext }
     private let fileManager = FileManager.default
+    /// Off-main queue for copying (potentially large) video clips into projects, so
+    /// autosave never blocks the UI. `mediaGroup` tracks in-flight copies.
+    private let mediaQueue = DispatchQueue(label: "com.devron.claudecollage.mediacopy", qos: .utility)
+    private let mediaGroup = DispatchGroup()
 
     init(container: ModelContainer) {
         self.container = container
@@ -201,6 +205,11 @@ final class ProjectStore {
     /// `VideoSourcePicker`, and both can disappear — the copy makes resume
     /// self-contained. The cost is duplicated storage for large clips; referencing
     /// the original `PHAsset` where it's still available is a possible refinement.
+    ///
+    /// The clip copy (potentially hundreds of MB) runs on a background queue so the
+    /// autosave never hitches the main thread; the SwiftData record is written
+    /// immediately with the media ids, so resume works as soon as the copy lands.
+    /// Tests await `awaitPendingMediaWrites()`.
     func saveVideo(_ viewModel: VideoEditorViewModel) {
         pendingSave?.cancel()
         pendingSave = nil
@@ -208,8 +217,8 @@ final class ProjectStore {
         let projectID = viewModel.projectID
         let data = viewModel.projectData()
 
-        writeMedia(viewModel.mediaFileURLs(), forProject: projectID,
-                   referenced: data.referencedMediaIDs)
+        scheduleMediaCopies(viewModel.mediaFileURLs(), forProject: projectID,
+                            referenced: data.referencedMediaIDs)
 
         let payload = try? JSONEncoder().encode(data)
         let thumbnailData = viewModel.thumbnail.flatMap {
@@ -310,10 +319,12 @@ final class ProjectStore {
 
     // MARK: - Private: video/audio disk cache
 
-    /// Copies each referenced clip into the project folder as `<mediaID>.<ext>`.
-    /// Ids are stable, so an already-copied clip is left alone; a source that IS
-    /// the destination (re-saving a restored project) is skipped.
-    private func writeMedia(
+    /// Copies each referenced clip into the project folder as `<mediaID>.<ext>`, off
+    /// the main thread. Ids are stable, so an already-copied clip is left alone; a
+    /// source that IS the destination (re-saving a restored project) is skipped. The
+    /// in-flight copies are tracked in `mediaGroup` so tests (and any code that must
+    /// see the files) can `await awaitPendingMediaWrites()`.
+    private func scheduleMediaCopies(
         _ urls: [UUID: URL],
         forProject projectID: UUID,
         referenced: Set<UUID>
@@ -321,12 +332,33 @@ final class ProjectStore {
         let directory = mediaDirectory(projectID)
         try? fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
 
+        var jobs: [(source: URL, destination: URL)] = []
         for id in referenced {
             guard let source = urls[id], existingMediaURL(id, in: directory) == nil else { continue }
             let ext = source.pathExtension.isEmpty ? "mov" : source.pathExtension
             let destination = directory.appendingPathComponent("\(id.uuidString).\(ext)")
             guard source.standardizedFileURL != destination.standardizedFileURL else { continue }
-            try? fileManager.copyItem(at: source, to: destination)
+            jobs.append((source, destination))
+        }
+        guard !jobs.isEmpty else { return }
+
+        let group = mediaGroup
+        let jobsToRun = jobs
+        group.enter()
+        mediaQueue.async {
+            for job in jobsToRun {
+                try? FileManager.default.copyItem(at: job.source, to: job.destination)
+            }
+            group.leave()
+        }
+    }
+
+    /// Suspends until every in-flight media copy has finished. Resumes immediately
+    /// when none are pending.
+    func awaitPendingMediaWrites() async {
+        let group = mediaGroup
+        await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
+            group.notify(queue: .main) { cont.resume() }
         }
     }
 

@@ -85,6 +85,8 @@ final class VideoPersistenceTests: XCTestCase {
         vm.setTransition(CellTransition(style: .zoomIn, duration: 0.4), forCellAt: 1)
 
         store.saveVideo(vm)
+
+        await store.awaitPendingMediaWrites()
         defer { store.delete(id: vm.projectID) }
 
         let loaded = try XCTUnwrap(store.loadVideoViewModel(id: vm.projectID))
@@ -108,6 +110,8 @@ final class VideoPersistenceTests: XCTestCase {
         vm.setMusic(assetID: musicID, asset: AVURLAsset(url: musicURL), volume: 0.45)
 
         store.saveVideo(vm)
+
+        await store.awaitPendingMediaWrites()
         defer { store.delete(id: vm.projectID) }
 
         let loaded = try XCTUnwrap(store.loadVideoViewModel(id: vm.projectID))
@@ -125,6 +129,8 @@ final class VideoPersistenceTests: XCTestCase {
         vm.setVideo(assetID: UUID(), asset: AVURLAsset(url: videoURL), forCellAt: 0)
 
         store.saveVideo(vm)
+
+        await store.awaitPendingMediaWrites()
         defer { store.delete(id: vm.projectID) }
 
         let summaries = store.listSummaries()
@@ -148,6 +154,7 @@ final class VideoPersistenceTests: XCTestCase {
         let videoURL = try await makeVideoFile()
         vm.setVideo(assetID: UUID(), asset: AVURLAsset(url: videoURL), forCellAt: 0)
         store.saveVideo(vm)
+        await store.awaitPendingMediaWrites()
         defer { store.delete(id: vm.projectID) }
 
         XCTAssertNil(store.loadCarouselViewModel(id: vm.projectID),
@@ -164,6 +171,8 @@ final class VideoPersistenceTests: XCTestCase {
         vm.setVideo(assetID: id, asset: AVURLAsset(url: originalURL), forCellAt: 0)
 
         store.saveVideo(vm)
+
+        await store.awaitPendingMediaWrites()
         defer { store.delete(id: vm.projectID) }
 
         // Simulate the picker's temp copy being reaped / the Photos asset going away.
@@ -186,6 +195,7 @@ final class VideoPersistenceTests: XCTestCase {
         let originalURL = try await makeVideoFile()
         vm.setVideo(assetID: id, asset: AVURLAsset(url: originalURL), forCellAt: 0)
         store.saveVideo(vm)
+        await store.awaitPendingMediaWrites()
 
         let loaded = try XCTUnwrap(store.loadVideoViewModel(id: vm.projectID))
         let copiedURL = try XCTUnwrap((loaded.asset(for: id) as? AVURLAsset)?.url)
@@ -199,7 +209,7 @@ final class VideoPersistenceTests: XCTestCase {
     func testEmptyVideoProjectStillSavesAndReloads() throws {
         let store = try makeStore()
         let vm = makeViewModel(layout: .grid(.threeLeft))
-        store.saveVideo(vm)
+        store.saveVideo(vm)   // no media, so nothing to await
         defer { store.delete(id: vm.projectID) }
 
         let loaded = try XCTUnwrap(store.loadVideoViewModel(id: vm.projectID))

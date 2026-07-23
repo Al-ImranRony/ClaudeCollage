@@ -412,6 +412,46 @@ final class VideoCompositionTests: XCTestCase {
         }
     }
 
+    // MARK: - Export render size (quality-hardening #1)
+
+    func testBuildRespectsAnExplicitRenderSize() async throws {
+        let red = try await makeSolidVideo(r: 235, g: 20, b: 20, seconds: 1)
+        let cell = VideoCompositionCell(asset: AVURLAsset(url: red), frame: unit(160))
+        let bundle = try await VideoComposer().buildComposition(
+            cells: [cell], canvasSize: sq(160), renderSize: CGSize(width: 320, height: 320))
+        XCTAssertEqual(bundle.renderSize, CGSize(width: 320, height: 320))
+        XCTAssertEqual(bundle.videoComposition.renderSize, CGSize(width: 320, height: 320))
+    }
+
+    func testExportedFileMatchesTheRenderSize() async throws {
+        let red = try await makeSolidVideo(r: 235, g: 20, b: 20, seconds: 1)
+        let cell = VideoCompositionCell(asset: AVURLAsset(url: red), frame: unit(160))
+        let bundle = try await VideoComposer().buildComposition(
+            cells: [cell], canvasSize: sq(160), renderSize: CGSize(width: 480, height: 480))
+        let out = tempURL(ext: "mp4")
+        try await VideoComposer().export(bundle: bundle, to: out)
+        let track = try await AVURLAsset(url: out).loadTracks(withMediaType: .video).first!
+        let size = try await track.load(.naturalSize)
+        XCTAssertEqual(size.width, 480, accuracy: 1, "the exported file is at the requested resolution")
+        XCTAssertEqual(size.height, 480, accuracy: 1)
+    }
+
+    func testRenderSizeScalesCellPlacement() async throws {
+        // Horizontal split rendered at 2×: the left/right cells still land left/right.
+        let red = try await makeSolidVideo(r: 235, g: 20, b: 20, seconds: 1)
+        let blue = try await makeSolidVideo(r: 20, g: 20, b: 235, seconds: 1)
+        let cells = [
+            VideoCompositionCell(asset: AVURLAsset(url: red), frame: CGRect(x: 0, y: 0, width: 80, height: 160)),
+            VideoCompositionCell(asset: AVURLAsset(url: blue), frame: CGRect(x: 80, y: 0, width: 80, height: 160))
+        ]
+        let bundle = try await VideoComposer().buildComposition(
+            cells: cells, canvasSize: sq(160), renderSize: CGSize(width: 320, height: 320))
+        let left = try await compositedPixel(bundle, x: 80, y: 160)    // left half at 2×
+        let right = try await compositedPixel(bundle, x: 240, y: 160)  // right half at 2×
+        XCTAssertGreaterThan(left.r, 150); XCTAssertLessThan(left.b, 90)
+        XCTAssertGreaterThan(right.b, 150); XCTAssertLessThan(right.r, 90)
+    }
+
     // MARK: - Cancellation (slice 6a)
 
     func testCancelledExportThrowsCancelledAndLeavesNoFile() async throws {

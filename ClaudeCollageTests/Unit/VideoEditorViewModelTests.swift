@@ -71,6 +71,13 @@ final class VideoEditorViewModelTests: XCTestCase {
         XCTAssertNil(vm.cells[0].videoID)
     }
 
+    func testSetVideoDefaultsToLoopingSoShortClipsFillTheTimeline() {
+        let vm = makeViewModel()
+        vm.setVideo(assetID: UUID(), asset: makeAsset(), forCellAt: 0)
+        XCTAssertTrue(vm.cells[0].isLooping,
+                      "a freshly placed clip loops by default so it never leaves a hole")
+    }
+
     func testFilledCellCountCountsOnlyCellsWithVideo() {
         let vm = makeViewModel(layout: .grid(.fourSquare))
         vm.setVideo(assetID: UUID(), asset: makeAsset(), forCellAt: 0)
@@ -114,6 +121,38 @@ final class VideoEditorViewModelTests: XCTestCase {
         let vm = makeViewModel()
         vm.setVolume(0.5, forCellAt: 99)   // must not trap
         XCTAssertEqual(vm.cellCount, 2)
+    }
+
+    // MARK: - Interactive changes (coalesced undo, hardening #3)
+
+    // Simulate a slider drag: many mid-gesture updates ending at 0.25.
+    private let dragVolumes = [0.9, 0.7, 0.5, 0.35, 0.25]
+
+    func testInteractiveVolumeDoesNotRecordUndoUntilCommitted() {
+        let vm = makeViewModel()
+        for v in dragVolumes { vm.setVolumeInteractive(v, forCellAt: 0) }
+        XCTAssertFalse(vm.canUndo, "mid-drag updates must not each push an undo snapshot")
+        XCTAssertEqual(vm.cells[0].volume, 0.25, accuracy: 1e-9, "but the live value still tracks the drag")
+    }
+
+    func testCommitInteractiveRecordsExactlyOneUndoStep() {
+        let vm = makeViewModel()
+        for v in dragVolumes { vm.setVolumeInteractive(v, forCellAt: 0) }
+        vm.commitInteractive()
+        XCTAssertTrue(vm.canUndo)
+        vm.undo()
+        XCTAssertEqual(vm.cells[0].volume, 1.0, accuracy: 1e-9,
+                       "one undo returns the whole drag to where it began")
+    }
+
+    func testInteractiveTrimThenCommitIsOneStep() {
+        let vm = makeViewModel()
+        vm.setTrimInteractive(VideoTrim(start: 0.1, end: 0.5), forCellAt: 0)
+        vm.setTrimInteractive(VideoTrim(start: 0.2, end: 0.9), forCellAt: 0)
+        XCTAssertFalse(vm.canUndo)
+        vm.commitInteractive()
+        XCTAssertEqual(vm.cells[0].trim, VideoTrim(start: 0.2, end: 0.9))
+        XCTAssertTrue(vm.canUndo)
     }
 
     // MARK: - Selection
