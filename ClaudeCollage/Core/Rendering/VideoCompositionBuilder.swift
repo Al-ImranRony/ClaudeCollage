@@ -247,9 +247,11 @@ extension VideoComposer {
         codec: ExportSettings.VideoCodec = .h264,
         container: ExportPreset.VideoContainer = .mp4,
         to url: URL,
-        progress: (@Sendable (Float) -> Void)? = nil
+        progress: (@Sendable (Float) -> Void)? = nil,
+        cancellation: ExportCancellationToken? = nil
     ) async throws {
         try? FileManager.default.removeItem(at: url)
+        if cancellation?.isCancelled == true { throw ComposerError.cancelled }
         let tracks = try await bundle.composition.loadTracks(withMediaType: .video)
         guard !tracks.isEmpty else { throw ComposerError.noFrames }
         let audioTracks = try await bundle.composition.loadTracks(withMediaType: .audio)
@@ -305,7 +307,8 @@ extension VideoComposer {
                                     input: writerInput, adaptor: adaptor,
                                     audioOutput: audioOutput, audioInput: audioInput,
                                     overlay: bundle.overlayImage,
-                                    width: width, height: height, duration: bundle.duration.seconds)
+                                    width: width, height: height, duration: bundle.duration.seconds,
+                                    outputURL: url, cancellation: cancellation)
         let exportQueue = DispatchQueue(label: "com.devron.claudecollage.videoexport")
         try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
             exportQueue.async {
@@ -356,6 +359,16 @@ extension VideoComposer {
         let width: Int
         let height: Int
         let duration: Double
+        let outputURL: URL
+        let cancellation: ExportCancellationToken?
+    }
+
+    /// Tears down reader + writer and removes the partial file. Called when the
+    /// user cancels mid-export (the plan's "cancel works cleanly").
+    private static func abort(_ ctx: ExportContext) {
+        ctx.reader.cancelReading()
+        ctx.writer.cancelWriting()
+        try? FileManager.default.removeItem(at: ctx.outputURL)
     }
 
     /// Drains the reader's video (and optional audio) outputs into the writer,
@@ -371,6 +384,10 @@ extension VideoComposer {
         var audioDone = (ctx.audioInput == nil)
 
         while !videoDone || !audioDone {
+            if ctx.cancellation?.isCancelled == true {
+                abort(ctx)
+                throw ComposerError.cancelled
+            }
             var progressed = false
 
             if !videoDone, ctx.input.isReadyForMoreMediaData {

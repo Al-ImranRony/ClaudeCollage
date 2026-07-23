@@ -27,6 +27,9 @@ public final class VideoComposer: @unchecked Sendable {
         case writerSetupFailed
         case pixelBufferFailed
         case writeFailed
+        /// The caller cancelled via an `ExportCancellationToken`; any partial output
+        /// file has been removed.
+        case cancelled
     }
 
     private let queue = DispatchQueue(label: "com.devron.claudecollage.videocomposer")
@@ -44,7 +47,8 @@ public final class VideoComposer: @unchecked Sendable {
         codec: ExportSettings.VideoCodec = .h264,
         container: ExportPreset.VideoContainer = .mp4,
         to url: URL,
-        progress: (@Sendable (Float) -> Void)? = nil
+        progress: (@Sendable (Float) -> Void)? = nil,
+        cancellation: ExportCancellationToken? = nil
     ) async throws {
         guard !frames.isEmpty else { throw ComposerError.noFrames }
         try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
@@ -52,7 +56,7 @@ public final class VideoComposer: @unchecked Sendable {
                 do {
                     try self.writeSync(frames: frames, size: size, secondsPerFrame: secondsPerFrame,
                                        fps: fps, codec: codec, container: container, to: url,
-                                       progress: progress)
+                                       progress: progress, cancellation: cancellation)
                     cont.resume()
                 } catch {
                     cont.resume(throwing: error)
@@ -66,9 +70,12 @@ public final class VideoComposer: @unchecked Sendable {
     private func writeSync(
         frames: [CGImage], size: CGSize, secondsPerFrame: Double, fps: Int32,
         codec: ExportSettings.VideoCodec, container: ExportPreset.VideoContainer,
-        to url: URL, progress: (@Sendable (Float) -> Void)?
+        to url: URL, progress: (@Sendable (Float) -> Void)?,
+        cancellation: ExportCancellationToken?
     ) throws {
         try? FileManager.default.removeItem(at: url)
+        // Bail before doing any work if the user already cancelled.
+        if cancellation?.isCancelled == true { throw ComposerError.cancelled }
 
         let fileType: AVFileType = container == .mov ? .mov : .mp4
         guard let writer = try? AVAssetWriter(url: url, fileType: fileType) else {
@@ -107,6 +114,11 @@ public final class VideoComposer: @unchecked Sendable {
                 throw ComposerError.pixelBufferFailed
             }
             for _ in 0..<framesPerImage {
+                if cancellation?.isCancelled == true {
+                    writer.cancelWriting()
+                    try? FileManager.default.removeItem(at: url)
+                    throw ComposerError.cancelled
+                }
                 while !input.isReadyForMoreMediaData { Thread.sleep(forTimeInterval: 0.005) }
                 let time = CMTime(value: frameCounter, timescale: fps)
                 if !adaptor.append(buffer, withPresentationTime: time) {

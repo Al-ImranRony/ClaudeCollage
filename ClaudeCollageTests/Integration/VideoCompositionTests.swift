@@ -306,6 +306,76 @@ final class VideoCompositionTests: XCTestCase {
         XCTAssertEqual(bundle.audioMix.inputParameters.count, 1, "music gets a mix parameter")
     }
 
+    // MARK: - Cancellation (slice 6a)
+
+    func testCancelledExportThrowsCancelledAndLeavesNoFile() async throws {
+        let video = try await makeSolidVideo(r: 120, g: 120, b: 120, seconds: 1)
+        let cell = VideoCompositionCell(asset: AVURLAsset(url: video), frame: unit(160))
+        let bundle = try await VideoComposer().buildComposition(cells: [cell], canvasSize: sq(160))
+        let out = tempURL(ext: "mp4")
+
+        let token = ExportCancellationToken()
+        token.cancel()   // already cancelled → the write loop must bail on its first check
+
+        do {
+            try await VideoComposer().export(bundle: bundle, to: out, cancellation: token)
+            XCTFail("a cancelled export must not complete")
+        } catch let error as VideoComposer.ComposerError {
+            XCTAssertEqual(error, .cancelled)
+        }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: out.path),
+                       "a cancelled export cleans up its partial file")
+    }
+
+    func testCancelledSlideshowThrowsCancelled() async throws {
+        let out = tempURL(ext: "mp4")
+        let token = ExportCancellationToken()
+        token.cancel()
+        do {
+            try await VideoComposer().renderSlideshow(
+                frames: [solidImage(160, r: 10, g: 10, b: 10)], size: sq(160),
+                secondsPerFrame: 1, to: out, cancellation: token)
+            XCTFail("a cancelled slideshow must not complete")
+        } catch let error as VideoComposer.ComposerError {
+            XCTAssertEqual(error, .cancelled)
+        }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: out.path))
+    }
+
+    func testUncancelledExportStillCompletesAndReportsFullProgress() async throws {
+        let video = try await makeSolidVideo(r: 60, g: 180, b: 60, seconds: 1)
+        let cell = VideoCompositionCell(asset: AVURLAsset(url: video), frame: unit(160))
+        let bundle = try await VideoComposer().buildComposition(cells: [cell], canvasSize: sq(160))
+        let out = tempURL(ext: "mp4")
+
+        let recorder = ProgressRecorder()
+        try await VideoComposer().export(bundle: bundle, to: out,
+                                         progress: { recorder.record($0) },
+                                         cancellation: ExportCancellationToken())
+
+        XCTAssertTrue(FileManager.default.fileExists(atPath: out.path))
+        XCTAssertGreaterThan(recorder.values.count, 0, "progress is reported during the export")
+        XCTAssertEqual(recorder.values.last ?? 0, 1.0, accuracy: 0.15,
+                       "progress runs through to (about) 1.0")
+        XCTAssertTrue(recorder.isMonotonic, "progress never goes backwards")
+    }
+
+    /// Collects progress callbacks from the exporter's private queue.
+    private final class ProgressRecorder: @unchecked Sendable {
+        private let lock = NSLock()
+        private var storage: [Float] = []
+        func record(_ value: Float) {
+            lock.lock(); storage.append(value); lock.unlock()
+        }
+        var values: [Float] {
+            lock.lock(); defer { lock.unlock() }; return storage
+        }
+        var isMonotonic: Bool {
+            let snapshot = values
+            return zip(snapshot, snapshot.dropFirst()).allSatisfy { $0 <= $1 }
+        }
+    }
+
     // MARK: - Fixtures & helpers
 
     private func firstLayerInstruction(_ bundle: VideoCompositionBundle) -> AVVideoCompositionLayerInstruction? {

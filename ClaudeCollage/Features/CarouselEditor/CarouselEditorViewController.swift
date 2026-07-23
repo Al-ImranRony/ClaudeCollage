@@ -312,7 +312,11 @@ final class CarouselEditorViewController: UIViewController {
                 self.showComingSoon(title: "Export Failed", message: "There are no frames to export.")
                 return
             }
-            let spinner = self.presentSpinner("Exporting video…")
+            let token = ExportCancellationToken()
+            let progressVC = ExportProgressViewController()
+            progressVC.onCancel = { token.cancel() }
+            self.present(progressVC, animated: true)
+
             let size = options.videoPixelSize(canvasSize: self.viewModel.canvasSize)
             let ext = options.videoContainer == .mov ? "mov" : "mp4"
             let url = FileManager.default.temporaryDirectory
@@ -321,18 +325,24 @@ final class CarouselEditorViewController: UIViewController {
                 do {
                     try await VideoComposer().renderSlideshow(
                         frames: frames, size: size, secondsPerFrame: 2.0,
-                        codec: options.videoCodec, container: options.videoContainer, to: url)
+                        codec: options.videoCodec, container: options.videoContainer, to: url,
+                        progress: { [weak progressVC] value in
+                            progressVC?.update(fraction: Double(value))
+                        },
+                        cancellation: token)
                     if share {
-                        spinner.dismiss(animated: true) { self.shareURL(url) }
+                        progressVC.dismiss(animated: true) { self.shareURL(url) }
                     } else {
                         try await PhotoLibrarySaver().saveVideo(at: url)
-                        spinner.dismiss(animated: true) {
+                        progressVC.dismiss(animated: true) {
                             self.notify(.success)
                             self.showToast("Saved to Photos")
                         }
                     }
+                } catch VideoComposer.ComposerError.cancelled {
+                    progressVC.dismiss(animated: true) { self.showToast("Export cancelled") }
                 } catch {
-                    spinner.dismiss(animated: true) {
+                    progressVC.dismiss(animated: true) {
                         self.notify(.error)
                         self.showComingSoon(title: "Export Failed",
                                             message: "The video couldn't be created. Please try again.")

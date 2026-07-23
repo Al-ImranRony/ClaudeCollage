@@ -442,7 +442,12 @@ final class VideoEditorViewController: UIViewController {
             }
             self.player.pause()
             self.playItem.image = UIImage(systemName: "play.fill")
-            let spinner = self.presentSpinner("Exporting video…")
+
+            let token = ExportCancellationToken()
+            let progressVC = ExportProgressViewController()
+            progressVC.onCancel = { token.cancel() }
+            self.present(progressVC, animated: true)
+
             let ext = options.videoContainer == .mov ? "mov" : "mp4"
             let url = FileManager.default.temporaryDirectory
                 .appendingPathComponent("VideoCollage-\(UUID().uuidString).\(ext)")
@@ -451,18 +456,25 @@ final class VideoEditorViewController: UIViewController {
                     let bundle = try await self.viewModel.buildBundle()
                     try await VideoComposer().export(
                         bundle: bundle, codec: options.videoCodec,
-                        container: options.videoContainer, to: url)
+                        container: options.videoContainer, to: url,
+                        progress: { [weak progressVC] value in
+                            progressVC?.update(fraction: Double(value))
+                        },
+                        cancellation: token)
                     if share {
-                        spinner.dismiss(animated: true) { self.shareURL(url) }
+                        progressVC.dismiss(animated: true) { self.shareURL(url) }
                     } else {
                         try await PhotoLibrarySaver().saveVideo(at: url)
-                        spinner.dismiss(animated: true) {
+                        progressVC.dismiss(animated: true) {
                             self.notify(.success)
                             self.showToast("Saved to Photos")
                         }
                     }
+                } catch VideoComposer.ComposerError.cancelled {
+                    // A deliberate cancel isn't a failure — no error alert.
+                    progressVC.dismiss(animated: true) { self.showToast("Export cancelled") }
                 } catch {
-                    spinner.dismiss(animated: true) {
+                    progressVC.dismiss(animated: true) {
                         self.notify(.error)
                         self.showInfo(title: "Export Failed",
                                       message: "The video couldn't be created. Please try again.")
