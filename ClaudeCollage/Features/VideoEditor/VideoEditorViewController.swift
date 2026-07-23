@@ -218,7 +218,21 @@ final class VideoEditorViewController: UIViewController {
             item.audioMix = bundle.audioMix
             self.player.replaceCurrentItem(with: item)
             self.canvasView.setOverlayImage(bundle.overlayImage.map { UIImage(cgImage: $0) })
+            await self.refreshGalleryThumbnail()
         }
+    }
+
+    /// Gives the home gallery something recognizable for this project: the first
+    /// frame of the first filled cell. Only rendered once — re-deriving it on every
+    /// slider tick would be wasteful, and the first clip is a stable enough
+    /// identity for the card.
+    private func refreshGalleryThumbnail() async {
+        guard viewModel.thumbnail == nil else { return }
+        guard let index = (0 ..< viewModel.cellCount).first(where: { viewModel.cells[$0].videoID != nil }),
+              let asset = viewModel.asset(forCellAt: index) else { return }
+        let frames = await makeThumbnails(AssetBox(asset: asset), count: 1)
+        guard let first = frames.first?.cgImage else { return }
+        viewModel.setThumbnail(first)
     }
 
     // MARK: - Actions

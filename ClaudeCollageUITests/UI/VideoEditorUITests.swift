@@ -43,6 +43,32 @@ final class VideoEditorUITests: XCTestCase {
     }
 
     @MainActor
+    func testVideoCollageResumesFromHome() {
+        let app = XCUIApplication()
+        openVideoEditor(app)
+        // Switch to a 4-up grid so the resumed project is distinguishable from a
+        // fresh one (which starts as a 2-up stack).
+        app.buttons["videoLayoutButton"].tap()
+        let fourUp = app.buttons["4 · Grid"]
+        XCTAssertTrue(fourUp.waitForExistence(timeout: 5))
+        fourUp.tap()
+        XCTAssertTrue(app.otherElements["videoCell-3"].waitForExistence(timeout: 5))
+
+        // Back to Home — the collage is autosaved and appears in the gallery.
+        app.navigationBars["Video Collage"].buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(app.navigationBars["ClaudeCollage"].waitForExistence(timeout: 8))
+
+        let card = app.collectionViews.cells.element(boundBy: 0)
+        XCTAssertTrue(card.waitForExistence(timeout: 5), "Home shows the saved video collage")
+        card.tap()
+
+        XCTAssertTrue(app.navigationBars["Video Collage"].waitForExistence(timeout: 8),
+                      "Reopening resumes the video editor")
+        XCTAssertTrue(app.otherElements["videoCell-3"].waitForExistence(timeout: 5),
+                      "The 4-up layout resumed intact")
+    }
+
+    @MainActor
     func testChangingLayoutChangesSlotCount() {
         let app = XCUIApplication()
         openVideoEditor(app)

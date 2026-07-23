@@ -33,6 +33,10 @@ public final class CollageProject {
     /// frame carries its own `GridEditorState`; photos live on disk as JPEGs keyed
     /// by image id, exactly like grid projects.
     public var carouselData: Data?
+    /// Serialized `VideoProjectData` for video-mode projects (Step 04). Clips and
+    /// the music track live on disk keyed by `videoID` / `musicID`, mirroring how
+    /// photos are stored.
+    public var videoData: Data?
 
     public init(
         id: UUID = UUID(),

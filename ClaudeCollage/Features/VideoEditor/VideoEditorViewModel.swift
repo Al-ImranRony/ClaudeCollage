@@ -236,6 +236,56 @@ public final class VideoEditorViewModel {
             fps: fps)
     }
 
+    // MARK: - Persistence
+
+    /// The serializable state, for `ProjectStore`.
+    public func projectData() -> VideoProjectData {
+        VideoProjectData(layout: layout, cells: cells, music: music,
+                         borderWidth: Double(borderWidth))
+    }
+
+    /// File URLs of the cached clips keyed by media id — what the store copies into
+    /// the project folder. Assets that aren't file-backed (e.g. a slo-mo
+    /// `AVComposition`) have no URL and are skipped; those cells resume empty.
+    public func mediaFileURLs() -> [UUID: URL] {
+        var result: [UUID: URL] = [:]
+        for (id, asset) in assets {
+            if let urlAsset = asset as? AVURLAsset { result[id] = urlAsset.url }
+        }
+        if let musicID = music?.musicID, let urlAsset = musicAsset as? AVURLAsset {
+            result[musicID] = urlAsset.url
+        }
+        return result
+    }
+
+    /// Gallery thumbnail for the home screen. Set by the editor once it has a
+    /// composed frame; not an undoable edit, but it does schedule a save so the
+    /// image lands in the record.
+    public private(set) var thumbnail: CGImage?
+
+    public func setThumbnail(_ image: CGImage?) {
+        thumbnail = image
+        onCommit?(self)
+    }
+
+    /// Rehydrates a saved project. The restored state becomes the new undo
+    /// baseline (same contract as the grid editor's `restore`), and this does NOT
+    /// fire `onCommit` — loading is not an edit.
+    public func restore(data: VideoProjectData, assets: [UUID: AVAsset], musicAsset: AVAsset?) {
+        layout = data.layout
+        cells = data.cells.isEmpty
+            ? Array(repeating: VideoCellState(), count: max(1, data.layout.cellCount))
+            : data.cells
+        music = data.music
+        borderWidth = CGFloat(data.borderWidth)
+        self.assets = assets
+        self.musicAsset = musicAsset
+        selectedIndex = nil
+        undoStack.reset()
+        undoStack.push(Snapshot(cells: cells, music: music, layout: layout))
+        onChanged?()
+    }
+
     // MARK: - Undo / redo
 
     public func undo() {

@@ -148,13 +148,25 @@ final class AppCoordinator {
 
     /// Starts a video collage (Step 04 slice 5b). A 4:5 canvas with a 2-up stacked
     /// layout is the sensible default for social video; the layout is switchable in
-    /// the editor. Video projects are in-memory for now — persistence rides on the
-    /// SwiftData work that gave carousels resume (a follow-up).
+    /// the editor. Persisted immediately so it appears in the gallery on return,
+    /// then autosaved on every change (slice 5c).
     private func startVideoCollage() {
         let canvasSize = CanvasSize.size(forAspectRatio: "4:5")
         let viewModel = VideoEditorViewModel(canvasSize: canvasSize, layout: .grid(.twoUpVertical))
+        attachVideoAutosave(to: viewModel)
+        store.saveVideo(viewModel)
+        pushVideoEditor(viewModel)
+    }
+
+    private func pushVideoEditor(_ viewModel: VideoEditorViewModel) {
         let editor = VideoEditorViewController(viewModel: viewModel)
         navigationController.pushViewController(editor, animated: true)
+    }
+
+    private func attachVideoAutosave(to viewModel: VideoEditorViewModel) {
+        viewModel.onCommit = { [weak self] viewModel in
+            self?.store.scheduleSaveVideo(viewModel)
+        }
     }
 
     private func showTemplateGallery() {
@@ -209,8 +221,13 @@ final class AppCoordinator {
     }
 
     private func openProject(id: UUID) {
-        // Carousel projects resume into the carousel editor; everything else is a
-        // grid/template/polygon project in the grid editor.
+        // Routed by record type: video and carousel projects resume into their own
+        // editors; everything else is a grid/template/polygon project.
+        if let videoVM = store.loadVideoViewModel(id: id) {
+            attachVideoAutosave(to: videoVM)
+            pushVideoEditor(videoVM)
+            return
+        }
         if let carouselVM = store.loadCarouselViewModel(id: id) {
             attachCarouselAutosave(to: carouselVM)
             presentCarouselEditor(viewModel: carouselVM)

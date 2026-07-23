@@ -10,6 +10,7 @@
 //  database stays small.
 //
 
+import AVFoundation
 import Foundation
 import SwiftData
 import UIKit
@@ -182,6 +183,77 @@ final class ProjectStore {
         return UIImage(cgImage: cgImage).jpegData(compressionQuality: 0.8)
     }
 
+    // MARK: - Video save / load (Step 04)
+
+    /// Debounced video-collage save (mirrors `scheduleSave`).
+    func scheduleSaveVideo(_ viewModel: VideoEditorViewModel) {
+        pendingSave?.cancel()
+        let work = DispatchWorkItem { [weak self] in self?.saveVideo(viewModel) }
+        pendingSave = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4, execute: work)
+    }
+
+    /// Persists a video collage: copies every referenced clip (and the music track)
+    /// into the project folder, encodes the cell/music state, and upserts the record.
+    ///
+    /// Copying rather than storing a Photos identifier is deliberate: a picked clip
+    /// is backed either by the Photos library or by a temp-dir copy from
+    /// `VideoSourcePicker`, and both can disappear — the copy makes resume
+    /// self-contained. The cost is duplicated storage for large clips; referencing
+    /// the original `PHAsset` where it's still available is a possible refinement.
+    func saveVideo(_ viewModel: VideoEditorViewModel) {
+        pendingSave?.cancel()
+        pendingSave = nil
+
+        let projectID = viewModel.projectID
+        let data = viewModel.projectData()
+
+        writeMedia(viewModel.mediaFileURLs(), forProject: projectID,
+                   referenced: data.referencedMediaIDs)
+
+        let payload = try? JSONEncoder().encode(data)
+        let thumbnailData = viewModel.thumbnail.flatMap {
+            UIImage(cgImage: $0).jpegData(compressionQuality: 0.8)
+        }
+
+        let project = fetchProject(id: projectID) ?? {
+            let new = CollageProject(mode: .video, canvasSize: viewModel.canvasSize)
+            new.id = projectID
+            context.insert(new)
+            return new
+        }()
+
+        project.mode = .video
+        project.templateID = data.layout.persistID
+        project.frameCount = data.cells.count
+        project.canvasSize = viewModel.canvasSize
+        project.videoData = payload
+        // Keep an earlier thumbnail if this save happened before one was rendered.
+        if let thumbnailData { project.previewThumbnail = thumbnailData }
+        project.updatedAt = Date()
+
+        try? context.save()
+    }
+
+    /// Rehydrates a saved video collage: decodes the cell/music state and reopens
+    /// the copied clips from disk.
+    func loadVideoViewModel(id: UUID) -> VideoEditorViewModel? {
+        guard let project = fetchProject(id: id), project.mode == .video,
+              let data = project.videoData,
+              let payload = try? JSONDecoder().decode(VideoProjectData.self, from: data) else {
+            return nil
+        }
+        let media = loadMedia(forProject: id, referenced: payload.referencedMediaIDs)
+        let viewModel = VideoEditorViewModel(
+            canvasSize: project.canvasSize, layout: payload.layout,
+            borderWidth: CGFloat(payload.borderWidth), projectID: project.id)
+        viewModel.restore(
+            data: payload,
+            assets: media,
+            musicAsset: payload.music?.musicID.flatMap { media[$0] })
+        return viewModel
+    }
+
     // MARK: - Delete
 
     func delete(id: UUID) {
@@ -236,6 +308,49 @@ final class ProjectStore {
         return result
     }
 
+    // MARK: - Private: video/audio disk cache
+
+    /// Copies each referenced clip into the project folder as `<mediaID>.<ext>`.
+    /// Ids are stable, so an already-copied clip is left alone; a source that IS
+    /// the destination (re-saving a restored project) is skipped.
+    private func writeMedia(
+        _ urls: [UUID: URL],
+        forProject projectID: UUID,
+        referenced: Set<UUID>
+    ) {
+        let directory = mediaDirectory(projectID)
+        try? fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+
+        for id in referenced {
+            guard let source = urls[id], existingMediaURL(id, in: directory) == nil else { continue }
+            let ext = source.pathExtension.isEmpty ? "mov" : source.pathExtension
+            let destination = directory.appendingPathComponent("\(id.uuidString).\(ext)")
+            guard source.standardizedFileURL != destination.standardizedFileURL else { continue }
+            try? fileManager.copyItem(at: source, to: destination)
+        }
+    }
+
+    private func loadMedia(
+        forProject projectID: UUID,
+        referenced: Set<UUID>
+    ) -> [UUID: AVAsset] {
+        let directory = mediaDirectory(projectID)
+        var result: [UUID: AVAsset] = [:]
+        for id in referenced {
+            if let url = existingMediaURL(id, in: directory) {
+                result[id] = AVURLAsset(url: url)
+            }
+        }
+        return result
+    }
+
+    /// The copied file for a media id, whatever extension it was saved with.
+    private func existingMediaURL(_ id: UUID, in directory: URL) -> URL? {
+        let contents = (try? fileManager.contentsOfDirectory(
+            at: directory, includingPropertiesForKeys: nil)) ?? []
+        return contents.first { $0.deletingPathExtension().lastPathComponent == id.uuidString }
+    }
+
     private func referencedImageIDs(in state: GridEditorState) -> Set<UUID> {
         Set(state.cells.compactMap { $0.imageID })
     }
@@ -262,5 +377,11 @@ final class ProjectStore {
 
     private func imagesDirectory(_ id: UUID) -> URL {
         projectDirectory(id).appendingPathComponent("images", isDirectory: true)
+    }
+
+    /// Copied video clips + the music track for a video project. Lives under the
+    /// project directory, so `delete(id:)` reclaims it along with everything else.
+    private func mediaDirectory(_ id: UUID) -> URL {
+        projectDirectory(id).appendingPathComponent("media", isDirectory: true)
     }
 }
