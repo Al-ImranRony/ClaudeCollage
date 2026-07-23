@@ -30,6 +30,9 @@ final class ExportProgressViewController: UIViewController {
     private let cancelButton = UIButton(type: .system)
 
     private let exportTitle: String
+    /// The Lock Screen / Dynamic Island twin of this modal. A no-op when Live
+    /// Activities are unavailable, so it never affects the export.
+    private let liveActivity = ExportLiveActivityController()
     private var startDate = Date()
     /// `nonisolated(unsafe)` so the nonisolated `deinit` can invalidate it; it is
     /// only ever created and mutated on the main actor.
@@ -61,6 +64,7 @@ final class ExportProgressViewController: UIViewController {
         setupCard()
         startDate = Date()
         startTicking()
+        liveActivity.start(title: exportTitle)
         render()
     }
 
@@ -68,6 +72,9 @@ final class ExportProgressViewController: UIViewController {
         super.viewDidDisappear(animated)
         timer?.invalidate()
         timer = nil
+        // The modal is dismissed exactly when the export finishes / is cancelled,
+        // so this is the right moment to tear the Live Activity down too.
+        liveActivity.end()
     }
 
     // MARK: - Public API
@@ -168,6 +175,7 @@ final class ExportProgressViewController: UIViewController {
         statusLabel.text = state.statusText
         percentLabel.text = state.percentText
         progressView.setProgress(Float(state.fraction), animated: true)
+        if !state.isCancelling { liveActivity.update(fraction: state.fraction) }
 
         // Under the threshold it's a spinner; past it, a real bar + percentage.
         let showsBar = state.showsProgressBar && !state.isCancelling

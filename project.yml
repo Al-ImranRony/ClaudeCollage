@@ -65,6 +65,7 @@ targets:
         NSPhotoLibraryUsageDescription: "ClaudeCollage needs access to your photos to create collages."
         NSPhotoLibraryAddUsageDescription: "ClaudeCollage saves your finished collages to your photo library."
         NSMicrophoneUsageDescription: "ClaudeCollage uses the microphone when recording video for your collage."
+        NSSupportsLiveActivities: true
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
           UISceneConfigurations:
@@ -96,6 +97,8 @@ targets:
     deploymentTarget: "17.0"
     sources:
       - path: ClaudeCollageWidgets
+      # Shared with the app target: the Live Activity attributes the widget renders.
+      - path: ClaudeCollage/Core/Models/ExportActivityAttributes.swift
     info:
       path: ClaudeCollageWidgets/Info.plist
       properties:

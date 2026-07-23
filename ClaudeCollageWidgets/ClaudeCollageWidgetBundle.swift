@@ -13,6 +13,8 @@ import SwiftUI
 struct ClaudeCollageWidgetBundle: WidgetBundle {
     var body: some Widget {
         PlaceholderWidget()
+        // The in-progress export Live Activity (Step 04 slice 6b).
+        ExportLiveActivity()
     }
 }
 

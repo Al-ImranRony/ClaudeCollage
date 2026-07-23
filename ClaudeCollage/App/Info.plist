@@ -28,6 +28,8 @@
 	<string>ClaudeCollage saves your finished collages to your photo library.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>ClaudeCollage needs access to your photos to create collages.</string>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
