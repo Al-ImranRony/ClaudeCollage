@@ -33,6 +33,7 @@ final class AppCoordinator {
         home.onNewFreeform = { [weak self] size in self?.startFreeformProject(size: size) }
         home.onBrowseTemplates = { [weak self] in self?.showTemplateGallery() }
         home.onNewCarousel = { [weak self] in self?.startCarousel() }
+        home.onNewVideoCollage = { [weak self] in self?.startVideoCollage() }
         home.onOpenProject = { [weak self] id in self?.openProject(id: id) }
         home.onDeleteProject = { [weak self] id in self?.store.delete(id: id) }
         homeViewController = home
@@ -143,6 +144,17 @@ final class AppCoordinator {
         viewModel.onCommit = { [weak self] viewModel in
             self?.store.scheduleSaveCarousel(viewModel)
         }
+    }
+
+    /// Starts a video collage (Step 04 slice 5b). A 4:5 canvas with a 2-up stacked
+    /// layout is the sensible default for social video; the layout is switchable in
+    /// the editor. Video projects are in-memory for now — persistence rides on the
+    /// SwiftData work that gave carousels resume (a follow-up).
+    private func startVideoCollage() {
+        let canvasSize = CanvasSize.size(forAspectRatio: "4:5")
+        let viewModel = VideoEditorViewModel(canvasSize: canvasSize, layout: .grid(.twoUpVertical))
+        let editor = VideoEditorViewController(viewModel: viewModel)
+        navigationController.pushViewController(editor, animated: true)
     }
 
     private func showTemplateGallery() {

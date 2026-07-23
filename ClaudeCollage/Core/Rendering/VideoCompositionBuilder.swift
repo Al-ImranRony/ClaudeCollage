@@ -25,7 +25,12 @@ import CoreVideo
 import Foundation
 
 /// One video cell to assemble into the collage composition.
-public struct VideoCompositionCell {
+///
+/// `@unchecked Sendable` so a `@MainActor` editor can hand these to the
+/// nonisolated builder: the only non-Sendable member is the `AVAsset`, which is
+/// read-only here (never mutated) — the same carry-across-isolation idiom as
+/// `VideoAssetLoader.SendableBox` and the exporter's `ExportContext`.
+public struct VideoCompositionCell: @unchecked Sendable {
     public let asset: AVAsset
     /// Absolute canvas-pixel frame this cell occupies (top-left origin).
     public let frame: CGRect
@@ -58,7 +63,7 @@ public struct VideoCompositionCell {
 /// The optional background-music track to mix under the cells. The resolved
 /// `AVAsset` is the builder input; the persisted counterpart is
 /// `BackgroundMusicState` (the editor resolves `musicID` → asset).
-public struct BackgroundMusic {
+public struct BackgroundMusic: @unchecked Sendable {
     public let asset: AVAsset
     /// In/out selection within the source audio (unset end ⇒ whole track).
     public var trim: VideoTrim
@@ -82,7 +87,10 @@ public struct BackgroundMusic {
 /// `export(bundle:…)` draws it onto each composited frame at write-time, and the
 /// live preview overlays it as a CALayer above the player. Either way, preview ==
 /// export because the same `VideoOverlayRenderer` image is used.
-public struct VideoCompositionBundle {
+/// `@unchecked Sendable` for the same reason as `VideoCompositionCell`: a
+/// `@MainActor` editor builds the bundle and hands it to the nonisolated exporter,
+/// which is the only thing that touches it from then on.
+public struct VideoCompositionBundle: @unchecked Sendable {
     public let composition: AVMutableComposition
     public let videoComposition: AVMutableVideoComposition
     public let audioMix: AVMutableAudioMix

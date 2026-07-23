@@ -18,6 +18,7 @@ final class HomeViewController: UIViewController {
     var onNewFreeform: ((CGSize) -> Void)?
     var onBrowseTemplates: (() -> Void)?
     var onNewCarousel: (() -> Void)?
+    var onNewVideoCollage: (() -> Void)?
     var onOpenProject: ((UUID) -> Void)?
     var onDeleteProject: ((UUID) -> Void)?
 
@@ -59,7 +60,15 @@ final class HomeViewController: UIViewController {
         carouselButton.accessibilityIdentifier = "carouselButton"
         carouselButton.accessibilityLabel = "Carousel"
 
-        navigationItem.rightBarButtonItems = [addButton, templatesButton, freeformButton, carouselButton]
+        let videoButton = UIBarButtonItem(
+            image: UIImage(systemName: "play.rectangle"),
+            style: .plain, target: self, action: #selector(videoTapped)
+        )
+        videoButton.accessibilityIdentifier = "videoCollageButton"
+        videoButton.accessibilityLabel = "Video Collage"
+
+        navigationItem.rightBarButtonItems = [addButton, templatesButton, freeformButton,
+                                              carouselButton, videoButton]
 
         collectionView.translatesAutoresizingMaskIntoConstraints = false
         emptyStateView.translatesAutoresizingMaskIntoConstraints = false
@@ -104,6 +113,11 @@ final class HomeViewController: UIViewController {
     @objc private func carouselTapped() {
         Haptics.tap()
         onNewCarousel?()
+    }
+
+    @objc private func videoTapped() {
+        Haptics.tap()
+        onNewVideoCollage?()
     }
 
     /// Prompts for a custom canvas size (100–4000 px) and starts a freeform collage.

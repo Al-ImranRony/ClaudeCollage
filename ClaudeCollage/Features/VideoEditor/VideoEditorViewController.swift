@@ -1,0 +1,516 @@
+//
+//  VideoEditorViewController.swift
+//  ClaudeCollage
+//
+//  Step 04 slice 5b — the video collage editor.
+//
+//  UIKit (the plan's requirement) because the canvas is an `AVPlayerLayer`. The
+//  screen is deliberately thin: it owns chrome, gestures and presentation, while
+//  `VideoEditorViewModel` owns the state and the engine bridge.
+//
+//  The live preview is the REAL composition — `buildBundle()` produces the same
+//  `AVMutableComposition` + `AVVideoComposition` + `AVAudioMix` that the exporter
+//  writes, so per-cell layout, trim, loop, transitions, per-cell volume and the
+//  background music all play exactly as they will export. The composition is
+//  rebuilt (debounced) whenever the model changes.
+//
+//  v1 deviations (documented): cell content is placed by tapping a slot rather than
+//  dragging clips in; trim uses sliders over a thumbnail strip (see
+//  VideoCellControlsSheet); export renders at the canvas size (already 1080-based)
+//  rather than rescaling to the platform preset's pixel size.
+//
+
+import AVFoundation
+import SwiftUI
+import UIKit
+import UniformTypeIdentifiers
+
+final class VideoEditorViewController: UIViewController {
+
+    private let viewModel: VideoEditorViewModel
+
+    private let canvasView = VideoCanvasView()
+    private let player = AVPlayer()
+    private let emptyHintLabel = UILabel()
+
+    /// Retains the PHPicker delegate for the life of a pick.
+    private var videoPicker: VideoSourcePicker?
+    /// Which slot a pending pick fills.
+    private var pendingCellIndex: Int?
+    /// Coalesces composition rebuilds while sliders are being dragged.
+    private var rebuildTask: Task<Void, Never>?
+    /// `nonisolated(unsafe)` so `deinit` (which is nonisolated) can unregister it.
+    /// Only ever assigned once, on the main actor, in `viewDidLoad`.
+    private nonisolated(unsafe) var didFinishObserver: (any NSObjectProtocol)?
+
+    private lazy var undoItem = UIBarButtonItem(
+        image: UIImage(systemName: "arrow.uturn.backward"),
+        style: .plain, target: self, action: #selector(undoTapped))
+    private lazy var redoItem = UIBarButtonItem(
+        image: UIImage(systemName: "arrow.uturn.forward"),
+        style: .plain, target: self, action: #selector(redoTapped))
+    private lazy var playItem = UIBarButtonItem(
+        image: UIImage(systemName: "play.fill"),
+        style: .plain, target: self, action: #selector(playTapped))
+
+    // MARK: - Init
+
+    init(viewModel: VideoEditorViewModel) {
+        self.viewModel = viewModel
+        super.init(nibName: nil, bundle: nil)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
+
+    deinit {
+        if let didFinishObserver { NotificationCenter.default.removeObserver(didFinishObserver) }
+    }
+
+    // MARK: - Lifecycle
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        title = "Video Collage"
+        view.backgroundColor = Theme.Color.background
+        navigationItem.largeTitleDisplayMode = .never
+        setupNavigationBar()
+        setupToolbar()
+        setupLayout()
+        bindViewModel()
+        loopPlaybackForever()
+        canvasView.player = player
+        refreshCanvas()
+        rebuildComposition()
+    }
+
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        navigationController?.setToolbarHidden(false, animated: false)
+    }
+
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        player.pause()
+        if isMovingFromParent {
+            navigationController?.setToolbarHidden(true, animated: animated)
+        }
+    }
+
+    // MARK: - Setup
+
+    private func setupNavigationBar() {
+        let export = UIBarButtonItem(
+            image: UIImage(systemName: "square.and.arrow.up"),
+            style: .plain, target: self, action: #selector(exportTapped))
+        export.accessibilityIdentifier = "videoExportButton"
+        export.accessibilityLabel = "Export"
+        undoItem.accessibilityIdentifier = "videoUndoButton"
+        undoItem.accessibilityLabel = "Undo"
+        redoItem.accessibilityIdentifier = "videoRedoButton"
+        redoItem.accessibilityLabel = "Redo"
+        navigationItem.rightBarButtonItems = [export, redoItem, undoItem]
+    }
+
+    private func setupToolbar() {
+        let layout = UIBarButtonItem(
+            image: UIImage(systemName: "square.grid.2x2"),
+            style: .plain, target: self, action: #selector(layoutTapped))
+        layout.accessibilityIdentifier = "videoLayoutButton"
+        layout.accessibilityLabel = "Layout"
+
+        let music = UIBarButtonItem(
+            image: UIImage(systemName: "music.note"),
+            style: .plain, target: self, action: #selector(musicTapped))
+        music.accessibilityIdentifier = "videoMusicButton"
+        music.accessibilityLabel = "Music"
+
+        playItem.accessibilityIdentifier = "videoPlayButton"
+        playItem.accessibilityLabel = "Play"
+
+        let flex = UIBarButtonItem(systemItem: .flexibleSpace)
+        toolbarItems = [layout, flex, playItem, flex, music]
+    }
+
+    private func setupLayout() {
+        canvasView.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(canvasView)
+
+        emptyHintLabel.text = "Tap a slot to add a video"
+        emptyHintLabel.font = Theme.Typography.caption
+        emptyHintLabel.textColor = Theme.Color.textSecondary
+        emptyHintLabel.textAlignment = .center
+        emptyHintLabel.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(emptyHintLabel)
+
+        let aspect = viewModel.canvasSize.height > 0
+            ? viewModel.canvasSize.width / viewModel.canvasSize.height : 1
+
+        NSLayoutConstraint.activate([
+            canvasView.centerYAnchor.constraint(equalTo: view.safeAreaLayoutGuide.centerYAnchor, constant: -12),
+            canvasView.leadingAnchor.constraint(greaterThanOrEqualTo: view.leadingAnchor, constant: 16),
+            canvasView.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -16),
+            canvasView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            canvasView.topAnchor.constraint(greaterThanOrEqualTo: view.safeAreaLayoutGuide.topAnchor, constant: 16),
+            canvasView.widthAnchor.constraint(equalTo: canvasView.heightAnchor, multiplier: aspect),
+
+            emptyHintLabel.topAnchor.constraint(equalTo: canvasView.bottomAnchor, constant: 12),
+            emptyHintLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+        ])
+        // Prefer a large canvas but let the aspect constraint win.
+        let width = canvasView.widthAnchor.constraint(equalTo: view.widthAnchor, constant: -32)
+        width.priority = .defaultHigh
+        width.isActive = true
+
+        let tap = UITapGestureRecognizer(target: self, action: #selector(canvasTapped(_:)))
+        canvasView.addGestureRecognizer(tap)
+        canvasView.isUserInteractionEnabled = true
+    }
+
+    private func bindViewModel() {
+        viewModel.onChanged = { [weak self] in
+            self?.refreshCanvas()
+            self?.rebuildComposition()
+        }
+    }
+
+    /// Restarts the preview when it reaches the end — a collage reads better looping.
+    private func loopPlaybackForever() {
+        player.actionAtItemEnd = .none
+        didFinishObserver = NotificationCenter.default.addObserver(
+            forName: .AVPlayerItemDidPlayToEndTime, object: nil, queue: .main
+        ) { [weak self] _ in
+            guard let self else { return }
+            MainActor.assumeIsolated {
+                self.player.seek(to: .zero)
+                self.player.play()
+            }
+        }
+    }
+
+    // MARK: - Canvas
+
+    private func refreshCanvas() {
+        canvasView.configure(
+            canvasSize: viewModel.canvasSize,
+            cellFrames: viewModel.cellFrames().map(\.frame),
+            filled: (0 ..< viewModel.cellCount).map { viewModel.cells[$0].videoID != nil },
+            selectedIndex: viewModel.selectedIndex)
+        emptyHintLabel.isHidden = viewModel.hasContent
+        undoItem.isEnabled = viewModel.canUndo
+        redoItem.isEnabled = viewModel.canRedo
+    }
+
+    /// Rebuilds the preview composition from the model (debounced — sliders fire fast).
+    private func rebuildComposition() {
+        rebuildTask?.cancel()
+        guard viewModel.hasContent else {
+            player.replaceCurrentItem(with: nil)
+            return
+        }
+        rebuildTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 250_000_000)
+            guard let self, !Task.isCancelled else { return }
+            guard let bundle = try? await self.viewModel.buildBundle() else { return }
+            guard !Task.isCancelled else { return }
+            let item = AVPlayerItem(asset: bundle.composition)
+            item.videoComposition = bundle.videoComposition
+            item.audioMix = bundle.audioMix
+            self.player.replaceCurrentItem(with: item)
+            self.canvasView.setOverlayImage(bundle.overlayImage.map { UIImage(cgImage: $0) })
+        }
+    }
+
+    // MARK: - Actions
+
+    @objc private func canvasTapped(_ gesture: UITapGestureRecognizer) {
+        let point = gesture.location(in: canvasView)
+        guard let index = canvasView.cellIndex(at: point) else { return }
+        viewModel.selectCell(at: index)
+        Haptics.tap()
+        if viewModel.cells[index].videoID == nil {
+            presentVideoPicker(for: index)
+        } else {
+            presentCellControls(for: index)
+        }
+    }
+
+    @objc private func undoTapped() { viewModel.undo() }
+    @objc private func redoTapped() { viewModel.redo() }
+
+    @objc private func playTapped() {
+        guard viewModel.hasContent else {
+            showInfo(title: "Nothing to Play", message: "Add a video to a slot first.")
+            return
+        }
+        if player.timeControlStatus == .playing {
+            player.pause()
+            playItem.image = UIImage(systemName: "play.fill")
+        } else {
+            player.play()
+            playItem.image = UIImage(systemName: "pause.fill")
+        }
+    }
+
+    @objc private func layoutTapped() {
+        let sheet = UIAlertController(title: "Layout", message: nil, preferredStyle: .actionSheet)
+        for template in GridTemplate.allCases {
+            sheet.addAction(UIAlertAction(title: template.displayName, style: .default) { [weak self] _ in
+                self?.viewModel.changeLayout(.grid(template))
+                Haptics.tap()
+            })
+        }
+        sheet.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        sheet.popoverPresentationController?.barButtonItem = toolbarItems?.first
+        present(sheet, animated: true)
+    }
+
+    @objc private func musicTapped() {
+        let sheet = UIAlertController(title: "Background Music", message: nil, preferredStyle: .actionSheet)
+        sheet.addAction(UIAlertAction(title: viewModel.music == nil ? "Add Music…" : "Replace Music…",
+                                      style: .default) { [weak self] _ in
+            self?.presentMusicPicker()
+        })
+        if viewModel.music != nil {
+            sheet.addAction(UIAlertAction(title: "Music Volume…", style: .default) { [weak self] _ in
+                self?.presentMusicVolume()
+            })
+            sheet.addAction(UIAlertAction(title: "Remove Music", style: .destructive) { [weak self] _ in
+                self?.viewModel.removeMusic()
+                Haptics.tap()
+                self?.showToast("Music removed")
+            })
+        }
+        sheet.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        sheet.popoverPresentationController?.barButtonItem = toolbarItems?.last
+        present(sheet, animated: true)
+    }
+
+    // MARK: - Video picking
+
+    private func presentVideoPicker(for index: Int) {
+        pendingCellIndex = index
+        let picker = VideoSourcePicker { [weak self] asset in
+            guard let self else { return }
+            self.videoPicker = nil
+            guard let asset, let cellIndex = self.pendingCellIndex else { return }
+            self.pendingCellIndex = nil
+            self.viewModel.setVideo(assetID: UUID(), asset: asset, forCellAt: cellIndex)
+            Haptics.tap()
+        }
+        videoPicker = picker
+        present(picker.makePicker(), animated: true)
+    }
+
+    // MARK: - Per-cell controls
+
+    private func presentCellControls(for index: Int) {
+        guard let asset = viewModel.asset(forCellAt: index) else { return }
+        let cell = viewModel.cells[index]
+
+        Task { @MainActor in
+            let duration = (try? await asset.load(.duration).seconds) ?? 0
+            let thumbnails = await self.makeThumbnails(AssetBox(asset: asset))
+            let resolved = cell.trim.clamped(toAssetDuration: duration)
+            let values = VideoCellControlsSheet.Values(
+                trimStart: resolved.start,
+                trimEnd: resolved.end,
+                isLooping: cell.isLooping,
+                isMuted: cell.isMuted,
+                volume: cell.volume,
+                transitionStyle: cell.transition?.style,
+                transitionDuration: cell.transition?.duration ?? 0.5)
+
+            let sheet = VideoCellControlsSheet(
+                cellNumber: index + 1,
+                duration: duration,
+                thumbnails: thumbnails,
+                values: values,
+                onChange: { [weak self] updated in
+                    guard let self else { return }
+                    self.viewModel.setTrim(VideoTrim(start: updated.trimStart, end: updated.trimEnd),
+                                           forCellAt: index)
+                    self.viewModel.setLooping(updated.isLooping, forCellAt: index)
+                    self.viewModel.setMuted(updated.isMuted, forCellAt: index)
+                    self.viewModel.setVolume(updated.volume, forCellAt: index)
+                    let transition = updated.transitionStyle.map {
+                        CellTransition(style: $0, duration: updated.transitionDuration)
+                    }
+                    self.viewModel.setTransition(transition, forCellAt: index)
+                },
+                onReplace: { [weak self] in
+                    self?.dismiss(animated: true) { self?.presentVideoPicker(for: index) }
+                },
+                onRemove: { [weak self] in
+                    self?.dismiss(animated: true) {
+                        self?.viewModel.clearVideo(atCellIndex: index)
+                        Haptics.tap()
+                    }
+                },
+                onClose: { [weak self] in self?.dismiss(animated: true) })
+
+            let host = UIHostingController(rootView: sheet)
+            host.modalPresentationStyle = .pageSheet
+            if let presentation = host.sheetPresentationController {
+                presentation.detents = [.medium(), .large()]
+                presentation.prefersGrabberVisible = true
+            }
+            self.present(host, animated: true)
+        }
+    }
+
+    /// Carries the non-Sendable `AVAsset` off the main actor for thumbnailing.
+    private struct AssetBox: @unchecked Sendable {
+        let asset: AVAsset
+    }
+
+    /// Evenly spaced frame thumbnails for the trim strip. `nonisolated` so the
+    /// decode work — and the non-Sendable `AVAssetImageGenerator` — stay off the
+    /// main actor entirely rather than being sent across it.
+    private nonisolated func makeThumbnails(_ box: AssetBox, count: Int = 8) async -> [UIImage] {
+        guard let duration = try? await box.asset.load(.duration).seconds, duration > 0 else {
+            return []
+        }
+        let generator = AVAssetImageGenerator(asset: box.asset)
+        generator.appliesPreferredTrackTransform = true
+        generator.maximumSize = CGSize(width: 200, height: 200)
+        var images: [UIImage] = []
+        for index in 0 ..< count {
+            let seconds = duration * Double(index) / Double(count)
+            let time = CMTime(seconds: seconds, preferredTimescale: 600)
+            if let cgImage = try? await generator.image(at: time).image {
+                images.append(UIImage(cgImage: cgImage))
+            }
+        }
+        return images
+    }
+
+    // MARK: - Music
+
+    private func presentMusicPicker() {
+        let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.audio], asCopy: true)
+        picker.delegate = self
+        picker.allowsMultipleSelection = false
+        present(picker, animated: true)
+    }
+
+    private func presentMusicVolume() {
+        let alert = UIAlertController(title: "Music Volume", message: "\n\n", preferredStyle: .alert)
+        let slider = UISlider(frame: CGRect(x: 20, y: 60, width: 230, height: 20))
+        slider.minimumValue = 0
+        slider.maximumValue = 1
+        slider.value = Float(viewModel.music?.volume ?? 1)
+        slider.accessibilityIdentifier = "musicVolumeSlider"
+        alert.view.addSubview(slider)
+        alert.addAction(UIAlertAction(title: "Done", style: .default) { [weak self] _ in
+            self?.viewModel.setMusicVolume(Double(slider.value))
+        })
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        present(alert, animated: true)
+    }
+
+    // MARK: - Export
+
+    @objc private func exportTapped() {
+        let capabilities = ExportCapabilities(
+            canvasSize: viewModel.canvasSize,
+            canvasAspect: CanvasSize.aspectString(for: viewModel.canvasSize),
+            supportsVideo: true,
+            isPremium: EntitlementStore.shared.isPremiumUnlocked)
+        let sheet = UniversalExportSheetView(
+            capabilities: capabilities,
+            onSaveToPhotos: { [weak self] options in self?.exportVideo(options, share: false) },
+            onQuickShare: { [weak self] options in self?.exportVideo(options, share: true) },
+            onCancel: { [weak self] in self?.dismiss(animated: true) })
+        let host = UIHostingController(rootView: sheet)
+        host.modalPresentationStyle = .pageSheet
+        if let presentation = host.sheetPresentationController {
+            presentation.detents = [.medium(), .large()]
+            presentation.prefersGrabberVisible = true
+        }
+        present(host, animated: true)
+    }
+
+    /// Composes and writes the collage through the slice-4/5a direct
+    /// reader→writer path (video + muxed audio), then saves or shares it.
+    private func exportVideo(_ options: ExportOptions, share: Bool) {
+        dismiss(animated: true) { [weak self] in
+            guard let self else { return }
+            guard self.viewModel.hasContent else {
+                self.showInfo(title: "Nothing to Export", message: "Add a video to a slot first.")
+                return
+            }
+            self.player.pause()
+            self.playItem.image = UIImage(systemName: "play.fill")
+            let spinner = self.presentSpinner("Exporting video…")
+            let ext = options.videoContainer == .mov ? "mov" : "mp4"
+            let url = FileManager.default.temporaryDirectory
+                .appendingPathComponent("VideoCollage-\(UUID().uuidString).\(ext)")
+            Task { @MainActor in
+                do {
+                    let bundle = try await self.viewModel.buildBundle()
+                    try await VideoComposer().export(
+                        bundle: bundle, codec: options.videoCodec,
+                        container: options.videoContainer, to: url)
+                    if share {
+                        spinner.dismiss(animated: true) { self.shareURL(url) }
+                    } else {
+                        try await PhotoLibrarySaver().saveVideo(at: url)
+                        spinner.dismiss(animated: true) {
+                            self.notify(.success)
+                            self.showToast("Saved to Photos")
+                        }
+                    }
+                } catch {
+                    spinner.dismiss(animated: true) {
+                        self.notify(.error)
+                        self.showInfo(title: "Export Failed",
+                                      message: "The video couldn't be created. Please try again.")
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - Helpers
+
+    private func presentSpinner(_ message: String) -> UIAlertController {
+        let alert = UIAlertController(title: nil, message: message, preferredStyle: .alert)
+        let indicator = UIActivityIndicatorView(style: .medium)
+        indicator.translatesAutoresizingMaskIntoConstraints = false
+        indicator.startAnimating()
+        alert.view.addSubview(indicator)
+        NSLayoutConstraint.activate([
+            indicator.centerXAnchor.constraint(equalTo: alert.view.centerXAnchor),
+            indicator.bottomAnchor.constraint(equalTo: alert.view.bottomAnchor, constant: -20),
+        ])
+        present(alert, animated: true)
+        return alert
+    }
+
+    private func shareURL(_ url: URL) {
+        let share = UIActivityViewController(activityItems: [url], applicationActivities: nil)
+        share.popoverPresentationController?.barButtonItem = navigationItem.rightBarButtonItems?.first
+        present(share, animated: true)
+    }
+
+    private func showInfo(title: String, message: String) {
+        let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "OK", style: .default))
+        present(alert, animated: true)
+    }
+}
+
+// MARK: - Music file picking
+
+extension VideoEditorViewController: UIDocumentPickerDelegate {
+
+    func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+        guard let url = urls.first else { return }
+        // `asCopy: true` hands us a copy inside our own container, so no
+        // security-scoped bookmark dance is needed.
+        viewModel.setMusic(assetID: UUID(), asset: AVURLAsset(url: url))
+        Haptics.tap()
+        showToast("Music added")
+    }
+}
