@@ -87,6 +87,39 @@ final class VideoCompositionMathTests: XCTestCase {
         XCTAssertEqual(VideoCompositionMath.effectiveVolume(isMuted: false, volume: 0.5), 0.5, accuracy: 1e-6)
     }
 
+    // MARK: - Aspect-fill + crop (hardening #4)
+
+    func testAspectFillUsesMaxScaleToCover() {
+        // A wide 200×100 source into a tall 100×200 cell must scale by 2 (cover),
+        // not by 0.5 (fit).
+        let t = VideoCompositionMath.aspectFillTransform(
+            source: CGSize(width: 200, height: 100), in: CGRect(x: 0, y: 0, width: 100, height: 200))
+        XCTAssertEqual(t.a, 2, accuracy: 1e-6, "cover scale = max(w,h ratios)")
+    }
+
+    func testAspectFillCentresTheSourceOnTheCell() {
+        let cell = CGRect(x: 40, y: 60, width: 100, height: 100)
+        let source = CGSize(width: 200, height: 100)
+        let t = VideoCompositionMath.aspectFillTransform(source: source, in: cell)
+        let centre = CGPoint(x: source.width / 2, y: source.height / 2).applying(t)
+        XCTAssertEqual(centre.x, cell.midX, accuracy: 1e-6)
+        XCTAssertEqual(centre.y, cell.midY, accuracy: 1e-6)
+    }
+
+    func testFillCropRectIsTheCentredCellAspectSubRect() {
+        // Wide source, square cell → keep the centre square of the source.
+        let crop = VideoCompositionMath.fillCropRect(
+            source: CGSize(width: 200, height: 100), cellAspect: 1)
+        XCTAssertEqual(crop, CGRect(x: 50, y: 0, width: 100, height: 100))
+    }
+
+    func testFillCropRectForTallCellKeepsACentreColumn() {
+        // Square source, tall (1:2) cell → keep the centre half-width column.
+        let crop = VideoCompositionMath.fillCropRect(
+            source: CGSize(width: 100, height: 100), cellAspect: 0.5)
+        XCTAssertEqual(crop, CGRect(x: 25, y: 0, width: 50, height: 100))
+    }
+
     // MARK: - Render-size mapping (slice 6d / export resolution)
 
     func testRenderMapIsIdentityWhenSizesMatch() {

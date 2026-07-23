@@ -31,6 +31,12 @@ import Foundation
 /// read-only here (never mutated) — the same carry-across-isolation idiom as
 /// `VideoAssetLoader.SendableBox` and the exporter's `ExportContext`.
 public struct VideoCompositionCell: @unchecked Sendable {
+
+    /// How a clip fits its cell. `.fill` (default) covers the cell edge-to-edge and
+    /// crops the overflow — the collage look. `.fit` letterboxes to show the whole
+    /// frame.
+    public enum ContentMode: Sendable { case fill, fit }
+
     public let asset: AVAsset
     /// Absolute canvas-pixel frame this cell occupies (top-left origin).
     public let frame: CGRect
@@ -40,6 +46,7 @@ public struct VideoCompositionCell: @unchecked Sendable {
     public var volume: Double
     /// Optional intro animation for this cell (applied via layer-instruction ramps).
     public var transition: CellTransition?
+    public var contentMode: ContentMode
 
     public init(
         asset: AVAsset,
@@ -48,7 +55,8 @@ public struct VideoCompositionCell: @unchecked Sendable {
         isLooping: Bool = false,
         isMuted: Bool = false,
         volume: Double = 1,
-        transition: CellTransition? = nil
+        transition: CellTransition? = nil,
+        contentMode: ContentMode = .fill
     ) {
         self.asset = asset
         self.frame = frame
@@ -57,6 +65,7 @@ public struct VideoCompositionCell: @unchecked Sendable {
         self.isMuted = isMuted
         self.volume = volume
         self.transition = transition
+        self.contentMode = contentMode
     }
 }
 
@@ -168,8 +177,21 @@ extension VideoComposer {
             // resolution (identity when rendering at the canvas size).
             let mappedFrame = VideoCompositionMath.renderMappedRect(
                 item.cell.frame, canvas: canvasSize, render: output)
-            let transform = VideoCompositionMath.aspectFitTransform(
-                source: item.naturalSize, in: mappedFrame)
+            let transform: CGAffineTransform
+            switch item.cell.contentMode {
+            case .fill:
+                // Cover the cell, then crop the overflow to the cell's aspect so it
+                // can't bleed into a neighbour (centred crop → origin-flip-safe).
+                transform = VideoCompositionMath.aspectFillTransform(
+                    source: item.naturalSize, in: mappedFrame)
+                let cellAspect = mappedFrame.height > 0 ? mappedFrame.width / mappedFrame.height : 1
+                layer.setCropRectangle(
+                    VideoCompositionMath.fillCropRect(source: item.naturalSize, cellAspect: cellAspect),
+                    at: .zero)
+            case .fit:
+                transform = VideoCompositionMath.aspectFitTransform(
+                    source: item.naturalSize, in: mappedFrame)
+            }
             applyPlacement(transform, transition: item.cell.transition,
                            cellFrame: mappedFrame, clipDuration: item.range.duration,
                            timescale: ts, to: layer)

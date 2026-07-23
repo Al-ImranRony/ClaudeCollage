@@ -412,6 +412,47 @@ final class VideoCompositionTests: XCTestCase {
         }
     }
 
+    // MARK: - Aspect-fill + crop (quality-hardening #4)
+
+    /// A solid-colour video at an explicit (possibly non-square) size.
+    private func makeSolidVideoSized(_ size: CGSize, r: UInt8, g: UInt8, b: UInt8,
+                                     seconds: Double = 1) async throws -> URL {
+        let url = tempURL(ext: "mp4")
+        let image = solidImage(Int(size.width), r: r, g: g, b: b)   // colour is what matters
+        try await VideoComposer().renderSlideshow(frames: [image], size: size,
+                                                  secondsPerFrame: seconds, to: url)
+        return url
+    }
+
+    func testFillCoversTheCellWithNoLetterbox() async throws {
+        // A wide 320×160 source in a tall 80×160 cell: aspect-FIT would leave black
+        // bars top and bottom; aspect-FILL must cover the whole cell.
+        let wide = try await makeSolidVideoSized(CGSize(width: 320, height: 160), r: 230, g: 30, b: 30)
+        let cell = VideoCompositionCell(asset: AVURLAsset(url: wide),
+                                        frame: CGRect(x: 0, y: 0, width: 80, height: 160))
+        let bundle = try await VideoComposer().buildComposition(cells: [cell], canvasSize: sq(160))
+        // Top and bottom of the cell — the letterbox zones under fit.
+        let top = try await compositedPixel(bundle, x: 40, y: 8)
+        let bottom = try await compositedPixel(bundle, x: 40, y: 152)
+        XCTAssertGreaterThan(top.r, 150, "cell top is covered by video, not a black bar")
+        XCTAssertGreaterThan(bottom.r, 150, "cell bottom is covered too")
+    }
+
+    func testFilledCellDoesNotOverflowIntoItsNeighbour() async throws {
+        // Left cell filled with a wide red source; right cell blue. If fill didn't
+        // crop, the scaled-up red would bleed past the divider into the right cell.
+        let wideRed = try await makeSolidVideoSized(CGSize(width: 320, height: 160), r: 230, g: 30, b: 30)
+        let blue = try await makeSolidVideoSized(CGSize(width: 160, height: 160), r: 30, g: 30, b: 230)
+        let cells = [
+            VideoCompositionCell(asset: AVURLAsset(url: wideRed), frame: CGRect(x: 0, y: 0, width: 80, height: 160)),
+            VideoCompositionCell(asset: AVURLAsset(url: blue), frame: CGRect(x: 80, y: 0, width: 80, height: 160))
+        ]
+        let bundle = try await VideoComposer().buildComposition(cells: cells, canvasSize: sq(160))
+        let rightNearDivider = try await compositedPixel(bundle, x: 88, y: 80)  // just inside the right cell
+        XCTAssertGreaterThan(rightNearDivider.b, 150, "right cell stays blue")
+        XCTAssertLessThan(rightNearDivider.r, 90, "the filled left cell is cropped — no red bleed")
+    }
+
     // MARK: - Export render size (quality-hardening #1)
 
     func testBuildRespectsAnExplicitRenderSize() async throws {

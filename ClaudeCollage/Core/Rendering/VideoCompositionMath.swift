@@ -30,6 +30,36 @@ public enum VideoCompositionMath {
         return CGAffineTransform(a: scale, b: 0, c: 0, d: scale, tx: tx, ty: ty)
     }
 
+    /// Aspect-FILL: scale a source to COVER the cell (max scale) and centre it.
+    /// Pair with `fillCropRect` as the layer crop rectangle so the overflow doesn't
+    /// spill into neighbouring cells. This is the default for a collage cell —
+    /// edge-to-edge like VSCO / SCRL — versus the letterboxing `aspectFitTransform`.
+    public static func aspectFillTransform(source: CGSize, in cell: CGRect) -> CGAffineTransform {
+        guard source.width > 0, source.height > 0 else { return .identity }
+        let scale = max(cell.width / source.width, cell.height / source.height)
+        let scaledW = source.width * scale
+        let scaledH = source.height * scale
+        return CGAffineTransform(a: scale, b: 0, c: 0, d: scale,
+                                 tx: cell.midX - scaledW / 2, ty: cell.midY - scaledH / 2)
+    }
+
+    /// The centred sub-rectangle of `source` (in source pixels) matching the cell's
+    /// aspect ratio — the region kept when filling. Symmetric about the source
+    /// centre, so it is invariant to the crop-rectangle's coordinate-origin
+    /// convention. Used as the layer instruction's crop rectangle.
+    public static func fillCropRect(source: CGSize, cellAspect: CGFloat) -> CGRect {
+        guard source.width > 0, source.height > 0, cellAspect > 0 else {
+            return CGRect(origin: .zero, size: source)
+        }
+        if source.width / source.height > cellAspect {
+            let width = source.height * cellAspect          // wider than the cell → crop the sides
+            return CGRect(x: (source.width - width) / 2, y: 0, width: width, height: source.height)
+        } else {
+            let height = source.width / cellAspect          // taller than the cell → crop top/bottom
+            return CGRect(x: 0, y: (source.height - height) / 2, width: source.width, height: height)
+        }
+    }
+
     /// The composition duration is the longest cell; shorter cells either loop to
     /// fill it or simply end early (leaving background).
     public static func compositionDuration(cellDurations: [Double]) -> Double {
