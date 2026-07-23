@@ -55,6 +55,23 @@ public struct VideoCompositionCell {
     }
 }
 
+/// The optional background-music track to mix under the cells. The resolved
+/// `AVAsset` is the builder input; the persisted counterpart is
+/// `BackgroundMusicState` (the editor resolves `musicID` → asset).
+public struct BackgroundMusic {
+    public let asset: AVAsset
+    /// In/out selection within the source audio (unset end ⇒ whole track).
+    public var trim: VideoTrim
+    /// Music level, 0…1.
+    public var volume: Double
+
+    public init(asset: AVAsset, trim: VideoTrim = VideoTrim(), volume: Double = 1) {
+        self.asset = asset
+        self.trim = trim
+        self.volume = volume
+    }
+}
+
 /// The assembled composition + its video composition (per-cell layout/transform)
 /// + audio mix (per-cell mute/volume), ready to preview or export.
 ///
@@ -87,6 +104,7 @@ extension VideoComposer {
     public func buildComposition(
         cells: [VideoCompositionCell],
         canvasSize: CGSize,
+        music: BackgroundMusic? = nil,
         textOverlays: [TextOverlay] = [],
         stickerOverlays: [StickerOverlay] = [],
         textFontScale: CGFloat = 1,
@@ -148,6 +166,27 @@ extension VideoComposer {
             }
         }
 
+        // 4) Optional background music: its own composition audio track, trimmed
+        //    to the composition duration (no loop v1 — a shorter track just ends),
+        //    levelled through the audio mix at its own gain.
+        if let music,
+           let musicSource = try await music.asset.loadTracks(withMediaType: .audio).first {
+            let musicAssetDuration = try await music.asset.load(.duration).seconds
+            let musicTrim = music.trim.clamped(toAssetDuration: musicAssetDuration)
+            let insertSeconds = min(musicTrim.duration, totalSeconds)
+            if insertSeconds > 0,
+               let musicTrack = composition.addMutableTrack(withMediaType: .audio,
+                                                            preferredTrackID: kCMPersistentTrackID_Invalid) {
+                let musicRange = CMTimeRange(
+                    start: CMTime(seconds: musicTrim.start, preferredTimescale: ts),
+                    duration: CMTime(seconds: insertSeconds, preferredTimescale: ts))
+                try? musicTrack.insertTimeRange(musicRange, of: musicSource, at: .zero)
+                let params = AVMutableAudioMixInputParameters(track: musicTrack)
+                params.setVolume(Float(min(1, max(0, music.volume))), at: .zero)
+                audioParameters.append(params)
+            }
+        }
+
         let instruction = AVMutableVideoCompositionInstruction()
         instruction.timeRange = CMTimeRange(start: .zero, duration: total)
         instruction.layerInstructions = layerInstructions
@@ -191,8 +230,10 @@ extension VideoComposer {
     /// `AVAssetReaderVideoCompositionOutput` → `AVAssetWriter` path (no
     /// `AVAssetExportSession`, preserving fidelity per slice 1). Text/sticker
     /// overlays (`bundle.overlayImage`) are drawn onto each composited frame at
-    /// write-time. Video-only for now; muxing the audio mix arrives with the export
-    /// UX slice. Runs the blocking pull loop on a private queue, bridged to async.
+    /// write-time. When the composition carries audio (cell audio and/or background
+    /// music), the `bundle.audioMix` is decoded through an `AVAssetReaderAudioMixOutput`
+    /// and muxed into the file via an AAC audio input. Runs the blocking pull loop on
+    /// a private queue, bridged to async.
     public func export(
         bundle: VideoCompositionBundle,
         codec: ExportSettings.VideoCodec = .h264,
@@ -203,6 +244,7 @@ extension VideoComposer {
         try? FileManager.default.removeItem(at: url)
         let tracks = try await bundle.composition.loadTracks(withMediaType: .video)
         guard !tracks.isEmpty else { throw ComposerError.noFrames }
+        let audioTracks = try await bundle.composition.loadTracks(withMediaType: .audio)
 
         let width = Int(bundle.renderSize.width.rounded())
         let height = Int(bundle.renderSize.height.rounded())
@@ -230,8 +272,31 @@ extension VideoComposer {
         guard writer.canAdd(writerInput) else { throw ComposerError.writerSetupFailed }
         writer.add(writerInput)
 
+        // Audio: decode the composition's audio tracks through the mix (stereo LPCM)
+        // and re-encode to AAC. Skipped entirely when there is no source audio, so a
+        // silent slideshow stays video-only exactly as before.
+        var audioOutput: AVAssetReaderAudioMixOutput?
+        var audioInput: AVAssetWriterInput?
+        if !audioTracks.isEmpty {
+            let output = AVAssetReaderAudioMixOutput(
+                audioTracks: audioTracks, audioSettings: Self.pcmReaderSettings)
+            output.audioMix = bundle.audioMix
+            if reader.canAdd(output) {
+                reader.add(output)
+                let input = AVAssetWriterInput(mediaType: .audio, outputSettings: Self.aacWriterSettings)
+                input.expectsMediaDataInRealTime = false
+                if writer.canAdd(input) {
+                    writer.add(input)
+                    audioOutput = output
+                    audioInput = input
+                }
+            }
+        }
+
         let context = ExportContext(reader: reader, output: readerOutput, writer: writer,
-                                    input: writerInput, adaptor: adaptor, overlay: bundle.overlayImage,
+                                    input: writerInput, adaptor: adaptor,
+                                    audioOutput: audioOutput, audioInput: audioInput,
+                                    overlay: bundle.overlayImage,
                                     width: width, height: height, duration: bundle.duration.seconds)
         let exportQueue = DispatchQueue(label: "com.devron.claudecollage.videoexport")
         try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
@@ -242,6 +307,33 @@ extension VideoComposer {
         }
     }
 
+    /// Stereo 16-bit LPCM — the audio-mix output must decode to PCM for the mix
+    /// gains to apply; an explicit stereo layout keeps mono sources well-defined.
+    private static var pcmReaderSettings: [String: Any] {
+        var stereo = AudioChannelLayout()
+        stereo.mChannelLayoutTag = kAudioChannelLayoutTag_Stereo
+        let layout = Data(bytes: &stereo, count: MemoryLayout<AudioChannelLayout>.size)
+        return [
+            AVFormatIDKey: kAudioFormatLinearPCM,
+            AVLinearPCMBitDepthKey: 16,
+            AVLinearPCMIsFloatKey: false,
+            AVLinearPCMIsBigEndianKey: false,
+            AVLinearPCMIsNonInterleaved: false,
+            AVSampleRateKey: 44_100,
+            AVNumberOfChannelsKey: 2,
+            AVChannelLayoutKey: layout
+        ]
+    }
+
+    private static var aacWriterSettings: [String: Any] {
+        [
+            AVFormatIDKey: kAudioFormatMPEG4AAC,
+            AVNumberOfChannelsKey: 2,
+            AVSampleRateKey: 44_100,
+            AVEncoderBitRateKey: 128_000
+        ]
+    }
+
     /// Carries the non-Sendable reader/writer objects into the export queue. Safe:
     /// they're used only on that queue, never concurrently.
     private struct ExportContext: @unchecked Sendable {
@@ -250,35 +342,67 @@ extension VideoComposer {
         let writer: AVAssetWriter
         let input: AVAssetWriterInput
         let adaptor: AVAssetWriterInputPixelBufferAdaptor
+        let audioOutput: AVAssetReaderAudioMixOutput?
+        let audioInput: AVAssetWriterInput?
         let overlay: CGImage?
         let width: Int
         let height: Int
         let duration: Double
     }
 
+    /// Drains the reader's video (and optional audio) outputs into the writer,
+    /// interleaving both on this single queue: each input is fed whenever it is
+    /// ready, so neither backs up. Video frames get the overlay drawn in place
+    /// before append; audio samples pass through re-encoded by the AAC input.
     private static func runExport(_ ctx: ExportContext, progress: (@Sendable (Float) -> Void)?) throws {
         guard ctx.reader.startReading() else { throw ctx.reader.error ?? ComposerError.writeFailed }
         guard ctx.writer.startWriting() else { throw ctx.writer.error ?? ComposerError.writerSetupFailed }
         ctx.writer.startSession(atSourceTime: .zero)
 
-        while true {
-            while !ctx.input.isReadyForMoreMediaData { Thread.sleep(forTimeInterval: 0.003) }
-            guard let sample = ctx.output.copyNextSampleBuffer() else { break }
-            let pts = CMSampleBufferGetPresentationTimeStamp(sample)
-            guard let buffer = CMSampleBufferGetImageBuffer(sample) else { continue }
-            if let overlay = ctx.overlay {
-                drawOverlay(overlay, into: buffer, width: ctx.width, height: ctx.height)
+        var videoDone = false
+        var audioDone = (ctx.audioInput == nil)
+
+        while !videoDone || !audioDone {
+            var progressed = false
+
+            if !videoDone, ctx.input.isReadyForMoreMediaData {
+                if let sample = ctx.output.copyNextSampleBuffer() {
+                    let pts = CMSampleBufferGetPresentationTimeStamp(sample)
+                    if let buffer = CMSampleBufferGetImageBuffer(sample) {
+                        if let overlay = ctx.overlay {
+                            drawOverlay(overlay, into: buffer, width: ctx.width, height: ctx.height)
+                        }
+                        if !ctx.adaptor.append(buffer, withPresentationTime: pts) {
+                            ctx.reader.cancelReading(); ctx.writer.cancelWriting()
+                            throw ctx.writer.error ?? ComposerError.writeFailed
+                        }
+                        if ctx.duration > 0 { progress?(Float(min(1, pts.seconds / ctx.duration))) }
+                    }
+                    progressed = true
+                } else {
+                    ctx.input.markAsFinished()
+                    videoDone = true
+                }
             }
-            if !ctx.adaptor.append(buffer, withPresentationTime: pts) {
-                ctx.reader.cancelReading()
-                ctx.writer.cancelWriting()
-                throw ctx.writer.error ?? ComposerError.writeFailed
+
+            if !audioDone, let audioInput = ctx.audioInput, let audioOutput = ctx.audioOutput,
+               audioInput.isReadyForMoreMediaData {
+                if let sample = audioOutput.copyNextSampleBuffer() {
+                    if !audioInput.append(sample) {
+                        ctx.reader.cancelReading(); ctx.writer.cancelWriting()
+                        throw ctx.writer.error ?? ComposerError.writeFailed
+                    }
+                    progressed = true
+                } else {
+                    audioInput.markAsFinished()
+                    audioDone = true
+                }
             }
-            if ctx.duration > 0 { progress?(Float(min(1, pts.seconds / ctx.duration))) }
+
+            if !progressed { Thread.sleep(forTimeInterval: 0.003) }
         }
 
         if ctx.reader.status == .failed { throw ctx.reader.error ?? ComposerError.writeFailed }
-        ctx.input.markAsFinished()
         let sema = DispatchSemaphore(value: 0)
         ctx.writer.finishWriting { sema.signal() }
         sema.wait()

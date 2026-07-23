@@ -245,6 +245,67 @@ final class VideoCompositionTests: XCTestCase {
         XCTAssertGreaterThan(right.b, 150); XCTAssertLessThan(right.r, 90)
     }
 
+    // MARK: - Audio muxing into export (slice 5a)
+
+    func testExportMuxesCellAudioTrack() async throws {
+        // A cell whose source carries audio → the exported file has an audio track
+        // (slice 4 export was video-only).
+        let av = try await makeSilentAudioVideo(seconds: 1)
+        let cell = VideoCompositionCell(asset: AVURLAsset(url: av), frame: unit(160))
+        let bundle = try await VideoComposer().buildComposition(cells: [cell], canvasSize: sq(160))
+        let out = tempURL(ext: "mp4")
+        try await VideoComposer().export(bundle: bundle, to: out)
+        let audio = try await AVURLAsset(url: out).loadTracks(withMediaType: .audio)
+        XCTAssertEqual(audio.count, 1, "cell audio is muxed into the exported file")
+    }
+
+    func testBackgroundMusicMixesIntoExport() async throws {
+        // A silent-source video (no cell audio) + a background-music track → the
+        // export carries audible audio that can only have come from the music.
+        let silent = try await makeSolidVideo(r: 200, g: 200, b: 200, seconds: 1)  // no audio
+        let music = try await makeToneAudio(seconds: 2)
+        let cell = VideoCompositionCell(asset: AVURLAsset(url: silent), frame: unit(160))
+        let bundle = try await VideoComposer().buildComposition(
+            cells: [cell], canvasSize: sq(160),
+            music: BackgroundMusic(asset: AVURLAsset(url: music), volume: 1))
+        let out = tempURL(ext: "mp4")
+        try await VideoComposer().export(bundle: bundle, to: out)
+
+        let audio = try await AVURLAsset(url: out).loadTracks(withMediaType: .audio)
+        XCTAssertEqual(audio.count, 1, "background music is muxed even when cells are silent")
+        let rms = try await audioRMS(out)
+        XCTAssertGreaterThan(rms, 0.02, "the music tone is audible in the export")
+    }
+
+    func testBackgroundMusicVolumeZeroIsSilent() async throws {
+        let silent = try await makeSolidVideo(r: 200, g: 200, b: 200, seconds: 1)
+        let music = try await makeToneAudio(seconds: 2)
+        let cell = VideoCompositionCell(asset: AVURLAsset(url: silent), frame: unit(160))
+        let bundle = try await VideoComposer().buildComposition(
+            cells: [cell], canvasSize: sq(160),
+            music: BackgroundMusic(asset: AVURLAsset(url: music), volume: 0))
+        let out = tempURL(ext: "mp4")
+        try await VideoComposer().export(bundle: bundle, to: out)
+        let rms = try await audioRMS(out)
+        XCTAssertLessThan(rms, 0.01, "music mixed at 0 gain → (near) silent export")
+    }
+
+    func testBackgroundMusicAddsTrackTrimmedToDuration() async throws {
+        // Music longer than the composition is trimmed to the composition duration,
+        // and rides the audio mix at its own gain — even with silent cells.
+        let video = try await makeSolidVideo(r: 100, g: 100, b: 100, seconds: 1)  // 1s → duration
+        let music = try await makeToneAudio(seconds: 5)                            // 5s → trimmed
+        let cell = VideoCompositionCell(asset: AVURLAsset(url: video), frame: unit(160))
+        let bundle = try await VideoComposer().buildComposition(
+            cells: [cell], canvasSize: sq(160),
+            music: BackgroundMusic(asset: AVURLAsset(url: music), volume: 0.5))
+        let audio = try await bundle.composition.loadTracks(withMediaType: .audio)
+        XCTAssertEqual(audio.count, 1, "music track added even though the cell has no audio")
+        let dur = try await audio[0].load(.timeRange).duration.seconds
+        XCTAssertEqual(dur, bundle.duration.seconds, accuracy: 0.1, "music trimmed to composition duration")
+        XCTAssertEqual(bundle.audioMix.inputParameters.count, 1, "music gets a mix parameter")
+    }
+
     // MARK: - Fixtures & helpers
 
     private func firstLayerInstruction(_ bundle: VideoCompositionBundle) -> AVVideoCompositionLayerInstruction? {
@@ -337,6 +398,111 @@ final class VideoCompositionTests: XCTestCase {
             writer.finishWriting { c.resume() }
         }
         return url
+    }
+
+    /// An audio-only file carrying a real (non-silent) sine tone, so the
+    /// background-music path has something audible to mix and read back.
+    private func makeToneAudio(seconds: Double, frequency: Double = 440) async throws -> URL {
+        let url = tempURL(ext: "m4a")
+        try? FileManager.default.removeItem(at: url)
+        let sampleRate = 44_100.0
+        let writer = try AVAssetWriter(url: url, fileType: .m4a)
+        let aInput = AVAssetWriterInput(mediaType: .audio, outputSettings: [
+            AVFormatIDKey: kAudioFormatMPEG4AAC, AVNumberOfChannelsKey: 1,
+            AVSampleRateKey: sampleRate, AVEncoderBitRateKey: 96_000])
+        aInput.expectsMediaDataInRealTime = false
+        writer.add(aInput)
+        guard writer.startWriting() else { throw writer.error ?? NSError(domain: "fixture", code: 2) }
+        writer.startSession(atSourceTime: .zero)
+
+        let chunk = 1024
+        let total = Int(seconds * sampleRate)
+        var written = 0
+        while written < total {
+            while !aInput.isReadyForMoreMediaData { try? await Task.sleep(nanoseconds: 2_000_000) }
+            let n = min(chunk, total - written)
+            guard let sb = toneBuffer(sampleRate: sampleRate, frames: n, startFrame: written,
+                                      frequency: frequency,
+                                      pts: CMTime(value: Int64(written), timescale: Int32(sampleRate))) else { break }
+            aInput.append(sb)
+            written += n
+        }
+        aInput.markAsFinished()
+        await withCheckedContinuation { (c: CheckedContinuation<Void, Never>) in
+            writer.finishWriting { c.resume() }
+        }
+        return url
+    }
+
+    private func toneBuffer(sampleRate: Double, frames: Int, startFrame: Int,
+                            frequency: Double, pts: CMTime) -> CMSampleBuffer? {
+        var asbd = AudioStreamBasicDescription(
+            mSampleRate: sampleRate, mFormatID: kAudioFormatLinearPCM,
+            mFormatFlags: kAudioFormatFlagIsSignedInteger | kAudioFormatFlagIsPacked,
+            mBytesPerPacket: 2, mFramesPerPacket: 1, mBytesPerFrame: 2,
+            mChannelsPerFrame: 1, mBitsPerChannel: 16, mReserved: 0)
+        var format: CMAudioFormatDescription?
+        guard CMAudioFormatDescriptionCreate(allocator: kCFAllocatorDefault, asbd: &asbd, layoutSize: 0,
+                                             layout: nil, magicCookieSize: 0, magicCookie: nil,
+                                             extensions: nil, formatDescriptionOut: &format) == noErr,
+              let format else { return nil }
+        var samples = [Int16](repeating: 0, count: frames)
+        let amp = 0.6 * Double(Int16.max)
+        for i in 0..<frames {
+            let t = Double(startFrame + i) / sampleRate
+            samples[i] = Int16(amp * sin(2 * .pi * frequency * t))
+        }
+        let dataSize = frames * 2
+        var block: CMBlockBuffer?
+        guard CMBlockBufferCreateWithMemoryBlock(allocator: kCFAllocatorDefault, memoryBlock: nil,
+                                                 blockLength: dataSize, blockAllocator: kCFAllocatorDefault,
+                                                 customBlockSource: nil, offsetToData: 0, dataLength: dataSize,
+                                                 flags: kCMBlockBufferAssureMemoryNowFlag,
+                                                 blockBufferOut: &block) == kCMBlockBufferNoErr,
+              let block else { return nil }
+        _ = samples.withUnsafeBytes { raw in
+            CMBlockBufferReplaceDataBytes(with: raw.baseAddress!, blockBuffer: block,
+                                          offsetIntoDestination: 0, dataLength: dataSize)
+        }
+        var sample: CMSampleBuffer?
+        var timing = CMSampleTimingInfo(duration: CMTime(value: 1, timescale: Int32(sampleRate)),
+                                        presentationTimeStamp: pts, decodeTimeStamp: .invalid)
+        var sizeArr = [2]
+        guard CMSampleBufferCreateReady(allocator: kCFAllocatorDefault, dataBuffer: block,
+                                        formatDescription: format, sampleCount: frames,
+                                        sampleTimingEntryCount: 1, sampleTimingArray: &timing,
+                                        sampleSizeEntryCount: 1, sampleSizeArray: &sizeArr,
+                                        sampleBufferOut: &sample) == noErr else { return nil }
+        return sample
+    }
+
+    /// Decodes the exported file's audio track to 16-bit PCM and returns its RMS
+    /// amplitude in 0…1 — a proxy for "is there audible sound in the export?".
+    private func audioRMS(_ url: URL) async throws -> Double {
+        let asset = AVURLAsset(url: url)
+        guard let track = try await asset.loadTracks(withMediaType: .audio).first else { return 0 }
+        let reader = try AVAssetReader(asset: asset)
+        let output = AVAssetReaderTrackOutput(track: track, outputSettings: [
+            AVFormatIDKey: kAudioFormatLinearPCM,
+            AVLinearPCMBitDepthKey: 16, AVLinearPCMIsFloatKey: false,
+            AVLinearPCMIsBigEndianKey: false, AVLinearPCMIsNonInterleaved: false])
+        reader.add(output)
+        reader.startReading()
+        var sumSquares = 0.0
+        var count = 0
+        while let sample = output.copyNextSampleBuffer() {
+            guard let block = CMSampleBufferGetDataBuffer(sample) else { continue }
+            let length = CMBlockBufferGetDataLength(block)
+            var data = [Int16](repeating: 0, count: length / 2)
+            CMBlockBufferCopyDataBytes(block, atOffset: 0, dataLength: length, destination: &data)
+            for v in data {
+                let n = Double(v) / Double(Int16.max)
+                sumSquares += n * n
+            }
+            count += data.count
+        }
+        guard count > 0 else { return 0 }
+        return (sumSquares / Double(count)).squareRoot()
     }
 
     private func pixelBuffer(from image: CGImage, side: Int) -> CVPixelBuffer? {
