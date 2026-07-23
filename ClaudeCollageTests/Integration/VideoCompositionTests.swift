@@ -306,6 +306,81 @@ final class VideoCompositionTests: XCTestCase {
         XCTAssertEqual(bundle.audioMix.inputParameters.count, 1, "music gets a mix parameter")
     }
 
+    // MARK: - Archiving a non-file-backed asset (slice 5d)
+
+    /// Photos hands back slo-mo clips as an `AVComposition`, which has no file URL,
+    /// so it can't be copied into a project on save. `AVMutableComposition` is the
+    /// same shape of thing, and stands in for it headlessly here.
+    private func makeNonFileBackedAsset(from url: URL, withAudio: Bool = false) async throws -> AVAsset {
+        let source = AVURLAsset(url: url)
+        let duration = try await source.load(.duration)
+        let composition = AVMutableComposition()
+        if let videoTrack = try await source.loadTracks(withMediaType: .video).first,
+           let track = composition.addMutableTrack(withMediaType: .video,
+                                                   preferredTrackID: kCMPersistentTrackID_Invalid) {
+            try track.insertTimeRange(CMTimeRange(start: .zero, duration: duration),
+                                      of: videoTrack, at: .zero)
+        }
+        if withAudio, let audioTrack = try await source.loadTracks(withMediaType: .audio).first,
+           let track = composition.addMutableTrack(withMediaType: .audio,
+                                                   preferredTrackID: kCMPersistentTrackID_Invalid) {
+            try track.insertTimeRange(CMTimeRange(start: .zero, duration: duration),
+                                      of: audioTrack, at: .zero)
+        }
+        return composition
+    }
+
+    func testArchiveWritesAPlayableFileFromANonFileBackedAsset() async throws {
+        let source = try await makeSolidVideo(r: 225, g: 35, b: 35, seconds: 1)
+        let asset = try await makeNonFileBackedAsset(from: source)
+        XCTAssertNil(asset as? AVURLAsset, "the stand-in really has no file URL")
+
+        let out = tempURL(ext: "mp4")
+        try await VideoComposer().archive(asset: asset, to: out)
+
+        XCTAssertTrue(FileManager.default.fileExists(atPath: out.path))
+        let archived = AVURLAsset(url: out)
+        let tracks = try await archived.loadTracks(withMediaType: .video)
+        XCTAssertEqual(tracks.count, 1, "the archived file carries the video")
+        let pixel = try await filePixel(out, x: 80, y: 80)
+        XCTAssertGreaterThan(pixel.r, 150, "the archived frames are the source frames")
+        XCTAssertLessThan(pixel.b, 90)
+    }
+
+    func testArchivePreservesDuration() async throws {
+        let source = try await makeSolidVideo(r: 90, g: 90, b: 200, seconds: 2)
+        let asset = try await makeNonFileBackedAsset(from: source)
+        let out = tempURL(ext: "mp4")
+        try await VideoComposer().archive(asset: asset, to: out)
+
+        let duration = try await AVURLAsset(url: out).load(.duration).seconds
+        XCTAssertEqual(duration, 2.0, accuracy: 0.2, "archiving keeps the clip's length")
+    }
+
+    func testArchiveKeepsAudio() async throws {
+        let source = try await makeSilentAudioVideo(seconds: 1)
+        let asset = try await makeNonFileBackedAsset(from: source, withAudio: true)
+        let out = tempURL(ext: "mp4")
+        try await VideoComposer().archive(asset: asset, to: out)
+
+        let audio = try await AVURLAsset(url: out).loadTracks(withMediaType: .audio)
+        XCTAssertEqual(audio.count, 1, "the clip's audio survives archiving")
+    }
+
+    func testArchiveIsCancellable() async throws {
+        let source = try await makeSolidVideo(r: 10, g: 10, b: 10, seconds: 1)
+        let asset = try await makeNonFileBackedAsset(from: source)
+        let out = tempURL(ext: "mp4")
+        let token = ExportCancellationToken()
+        token.cancel()
+        do {
+            try await VideoComposer().archive(asset: asset, to: out, cancellation: token)
+            XCTFail("a cancelled archive must not complete")
+        } catch let error as VideoComposer.ComposerError {
+            XCTAssertEqual(error, .cancelled)
+        }
+    }
+
     // MARK: - Cancellation (slice 6a)
 
     func testCancelledExportThrowsCancelledAndLeavesNoFile() async throws {

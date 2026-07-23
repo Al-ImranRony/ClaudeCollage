@@ -25,8 +25,13 @@ import UniformTypeIdentifiers
 final class VideoSourcePicker: NSObject, PHPickerViewControllerDelegate {
 
     private let completion: (AVAsset?) -> Void
+    /// Fired (main actor) when the picked clip has to be transcoded before it can
+    /// be used — see `normalized(_:)`. The host shows progress; it can take a few
+    /// seconds for a long slo-mo clip.
+    private let willTranscode: (() -> Void)?
 
-    init(completion: @escaping (AVAsset?) -> Void) {
+    init(willTranscode: (() -> Void)? = nil, completion: @escaping (AVAsset?) -> Void) {
+        self.willTranscode = willTranscode
         self.completion = completion
     }
 
@@ -62,11 +67,38 @@ final class VideoSourcePicker: NSObject, PHPickerViewControllerDelegate {
         Task { @MainActor in
             do {
                 let asset = try await VideoAssetLoader().loadAsset(for: phAsset)
-                completion(asset)
+                completion(try await normalized(asset))
             } catch {
                 completion(nil)
             }
         }
+    }
+
+    /// Guarantees the returned asset is **file-backed**.
+    ///
+    /// Photos returns slo-mo (and other adjusted) videos as an `AVComposition`,
+    /// which has no URL — nothing for `ProjectStore` to copy into the project, so
+    /// the cell would resume empty. Those get archived to a real file first, which
+    /// bakes in the slow-motion timing and keeps the rest of the pipeline unaware
+    /// that this case exists. Ordinary clips pass straight through untouched.
+    private func normalized(_ asset: AVAsset) async throws -> AVAsset {
+        if asset is AVURLAsset { return asset }
+        willTranscode?()
+        let destination = FileManager.default.temporaryDirectory
+            .appendingPathComponent("VideoCell-\(UUID().uuidString).mp4")
+        try await Self.archive(AssetBox(asset), to: destination)
+        return AVURLAsset(url: destination)
+    }
+
+    /// Carries the non-Sendable `AVAsset` out to the nonisolated composer (the same
+    /// idiom as `VideoAssetLoader.SendableBox`); it is only read there.
+    private struct AssetBox: @unchecked Sendable {
+        let asset: AVAsset
+        init(_ asset: AVAsset) { self.asset = asset }
+    }
+
+    private static func archive(_ box: AssetBox, to url: URL) async throws {
+        try await VideoComposer().archive(asset: box.asset, to: url)
     }
 
     // MARK: - Route 2 — copy the file out of the picker sandbox

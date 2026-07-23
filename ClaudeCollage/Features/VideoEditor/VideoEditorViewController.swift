@@ -304,14 +304,32 @@ final class VideoEditorViewController: UIViewController {
 
     private func presentVideoPicker(for index: Int) {
         pendingCellIndex = index
-        let picker = VideoSourcePicker { [weak self] asset in
-            guard let self else { return }
-            self.videoPicker = nil
-            guard let asset, let cellIndex = self.pendingCellIndex else { return }
-            self.pendingCellIndex = nil
-            self.viewModel.setVideo(assetID: UUID(), asset: asset, forCellAt: cellIndex)
-            Haptics.tap()
-        }
+        // A slo-mo clip has to be transcoded to a real file before it can be used
+        // (see VideoSourcePicker.normalized) — that can take a few seconds, so it
+        // gets the same progress modal as an export rather than a frozen screen.
+        var importProgress: ExportProgressViewController?
+        let picker = VideoSourcePicker(
+            willTranscode: { [weak self] in
+                guard let self else { return }
+                let progressVC = ExportProgressViewController(title: "Importing clip…")
+                importProgress = progressVC
+                self.present(progressVC, animated: true)
+            },
+            completion: { [weak self] asset in
+                guard let self else { return }
+                self.videoPicker = nil
+                let finish = {
+                    guard let asset, let cellIndex = self.pendingCellIndex else { return }
+                    self.pendingCellIndex = nil
+                    self.viewModel.setVideo(assetID: UUID(), asset: asset, forCellAt: cellIndex)
+                    Haptics.tap()
+                }
+                if let importProgress {
+                    importProgress.dismiss(animated: true, completion: finish)
+                } else {
+                    finish()
+                }
+            })
         videoPicker = picker
         present(picker.makePicker(), animated: true)
     }

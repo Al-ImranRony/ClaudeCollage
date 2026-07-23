@@ -234,6 +234,60 @@ extension VideoComposer {
                                     isLooping: true, isMuted: true)
     }
 
+    /// Writes an arbitrary `AVAsset` out as a self-contained file.
+    ///
+    /// Why this exists: `PHImageManager` hands back **slo-mo** clips (and other
+    /// edited/adjusted videos) as an `AVComposition`, which has no file URL — so
+    /// there is nothing for `ProjectStore` to copy into a project, and the cell
+    /// would resume empty. `VideoSourcePicker` calls this to normalize such an
+    /// asset into a real file at import time, which keeps the invariant "every
+    /// cached asset is file-backed" true everywhere downstream.
+    ///
+    /// Orientation and frame rate come from `videoComposition(withPropertiesOf:)`,
+    /// so a portrait clip archives upright; the slo-mo timing is preserved because
+    /// it's baked into the composition being read. Audio rides along via the
+    /// existing mux. Still the direct reader→writer path — no `AVAssetExportSession`.
+    public func archive(
+        asset: AVAsset,
+        codec: ExportSettings.VideoCodec = .h264,
+        container: ExportPreset.VideoContainer = .mp4,
+        to url: URL,
+        progress: (@Sendable (Float) -> Void)? = nil,
+        cancellation: ExportCancellationToken? = nil
+    ) async throws {
+        let duration = try await asset.load(.duration)
+        let composition = AVMutableComposition()
+        let range = CMTimeRange(start: .zero, duration: duration)
+
+        guard let sourceVideo = try await asset.loadTracks(withMediaType: .video).first,
+              let videoTrack = composition.addMutableTrack(
+                withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid)
+        else { throw ComposerError.noFrames }
+        try videoTrack.insertTimeRange(range, of: sourceVideo, at: .zero)
+        // Carry the display orientation so the derived video composition rotates it.
+        videoTrack.preferredTransform = try await sourceVideo.load(.preferredTransform)
+
+        if let sourceAudio = try await asset.loadTracks(withMediaType: .audio).first,
+           let audioTrack = composition.addMutableTrack(
+            withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) {
+            try? audioTrack.insertTimeRange(range, of: sourceAudio, at: .zero)
+        }
+
+        let videoComposition = try await AVMutableVideoComposition.videoComposition(
+            withPropertiesOf: composition)
+
+        let bundle = VideoCompositionBundle(
+            composition: composition,
+            videoComposition: videoComposition,
+            audioMix: AVMutableAudioMix(),      // no level changes — a faithful copy
+            duration: duration,
+            renderSize: videoComposition.renderSize,
+            overlayImage: nil)
+
+        try await export(bundle: bundle, codec: codec, container: container, to: url,
+                         progress: progress, cancellation: cancellation)
+    }
+
     /// Exports the assembled bundle to a video file via the DIRECT
     /// `AVAssetReaderVideoCompositionOutput` → `AVAssetWriter` path (no
     /// `AVAssetExportSession`, preserving fidelity per slice 1). Text/sticker
