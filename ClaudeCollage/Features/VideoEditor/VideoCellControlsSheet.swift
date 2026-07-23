@@ -77,7 +77,6 @@ struct VideoCellControlsSheet: View {
             header
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
-                    if !thumbnails.isEmpty { thumbnailStrip }
                     trimSection
                     playbackSection
                     audioSection
@@ -107,22 +106,7 @@ struct VideoCellControlsSheet: View {
         .foregroundStyle(Color(Theme.Color.accent))
     }
 
-    // MARK: - Thumbnails + trim
-
-    private var thumbnailStrip: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 2) {
-                ForEach(Array(thumbnails.enumerated()), id: \.offset) { _, image in
-                    Image(uiImage: image)
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .frame(width: 56, height: 56)
-                        .clipped()
-                }
-            }
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-        }
-    }
+    // MARK: - Trim (filmstrip + draggable handles)
 
     private var trimSection: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -135,21 +119,13 @@ struct VideoCellControlsSheet: View {
             .font(.caption)
             .foregroundStyle(Color(Theme.Color.textSecondary))
 
-            Slider(value: Binding(
-                get: { values.trimStart },
-                set: { newValue in
-                    values.trimStart = min(newValue, values.trimEnd - 0.1)
-                    onLiveChange(values)
-                }), in: 0...duration, onEditingChanged: commitOnRelease)
-                .accessibilityIdentifier("cellTrimStartSlider")
-
-            Slider(value: Binding(
-                get: { values.trimEnd },
-                set: { newValue in
-                    values.trimEnd = max(newValue, values.trimStart + 0.1)
-                    onLiveChange(values)
-                }), in: 0...duration, onEditingChanged: commitOnRelease)
-                .accessibilityIdentifier("cellTrimEndSlider")
+            TrimStrip(
+                thumbnails: thumbnails,
+                duration: duration,
+                trimStart: Binding(get: { values.trimStart }, set: { values.trimStart = $0 }),
+                trimEnd: Binding(get: { values.trimEnd }, set: { values.trimEnd = $0 }),
+                onLive: { onLiveChange(values) },
+                onCommit: { onCommit(values) })
         }
     }
 
@@ -277,5 +253,103 @@ struct VideoCellControlsSheet: View {
     /// Slider `onEditingChanged`: commit once when the drag ends.
     private func commitOnRelease(_ editing: Bool) {
         if !editing { onCommit(values) }
+    }
+}
+
+// MARK: - Filmstrip with draggable trim handles
+
+/// The CapCut/InShot-style trim control: a frame filmstrip with a left and right
+/// handle you drag to set the in/out points. The area outside the selection dims;
+/// the selection carries an accent frame. Dragging fires `onLive` continuously and
+/// `onCommit` on release (one undo step).
+private struct TrimStrip: View {
+
+    let thumbnails: [UIImage]
+    let duration: Double
+    @Binding var trimStart: Double
+    @Binding var trimEnd: Double
+    let onLive: () -> Void
+    let onCommit: () -> Void
+
+    private let handleWidth: CGFloat = 16
+    private let height: CGFloat = 60
+    private let minGap: Double = 0.1
+
+    var body: some View {
+        GeometryReader { geo in
+            let width = geo.size.width
+            let startX = xFor(trimStart, width: width)
+            let endX = xFor(trimEnd, width: width)
+
+            ZStack(alignment: .leading) {
+                filmstrip
+                    .frame(width: width, height: height)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                // Dim the trimmed-away regions.
+                Color.black.opacity(0.55).frame(width: max(0, startX))
+                Color.black.opacity(0.55).frame(width: max(0, width - endX)).offset(x: endX)
+
+                // Selection frame.
+                RoundedRectangle(cornerRadius: 4)
+                    .stroke(Color(Theme.Color.accent), lineWidth: 3)
+                    .frame(width: max(0, endX - startX), height: height)
+                    .offset(x: startX)
+
+                handle.offset(x: startX - handleWidth / 2)
+                    .gesture(drag(isStart: true, width: width))
+                    .accessibilityIdentifier("cellTrimStartHandle")
+                handle.offset(x: endX - handleWidth / 2)
+                    .gesture(drag(isStart: false, width: width))
+                    .accessibilityIdentifier("cellTrimEndHandle")
+            }
+            .frame(height: height)
+        }
+        .frame(height: height)
+    }
+
+    private var filmstrip: some View {
+        HStack(spacing: 0) {
+            if thumbnails.isEmpty {
+                Rectangle().fill(Color(Theme.Color.controlFill))
+            } else {
+                ForEach(Array(thumbnails.enumerated()), id: \.offset) { _, image in
+                    Image(uiImage: image)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: height)
+                        .clipped()
+                }
+            }
+        }
+    }
+
+    private var handle: some View {
+        RoundedRectangle(cornerRadius: 4)
+            .fill(Color(Theme.Color.accent))
+            .frame(width: handleWidth, height: height)
+            .overlay(
+                Capsule().fill(.white).frame(width: 3, height: height * 0.35))
+    }
+
+    private func xFor(_ seconds: Double, width: CGFloat) -> CGFloat {
+        guard duration > 0 else { return 0 }
+        return CGFloat(min(1, max(0, seconds / duration))) * width
+    }
+
+    private func drag(isStart: Bool, width: CGFloat) -> some Gesture {
+        DragGesture(minimumDistance: 0)
+            .onChanged { value in
+                guard width > 0 else { return }
+                let seconds = Double(min(width, max(0, value.location.x)) / width) * duration
+                if isStart {
+                    trimStart = min(seconds, trimEnd - minGap)
+                } else {
+                    trimEnd = max(seconds, trimStart + minGap)
+                }
+                onLive()
+            }
+            .onEnded { _ in onCommit() }
     }
 }
