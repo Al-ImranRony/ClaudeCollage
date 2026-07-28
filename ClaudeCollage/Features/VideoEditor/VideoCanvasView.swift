@@ -217,7 +217,10 @@ final class VideoCanvasView: UIView {
     private func makeCellView() -> UIView {
         let cellView = UIView()
         cellView.isUserInteractionEnabled = false   // the VC owns the tap gesture
-        cellView.layer.cornerRadius = Theme.Radius.sm
+        // Cells render with sharp rectangular edges — no per-cell corner-radius
+        // concept exists in the video composition — so the selection chrome must
+        // stay square too, or its rounded outline reads as misaligned against the
+        // rectangular video underneath it.
         cellView.clipsToBounds = true
 
         let plus = UILabel()

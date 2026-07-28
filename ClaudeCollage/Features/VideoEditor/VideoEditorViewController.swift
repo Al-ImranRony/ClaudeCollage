@@ -356,16 +356,22 @@ final class VideoEditorViewController: UIViewController {
     }
 
     @objc private func layoutTapped() {
-        let sheet = UIAlertController(title: "Layout", message: nil, preferredStyle: .actionSheet)
-        for template in GridTemplate.allCases {
-            sheet.addAction(UIAlertAction(title: template.displayName, style: .default) { [weak self] _ in
+        let sheet = VideoLayoutPickerSheet(
+            templates: GridTemplate.allCases,
+            selected: viewModel.layout.gridTemplate ?? .twoUpVertical,
+            onSelect: { [weak self] template in
                 self?.viewModel.changeLayout(.grid(template))
                 Haptics.tap()
-            })
+            },
+            onClose: { [weak self] in self?.dismiss(animated: true) })
+
+        let host = UIHostingController(rootView: sheet)
+        host.modalPresentationStyle = .pageSheet
+        if let presentation = host.sheetPresentationController {
+            presentation.detents = [.medium(), .large()]
+            presentation.prefersGrabberVisible = true
         }
-        sheet.addAction(UIAlertAction(title: "Cancel", style: .cancel))
-        sheet.popoverPresentationController?.barButtonItem = toolbarItems?.first
-        present(sheet, animated: true)
+        present(host, animated: true)
     }
 
     @objc private func musicTapped() {
