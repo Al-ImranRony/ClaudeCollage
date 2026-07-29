@@ -21,11 +21,14 @@ final class GridEditorViewController: UIViewController {
     // UI
     private let canvasView = CanvasView()
     private lazy var layoutModeControl = UISegmentedControl(items: ["Grid", "Shapes"])
-    private lazy var layoutPicker = LayoutPickerView(selected: viewModel.state.layout.gridTemplate ?? .twoUpHorizontal)
+    private lazy var layoutPicker = LayoutPickerView(selected: viewModel.state.layout.gridTemplate)
     private lazy var shapePicker = ShapePickerView(selected: viewModel.state.layout.polygonTemplate)
     private lazy var customShapeButton = makeCustomShapeButton()
     /// The row wrapping `customShapeButton`; shown only in Shapes mode.
     private var customShapeRow: UIStackView?
+    /// The whole "Layout" group (label, Grid/Shapes switch, both pickers).
+    /// Hidden for `.template` documents, which have no layout alternatives.
+    private var layoutSection: UIStackView?
     private lazy var backgroundPicker = BackgroundPickerView(selected: viewModel.state.background)
     private let borderSlider = UISlider()
     private let cornerSlider = UISlider()
@@ -169,16 +172,19 @@ final class GridEditorViewController: UIViewController {
         canvasView.layer.cornerRadius = 12
         canvasView.clipsToBounds = true
 
-        // Border + corner sliders live in a labelled stack.
+        // Border + corner sliders live in a labelled stack. Both are normalized
+        // 0…1 and scaled through `viewModel.maxBorderWidth` / `maxCornerRadius`
+        // at read time, so the usable range follows the canvas and layout rather
+        // than a fixed constant that was far too small on a 1080pt canvas.
         borderSlider.minimumValue = 0
-        borderSlider.maximumValue = 20
-        borderSlider.value = Float(viewModel.state.borderWidth)
+        borderSlider.maximumValue = 1
+        borderSlider.value = Float(normalizedBorder)
         borderSlider.addTarget(self, action: #selector(borderChanged), for: .valueChanged)
         borderSlider.addTarget(self, action: #selector(sliderReleased), for: [.touchUpInside, .touchUpOutside])
 
         cornerSlider.minimumValue = 0
-        cornerSlider.maximumValue = 80
-        cornerSlider.value = Float(viewModel.state.cornerRadius)
+        cornerSlider.maximumValue = 1
+        cornerSlider.value = Float(normalizedCorner)
         cornerSlider.addTarget(self, action: #selector(cornerChanged), for: .valueChanged)
         cornerSlider.addTarget(self, action: #selector(sliderReleased), for: [.touchUpInside, .touchUpOutside])
 
@@ -204,12 +210,23 @@ final class GridEditorViewController: UIViewController {
         customRow.isHidden = !viewModel.state.layout.isPolygon
         customShapeRow = customRow
 
-        let controlsStack = UIStackView(arrangedSubviews: [
+        // The whole Layout group is hidden as one unit for `.template` documents:
+        // the template defines its own geometry, so both the Grid/Shapes switch
+        // and the pickers would be claiming a selection that does not exist.
+        let layoutSection = UIStackView(arrangedSubviews: [
             sectionLabel("Layout"),
             modeRow,
             layoutPicker,
             shapePicker,
             customRow,
+        ])
+        layoutSection.axis = .vertical
+        layoutSection.spacing = 6
+        layoutSection.isHidden = !viewModel.state.layout.offersLayoutAlternatives
+        self.layoutSection = layoutSection
+
+        let controlsStack = UIStackView(arrangedSubviews: [
+            layoutSection,
             borderRow,
             cornerRow,
             sectionLabel("Background"),
@@ -376,14 +393,17 @@ final class GridEditorViewController: UIViewController {
 
     /// Re-sync the sliders/pickers after undo/redo changes state underneath them.
     private func syncControls() {
-        borderSlider.value = Float(viewModel.state.borderWidth)
-        cornerSlider.value = Float(viewModel.state.cornerRadius)
+        borderSlider.value = Float(normalizedBorder)
+        cornerSlider.value = Float(normalizedCorner)
         let layout = viewModel.state.layout
+        layoutSection?.isHidden = !layout.offersLayoutAlternatives
         layoutModeControl.selectedSegmentIndex = layout.isPolygon ? 1 : 0
         layoutPicker.isHidden = layout.isPolygon
         shapePicker.isHidden = !layout.isPolygon
         customShapeRow?.isHidden = !layout.isPolygon
-        if let grid = layout.gridTemplate { layoutPicker.setSelected(grid) }
+        // Passed straight through (not `if let`) so the highlight clears when the
+        // document has no grid layout, rather than sticking on a stale template.
+        layoutPicker.setSelected(layout.gridTemplate)
         shapePicker.setSelected(layout.polygonTemplate)
         backgroundPicker.setSelected(viewModel.state.background)
     }
@@ -409,12 +429,27 @@ final class GridEditorViewController: UIViewController {
         }
     }
 
+    // MARK: - Slider scaling
+
+    /// Slider positions are normalized 0…1; the state they drive is in
+    /// reference-canvas points. These four helpers are the only place the two
+    /// representations meet.
+    private var normalizedBorder: Double {
+        let max = viewModel.maxBorderWidth
+        return max > 0 ? min(1, viewModel.state.borderWidth / max) : 0
+    }
+
+    private var normalizedCorner: Double {
+        let max = viewModel.maxCornerRadius
+        return max > 0 ? min(1, viewModel.state.cornerRadius / max) : 0
+    }
+
     @objc private func borderChanged() {
-        viewModel.previewBorderWidth(Double(borderSlider.value))
+        viewModel.previewBorderWidth(Double(borderSlider.value) * viewModel.maxBorderWidth)
     }
 
     @objc private func cornerChanged() {
-        viewModel.previewCornerRadius(Double(cornerSlider.value))
+        viewModel.previewCornerRadius(Double(cornerSlider.value) * viewModel.maxCornerRadius)
     }
 
     /// Records a single undo snapshot (and triggers auto-save) when a slider
@@ -490,12 +525,18 @@ final class GridEditorViewController: UIViewController {
 
         if let source = pendingSwapSource {
             pendingSwapSource = nil
+            canvasView.setSelectedCell(nil)
             if source != index {
                 viewModel.swapCells(source, index)
                 showToast("Cells swapped")
             }
             return
         }
+
+        // Outline the tapped cell so the sheet that follows is visibly attached to
+        // it. Without this, tapping a cell offers functionality with no feedback
+        // about which cell it applies to.
+        canvasView.setSelectedCell(index)
 
         if viewModel.state.cells.indices.contains(index),
            viewModel.state.cells[index].imageID != nil {
@@ -512,6 +553,7 @@ final class GridEditorViewController: UIViewController {
               viewModel.state.cells.indices.contains(index),
               viewModel.state.cells[index].imageID != nil else { return }
         pendingSwapSource = index
+        canvasView.setSelectedCell(index)
         haptic(.medium)
         showToast("Tap another cell to swap")
     }
@@ -526,8 +568,12 @@ final class GridEditorViewController: UIViewController {
         })
         sheet.addAction(UIAlertAction(title: "Clear", style: .destructive) { [weak self] _ in
             self?.viewModel.clearCell(at: index)
+            self?.canvasView.setSelectedCell(nil)
         })
-        sheet.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        // Also fires when the sheet is dismissed by tapping outside it.
+        sheet.addAction(UIAlertAction(title: "Cancel", style: .cancel) { [weak self] _ in
+            self?.canvasView.setSelectedCell(nil)
+        })
         sheet.popoverPresentationController?.sourceView = canvasView
         sheet.popoverPresentationController?.sourceRect = cellRectOnScreen(index) ?? canvasView.bounds
         present(sheet, animated: true)
@@ -543,6 +589,7 @@ final class GridEditorViewController: UIViewController {
             },
             onDone: { [weak self] in
                 self?.viewModel.commitInteractiveChange()
+                self?.canvasView.setSelectedCell(nil)
                 self?.dismiss(animated: true)
             }
         )
@@ -839,6 +886,9 @@ final class GridEditorViewController: UIViewController {
 extension GridEditorViewController: PHPickerViewControllerDelegate {
     func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
         picker.dismiss(animated: true)
+        // The cell outline was showing which cell the picker targets; the
+        // interaction ends here whether or not a photo came back.
+        canvasView.setSelectedCell(nil)
         guard let index = pendingPhotoCellIndex, let provider = results.first?.itemProvider else {
             pendingPhotoCellIndex = nil
             return

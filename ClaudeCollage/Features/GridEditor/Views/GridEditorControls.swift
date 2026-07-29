@@ -16,10 +16,13 @@ final class LayoutPickerView: UIView {
     var onSelect: ((GridTemplate) -> Void)?
 
     private let templates: [GridTemplate]
-    private var selected: GridTemplate
+    /// `nil` when the document has no grid layout (a template or polygon
+    /// collage), so no schematic is highlighted. Highlighting an arbitrary
+    /// default here would claim a selection the document does not have.
+    private var selected: GridTemplate?
     private lazy var collectionView = makeCollectionView()
 
-    init(templates: [GridTemplate] = GridTemplate.allCases, selected: GridTemplate) {
+    init(templates: [GridTemplate] = GridTemplate.allCases, selected: GridTemplate?) {
         self.templates = templates
         self.selected = selected
         super.init(frame: .zero)
@@ -29,7 +32,7 @@ final class LayoutPickerView: UIView {
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
 
-    func setSelected(_ template: GridTemplate) {
+    func setSelected(_ template: GridTemplate?) {
         guard template != selected else { return }
         selected = template
         collectionView.reloadData()
@@ -70,6 +73,7 @@ final class LayoutPickerView: UIView {
         view.showsHorizontalScrollIndicator = false
         view.dataSource = self
         view.delegate = self
+        view.accessibilityIdentifier = "layoutPicker"
         view.register(LayoutSchematicCell.self, forCellWithReuseIdentifier: LayoutSchematicCell.reuseID)
         return view
     }
@@ -219,6 +223,7 @@ final class ShapePickerView: UIView {
         view.showsHorizontalScrollIndicator = false
         view.dataSource = self
         view.delegate = self
+        view.accessibilityIdentifier = "shapePicker"
         view.register(ShapeThumbnailCell.self, forCellWithReuseIdentifier: ShapeThumbnailCell.reuseID)
         return view
     }
@@ -342,6 +347,7 @@ final class BackgroundPickerView: UIView {
         view.showsHorizontalScrollIndicator = false
         view.dataSource = self
         view.delegate = self
+        view.accessibilityIdentifier = "backgroundPicker"
         view.register(SwatchCell.self, forCellWithReuseIdentifier: SwatchCell.reuseID)
         return view
     }

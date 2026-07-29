@@ -183,6 +183,15 @@ public enum CollageLayout: Equatable, Sendable, Codable {
         return nil
     }
 
+    /// False for `.template` layouts, whose geometry comes from the template
+    /// itself — there is no Grid/Shapes alternative to offer, so the editor
+    /// hides its whole Layout section rather than highlighting a layout the
+    /// document does not actually use.
+    public var offersLayoutAlternatives: Bool {
+        if case .template = self { return false }
+        return true
+    }
+
     /// Stable identifier for persistence (`CollageProject.templateID`).
     public var persistID: String {
         switch self {

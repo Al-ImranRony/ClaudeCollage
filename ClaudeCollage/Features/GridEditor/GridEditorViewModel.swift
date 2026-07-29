@@ -249,6 +249,47 @@ public final class GridEditorViewModel {
         return filteredImages[id] ?? sourceImages[id]
     }
 
+    // MARK: - Control bounds
+
+    /// Fraction of the canvas's smaller side that `borderWidth` may reach.
+    private static let borderCeilingFraction: Double = 0.12
+    /// Ceiling on how much of the smallest cell the border may consume, so no
+    /// layout can ever be squeezed to a zero-area cell.
+    private static let borderCellSafetyFraction: Double = 0.8
+
+    /// Upper bound for `borderWidth`, in reference-canvas points.
+    ///
+    /// Proportional rather than a fixed constant so the slider means the same
+    /// thing on a 1080×1080 post as on a 1080×1920 story, and so a dense grid
+    /// can't be driven to collapsed cells.
+    public var maxBorderWidth: Double {
+        let canvasCeiling = Double(min(canvasSize.width, canvasSize.height)) * Self.borderCeilingFraction
+        guard let smallestSide = smallestCellSideAtZeroBorder else { return canvasCeiling }
+        return min(canvasCeiling, smallestSide * Self.borderCellSafetyFraction)
+    }
+
+    /// Upper bound for `cornerRadius`, in reference-canvas points: half the
+    /// smallest cell's smaller side, so any cell can be driven fully round.
+    ///
+    /// Measured at zero border on purpose. Deriving it from the *current* border
+    /// would make the corner slider's scale shift while the border slider is
+    /// dragged; the render path already clamps radius to the real cell size, so
+    /// a stable scale here costs nothing.
+    public var maxCornerRadius: Double {
+        guard let smallestSide = smallestCellSideAtZeroBorder else {
+            return Double(min(canvasSize.width, canvasSize.height)) / 2
+        }
+        return smallestSide / 2
+    }
+
+    /// Smaller side of the smallest cell in the current layout, ignoring border.
+    private var smallestCellSideAtZeroBorder: Double? {
+        let frames = engine.layout(for: state.layout, canvasSize: canvasSize, borderWidth: 0)
+        let sides = frames.map { Double(min($0.frame.width, $0.frame.height)) }
+        guard let smallest = sides.min(), smallest > 0 else { return nil }
+        return smallest
+    }
+
     /// The lightweight display model for the GPU canvas.
     func canvasModel() -> CanvasModel {
         let frames = engine.layout(for: state.layout, canvasSize: canvasSize, borderWidth: CGFloat(state.borderWidth))

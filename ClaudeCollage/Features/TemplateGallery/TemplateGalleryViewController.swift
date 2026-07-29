@@ -213,6 +213,7 @@ final class TemplateGalleryViewController: UIViewController {
 
         let view = UICollectionView(frame: .zero, collectionViewLayout: layout)
         view.backgroundColor = Theme.Color.background
+        view.showsVerticalScrollIndicator = false
         view.delegate = self
         view.accessibilityIdentifier = "templateGalleryGrid"
         return view

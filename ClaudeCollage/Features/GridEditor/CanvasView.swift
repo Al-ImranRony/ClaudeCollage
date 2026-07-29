@@ -79,6 +79,17 @@ final class CanvasView: UIView {
     /// Snap-alignment guide lines drawn above everything during a sticker drag.
     private let snapGuideLayer = CAShapeLayer()
 
+    /// Outline around the selected photo cell. Deliberately mirrors the text and
+    /// sticker selection chrome (dashed accent stroke) so all three object types
+    /// read as the same kind of "selected".
+    ///
+    /// Lives on `contentContainer` rather than inside the cell view because cells
+    /// clip to bounds and non-rectangular ones carry a `CAShapeLayer` mask — a
+    /// stroke drawn inside would be half-clipped away at the very edge it needs
+    /// to trace.
+    private let cellSelectionLayer = CAShapeLayer()
+    private var selectedCellIndex: Int?
+
     /// Detail-editing magnification of the collage content (1…3). A view aid only —
     /// not part of the collage state, so it never persists or exports.
     private(set) var canvasZoom: CGFloat = 1
@@ -96,6 +107,14 @@ final class CanvasView: UIView {
         snapGuideLayer.zPosition = 10_000    // above cells, text, and stickers
         snapGuideLayer.isHidden = true
         contentContainer.layer.addSublayer(snapGuideLayer)
+
+        cellSelectionLayer.strokeColor = Theme.Color.accent.cgColor
+        cellSelectionLayer.lineWidth = 1.5
+        cellSelectionLayer.lineDashPattern = [5, 4]
+        cellSelectionLayer.fillColor = UIColor.clear.cgColor
+        cellSelectionLayer.zPosition = 9_000     // above content, below snap guides
+        cellSelectionLayer.isHidden = true
+        contentContainer.layer.addSublayer(cellSelectionLayer)
     }
 
     @available(*, unavailable)
@@ -108,6 +127,11 @@ final class CanvasView: UIView {
     func configure(with model: CanvasModel) {
         let countChanged = model.cells.count != cellViews.count
         self.model = model
+
+        // A layout change can leave the selection pointing past the new cell list.
+        if let selected = selectedCellIndex, selected >= model.cells.count {
+            selectedCellIndex = nil
+        }
 
         if countChanged {
             cellViews.forEach { $0.removeFromSuperview() }
@@ -240,7 +264,56 @@ final class CanvasView: UIView {
 
         layoutOverlays()
         layoutStickers()
+        updateCellSelection()
         applyZoomTransform()
+    }
+
+    // MARK: - Cell selection
+
+    /// Marks one photo cell as selected, or clears the outline with `nil`.
+    ///
+    /// Preview chrome only: export composites through `CollageRenderer`, which
+    /// never sees this view, so the outline cannot be baked into an exported image.
+    func setSelectedCell(_ index: Int?) {
+        guard index != selectedCellIndex else { return }
+        selectedCellIndex = index
+        updateCellSelection()
+    }
+
+    /// Redraws the selection outline to trace the selected cell's actual boundary,
+    /// including its corner radius and any non-rectangular clip shape.
+    private func updateCellSelection() {
+        guard let model, let index = selectedCellIndex,
+              model.cells.indices.contains(index), referenceScaleFactor > 0 else {
+            cellSelectionLayer.isHidden = true
+            return
+        }
+        let cell = model.cells[index]
+        let factor = referenceScaleFactor
+        let scaled = CGRect(
+            x: cell.frame.minX * factor,
+            y: cell.frame.minY * factor,
+            width: cell.frame.width * factor,
+            height: cell.frame.height * factor
+        )
+        // Inset by half the stroke so the dashes sit just inside the cell edge
+        // rather than straddling it into the border gap.
+        let inset = cellSelectionLayer.lineWidth / 2
+        let outline = scaled.insetBy(dx: inset, dy: inset)
+        guard outline.width > 0, outline.height > 0 else {
+            cellSelectionLayer.isHidden = true
+            return
+        }
+
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        cellSelectionLayer.frame = contentContainer.bounds
+        cellSelectionLayer.path = cell.clipShape.path(
+            in: outline,
+            cornerRadius: max(0, cell.cornerRadius * factor - inset)
+        )
+        cellSelectionLayer.isHidden = false
+        CATransaction.commit()
     }
 
     /// Positions each text overlay view (normalized frame → on-screen points) and

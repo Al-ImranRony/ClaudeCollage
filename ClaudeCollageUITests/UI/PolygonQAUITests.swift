@@ -43,12 +43,21 @@ final class PolygonQAUITests: XCTestCase {
 
         // Switch to Shapes.
         shapesSeg.tap()
-        XCTAssertTrue(app.collectionViews.cells.firstMatch.waitForExistence(timeout: 5), "Shape picker populated")
+
+        // Target the shape strip by identifier. `collectionViews.firstMatch` used
+        // to stand in for it, but the editor has three pickers (layout, shape,
+        // background) and that query silently resolved to whichever the element
+        // tree happened to yield first — it landed on the offscreen background
+        // swatches once the controls were regrouped.
+        let strip = app.collectionViews["shapePicker"]
+        XCTAssertTrue(strip.waitForExistence(timeout: 5), "Shape picker visible in Shapes mode")
+        XCTAssertTrue(strip.cells.firstMatch.waitForExistence(timeout: 5), "Shape picker populated")
+        XCTAssertFalse(app.collectionViews["layoutPicker"].exists,
+                       "Grid layout picker must be hidden in Shapes mode")
         attach(app, "02_shapes_mode")
 
         // Walk all 9 polygon layouts. The strip scrolls horizontally, so tap by
         // index and swipe when the next cell isn't hittable yet.
-        let strip = app.collectionViews.firstMatch
         for i in 0 ..< 9 {
             var cell = strip.cells.element(boundBy: i)
             if !cell.isHittable {
@@ -73,6 +82,8 @@ final class PolygonQAUITests: XCTestCase {
         // Switch back to Grid — content/layout preserved, no crash.
         gridSeg.tap()
         XCTAssertTrue(app.navigationBars["Grid Collage"].exists, "Grid restore no crash")
+        XCTAssertTrue(app.collectionViews["layoutPicker"].waitForExistence(timeout: 3),
+                      "Grid layout picker returns in Grid mode")
         attach(app, "05_back_to_grid")
         shapesSeg.tap()
 

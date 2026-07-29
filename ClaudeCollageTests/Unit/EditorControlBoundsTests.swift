@@ -1,0 +1,131 @@
+//
+//  EditorControlBoundsTests.swift
+//  ClaudeCollageTests
+//
+//  Step 04.5 batch A — the proportional border / corner-radius bounds that
+//  replaced the old fixed slider caps (border 20, corner 80), which were far too
+//  small against a 1080pt reference canvas and meant different things on a square
+//  canvas than on a story canvas.
+//
+//  Also covers `CollageLayout.offersLayoutAlternatives`, the predicate that hides
+//  the editor's Layout section for `.template` documents instead of highlighting a
+//  grid layout the document does not use.
+//
+
+import XCTest
+import CoreGraphics
+@testable import ClaudeCollage
+
+@MainActor
+final class EditorControlBoundsTests: XCTestCase {
+
+    private let engine = CollageLayoutEngine()
+
+    private func makeViewModel(
+        layout: CollageLayout,
+        canvasSize: CGSize = CGSize(width: 1080, height: 1080)
+    ) -> GridEditorViewModel {
+        GridEditorViewModel(canvasSize: canvasSize, state: GridEditorState(layout: layout))
+    }
+
+    // MARK: - Border bounds
+
+    func testBorderCeilingIsProportionalToCanvasShorterSide() {
+        // 12% of the shorter side. A single full-bleed cell is large enough that
+        // the cell-safety clamp never binds, so the canvas ceiling is what shows.
+        let square = makeViewModel(layout: .grid(.oneCell))
+        XCTAssertEqual(square.maxBorderWidth, 1080 * 0.12, accuracy: 0.001)
+
+        let story = makeViewModel(
+            layout: .grid(.oneCell), canvasSize: CGSize(width: 1080, height: 1920))
+        XCTAssertEqual(story.maxBorderWidth, 1080 * 0.12, accuracy: 0.001,
+                       "Story canvas should key off the 1080 short side, not the 1920 long side")
+    }
+
+    func testBorderCeilingBeatsTheOldFixedCapByAWideMargin() {
+        // The regression this batch fixes: 20pt on a 1080 canvas is 1.9%.
+        let viewModel = makeViewModel(layout: .grid(.fourSquare))
+        XCTAssertGreaterThan(viewModel.maxBorderWidth, 20,
+                             "New ceiling must exceed the old hardcoded cap of 20")
+    }
+
+    func testBorderCeilingNeverCollapsesACell() {
+        // Every shipped grid, at its own maximum border, must still leave every
+        // cell with positive width and height.
+        for template in GridTemplate.allCases {
+            let viewModel = makeViewModel(layout: .grid(template))
+            let border = CGFloat(viewModel.maxBorderWidth)
+            let frames = engine.layout(
+                for: .grid(template), canvasSize: viewModel.canvasSize, borderWidth: border)
+
+            XCTAssertFalse(frames.isEmpty, "\(template) produced no cells")
+            for frame in frames {
+                XCTAssertGreaterThan(frame.frame.width, 0,
+                                     "\(template) collapsed a cell's width at max border \(border)")
+                XCTAssertGreaterThan(frame.frame.height, 0,
+                                     "\(template) collapsed a cell's height at max border \(border)")
+            }
+        }
+    }
+
+    func testDenseGridGetsATighterBorderCeilingThanASingleCell() {
+        let single = makeViewModel(layout: .grid(.oneCell)).maxBorderWidth
+        let dense = makeViewModel(layout: .grid(.nineGrid)).maxBorderWidth
+        XCTAssertLessThanOrEqual(dense, single,
+                                 "A dense grid must not allow a looser border than a single cell")
+    }
+
+    // MARK: - Corner bounds
+
+    func testCornerCeilingReachesHalfTheSmallestCellSide() {
+        // Half the smaller side is exactly the radius at which a cell becomes a
+        // circle/pill, so the slider must be able to get there.
+        let viewModel = makeViewModel(layout: .grid(.fourSquare))
+        // 2×2 on 1080 → 540pt cells → 270pt to go fully round.
+        XCTAssertEqual(viewModel.maxCornerRadius, 270, accuracy: 0.001)
+    }
+
+    func testCornerCeilingBeatsTheOldFixedCap() {
+        let viewModel = makeViewModel(layout: .grid(.fourSquare))
+        XCTAssertGreaterThan(viewModel.maxCornerRadius, 80,
+                             "New ceiling must exceed the old hardcoded cap of 80")
+    }
+
+    func testCornerCeilingIsIndependentOfCurrentBorder() {
+        // Deliberate: deriving the corner scale from the *current* border would
+        // make the corner slider's meaning shift while the border slider is dragged.
+        let relaxed = makeViewModel(layout: .grid(.fourSquare))
+        var tightState = GridEditorState(layout: .grid(.fourSquare))
+        tightState.borderWidth = 100
+        let tight = GridEditorViewModel(
+            canvasSize: CGSize(width: 1080, height: 1080), state: tightState)
+
+        XCTAssertEqual(relaxed.maxCornerRadius, tight.maxCornerRadius, accuracy: 0.001)
+    }
+
+    // MARK: - Layout alternatives predicate
+
+    func testGridAndPolygonLayoutsOfferAlternatives() {
+        XCTAssertTrue(CollageLayout.grid(.fourSquare).offersLayoutAlternatives)
+        XCTAssertTrue(CollageLayout.polygon(.diagonalLeft).offersLayoutAlternatives)
+    }
+
+    func testTemplateLayoutOffersNoAlternatives() {
+        // The regression: a `.template` document used to show the Layout picker
+        // with `.twoUpHorizontal` highlighted, claiming a selection it never had.
+        let template = TemplateLayout(
+            templateID: "editorial-3up",
+            name: "Editorial 3-Up",
+            aspectRatio: "4:5",
+            cells: [
+                TemplateLayoutCell(frame: CGRect(x: 0, y: 0, width: 1, height: 0.5)),
+                TemplateLayoutCell(frame: CGRect(x: 0, y: 0.5, width: 0.5, height: 0.5)),
+                TemplateLayoutCell(frame: CGRect(x: 0.5, y: 0.5, width: 0.5, height: 0.5)),
+            ])
+        let layout = CollageLayout.template(template)
+
+        XCTAssertFalse(layout.offersLayoutAlternatives)
+        XCTAssertNil(layout.gridTemplate,
+                     "A template document has no grid template to highlight")
+    }
+}
