@@ -2,42 +2,178 @@
 //  AppCoordinator.swift
 //  ClaudeCollage
 //
-//  Root navigation coordinator (MVVM-C). Owns the root UINavigationController
-//  and the ProjectStore, and routes between the home gallery and the grid
-//  editor. SwiftUI screens (none yet in Step 01) would be presented here via
-//  UIHostingController.
+//  Root navigation coordinator (MVVM-C). Owns the root `AppTabBarController` and
+//  the ProjectStore, and routes between the tabs and every editor. SwiftUI screens
+//  are presented here via UIHostingController.
+//
+//  Step 04.5 batch C moved the root from a single UINavigationController to a tab
+//  bar. Every screen keeps the closure interface it already had — the closures are
+//  rewired, not rewritten — so no editor changed. Pushes now target the SELECTED
+//  tab's stack (`activeNavigationController`) instead of one global stack.
 //
 
 import UIKit
 import SwiftData
 import SwiftUI
+import PhotosUI
 
 @MainActor
 final class AppCoordinator {
 
-    private let navigationController: UINavigationController
+    private let tabBarController: AppTabBarController
     private let store: ProjectStore
-    private weak var homeViewController: HomeViewController?
     /// Retains the panoramic PHPicker delegate for the life of the pick.
     private var panoramicPicker: PanoramicSourcePicker?
+    /// Retains the "+" flow's photo picker delegate for the life of the pick.
+    private var startEditingPicker: StartEditingPhotoPicker?
 
-    init(navigationController: UINavigationController, container: ModelContainer) {
-        self.navigationController = navigationController
+    init(tabBarController: AppTabBarController, container: ModelContainer) {
+        self.tabBarController = tabBarController
         self.store = ProjectStore(container: container)
     }
 
     func start() {
         let home = HomeViewController()
-        home.summariesProvider = { [weak self] in self?.store.listSummaries() ?? [] }
+        home.featuredTemplatesProvider = { TemplateService.shared.templates }
+        home.onSelectTemplate = { [weak self] template in self?.openTemplate(template) }
+        home.onBrowseTemplates = { [weak self] in self?.selectTemplatesTab() }
         home.onNewProject = { [weak self] in self?.startNewGridProject() }
-        home.onNewFreeform = { [weak self] size in self?.startFreeformProject(size: size) }
-        home.onBrowseTemplates = { [weak self] in self?.showTemplateGallery() }
-        home.onNewCarousel = { [weak self] in self?.startCarousel() }
+        home.onNewPolygon = { [weak self] in self?.startNewPolygonProject() }
         home.onNewVideoCollage = { [weak self] in self?.startVideoCollage() }
-        home.onOpenProject = { [weak self] id in self?.openProject(id: id) }
-        home.onDeleteProject = { [weak self] id in self?.store.delete(id: id) }
-        homeViewController = home
-        navigationController.setViewControllers([home], animated: false)
+
+        let templates = TemplateGalleryViewController(service: .shared)
+        templates.onSelectTemplate = { [weak self] template in self?.openTemplate(template) }
+
+        let projects = ProjectsViewController()
+        projects.summariesProvider = { [weak self] in self?.store.listSummaries() ?? [] }
+        projects.onNewProject = { [weak self] in self?.startNewGridProject() }
+        projects.onOpenProject = { [weak self] id in self?.openProject(id: id) }
+        projects.onDeleteProject = { [weak self] id in self?.store.delete(id: id) }
+
+        let carousel = CarouselStartViewController()
+        carousel.onCreate = { [weak self] config in self?.beginCarousel(config: config) }
+
+        tabBarController.setTabs([
+            (home, tabItem("Home", "house.fill", "homeTab")),
+            (templates, tabItem("Templates", "rectangle.3.group.fill", "templatesButton")),
+            (projects, tabItem("Projects", "square.grid.2x2.fill", "projectsTab")),
+            (carousel, tabItem("Carousel", "rectangle.stack.fill", "carouselButton")),
+        ])
+        tabBarController.onStartEditing = { [weak self] in self?.presentStartEditingSheet() }
+
+        // Bundled templates back the Home strip; the gallery loads them too, but
+        // Home is shown first so it cannot wait for that.
+        _ = TemplateService.shared.loadBundledTemplates()
+        home.reload()
+    }
+
+    private func tabItem(_ title: String, _ symbol: String, _ identifier: String) -> UITabBarItem {
+        let item = UITabBarItem(title: title, image: UIImage(systemName: symbol), tag: 0)
+        item.accessibilityIdentifier = identifier
+        return item
+    }
+
+    // MARK: - Navigation helpers
+
+    /// The stack a newly created project is pushed onto: whichever tab the user
+    /// started from, so Back returns them where they were.
+    private var navigationController: UINavigationController {
+        tabBarController.activeNavigationController ?? UINavigationController()
+    }
+
+    private func selectTemplatesTab() {
+        tabBarController.selectTab { $0 is TemplateGalleryViewController }
+    }
+
+    // MARK: - "Start Editing" (+)
+
+    /// The floating "+" — the one place creation-with-a-choice begins.
+    ///
+    /// Grid vs Shapes vs Freeform is deliberately NOT asked here: pick photos and
+    /// start editing, then swap layout from the editor's own Layout/Shape pickers.
+    private func presentStartEditingSheet() {
+        let sheet = UIAlertController(
+            title: "Start Editing", message: nil, preferredStyle: .actionSheet)
+        sheet.view.accessibilityIdentifier = "startEditingSheet"
+
+        let image = UIAlertAction(title: "Image", style: .default) { [weak self] _ in
+            self?.pickPhotosForNewCollage()
+        }
+        image.accessibilityIdentifier = "startEditingImage"
+        let video = UIAlertAction(title: "Video", style: .default) { [weak self] _ in
+            self?.startVideoCollage()
+        }
+        video.accessibilityIdentifier = "startEditingVideo"
+        let canvas = UIAlertAction(title: "Custom Canvas", style: .default) { [weak self] _ in
+            self?.promptForCustomCanvas()
+        }
+        canvas.accessibilityIdentifier = "startEditingCustomCanvas"
+
+        sheet.addAction(image)
+        sheet.addAction(video)
+        sheet.addAction(canvas)
+        sheet.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        // The "+" floats over the tab bar, so anchor the popover there on iPad.
+        sheet.popoverPresentationController?.sourceView = tabBarController.view
+        sheet.popoverPresentationController?.sourceRect = CGRect(
+            x: tabBarController.view.bounds.midX, y: tabBarController.view.bounds.maxY - 90,
+            width: 1, height: 1)
+        tabBarController.present(sheet, animated: true)
+    }
+
+    /// Photos-first entry: pick up to nine images, then open a grid sized to fit
+    /// them with every cell already filled.
+    private func pickPhotosForNewCollage() {
+        let picker = StartEditingPhotoPicker { [weak self] images in
+            guard let self else { return }
+            self.startEditingPicker = nil
+            guard !images.isEmpty else { return }   // cancelled — create nothing
+            self.startGridProject(with: images)
+        }
+        startEditingPicker = picker
+        tabBarController.present(picker.makePicker(), animated: true)
+    }
+
+    /// Prompts for a custom canvas size (100–4000 px) and starts a freeform collage.
+    /// Moved here from the old Home nav bar when "Custom Size" joined the "+" sheet.
+    private func promptForCustomCanvas() {
+        let alert = UIAlertController(
+            title: "Custom Canvas",
+            message: "Enter a size in pixels (100–4000).",
+            preferredStyle: .alert
+        )
+        alert.addTextField { field in
+            field.placeholder = "Width"
+            field.text = "1080"
+            field.keyboardType = .numberPad
+            field.accessibilityIdentifier = "freeformWidthField"
+        }
+        alert.addTextField { field in
+            field.placeholder = "Height"
+            field.text = "1080"
+            field.keyboardType = .numberPad
+            field.accessibilityIdentifier = "freeformHeightField"
+        }
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        alert.addAction(UIAlertAction(title: "Create", style: .default) { [weak self, weak alert] _ in
+            let width = Double(alert?.textFields?[0].text ?? "") ?? 1080
+            let height = Double(alert?.textFields?[1].text ?? "") ?? 1080
+            self?.startFreeformProject(size: CGSize(width: width, height: height))
+        })
+        tabBarController.present(alert, animated: true)
+    }
+
+    /// Opens a grid whose template matches the number of photos picked, with each
+    /// cell pre-filled in pick order.
+    private func startGridProject(with images: [CGImage]) {
+        let template = GridTemplate.bestFit(forPhotoCount: images.count)
+        let viewModel = GridEditorViewModel(state: GridEditorState(template: template))
+        for (index, image) in images.enumerated() where index < template.cellCount {
+            viewModel.setImage(image, forCellAt: index)
+        }
+        attachAutosave(to: viewModel)
+        store.save(viewModel)
+        pushEditor(with: viewModel)
     }
 
     // MARK: - Routing
@@ -46,6 +182,16 @@ final class AppCoordinator {
         let viewModel = GridEditorViewModel()
         attachAutosave(to: viewModel)
         // Persist immediately so the project appears in the gallery on return.
+        store.save(viewModel)
+        pushEditor(with: viewModel)
+    }
+
+    /// Home's "Shapes" quick-start: a blank collage already on a polygon layout, so
+    /// the editor opens in Shapes mode rather than needing the segment flipped.
+    private func startNewPolygonProject() {
+        let state = GridEditorState(layout: .polygon(.diagonalLeft))
+        let viewModel = GridEditorViewModel(state: state)
+        attachAutosave(to: viewModel)
         store.save(viewModel)
         pushEditor(with: viewModel)
     }
@@ -73,23 +219,9 @@ final class AppCoordinator {
         pushEditor(with: viewModel)
     }
 
-    /// Presents the SwiftUI carousel type selector; the chosen `CarouselStartConfig`
-    /// is turned into frames (via the slice-3 builders) and pushed into the carousel
-    /// editor. Panoramic first picks a wide source photo to split.
-    private func startCarousel() {
-        let selector = CarouselTypeSelectorView(
-            onCreate: { [weak self] config in
-                self?.navigationController.dismiss(animated: true) {
-                    self?.beginCarousel(config: config)
-                }
-            },
-            onCancel: { [weak self] in self?.navigationController.dismiss(animated: true) }
-        )
-        let host = UIHostingController(rootView: selector)
-        host.view.accessibilityIdentifier = "carouselTypeSelector"
-        navigationController.present(host, animated: true)
-    }
-
+    /// Turns the Carousel tab's chosen `CarouselStartConfig` into frames (via the
+    /// slice-3 builders) and pushes the carousel editor. Panoramic first picks a
+    /// wide source photo to split.
     private func beginCarousel(config: CarouselStartConfig) {
         let canvasSize = CanvasSize.size(forAspectRatio: config.aspectRatio)
         let service = CarouselService()
@@ -137,7 +269,7 @@ final class AppCoordinator {
     private func presentCarouselEditor(viewModel: CarouselEditorViewModel) {
         let editor = CarouselEditorViewController(viewModel: viewModel)
         editor.onEditFrame = { [weak self] frameVM in self?.pushEditor(with: frameVM) }
-        navigationController.pushViewController(editor, animated: true)
+        push(editor)
     }
 
     private func attachCarouselAutosave(to viewModel: CarouselEditorViewModel) {
@@ -160,19 +292,13 @@ final class AppCoordinator {
 
     private func pushVideoEditor(_ viewModel: VideoEditorViewModel) {
         let editor = VideoEditorViewController(viewModel: viewModel)
-        navigationController.pushViewController(editor, animated: true)
+        push(editor)
     }
 
     private func attachVideoAutosave(to viewModel: VideoEditorViewModel) {
         viewModel.onCommit = { [weak self] viewModel in
             self?.store.scheduleSaveVideo(viewModel)
         }
-    }
-
-    private func showTemplateGallery() {
-        let gallery = TemplateGalleryViewController(service: .shared)
-        gallery.onSelectTemplate = { [weak self] template in self?.openTemplate(template) }
-        navigationController.pushViewController(gallery, animated: true)
     }
 
     /// Opens a (free or unlocked) template in the editor. Templates that exactly
@@ -240,6 +366,13 @@ final class AppCoordinator {
 
     private func pushEditor(with viewModel: GridEditorViewModel) {
         let editor = GridEditorViewController(viewModel: viewModel)
+        push(editor)
+    }
+
+    /// Every editor hides the tab bar while it is on screen. Without this the bar
+    /// would sit under the editor's bottom controls and eat their safe area.
+    private func push(_ editor: UIViewController) {
+        editor.hidesBottomBarWhenPushed = true
         navigationController.pushViewController(editor, animated: true)
     }
 

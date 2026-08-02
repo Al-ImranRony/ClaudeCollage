@@ -13,7 +13,9 @@ import SwiftUI
 struct CarouselTypeSelectorView: View {
 
     let onCreate: (CarouselStartConfig) -> Void
-    let onCancel: () -> Void
+    /// `nil` when the selector is a tab root rather than a sheet — there is
+    /// nothing to dismiss, so the header collapses to just the title.
+    let onCancel: (() -> Void)?
 
     @State private var type: CarouselType = .matched
     @State private var frameCount = 3
@@ -62,13 +64,19 @@ struct CarouselTypeSelectorView: View {
 
     private var header: some View {
         HStack {
-            Button("Cancel", action: onCancel)
-                .accessibilityIdentifier("carouselCancelButton")
-            Spacer()
-            Text("New Carousel").font(.headline)
-            Spacer()
-            Button("Cancel", action: onCancel).opacity(0)   // balance the title
-                .accessibilityHidden(true)
+            if let onCancel {
+                Button("Cancel", action: onCancel)
+                    .accessibilityIdentifier("carouselCancelButton")
+                Spacer()
+                Text("New Carousel").font(.headline)
+                Spacer()
+                Button("Cancel", action: onCancel).opacity(0)   // balance the title
+                    .accessibilityHidden(true)
+            } else {
+                Spacer()
+                Text("New Carousel").font(.headline)
+                Spacer()
+            }
         }
         .padding()
         .foregroundStyle(Color(Theme.Color.accent))

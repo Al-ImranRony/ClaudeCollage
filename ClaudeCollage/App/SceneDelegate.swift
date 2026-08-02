@@ -21,15 +21,14 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         guard let windowScene = scene as? UIWindowScene else { return }
 
         let window = UIWindow(windowScene: windowScene)
-        let navigationController = UINavigationController()
-        navigationController.navigationBar.prefersLargeTitles = true
+        let tabBarController = AppTabBarController()
 
         let container = ModelContainerFactory.makeShared()
-        let coordinator = AppCoordinator(navigationController: navigationController, container: container)
+        let coordinator = AppCoordinator(tabBarController: tabBarController, container: container)
         coordinator.start()
 
         AppAppearance.apply(to: window)
-        window.rootViewController = navigationController
+        window.rootViewController = tabBarController
         window.makeKeyAndVisible()
 
         Haptics.prepare()

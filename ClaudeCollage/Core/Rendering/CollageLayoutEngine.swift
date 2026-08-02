@@ -18,6 +18,24 @@ import CoreGraphics
 /// 0.0...1.0 unit square). `CollageLayoutEngine` scales these to the canvas
 /// and applies the border inset.
 public enum GridTemplate: String, Codable, Sendable, CaseIterable {
+
+    /// The tightest stock grid that can hold `count` photos.
+    ///
+    /// Used by the "+" flow, which picks photos before a layout: the collage opens
+    /// already filled, and the user swaps layout afterwards if they want to. Counts
+    /// above nine clamp to the largest grid; the extra photos are dropped by the
+    /// caller rather than silently reflowed.
+    public static func bestFit(forPhotoCount count: Int) -> GridTemplate {
+        switch count {
+        case ..<2: return .oneCell
+        case 2: return .twoUpHorizontal
+        case 3: return .threeLeft
+        case 4: return .fourSquare
+        case 5, 6: return .sixGrid
+        default: return .nineGrid
+        }
+    }
+
     case oneCell
     case twoUpHorizontal
     case twoUpVertical

@@ -60,13 +60,16 @@ final class CarouselEditorUITests: XCTestCase {
         app.buttons["addFrameButton"].tap()
         XCTAssertEqual(app.collectionViews["carouselFrameStrip"].cells.count, 4)
 
-        // Back to Home — the carousel is autosaved and appears in the gallery.
+        // Back out of the editor, then over to the Projects tab: the saved gallery
+        // lives there since Home became a discovery screen (Step 04.5 batch C).
         app.navigationBars["Carousel"].buttons.element(boundBy: 0).tap()
-        XCTAssertTrue(app.navigationBars["ClaudeCollage"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.navigationBars["New Carousel"].waitForExistence(timeout: 8),
+                      "Backing out returns to the Carousel tab's own root")
 
         // The most-recent project is the carousel just made; reopening resumes it.
-        let card = app.collectionViews.cells.element(boundBy: 0)
-        XCTAssertTrue(card.waitForExistence(timeout: 5), "Home shows the saved carousel")
+        app.buttons["projectsTab"].tap()
+        let card = app.collectionViews["projectsGrid"].cells.element(boundBy: 0)
+        XCTAssertTrue(card.waitForExistence(timeout: 5), "Projects shows the saved carousel")
         card.tap()
         XCTAssertTrue(app.navigationBars["Carousel"].waitForExistence(timeout: 8),
                       "Reopening resumes the carousel editor")
