@@ -261,7 +261,7 @@ final class CarouselEditorViewController: UIViewController {
             ? viewModel.canvasSize.width / viewModel.canvasSize.height : 1
         let preview = CarouselPreviewViewController(
             images: images, aspectRatio: aspect, startIndex: viewModel.currentIndex)
-        preview.onExport = { [weak self] in self?.exportImageSet() }
+        preview.onExport = { [weak self] in self?.shareFrameImages() }
         present(preview, animated: true)
     }
 
@@ -279,7 +279,7 @@ final class CarouselEditorViewController: UIViewController {
             },
             onQuickShare: { [weak self] options in
                 if options.media == .video { self?.exportVideo(options, share: true) }
-                else { self?.dismiss(animated: true) { self?.exportImageSet() } }
+                else { self?.dismiss(animated: true) { self?.shareFrameImages() } }
             },
             onCancel: { [weak self] in self?.dismiss(animated: true) })
         let host = UIHostingController(rootView: sheet)
@@ -404,9 +404,15 @@ final class CarouselEditorViewController: UIViewController {
         present(share, animated: true)
     }
 
-    /// Renders every frame full-resolution, zips them as frame_NN.jpg, and offers the
-    /// archive via the share sheet (save to Files / AirDrop / etc.).
-    private func exportImageSet() {
+    /// Renders every frame full-resolution and offers the images themselves via the
+    /// share sheet, in carousel order.
+    ///
+    /// This used to hand over a single .zip. That is a fine artifact for Files, but
+    /// it is the wrong one for the apps carousels are actually posted to — nothing
+    /// downstream can unpack it, so the export was effectively a dead end. Sharing
+    /// the individual JPEGs lets AirDrop, Messages, Files and the photo apps each
+    /// take the frames directly.
+    private func shareFrameImages() {
         let images = renderFrames()
         guard !images.isEmpty else {
             showComingSoon(title: "Export Failed", message: "There are no frames to export.")
@@ -416,9 +422,9 @@ final class CarouselEditorViewController: UIViewController {
             let dir = FileManager.default.temporaryDirectory
                 .appendingPathComponent("CarouselExport", isDirectory: true)
             try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-            let zipURL = try CarouselExporter().exportImageSet(
-                images: images, baseName: "Carousel", into: dir)
-            let share = UIActivityViewController(activityItems: [zipURL], applicationActivities: nil)
+            let urls = try CarouselExporter().writeShareableFrames(
+                images, baseName: "Carousel", into: dir)
+            let share = UIActivityViewController(activityItems: urls, applicationActivities: nil)
             share.popoverPresentationController?.barButtonItem = navigationItem.rightBarButtonItems?.first
             present(share, animated: true)
         } catch {

@@ -59,4 +59,57 @@ final class CarouselExporterTests: XCTestCase {
         XCTAssertThrowsError(try CarouselExporter().exportImageSet(
             images: [], baseName: "Empty", into: FileManager.default.temporaryDirectory))
     }
+
+    // MARK: - Shareable frames (Step 04.5)
+
+    func testShareableFramesAreLooseNumberedImagesNotAnArchive() throws {
+        let dir = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let urls = try CarouselExporter().writeShareableFrames(
+            [makeImage(), makeImage(), makeImage()], baseName: "Carousel", into: dir)
+
+        XCTAssertEqual(urls.map(\.lastPathComponent),
+                       ["Carousel_01.jpg", "Carousel_02.jpg", "Carousel_03.jpg"])
+        for url in urls {
+            XCTAssertEqual(url.pathExtension, "jpg", "sharing must offer images, not an archive")
+            XCTAssertTrue(FileManager.default.fileExists(atPath: url.path))
+        }
+    }
+
+    func testShareableFramesPreserveCarouselOrder() throws {
+        // Order is the contract: a carousel posted out of sequence is wrong, and the
+        // share sheet passes these URLs straight through.
+        let dir = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let urls = try CarouselExporter().writeShareableFrames(
+            (0 ..< 6).map { _ in makeImage() }, baseName: "Carousel", into: dir)
+
+        let indices = urls.map { url -> Int in
+            Int(url.deletingPathExtension().lastPathComponent.split(separator: "_").last ?? "") ?? -1
+        }
+        XCTAssertEqual(indices, Array(1 ... 6))
+    }
+
+    func testShareableFramesWithNoFramesThrows() {
+        XCTAssertThrowsError(try CarouselExporter().writeShareableFrames(
+            [], baseName: "Empty", into: FileManager.default.temporaryDirectory))
+    }
+
+    func testShareableFramesReplaceAStaleExport() throws {
+        // The temp directory is reused across exports; a shorter carousel must not
+        // leave the previous run's extra frames behind to be shared by mistake.
+        let dir = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let exporter = CarouselExporter()
+        _ = try exporter.writeShareableFrames(
+            (0 ..< 5).map { _ in makeImage() }, baseName: "Carousel", into: dir)
+        let second = try exporter.writeShareableFrames(
+            [makeImage(), makeImage()], baseName: "Carousel", into: dir)
+
+        XCTAssertEqual(second.count, 2)
+        let contents = try FileManager.default.contentsOfDirectory(
+            atPath: dir.appendingPathComponent("Carousel").path)
+        XCTAssertEqual(contents.sorted(), ["Carousel_01.jpg", "Carousel_02.jpg"],
+                       "stale frames from the previous export must be cleared")
+    }
 }

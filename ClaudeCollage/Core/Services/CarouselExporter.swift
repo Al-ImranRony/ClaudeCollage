@@ -3,13 +3,17 @@
 //  ClaudeCollage
 //
 //  Step 03b slice 7 — exports a carousel as an image set: each frame written as a
-//  zero-padded frame_NN.jpg, then archived into a .zip for saving to Files (Camera
-//  Roll can't hold a numbered folder). The zip is produced by NSFileCoordinator's
-//  `.forUploading` archive — the platform's own directory-to-zip, so there's no
-//  third-party dependency.
+//  zero-padded, numbered .jpg. Two deliveries share that one writer:
 //
-//  Video-slideshow export lands with Step 04's VideoComposer (AVFoundation); until
-//  then the editor offers image-set export only.
+//  • `writeShareableFrames` returns the loose images, which is what the share sheet
+//    hands to AirDrop / Messages / the photo apps a carousel is posted from.
+//  • `exportImageSet` archives them into a .zip for Files (the Camera Roll can't
+//    hold a numbered folder), via NSFileCoordinator's `.forUploading` archive —
+//    the platform's own directory-to-zip, so there's no third-party dependency.
+//
+//  Step 04.5: sharing used to go through the zip only, which nothing downstream
+//  could unpack. Frame ORDER is the contract in both paths — a carousel is only
+//  meaningful in sequence.
 //
 
 import CoreGraphics
@@ -25,10 +29,17 @@ public struct CarouselExporter {
 
     public init() {}
 
-    /// Writes each frame as `frame_01.jpg`, `frame_02.jpg`, … into `directory`
-    /// (created if needed) and returns the written file URLs in order.
+    /// Writes each frame as `<prefix>_01.jpg`, `<prefix>_02.jpg`, … into
+    /// `directory` (created if needed) and returns the written file URLs in
+    /// carousel order.
+    ///
+    /// The order of the returned array is the contract: a carousel is only
+    /// meaningful in sequence, and both the share sheet and the Photos save rely
+    /// on this being the running order.
     @discardableResult
-    public func writeFrames(_ images: [CGImage], to directory: URL) throws -> [URL] {
+    public func writeFrames(
+        _ images: [CGImage], to directory: URL, prefix: String = "frame"
+    ) throws -> [URL] {
         guard !images.isEmpty else { throw ExportError.noFrames }
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         var urls: [URL] = []
@@ -36,11 +47,26 @@ public struct CarouselExporter {
             guard let data = UIImage(cgImage: image).jpegData(compressionQuality: 0.92) else {
                 throw ExportError.encodingFailed
             }
-            let url = directory.appendingPathComponent(String(format: "frame_%02d.jpg", i + 1))
+            let url = directory.appendingPathComponent(String(format: "%@_%02d.jpg", prefix, i + 1))
             try data.write(to: url)
             urls.append(url)
         }
         return urls
+    }
+
+    /// Writes the frames as individually shareable JPEGs in a fresh directory and
+    /// returns them in order, ready to hand straight to a share sheet.
+    ///
+    /// This is the counterpart to `exportImageSet`: same files, no archive around
+    /// them. A zip is the right artifact for Files, but it is useless to the apps
+    /// people actually post carousels to, which expect the images themselves.
+    public func writeShareableFrames(
+        _ images: [CGImage], baseName: String, into directory: URL
+    ) throws -> [URL] {
+        guard !images.isEmpty else { throw ExportError.noFrames }
+        let framesDir = directory.appendingPathComponent(baseName, isDirectory: true)
+        try? FileManager.default.removeItem(at: framesDir)
+        return try writeFrames(images, to: framesDir, prefix: baseName)
     }
 
     /// Renders the frames to `<baseName>/frame_NN.jpg` under `directory`, then zips
