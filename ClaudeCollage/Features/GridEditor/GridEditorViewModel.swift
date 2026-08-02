@@ -293,8 +293,9 @@ public final class GridEditorViewModel {
     /// The lightweight display model for the GPU canvas.
     func canvasModel() -> CanvasModel {
         let frames = engine.layout(for: state.layout, canvasSize: canvasSize, borderWidth: CGFloat(state.borderWidth))
-        // Polygon shapes render edge-to-edge; corner radius only applies to grids.
-        let radius = state.layout.isPolygon ? 0 : CGFloat(state.cornerRadius)
+        // Applies to every shape now: `CellClipShape.path` rounds polygon vertices
+        // as well as rectangle corners.
+        let radius = CGFloat(state.cornerRadius)
         let cells: [CanvasCellModel] = frames.enumerated().map { index, frame in
             let custom = index < state.cells.count ? state.cells[index].customClip : nil
             return CanvasCellModel(
@@ -358,7 +359,7 @@ public final class GridEditorViewModel {
 
     private func makeRenderRequest() -> RenderRequest {
         let frames = engine.layout(for: state.layout, canvasSize: canvasSize, borderWidth: CGFloat(state.borderWidth))
-        let radius = state.layout.isPolygon ? 0 : CGFloat(state.cornerRadius)
+        let radius = CGFloat(state.cornerRadius)
         let cells: [RenderCell] = frames.enumerated().map { index, frame in
             let custom = index < state.cells.count ? state.cells[index].customClip : nil
             return RenderCell(

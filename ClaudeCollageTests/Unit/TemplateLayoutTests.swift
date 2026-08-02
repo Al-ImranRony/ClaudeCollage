@@ -64,7 +64,11 @@ final class TemplateLayoutTests: XCTestCase {
         XCTAssertEqual(frames[1].frame, CGRect(x: 505, y: 5, width: 490, height: 990))
     }
 
-    func testShapedTemplateCellRendersEdgeToEdge() {
+    /// Step 04.5 batch B changed this contract. Shaped template cells used to
+    /// ignore the border while rectangular ones in the same template honoured it,
+    /// so a mixed template gapped some cells and not others. An ellipse is defined
+    /// by its frame, so it takes the inset on the frame exactly like a rectangle.
+    func testShapedTemplateCellTakesTheBorderInset() {
         let layout = TemplateLayout(
             templateID: "t", name: "T", aspectRatio: "1:1",
             cells: [TemplateLayoutCell(frame: CGRect(x: 0.25, y: 0.25, width: 0.5, height: 0.5),
@@ -75,9 +79,22 @@ final class TemplateLayoutTests: XCTestCase {
             for: layout, canvasSize: CGSize(width: 400, height: 400), borderWidth: 20
         )
 
-        // Shaped cells ignore the rectangular border inset (like polygon layouts).
-        XCTAssertEqual(frames[0].frame, CGRect(x: 100, y: 100, width: 200, height: 200))
+        XCTAssertEqual(frames[0].frame, CGRect(x: 110, y: 110, width: 180, height: 180))
         XCTAssertEqual(frames[0].clipShape, .ellipse)
+    }
+
+    func testShapedTemplateCellIsUntouchedAtZeroBorder() {
+        let layout = TemplateLayout(
+            templateID: "t", name: "T", aspectRatio: "1:1",
+            cells: [TemplateLayoutCell(frame: CGRect(x: 0.25, y: 0.25, width: 0.5, height: 0.5),
+                                       clip: .ellipse)]
+        )
+
+        let frames = CollageLayoutEngine().templateLayout(
+            for: layout, canvasSize: CGSize(width: 400, height: 400), borderWidth: 0
+        )
+
+        XCTAssertEqual(frames[0].frame, CGRect(x: 100, y: 100, width: 200, height: 200))
     }
 
     func testCollageLayoutAccessorsForTemplateCase() {

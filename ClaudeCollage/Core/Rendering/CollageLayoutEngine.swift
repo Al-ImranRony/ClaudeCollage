@@ -259,9 +259,7 @@ public struct CollageLayoutEngine: Sendable {
         case let .grid(template):
             return self.layout(for: template, canvasSize: canvasSize, borderWidth: borderWidth)
         case let .polygon(template):
-            // Polygon layouts render edge-to-edge; the rectangular border inset
-            // does not apply (v1). The shape's own gaps provide separation.
-            return polygonLayout(for: template, canvasSize: canvasSize)
+            return polygonLayout(for: template, canvasSize: canvasSize, borderWidth: borderWidth)
         case let .template(template):
             return templateLayout(for: template, canvasSize: canvasSize, borderWidth: borderWidth)
         }
@@ -269,9 +267,10 @@ public struct CollageLayoutEngine: Sendable {
 
     /// Resolves a standard template's photo cells into absolute-pixel frames.
     ///
-    /// Rectangular cells take the same border inset as grid cells (templates are
-    /// authored edge-to-edge, the user's border slider provides the gap); shaped
-    /// cells render edge-to-edge like polygon layouts.
+    /// Templates are authored edge-to-edge; the user's border slider provides the
+    /// gap. Rectangular and elliptical cells inset their frame, vertex-defined
+    /// cells shrink their boundary about its centroid — the same split as
+    /// `polygonLayout`.
     public func templateLayout(
         for template: TemplateLayout,
         canvasSize: CGSize,
@@ -286,7 +285,8 @@ public struct CollageLayoutEngine: Sendable {
                 width: cell.frame.width * canvasSize.width,
                 height: cell.frame.height * canvasSize.height
             )
-            let insetRect = cell.clip.isRectangle ? scaled.insetBy(dx: inset, dy: inset) : scaled
+            let insetsFrame = cell.clip.isRectangle || cell.clip == .ellipse
+            let insetRect = insetsFrame ? scaled.insetBy(dx: inset, dy: inset) : scaled
             let clamped = CGRect(
                 x: insetRect.origin.x,
                 y: insetRect.origin.y,
@@ -297,7 +297,7 @@ public struct CollageLayoutEngine: Sendable {
                 id: "\(template.templateID)-\(index)",
                 frame: clamped,
                 shape: shapeTag(for: cell.clip),
-                clipShape: cell.clip
+                clipShape: cell.clip.inset(by: inset, in: scaled)
             )
         }
     }
@@ -307,22 +307,42 @@ public struct CollageLayoutEngine: Sendable {
     /// Each cell's `frame` is its bounding box in canvas pixels; `clipShape`
     /// carries the boundary, still normalized within that box, ready to become a
     /// `CGPath` at render time.
+    ///
+    /// - Parameter borderWidth: same convention as the grid path — each cell
+    ///   pulls in by `borderWidth / 2`, so the gap between two adjacent cells is
+    ///   `borderWidth`. Vertex shapes shrink their boundary about their centroid
+    ///   rather than their bounding box, since insetting the box of a triangle
+    ///   would move its edges by unequal amounts; ellipses inset the box, which
+    ///   for them is equivalent.
     public func polygonLayout(
         for template: PolygonTemplate,
-        canvasSize: CGSize
+        canvasSize: CGSize,
+        borderWidth: CGFloat = 0
     ) -> [CellFrame] {
-        template.normalizedCells.enumerated().map { index, cell in
+        let inset = max(0, borderWidth) / 2
+
+        return template.normalizedCells.enumerated().map { index, cell in
             let frame = CGRect(
                 x: cell.rect.minX * canvasSize.width,
                 y: cell.rect.minY * canvasSize.height,
                 width: cell.rect.width * canvasSize.width,
                 height: cell.rect.height * canvasSize.height
             )
+            // Ellipses are defined by the frame, so they inset it; vertex shapes
+            // keep the frame (the image still fills it) and shrink the boundary.
+            let insetFrame: CGRect
+            if case .ellipse = cell.clip {
+                let shrunk = frame.insetBy(dx: inset, dy: inset)
+                insetFrame = CGRect(x: shrunk.origin.x, y: shrunk.origin.y,
+                                    width: max(0, shrunk.width), height: max(0, shrunk.height))
+            } else {
+                insetFrame = frame
+            }
             return CellFrame(
                 id: "\(template.rawValue)-\(index)",
-                frame: frame,
+                frame: insetFrame,
                 shape: shapeTag(for: cell.clip),
-                clipShape: cell.clip
+                clipShape: cell.clip.inset(by: inset, in: frame)
             )
         }
     }

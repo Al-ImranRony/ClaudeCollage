@@ -142,9 +142,10 @@ final class CanvasView: UIView {
             }
         }
         // Content (images) is set only here — never in the per-frame layout pass.
+        // Clip shape is applied in `layoutCanvas`, where the reference scale factor
+        // needed to convert the corner radius to screen points is known.
         for (index, cell) in model.cells.enumerated() where cellViews.indices.contains(index) {
             cellViews[index].setImage(cell.image)
-            cellViews[index].setClipShape(cell.clipShape)
         }
         rebuildOverlayViewsIfNeeded(count: model.textOverlays.count)
         rebuildStickerViews(model.stickerOverlays)
@@ -259,6 +260,7 @@ final class CanvasView: UIView {
                 height: cell.frame.height * factor
             )
             view.layer.cornerRadius = cell.cornerRadius * factor
+            view.setClipShape(cell.clipShape, cornerRadius: cell.cornerRadius * factor)
             view.setGeometryTransform(cell.transform, factor: factor)
         }
 
@@ -463,6 +465,8 @@ final class CellContentView: UIView {
     /// The cell boundary. `.rectangle` uses the fast layer-cornerRadius path with
     /// no mask; any other shape installs a `CAShapeLayer` mask rebuilt on layout.
     private var clipShape: CellClipShape = .rectangle
+    /// Vertex-rounding radius for the masked path, in on-screen points.
+    private var shapeCornerRadius: CGFloat = 0
     private lazy var shapeMask: CAShapeLayer = {
         let mask = CAShapeLayer()
         mask.fillColor = UIColor.white.cgColor
@@ -506,9 +510,14 @@ final class CellContentView: UIView {
     /// Installs (or removes) the shape mask. Non-rectangular cells clip to a
     /// `CAShapeLayer` path — this fits the existing GPU layer tree with no change
     /// to how pan/zoom transforms are applied.
-    func setClipShape(_ shape: CellClipShape) {
-        guard shape != clipShape else { return }
+    ///
+    /// `cornerRadius` is in on-screen points and rounds the shape's vertices. It
+    /// is carried here rather than read from `layer.cornerRadius` because that
+    /// property has no effect once a mask is installed.
+    func setClipShape(_ shape: CellClipShape, cornerRadius: CGFloat = 0) {
+        guard shape != clipShape || cornerRadius != shapeCornerRadius else { return }
         clipShape = shape
+        shapeCornerRadius = cornerRadius
         if shape.isRectangle {
             layer.mask = nil
         } else {
@@ -524,7 +533,7 @@ final class CellContentView: UIView {
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         shapeMask.frame = bounds
-        shapeMask.path = clipShape.path(in: bounds)
+        shapeMask.path = clipShape.path(in: bounds, cornerRadius: shapeCornerRadius)
         CATransaction.commit()
     }
 

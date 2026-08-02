@@ -62,9 +62,17 @@ public struct GridEditorState: Equatable, Sendable, Codable {
     /// same undo/redo + autosave as text.
     public var stickerOverlays: [StickerOverlay]
 
+    /// Border applied to a newly created collage, in reference-canvas points
+    /// (~2.2% of a 1080 canvas). The old default of 8 was 0.74% — visible only
+    /// as a hairline once the slider cap stopped being the limiting factor.
+    ///
+    /// Deliberately NOT the same constant as the legacy decode fallback below:
+    /// changing this affects new collages only, never a persisted one.
+    public static let defaultBorderWidth: Double = 24
+
     public init(
         layout: CollageLayout = .grid(.twoUpHorizontal),
-        borderWidth: Double = 8,
+        borderWidth: Double = GridEditorState.defaultBorderWidth,
         cornerRadius: Double = 0,
         background: CollageBackground = .white,
         cells: [EditorCellState]? = nil,
@@ -81,7 +89,8 @@ public struct GridEditorState: Equatable, Sendable, Codable {
     }
 
     /// Convenience for grid callers / tests.
-    public init(template: GridTemplate, borderWidth: Double = 8, cornerRadius: Double = 0,
+    public init(template: GridTemplate, borderWidth: Double = GridEditorState.defaultBorderWidth,
+                cornerRadius: Double = 0,
                 background: CollageBackground = .white, cells: [EditorCellState]? = nil) {
         self.init(layout: .grid(template), borderWidth: borderWidth, cornerRadius: cornerRadius,
                   background: background, cells: cells)
@@ -116,6 +125,8 @@ public struct GridEditorState: Equatable, Sendable, Codable {
         } else {
             self.layout = .grid(.twoUpHorizontal)
         }
+        // Stays 8 — the value legacy blobs were authored against. Raising it here
+        // would silently restyle every already-saved collage that predates the key.
         self.borderWidth = try container.decodeIfPresent(Double.self, forKey: .borderWidth) ?? 8
         self.cornerRadius = try container.decodeIfPresent(Double.self, forKey: .cornerRadius) ?? 0
         self.background = try container.decodeIfPresent(CollageBackground.self, forKey: .background) ?? .white
