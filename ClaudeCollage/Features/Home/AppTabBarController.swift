@@ -55,7 +55,32 @@ final class AppTabBarController: UITabBarController {
             x: (view.bounds.width - diameter) / 2, y: 0, width: diameter, height: diameter
         )
         plusButton.layer.cornerRadius = diameter / 2
+        updatePlusVisibility()
     }
+
+    // MARK: - Floating button visibility
+
+    /// The "+" belongs to Home only, and must never outlive the tab bar.
+    ///
+    /// It lives on the tab bar CONTROLLER's view rather than on the bar, so
+    /// `hidesBottomBarWhenPushed` slides the bar away without touching it — it was
+    /// left hovering over pushed editors, sitting on top of their bottom controls.
+    ///
+    /// Keyed off navigation stack depth rather than the bar's frame: the frame is
+    /// mid-animation at the moment we need the answer, whereas the stack has
+    /// already been updated by `willShow`.
+    private func updatePlusVisibility() {
+        plusContainer.isHidden = !isPlusVisible
+    }
+
+    private var isPlusVisible: Bool {
+        guard selectedIndex == Self.homeIndex,
+              let nav = selectedViewController as? UINavigationController
+        else { return false }
+        return nav.viewControllers.count == 1
+    }
+
+    private static let homeIndex = 0
 
     // MARK: - Setup
 
@@ -65,6 +90,8 @@ final class AppTabBarController: UITabBarController {
         var controllers: [UIViewController] = roots.map { entry in
             let nav = UINavigationController(rootViewController: entry.root)
             nav.tabBarItem = entry.item
+            // Watched so the floating "+" disappears the moment an editor is pushed.
+            nav.delegate = self
             return nav
         }
 
@@ -163,6 +190,26 @@ extension AppTabBarController: UITabBarControllerDelegate {
         _ tabBarController: UITabBarController, shouldSelect viewController: UIViewController
     ) -> Bool {
         viewControllers?.firstIndex(of: viewController) != Self.placeholderIndex
+    }
+
+    func tabBarController(
+        _ tabBarController: UITabBarController, didSelect viewController: UIViewController
+    ) {
+        updatePlusVisibility()
+    }
+}
+
+// MARK: - Child navigation
+
+extension AppTabBarController: UINavigationControllerDelegate {
+    /// Fires before the push/pop animation, by which point the stack has already
+    /// changed — so the "+" leaves with the tab bar instead of lingering over the
+    /// editor for the length of the transition.
+    func navigationController(
+        _ navigationController: UINavigationController,
+        willShow viewController: UIViewController, animated: Bool
+    ) {
+        updatePlusVisibility()
     }
 }
 

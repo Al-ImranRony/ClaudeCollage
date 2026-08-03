@@ -83,14 +83,18 @@ public final class GridEditorViewModel {
     }
 
     public func previewBorderWidth(_ width: Double) {
-        let clamped = max(0, min(20, width))
+        // Clamped to the derived ceiling, NOT a constant. This used to be
+        // `min(20, width)` — the old hardcoded slider cap — which survived the
+        // move to proportional bounds and silently pinned the border at 20pt
+        // about 15% along the new slider, so dragging further did nothing.
+        let clamped = max(0, min(maxBorderWidth, width))
         guard clamped != state.borderWidth else { return }
         state.borderWidth = clamped
         onChange?()
     }
 
     public func previewCornerRadius(_ radius: Double) {
-        let clamped = max(0, radius)
+        let clamped = max(0, min(maxCornerRadius, radius))
         guard clamped != state.cornerRadius else { return }
         state.cornerRadius = clamped
         onChange?()

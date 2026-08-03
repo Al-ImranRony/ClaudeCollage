@@ -103,6 +103,52 @@ final class EditorControlBoundsTests: XCTestCase {
         XCTAssertEqual(relaxed.maxCornerRadius, tight.maxCornerRadius, accuracy: 0.001)
     }
 
+    // MARK: - Preview clamps (device-QA regressions)
+
+    func testPreviewBorderAcceptsValuesAboveTheOldFixedCap() {
+        // The regression: previewBorderWidth kept clamping to `min(20, width)` after
+        // the slider moved to proportional bounds, so the border froze at 20pt about
+        // 15% along the new range and dragging further did nothing.
+        let viewModel = makeViewModel(layout: .grid(.fourSquare))
+        XCTAssertGreaterThan(viewModel.maxBorderWidth, 20, "precondition")
+
+        viewModel.previewBorderWidth(viewModel.maxBorderWidth)
+        XCTAssertEqual(viewModel.state.borderWidth, viewModel.maxBorderWidth, accuracy: 0.001,
+                       "The full slider travel must reach the derived ceiling")
+
+        viewModel.previewBorderWidth(60)
+        XCTAssertEqual(viewModel.state.borderWidth, 60, accuracy: 0.001,
+                       "A mid-range value above 20 must apply verbatim")
+    }
+
+    func testPreviewBorderIsStillClampedToTheCeiling() {
+        let viewModel = makeViewModel(layout: .grid(.fourSquare))
+        viewModel.previewBorderWidth(10_000)
+        XCTAssertEqual(viewModel.state.borderWidth, viewModel.maxBorderWidth, accuracy: 0.001)
+        viewModel.previewBorderWidth(-5)
+        XCTAssertEqual(viewModel.state.borderWidth, 0, accuracy: 0.001)
+    }
+
+    func testPreviewCornerIsClampedToTheCeiling() {
+        let viewModel = makeViewModel(layout: .grid(.fourSquare))
+        viewModel.previewCornerRadius(10_000)
+        XCTAssertEqual(viewModel.state.cornerRadius, viewModel.maxCornerRadius, accuracy: 0.001)
+    }
+
+    func testEverySliderPositionMovesTheBorder() {
+        // Walks the slider end to end: each step must produce a strictly larger
+        // border, which is exactly what stopped happening past the old cap.
+        let viewModel = makeViewModel(layout: .grid(.fourSquare))
+        var previous = -1.0
+        for step in 0 ... 10 {
+            let fraction = Double(step) / 10
+            viewModel.previewBorderWidth(fraction * viewModel.maxBorderWidth)
+            XCTAssertGreaterThan(viewModel.state.borderWidth, previous,
+                                 "Slider at \(Int(fraction * 100))% did not move the border")
+            previous = viewModel.state.borderWidth
+        }
+    }
+
     // MARK: - Layout alternatives predicate
 
     func testGridAndPolygonLayoutsOfferAlternatives() {

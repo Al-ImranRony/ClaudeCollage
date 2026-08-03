@@ -428,9 +428,32 @@ final class CanvasView: UIView {
     var displayedContentRect: CGRect { contentContainer.frame }
 
     /// Which cell contains `point` (this view's coordinates), if any.
+    /// The index of the TOPMOST cell containing `point`.
+    ///
+    /// Searched back-to-front, matching `overlayID(at:)` and `stickerID(at:)`.
+    /// Template cells may overlap, and later cells are added as later subviews, so
+    /// a front-to-back search returns whatever is underneath: on a template with a
+    /// full-bleed backdrop behind smaller zones, every tap resolved to the backdrop
+    /// and the smaller zones could not be filled at all.
+    ///
+    /// Non-rectangular cells are tested against their actual clip shape rather than
+    /// their bounding box, so a diagonal or polygon cell does not swallow taps in
+    /// the corners it does not visually occupy.
     func cellIndex(at point: CGPoint) -> Int? {
         let local = convert(point, to: contentContainer)
-        return cellViews.firstIndex { $0.frame.contains(local) }
+        for index in cellViews.indices.reversed() {
+            let view = cellViews[index]
+            guard view.frame.contains(local) else { continue }
+            let cells = model?.cells ?? []
+            let shape = cells.indices.contains(index) ? cells[index].clipShape : .rectangle
+            if shape.isRectangle { return index }
+            // Hit-test the real boundary, in the cell's own coordinate space.
+            let inCell = CGPoint(x: local.x - view.frame.minX, y: local.y - view.frame.minY)
+            if shape.path(in: CGRect(origin: .zero, size: view.frame.size)).contains(inCell) {
+                return index
+            }
+        }
+        return nil
     }
 
     /// The id of the topmost text overlay containing `point` (this view's

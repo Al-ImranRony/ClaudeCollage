@@ -90,6 +90,38 @@ final class TabBarShellUITests: XCTestCase {
     }
 
     @MainActor
+    func testFloatingPlusIsHiddenOutsideHome() {
+        // It lives on the tab bar controller's view, so nothing hides it for free.
+        // On device it stayed on screen over the editor's Border slider.
+        let app = launch()
+        let plus = app.buttons["startEditingButton"]
+        XCTAssertTrue(plus.waitForExistence(timeout: 5), "Shown on Home")
+
+        for identifier in ["templatesButton", "projectsTab", "carouselButton"] {
+            app.buttons[identifier].tap()
+            XCTAssertFalse(plus.exists, "The + is Home-only, but showed on \(identifier)")
+        }
+
+        app.buttons["homeTab"].tap()
+        XCTAssertTrue(plus.waitForExistence(timeout: 5), "…and comes back on Home")
+    }
+
+    @MainActor
+    func testFloatingPlusIsHiddenWhileEditing() {
+        let app = launch()
+        let plus = app.buttons["startEditingButton"]
+        XCTAssertTrue(plus.waitForExistence(timeout: 5))
+
+        app.buttons["newProjectButton"].tap()
+        XCTAssertTrue(app.navigationBars["Grid Collage"].waitForExistence(timeout: 8))
+        XCTAssertFalse(plus.exists,
+                       "The + must not hover over the editor's bottom controls")
+
+        app.navigationBars["Grid Collage"].buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(plus.waitForExistence(timeout: 5), "…and returns on the way back")
+    }
+
+    @MainActor
     func testTabBarIsHiddenWhileEditing() {
         // hidesBottomBarWhenPushed — without it the bar sits under the editor's
         // bottom control strip.
