@@ -5,18 +5,21 @@
 //  Step 04.5 batch C — the app's root shell.
 //
 //  Module selection used to be five UIBarButtonItems crammed into the Home nav
-//  bar. It is now a bottom tab bar with a floating "Start Editing" button:
+//  bar. It is now a four-item bottom tab bar with a floating "Start Editing"
+//  button sitting clear above it:
 //
-//      Home | Templates | (+) | Projects | Carousel
+//                        (+)
+//      Home | Templates | Projects | Carousel
 //
 //  Each tab owns its own UINavigationController, so pushing an editor keeps that
 //  tab's back stack intact. Editors set `hidesBottomBarWhenPushed`, so the bar is
 //  gone while editing and their bottom controls keep the full safe area.
 //
-//  The "+" is not a tab. UITabBarController spreads its items evenly, so a real
-//  centred button would straddle two of them; instead a disabled placeholder tab
-//  holds the middle slot open and the button floats above the gap in a
-//  hit-test-passthrough container.
+//  The "+" is not a tab and no longer notches into the bar, so no placeholder is
+//  needed to hold a centre slot open — all four items are real and evenly spread.
+//  It is available from every tab: starting a collage should never require going
+//  back to Home first. It lives in a hit-test-passthrough container so only the
+//  button itself takes touches; everything around it reaches the content below.
 //
 
 import UIKit
@@ -27,13 +30,18 @@ final class AppTabBarController: UITabBarController {
     /// Tapped the floating "Start Editing" button.
     var onStartEditing: (() -> Void)?
 
-    /// Index of the disabled placeholder that reserves the centre slot.
-    private static let placeholderIndex = 2
-
     private let plusContainer = PassthroughView()
     private let plusButton = UIButton(type: .custom)
 
-    private let diameter: CGFloat = 60
+    private let diameter: CGFloat = 56
+    /// Gap between the bottom of the button and the top of the tab bar. Small
+    /// enough to read as one control cluster, large enough that the button is
+    /// clearly floating above the bar rather than notched into it.
+    private let barGap: CGFloat = 10
+
+    /// Vertical space a tab root must leave free so its content can scroll clear
+    /// of the button instead of being covered — and, worse, having its taps eaten.
+    private var plusClearance: CGFloat { diameter + barGap }
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -44,10 +52,10 @@ final class AppTabBarController: UITabBarController {
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
-        // Sits slightly proud of the bar, which is what reads as "floating".
+        // Fully above the bar, not notched into it.
         plusContainer.frame = CGRect(
             x: 0,
-            y: tabBar.frame.minY - diameter / 2,
+            y: tabBar.frame.minY - diameter - barGap,
             width: view.bounds.width,
             height: diameter
         )
@@ -60,11 +68,12 @@ final class AppTabBarController: UITabBarController {
 
     // MARK: - Floating button visibility
 
-    /// The "+" belongs to Home only, and must never outlive the tab bar.
+    /// Shown on every tab — starting a collage should never require switching to
+    /// Home first — but never over a pushed editor.
     ///
     /// It lives on the tab bar CONTROLLER's view rather than on the bar, so
-    /// `hidesBottomBarWhenPushed` slides the bar away without touching it — it was
-    /// left hovering over pushed editors, sitting on top of their bottom controls.
+    /// `hidesBottomBarWhenPushed` slides the bar away without touching it; left
+    /// alone it hovered over editors, on top of their bottom controls.
     ///
     /// Keyed off navigation stack depth rather than the bar's frame: the frame is
     /// mid-animation at the moment we need the answer, whereas the stack has
@@ -74,20 +83,19 @@ final class AppTabBarController: UITabBarController {
     }
 
     private var isPlusVisible: Bool {
-        guard selectedIndex == Self.homeIndex,
-              let nav = selectedViewController as? UINavigationController
-        else { return false }
+        guard let nav = selectedViewController as? UINavigationController else { return false }
         return nav.viewControllers.count == 1
     }
 
-    private static let homeIndex = 0
-
     // MARK: - Setup
 
-    /// Wraps each root in its own navigation controller and inserts the disabled
-    /// placeholder that holds the centre slot open for the "+".
+    /// Wraps each root in its own navigation controller. All items are real — the
+    /// "+" sits above the bar rather than inside it, so nothing holds a slot open.
     func setTabs(_ roots: [(root: UIViewController, item: UITabBarItem)]) {
-        var controllers: [UIViewController] = roots.map { entry in
+        let controllers: [UIViewController] = roots.map { entry in
+            // Applied to the ROOT, not the nav: a pushed editor hides both the bar
+            // and the "+", so it must not inherit the reserved space.
+            entry.root.additionalSafeAreaInsets.bottom = plusClearance
             let nav = UINavigationController(rootViewController: entry.root)
             nav.tabBarItem = entry.item
             // Watched so the floating "+" disappears the moment an editor is pushed.
@@ -95,14 +103,7 @@ final class AppTabBarController: UITabBarController {
             return nav
         }
 
-        let placeholder = UIViewController()
-        placeholder.tabBarItem = UITabBarItem(title: nil, image: nil, tag: 0)
-        placeholder.tabBarItem.isEnabled = false
-        placeholder.tabBarItem.accessibilityIdentifier = "tabBarCentreSpacer"
-        controllers.insert(placeholder, at: Self.placeholderIndex)
-
         setViewControllers(controllers, animated: false)
-        // The placeholder must never be the initial selection.
         selectedIndex = 0
     }
 
@@ -184,14 +185,6 @@ final class AppTabBarController: UITabBarController {
 // MARK: - Delegate
 
 extension AppTabBarController: UITabBarControllerDelegate {
-    /// Belt-and-braces alongside `isEnabled = false`: the centre spacer is not a
-    /// destination, so it must never become the selection.
-    func tabBarController(
-        _ tabBarController: UITabBarController, shouldSelect viewController: UIViewController
-    ) -> Bool {
-        viewControllers?.firstIndex(of: viewController) != Self.placeholderIndex
-    }
-
     func tabBarController(
         _ tabBarController: UITabBarController, didSelect viewController: UIViewController
     ) {
@@ -220,7 +213,14 @@ extension AppTabBarController: UINavigationControllerDelegate {
 /// plain full-width `UIView` would otherwise swallow.
 private final class PassthroughView: UIView {
     override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
-        for subview in subviews.reversed() {
+        // These three checks are what `super.hitTest` does before it walks anything,
+        // and overriding without them made the container claim touches even while
+        // hidden: the editor's Border slider and Custom Shape button sit in exactly
+        // the band the button occupies, so dragging the slider opened the Start
+        // Editing sheet instead.
+        guard !isHidden, alpha > 0.01, isUserInteractionEnabled else { return nil }
+
+        for subview in subviews.reversed() where !subview.isHidden && subview.alpha > 0.01 {
             let local = convert(point, to: subview)
             if let hit = subview.hitTest(local, with: event) { return hit }
         }

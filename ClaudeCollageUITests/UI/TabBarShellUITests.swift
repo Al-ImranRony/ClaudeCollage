@@ -90,20 +90,42 @@ final class TabBarShellUITests: XCTestCase {
     }
 
     @MainActor
-    func testFloatingPlusIsHiddenOutsideHome() {
-        // It lives on the tab bar controller's view, so nothing hides it for free.
-        // On device it stayed on screen over the editor's Border slider.
+    func testFloatingPlusIsAvailableFromEveryTab() {
+        // Starting a collage must never require switching to Home first.
         let app = launch()
         let plus = app.buttons["startEditingButton"]
         XCTAssertTrue(plus.waitForExistence(timeout: 5), "Shown on Home")
 
-        for identifier in ["templatesButton", "projectsTab", "carouselButton"] {
+        for identifier in ["templatesButton", "projectsTab", "carouselButton", "homeTab"] {
             app.buttons[identifier].tap()
-            XCTAssertFalse(plus.exists, "The + is Home-only, but showed on \(identifier)")
+            XCTAssertTrue(plus.waitForExistence(timeout: 3),
+                          "The + must be present on \(identifier)")
+            XCTAssertTrue(plus.isHittable, "…and tappable there, not covered")
         }
+    }
 
-        app.buttons["homeTab"].tap()
-        XCTAssertTrue(plus.waitForExistence(timeout: 5), "…and comes back on Home")
+    @MainActor
+    func testFloatingPlusSitsClearAboveTheTabBar() {
+        // It should read as floating above the bar, not notched into it: no vertical
+        // overlap with the bar's own frame.
+        let app = launch()
+        let plus = app.buttons["startEditingButton"]
+        XCTAssertTrue(plus.waitForExistence(timeout: 5))
+        let tabBar = app.tabBars["mainTabBar"]
+        XCTAssertTrue(tabBar.waitForExistence(timeout: 5))
+
+        XCTAssertLessThanOrEqual(plus.frame.maxY, tabBar.frame.minY + 0.5,
+                                 "The + overlaps the tab bar instead of floating above it")
+    }
+
+    @MainActor
+    func testEveryTabIsARealDestination() {
+        // The centre placeholder that used to hold a slot open for a notched "+" is
+        // gone, so all four items are real and selectable.
+        let app = launch()
+        let tabBar = app.tabBars["mainTabBar"]
+        XCTAssertTrue(tabBar.waitForExistence(timeout: 5))
+        XCTAssertEqual(tabBar.buttons.count, 4, "Four real tabs, no spacer")
     }
 
     @MainActor
@@ -119,6 +141,26 @@ final class TabBarShellUITests: XCTestCase {
 
         app.navigationBars["Grid Collage"].buttons.element(boundBy: 0).tap()
         XCTAssertTrue(plus.waitForExistence(timeout: 5), "…and returns on the way back")
+    }
+
+    @MainActor
+    func testHiddenPlusDoesNotSwallowEditorTouches() {
+        // The "+" sits in a custom hit-test container. Overriding hitTest without
+        // super's hidden/alpha checks made that container claim touches even while
+        // hidden — and it occupies exactly the band the editor's Border slider and
+        // Custom Shape button live in, so dragging the slider opened the Start
+        // Editing sheet and the back button became unreachable.
+        let app = launch()
+        app.buttons["newProjectButton"].tap()
+        XCTAssertTrue(app.navigationBars["Grid Collage"].waitForExistence(timeout: 8))
+
+        app.sliders.element(boundBy: 0).adjust(toNormalizedSliderPosition: 0.6)
+        XCTAssertEqual(app.sheets.count, 0,
+                       "Dragging a slider must not reach the hidden + behind it")
+
+        app.navigationBars["Grid Collage"].buttons["BackButton"].tap()
+        XCTAssertTrue(app.navigationBars["ClaudeCollage"].waitForExistence(timeout: 5),
+                      "…and the editor's own chrome stays reachable")
     }
 
     @MainActor
