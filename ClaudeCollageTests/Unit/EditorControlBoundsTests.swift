@@ -149,6 +149,66 @@ final class EditorControlBoundsTests: XCTestCase {
         }
     }
 
+    // MARK: - Live-drag update routing
+
+    func testBorderDragFiresGeometryOnlyNotAFullRebuild() {
+        // `onChange` drives a full canvas reconfigure: every CGImage re-wrapped,
+        // every sticker view torn down and re-rasterized. At slider frequency that
+        // is what made the canvas stutter mid-drag. A border tick must take the
+        // geometry-only route.
+        let viewModel = makeViewModel(layout: .grid(.fourSquare))
+        var fullRebuilds = 0
+        var geometryUpdates = 0
+        viewModel.onChange = { fullRebuilds += 1 }
+        viewModel.onGeometryChange = { geometryUpdates += 1 }
+
+        for step in 1 ... 20 {
+            viewModel.previewBorderWidth(Double(step) * 2)
+        }
+
+        XCTAssertEqual(geometryUpdates, 20, "Every tick repositions the cells")
+        XCTAssertEqual(fullRebuilds, 0, "…and none of them rebuilds the canvas")
+    }
+
+    func testCornerDragFiresGeometryOnlyNotAFullRebuild() {
+        let viewModel = makeViewModel(layout: .grid(.fourSquare))
+        var fullRebuilds = 0
+        var geometryUpdates = 0
+        viewModel.onChange = { fullRebuilds += 1 }
+        viewModel.onGeometryChange = { geometryUpdates += 1 }
+
+        for step in 1 ... 20 {
+            viewModel.previewCornerRadius(Double(step) * 2)
+        }
+
+        XCTAssertEqual(geometryUpdates, 20)
+        XCTAssertEqual(fullRebuilds, 0)
+    }
+
+    func testRepeatedIdenticalValuesDoNoWorkAtAll() {
+        // UISlider emits valueChanged far more often than the value actually moves.
+        let viewModel = makeViewModel(layout: .grid(.fourSquare))
+        var geometryUpdates = 0
+        viewModel.onGeometryChange = { geometryUpdates += 1 }
+
+        viewModel.previewBorderWidth(30)
+        for _ in 0 ..< 10 { viewModel.previewBorderWidth(30) }
+
+        XCTAssertEqual(geometryUpdates, 1, "An unchanged value must not redraw")
+    }
+
+    func testDiscreteEditsStillTakeTheFullPath() {
+        // Only the live drags are cheap; a layout change still needs a real rebuild
+        // because the cell count and clip shapes change.
+        let viewModel = makeViewModel(layout: .grid(.fourSquare))
+        var fullRebuilds = 0
+        viewModel.onChange = { fullRebuilds += 1 }
+        viewModel.onGeometryChange = { XCTFail("A layout change is not geometry-only") }
+
+        viewModel.setLayout(.grid(.nineGrid))
+        XCTAssertEqual(fullRebuilds, 1)
+    }
+
     // MARK: - Layout alternatives predicate
 
     func testGridAndPolygonLayoutsOfferAlternatives() {

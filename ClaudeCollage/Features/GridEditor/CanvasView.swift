@@ -152,6 +152,33 @@ final class CanvasView: UIView {
         layoutCanvas()
     }
 
+    /// Lightweight path for border / corner-radius drags: only cell GEOMETRY has
+    /// changed, so the images, text and stickers are left exactly as they are.
+    ///
+    /// A full `configure` re-wraps every `CGImage` into a `UIImage`, tears down and
+    /// rebuilds every sticker view, and re-rasterizes each sticker symbol through
+    /// `StickerRendering`. Doing that at slider frequency is what made the canvas
+    /// stutter while dragging Border or Corners — none of it is needed when the only
+    /// thing that moved is where the cells sit.
+    ///
+    /// Falls back to the full path if the cell count turns out to differ, so callers
+    /// can use this without first proving the layout is unchanged.
+    func updateGeometry(with model: CanvasModel) {
+        guard model.cells.count == cellViews.count else {
+            configure(with: model)
+            return
+        }
+        self.model = model
+        // Cell frames, corner radii and mask paths all change together here; without
+        // this the mask/selection layers can lag the frames by a frame or two.
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        layoutCellGeometry()
+        updateCellSelection()
+        CATransaction.commit()
+        applyZoomTransform()
+    }
+
     /// Lightweight path for text-only edits (typing / styling): refresh the overlay
     /// views without touching the photo cell views or re-wrapping their CGImages.
     func updateTextOverlays(_ overlays: [TextOverlay]) {
@@ -239,6 +266,17 @@ final class CanvasView: UIView {
     /// Positions cells and re-applies transforms at the current scale. Does NOT
     /// touch cell images, so a bounds change never re-wraps CGImages.
     private func layoutCanvas() {
+        layoutCellGeometry()
+        layoutOverlays()
+        layoutStickers()
+        updateCellSelection()
+        applyZoomTransform()
+    }
+
+    /// The cell half of the layout pass, split out so a border / corner drag can
+    /// reposition the cells without also re-laying-out text and re-rasterizing
+    /// stickers. See `updateGeometry(with:)`.
+    private func layoutCellGeometry() {
         guard let model, model.canvasSize.width > 0 else { return }
 
         // Frame math must run with an identity transform (setting .frame under a
@@ -263,11 +301,6 @@ final class CanvasView: UIView {
             view.setClipShape(cell.clipShape, cornerRadius: cell.cornerRadius * factor)
             view.setGeometryTransform(cell.transform, factor: factor)
         }
-
-        layoutOverlays()
-        layoutStickers()
-        updateCellSelection()
-        applyZoomTransform()
     }
 
     // MARK: - Cell selection

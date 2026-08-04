@@ -44,6 +44,12 @@ public final class GridEditorViewModel {
     /// The view controller refreshes just the overlay layers — no cell rebuild.
     public var onTextOverlaysChanged: (() -> Void)?
 
+    /// Only cell geometry moved — a live border / corner-radius drag. The cell set,
+    /// its images and every overlay are unchanged, so the view controller
+    /// repositions cells and nothing else. Fired continuously during a drag, which
+    /// is why it must stay cheap.
+    public var onGeometryChange: (() -> Void)?
+
     /// A committed change — persistence auto-saves (debounced by the caller).
     public var onCommit: ((GridEditorViewModel) -> Void)?
 
@@ -90,14 +96,16 @@ public final class GridEditorViewModel {
         let clamped = max(0, min(maxBorderWidth, width))
         guard clamped != state.borderWidth else { return }
         state.borderWidth = clamped
-        onChange?()
+        // Geometry-only: `onChange` would rebuild images, text and stickers on every
+        // tick of the drag.
+        onGeometryChange?()
     }
 
     public func previewCornerRadius(_ radius: Double) {
         let clamped = max(0, min(maxCornerRadius, radius))
         guard clamped != state.cornerRadius else { return }
         state.cornerRadius = clamped
-        onChange?()
+        onGeometryChange?()
     }
 
     public func setBackground(_ background: CollageBackground) {

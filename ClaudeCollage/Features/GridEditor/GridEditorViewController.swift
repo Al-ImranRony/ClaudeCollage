@@ -337,6 +337,13 @@ final class GridEditorViewController: UIViewController {
             guard let self else { return }
             self.canvasView.updateTextOverlays(self.viewModel.textOverlays)
         }
+        // Border / corner drags: reposition cells only. Deliberately does NOT call
+        // `refreshToolbar` — undo state can't change until the drag is committed on
+        // release, so there is nothing to refresh at slider frequency.
+        viewModel.onGeometryChange = { [weak self] in
+            guard let self else { return }
+            self.canvasView.updateGeometry(with: self.viewModel.canvasModel())
+        }
 
         // Stickers manage their own geometry on the GPU during a gesture; the view
         // model records it (no snapshot) and commits one on gesture end.
@@ -456,6 +463,9 @@ final class GridEditorViewController: UIViewController {
     /// drag finishes.
     @objc private func sliderReleased() {
         viewModel.commitInteractiveChange()
+        // The drag itself goes through the geometry-only path, which skips this to
+        // stay cheap — so the undo button is brought up to date once, here.
+        refreshToolbar()
     }
 
     // MARK: - Custom shape (premium)
