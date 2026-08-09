@@ -55,6 +55,11 @@ public final class GridEditorViewModel {
 
     /// Downsampled source photos, keyed by stable image id.
     private var sourceImages: [UUID: CGImage] = [:]
+
+    /// Resolves personal (image-backed) stickers to bitmaps for both renderers.
+    /// Injected so the view model never reaches into SwiftData itself, and so the
+    /// editor works headlessly in tests with no store at all.
+    public var personalStickerImages: ((_ overlays: [StickerOverlay]) -> [UUID: CGImage])?
     /// Cached filtered results for cells whose filters are non-default.
     private var filteredImages: [UUID: CGImage] = [:]
 
@@ -320,7 +325,8 @@ public final class GridEditorViewModel {
         }
         return CanvasModel(canvasSize: canvasSize, background: state.background,
                            cells: cells, textOverlays: state.textOverlays,
-                           stickerOverlays: state.stickerOverlays)
+                           stickerOverlays: state.stickerOverlays,
+                           stickerImages: resolvedStickerImages())
     }
 
     // MARK: - Rendering (one-shot only)
@@ -340,6 +346,13 @@ public final class GridEditorViewModel {
     public func renderThumbnail(maxDimension: CGFloat = 320) -> CGImage? {
         let scale = canvasSize.width > 0 ? maxDimension / canvasSize.width : 1
         return renderer.render(makeRenderRequest(), scale: scale)
+    }
+
+    /// Bitmaps for whatever personal stickers the current state references.
+    /// Empty when no resolver is wired, which leaves symbol stickers untouched.
+    private func resolvedStickerImages() -> [UUID: CGImage] {
+        guard let personalStickerImages else { return [:] }
+        return personalStickerImages(state.stickerOverlays)
     }
 
     // MARK: - Persistence bridge
@@ -387,7 +400,8 @@ public final class GridEditorViewModel {
         // its own raster scale in `render`, leaving these coordinates untouched).
         return RenderRequest(canvasSize: canvasSize, background: state.background,
                              cells: cells, textOverlays: state.textOverlays, textFontScale: 1,
-                             stickerOverlays: state.stickerOverlays)
+                             stickerOverlays: state.stickerOverlays,
+                             stickerImages: resolvedStickerImages())
     }
 
     /// Recomputes filtered images for all cells after an undo/redo/restore.

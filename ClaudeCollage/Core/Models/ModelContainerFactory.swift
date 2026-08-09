@@ -19,6 +19,7 @@ public enum ModelContainerFactory {
         let schema = Schema([
             CollageProject.self,
             CollageCell.self,
+            PersonalSticker.self,
         ])
         do {
             let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)

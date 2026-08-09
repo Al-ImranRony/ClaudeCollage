@@ -35,6 +35,9 @@ struct CanvasModel {
     var textOverlays: [TextOverlay] = []
     /// Sticker overlays layered above the text (normalized). Step 03a slice 6.
     var stickerOverlays: [StickerOverlay] = []
+    /// Bitmaps for personal (image-backed) stickers, keyed by `imageID`. Resolved
+    /// by the view model so this view never reaches into a store.
+    var stickerImages: [UUID: CGImage] = [:]
 }
 
 final class CanvasView: UIView {
@@ -372,7 +375,9 @@ final class CanvasView: UIView {
         let size = contentContainer.bounds.size
         guard size.width > 0 else { return }
         for (index, overlay) in model.stickerOverlays.enumerated() where stickerViews.indices.contains(index) {
-            stickerViews[index].apply(overlay: overlay, in: size)
+            stickerViews[index].apply(
+                overlay: overlay, in: size,
+                source: overlay.imageID.flatMap { model.stickerImages[$0] })
         }
     }
 
@@ -766,6 +771,8 @@ final class StickerOverlayView: UIView {
 
     let stickerID: UUID
     private var overlay: StickerOverlay
+    /// Resolved bitmap for a personal sticker; nil for a symbol sticker.
+    private var source: CGImage?
     private let imageView = UIImageView()
     private let selectionLayer = CAShapeLayer()
 
@@ -815,8 +822,9 @@ final class StickerOverlayView: UIView {
 
     /// Positions the view from its normalized model at the given container size and
     /// re-renders the symbol crisply at the resolved point side.
-    func apply(overlay: StickerOverlay, in containerSize: CGSize) {
+    func apply(overlay: StickerOverlay, in containerSize: CGSize, source: CGImage? = nil) {
         self.overlay = overlay
+        self.source = source
         let side = max(8, CGFloat(overlay.sizeNorm) * containerSize.width)
         // Set bounds with an identity transform, then re-apply the rotation, so the
         // rotation composes cleanly with the new size (mirrors CellContentView).
@@ -838,7 +846,7 @@ final class StickerOverlayView: UIView {
     }
 
     private func refreshImage(side: CGFloat) {
-        imageView.image = StickerRendering.image(for: overlay, sidePx: side)
+        imageView.image = StickerRendering.image(for: overlay, sidePx: side, source: source)
     }
 
     // MARK: - Gestures

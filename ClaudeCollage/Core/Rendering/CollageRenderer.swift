@@ -52,6 +52,9 @@ public struct RenderRequest: Sendable {
     /// Sticker overlays drawn (in order) above the text. Normalized center + size;
     /// resolution-independent SF Symbols, so no font scale is needed.
     public let stickerOverlays: [StickerOverlay]
+    /// Bitmaps for personal (image-backed) stickers, keyed by `StickerOverlay.imageID`.
+    /// Resolved by the caller so the renderer stays Sendable and off-actor.
+    public let stickerImages: [UUID: CGImage]
 
     public init(
         canvasSize: CGSize,
@@ -59,7 +62,8 @@ public struct RenderRequest: Sendable {
         cells: [RenderCell],
         textOverlays: [TextOverlay] = [],
         textFontScale: CGFloat = 1,
-        stickerOverlays: [StickerOverlay] = []
+        stickerOverlays: [StickerOverlay] = [],
+        stickerImages: [UUID: CGImage] = [:]
     ) {
         self.canvasSize = canvasSize
         self.background = background
@@ -67,6 +71,7 @@ public struct RenderRequest: Sendable {
         self.textOverlays = textOverlays
         self.textFontScale = textFontScale
         self.stickerOverlays = stickerOverlays
+        self.stickerImages = stickerImages
     }
 }
 
@@ -126,7 +131,9 @@ public final class CollageRenderer: @unchecked Sendable {
 
             // Stickers composite above the text, in authoring order.
             for overlay in request.stickerOverlays {
-                StickerRendering.draw(overlay, in: request.canvasSize, context: cg)
+                StickerRendering.draw(
+                    overlay, in: request.canvasSize, context: cg,
+                    source: overlay.imageID.flatMap { request.stickerImages[$0] })
             }
         }
         return output.cgImage

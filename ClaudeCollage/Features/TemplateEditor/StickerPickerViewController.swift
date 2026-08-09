@@ -19,6 +19,18 @@ final class StickerPickerViewController: UIViewController {
     /// Called with the chosen sticker; the editor turns it into a canvas overlay.
     var onPick: ((StickerEntry) -> Void)?
 
+    /// Called with a personal sticker's id — a subject the user lifted from their
+    /// own photo (Step 05). Separate from `onPick` because these carry a bitmap
+    /// rather than a symbol name.
+    var onPickPersonal: ((UUID) -> Void)?
+
+    /// The personal library. Nil, or empty, simply means no "Yours" tab.
+    var personalStore: PersonalStickerStore?
+    private var personalStickers: [PersonalSticker] = []
+    /// True when the leading segment is the personal library.
+    private var showsPersonalTab: Bool { !personalStickers.isEmpty }
+    private var isPersonalTabSelected: Bool { showsPersonalTab && selectedPackIndex == 0 }
+
     private let catalog: StickerCatalog
     private var packs: [StickerPack] = []
     private var selectedPackIndex = 0
@@ -40,20 +52,28 @@ final class StickerPickerViewController: UIViewController {
         view.backgroundColor = Theme.Color.background
 
         packs = catalog.loadPacks()
+        personalStickers = personalStore?.allStickers() ?? []
 
         packControl.translatesAutoresizingMaskIntoConstraints = false
         packControl.accessibilityIdentifier = "stickerPackControl"
         packControl.selectedSegmentTintColor = Theme.Color.accent
         packControl.setTitleTextAttributes([.foregroundColor: Theme.Color.textOnAccent], for: .selected)
+        if showsPersonalTab {
+            packControl.insertSegment(
+                with: UIImage(systemName: "person.crop.square") ?? UIImage(),
+                at: 0, animated: false)
+        }
+        let packOffset = showsPersonalTab ? 1 : 0
         for (index, pack) in packs.enumerated() {
             let image = UIImage(systemName: pack.symbol)
             if let image {
-                packControl.insertSegment(with: image, at: index, animated: false)
+                packControl.insertSegment(with: image, at: index + packOffset, animated: false)
             } else {
-                packControl.insertSegment(withTitle: pack.name, at: index, animated: false)
+                packControl.insertSegment(withTitle: pack.name, at: index + packOffset, animated: false)
             }
         }
-        packControl.selectedSegmentIndex = packs.isEmpty ? UISegmentedControl.noSegment : 0
+        packControl.selectedSegmentIndex =
+            (packs.isEmpty && !showsPersonalTab) ? UISegmentedControl.noSegment : 0
         packControl.addTarget(self, action: #selector(packChanged), for: .valueChanged)
 
         collectionView.translatesAutoresizingMaskIntoConstraints = false
@@ -80,7 +100,9 @@ final class StickerPickerViewController: UIViewController {
     }
 
     private var currentStickers: [StickerEntry] {
-        packs.indices.contains(selectedPackIndex) ? packs[selectedPackIndex].stickers : []
+        guard !isPersonalTabSelected else { return [] }
+        let index = selectedPackIndex - (showsPersonalTab ? 1 : 0)
+        return packs.indices.contains(index) ? packs[index].stickers : []
     }
 
     private func makeCollectionView() -> UICollectionView {
@@ -110,9 +132,15 @@ final class StickerPickerViewController: UIViewController {
     }
 
     /// A grabber sheet wrapper for presenting the picker from the editor.
-    static func sheet(onPick: @escaping (StickerEntry) -> Void) -> UIViewController {
+    static func sheet(
+        personalStore: PersonalStickerStore? = nil,
+        onPick: @escaping (StickerEntry) -> Void,
+        onPickPersonal: ((UUID) -> Void)? = nil
+    ) -> UIViewController {
         let picker = StickerPickerViewController()
+        picker.personalStore = personalStore
         picker.onPick = onPick
+        picker.onPickPersonal = onPickPersonal
         let nav = UINavigationController(rootViewController: picker)
         if let sheet = nav.sheetPresentationController {
             sheet.detents = [.medium(), .large()]
@@ -127,7 +155,7 @@ final class StickerPickerViewController: UIViewController {
 extension StickerPickerViewController: UICollectionViewDataSource, UICollectionViewDelegate {
 
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
-        currentStickers.count
+        isPersonalTabSelected ? personalStickers.count : currentStickers.count
     }
 
     func collectionView(
@@ -136,7 +164,13 @@ extension StickerPickerViewController: UICollectionViewDataSource, UICollectionV
     ) -> UICollectionViewCell {
         let cell = collectionView.dequeueReusableCell(
             withReuseIdentifier: StickerCell.reuseID, for: indexPath)
-        if let cell = cell as? StickerCell, currentStickers.indices.contains(indexPath.item) {
+        guard let cell = cell as? StickerCell else { return cell }
+        if isPersonalTabSelected {
+            if personalStickers.indices.contains(indexPath.item),
+               let image = personalStore?.image(for: personalStickers[indexPath.item].id) {
+                cell.configure(withImage: image)
+            }
+        } else if currentStickers.indices.contains(indexPath.item) {
             cell.configure(with: currentStickers[indexPath.item])
         }
         return cell
@@ -144,12 +178,18 @@ extension StickerPickerViewController: UICollectionViewDataSource, UICollectionV
 
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
         collectionView.deselectItem(at: indexPath, animated: true)
-        guard currentStickers.indices.contains(indexPath.item) else { return }
         Haptics.tap()
-        let entry = currentStickers[indexPath.item]
-        dismiss(animated: true) { [weak self] in
-            self?.onPick?(entry)
+
+        if isPersonalTabSelected {
+            guard personalStickers.indices.contains(indexPath.item) else { return }
+            let id = personalStickers[indexPath.item].id
+            dismiss(animated: true) { [weak self] in self?.onPickPersonal?(id) }
+            return
         }
+
+        guard currentStickers.indices.contains(indexPath.item) else { return }
+        let entry = currentStickers[indexPath.item]
+        dismiss(animated: true) { [weak self] in self?.onPick?(entry) }
     }
 }
 
@@ -180,6 +220,13 @@ private final class StickerCell: UICollectionViewCell {
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
+
+    /// A personal sticker draws its own pixels — no tint, since those colours came
+    /// out of the user's photo.
+    func configure(withImage image: CGImage) {
+        imageView.image = UIImage(cgImage: image)
+        accessibilityLabel = "Your sticker"
+    }
 
     func configure(with entry: StickerEntry) {
         let config = UIImage.SymbolConfiguration(pointSize: 40, weight: .semibold)

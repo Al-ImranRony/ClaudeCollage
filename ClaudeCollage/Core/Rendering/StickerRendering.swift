@@ -28,24 +28,50 @@ public enum StickerRendering {
         return CGRect(x: center.x - side / 2, y: center.y - side / 2, width: side, height: side)
     }
 
-    /// The tinted symbol image for a sticker at a concrete pixel side. Falls back
-    /// to a filled star when the named symbol is unavailable, so a sticker never
-    /// renders blank.
-    public static func image(for overlay: StickerOverlay, sidePx: CGFloat) -> UIImage? {
+    /// The drawable image for a sticker at a concrete pixel side.
+    ///
+    /// - Parameter source: the resolved bitmap for a personal (image-backed)
+    ///   sticker. Passed in rather than looked up, so this stays pure and the
+    ///   export path — which runs off the main actor — needs no store access.
+    ///
+    /// A personal sticker draws its own pixels and takes only `opacity`; its
+    /// colours came from the user's photo and tinting them would destroy it.
+    /// Everything else is the original tinted-SF-Symbol path, which falls back to
+    /// a filled star when a symbol is unavailable so a sticker never renders blank.
+    public static func image(
+        for overlay: StickerOverlay, sidePx: CGFloat, source: CGImage? = nil
+    ) -> UIImage? {
+        let alpha = CGFloat(min(max(overlay.opacity, 0), 1))
+
+        if overlay.imageID != nil {
+            // An image-backed sticker whose bitmap is missing (deleted from the
+            // library, or a project opened on another device) draws nothing rather
+            // than silently reverting to a star that the user never chose.
+            guard let source else { return nil }
+            let image = UIImage(cgImage: source)
+            guard alpha < 1 else { return image }
+            return UIGraphicsImageRenderer(size: image.size).image { _ in
+                image.draw(at: .zero, blendMode: .normal, alpha: alpha)
+            }
+        }
+
         let config = UIImage.SymbolConfiguration(pointSize: max(1, sidePx * 0.82), weight: .semibold)
         let base = UIImage(systemName: overlay.symbolName, withConfiguration: config)
             ?? UIImage(systemName: "star.fill", withConfiguration: config)
-        let color = UIColor(hex: overlay.colorHex)
-            .withAlphaComponent(CGFloat(min(max(overlay.opacity, 0), 1)))
+        let color = UIColor(hex: overlay.colorHex).withAlphaComponent(alpha)
         return base?.withTintColor(color, renderingMode: .alwaysOriginal)
     }
 
     /// Draws the sticker into a Core Graphics context (export / thumbnail path),
     /// aspect-fit and rotated within its box — matching how the live UIImageView
     /// (scaleAspectFit + a rotation transform) shows it.
-    public static func draw(_ overlay: StickerOverlay, in canvasPx: CGSize, context cg: CGContext) {
+    public static func draw(
+        _ overlay: StickerOverlay, in canvasPx: CGSize, context cg: CGContext,
+        source: CGImage? = nil
+    ) {
         let box = frame(for: overlay, in: canvasPx)
-        guard box.width > 0, let image = image(for: overlay, sidePx: box.width) else { return }
+        guard box.width > 0,
+              let image = image(for: overlay, sidePx: box.width, source: source) else { return }
 
         let fitted = aspectFitSize(image.size, in: box.size)
         cg.saveGState()

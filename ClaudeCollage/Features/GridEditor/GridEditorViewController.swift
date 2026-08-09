@@ -36,6 +36,14 @@ final class GridEditorViewController: UIViewController {
     private var undoItem: UIBarButtonItem?
     private var redoItem: UIBarButtonItem?
 
+    /// On-device intelligence. Injected so tests can drive the lift flow with a
+    /// deterministic stub — Vision itself cannot run in the simulator.
+    var aiService = AIService()
+    /// The personal sticker library; nil when the editor runs without a store
+    /// (previews, unit tests), in which case lifting still works but nothing is
+    /// saved for reuse.
+    var personalStickers: PersonalStickerStore?
+
     private var gestureController: CellGestureController?
     /// Pinch that magnifies the canvas for detail editing — gated (via the delegate)
     /// to touches on empty canvas background so it never fights cell/sticker pinch.
@@ -576,6 +584,14 @@ final class GridEditorViewController: UIViewController {
         sheet.addAction(UIAlertAction(title: "Edit Cell", style: .default) { [weak self] _ in
             self?.presentFilterPanel(for: index)
         })
+        // Deliberately always offered, never conditionally hidden: the work happens
+        // on-device and whether this photo HAS a liftable subject is only knowable
+        // by trying. A "no subject found" reply is a normal outcome, not an error.
+        let lift = UIAlertAction(title: "Lift Subject", style: .default) { [weak self] _ in
+            self?.liftSubject(fromCellAt: index)
+        }
+        lift.accessibilityIdentifier = "liftSubjectAction"
+        sheet.addAction(lift)
         sheet.addAction(UIAlertAction(title: "Clear", style: .destructive) { [weak self] _ in
             self?.viewModel.clearCell(at: index)
             self?.canvasView.setSelectedCell(nil)
@@ -684,13 +700,104 @@ final class GridEditorViewController: UIViewController {
         presentTextStyleSheet(for: id)
     }
 
+    // MARK: - Subject lift (Step 05)
+
+    /// Lifts the subject out of a cell's photo, saves it to the personal sticker
+    /// library, and drops it on the canvas as a sticker.
+    ///
+    /// Runs entirely on-device. Vision needs real hardware — in the simulator it
+    /// fails with "Could not create inference context" — so the failure path here
+    /// is not an edge case, it is what every simulator run does, and it has to
+    /// read as an explanation rather than a crash.
+    private func liftSubject(fromCellAt index: Int) {
+        guard let photo = viewModel.displayImage(forCellAt: index) else {
+            showToast("Add a photo to this cell first")
+            return
+        }
+        canvasView.setSelectedCell(index)
+        let progress = presentLiftProgress()
+
+        Task { @MainActor in
+            defer { canvasView.setSelectedCell(nil) }
+            do {
+                let subject = try await aiService.liftSubject(from: photo)
+                progress.dismiss(animated: true) { [weak self] in
+                    self?.placeLiftedSubject(subject)
+                }
+            } catch {
+                progress.dismiss(animated: true) { [weak self] in
+                    self?.reportLiftFailure(error)
+                }
+            }
+        }
+    }
+
+    private func placeLiftedSubject(_ subject: CGImage) {
+        // Saved before it is placed, so the sticker exists in the library even if
+        // the user immediately undoes the placement.
+        guard let imageID = personalStickers?.save(subject) else {
+            showToast("Couldn't save that subject")
+            return
+        }
+        let overlay = StickerOverlay(stickerID: "personal.\(imageID.uuidString)", imageID: imageID)
+        let id = viewModel.addSticker(overlay)
+        canvasView.setSelectedSticker(id)
+        Haptics.success()
+        showToast("Subject lifted · saved to your stickers")
+    }
+
+    private func reportLiftFailure(_ error: Error) {
+        Haptics.error()
+        let message: String
+        switch error {
+        case AIService.AIError.noSubjectFound:
+            message = "No clear subject in this photo. Try one with a distinct person or object."
+        case SegmentationError.visionUnavailable:
+            message = "Subject lifting needs a real device — it isn't available in the simulator."
+        default:
+            message = "Couldn't lift the subject. Try a different photo."
+        }
+        let alert = UIAlertController(title: "Lift Subject", message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "OK", style: .default))
+        present(alert, animated: true)
+    }
+
+    private func presentLiftProgress() -> UIAlertController {
+        // The brief asks AI operations to state their expected duration rather than
+        // spin silently.
+        let alert = UIAlertController(
+            title: nil, message: "Finding the subject…\nThis usually takes a second.",
+            preferredStyle: .alert)
+        let spinner = UIActivityIndicatorView(style: .medium)
+        spinner.translatesAutoresizingMaskIntoConstraints = false
+        spinner.startAnimating()
+        alert.view.addSubview(spinner)
+        NSLayoutConstraint.activate([
+            spinner.centerXAnchor.constraint(equalTo: alert.view.centerXAnchor),
+            spinner.bottomAnchor.constraint(equalTo: alert.view.bottomAnchor, constant: -16),
+        ])
+        present(alert, animated: true)
+        return alert
+    }
+
     /// Opens the sticker picker; the chosen sticker becomes a selected canvas overlay.
     @objc private func addStickerTapped() {
         Haptics.tap()
-        let picker = StickerPickerViewController.sheet { [weak self] entry in
-            self?.addSticker(from: entry)
-        }
+        let picker = StickerPickerViewController.sheet(
+            personalStore: personalStickers,
+            onPick: { [weak self] entry in self?.addSticker(from: entry) },
+            onPickPersonal: { [weak self] imageID in self?.addPersonalSticker(imageID) }
+        )
         present(picker, animated: true)
+    }
+
+    /// Re-places a previously lifted subject from the personal library.
+    private func addPersonalSticker(_ imageID: UUID) {
+        let overlay = StickerOverlay(stickerID: "personal.\(imageID.uuidString)", imageID: imageID)
+        let id = viewModel.addSticker(overlay)
+        canvasView.setSelectedSticker(id)
+        Haptics.success()
+        showToast("Drag to position · double-tap to remove")
     }
 
     private func addSticker(from entry: StickerEntry) {

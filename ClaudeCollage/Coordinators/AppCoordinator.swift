@@ -22,6 +22,9 @@ final class AppCoordinator {
 
     private let tabBarController: AppTabBarController
     private let store: ProjectStore
+    /// One library for the whole app: a subject lifted in any editor is offered in
+    /// every later one, which is the point of the workflow.
+    private let personalStickers: PersonalStickerStore
     /// Retains the panoramic PHPicker delegate for the life of the pick.
     private var panoramicPicker: PanoramicSourcePicker?
     /// Retains the "+" flow's photo picker delegate for the life of the pick.
@@ -30,6 +33,7 @@ final class AppCoordinator {
     init(tabBarController: AppTabBarController, container: ModelContainer) {
         self.tabBarController = tabBarController
         self.store = ProjectStore(container: container)
+        self.personalStickers = PersonalStickerStore(container: container)
     }
 
     func start() {
@@ -365,7 +369,13 @@ final class AppCoordinator {
     }
 
     private func pushEditor(with viewModel: GridEditorViewModel) {
+        // Resolved here rather than inside the view model so it never touches
+        // SwiftData directly, and so the editor stays constructible in tests.
+        viewModel.personalStickerImages = { [weak self] overlays in
+            self?.personalStickers.images(for: overlays) ?? [:]
+        }
         let editor = GridEditorViewController(viewModel: viewModel)
+        editor.personalStickers = personalStickers
         push(editor)
     }
 
