@@ -14,6 +14,11 @@ import CoreGraphics
 public final class CollageProject {
 
     @Attribute(.unique) public var id: UUID
+    /// User-given name. Optional so every project saved before Step 05 keeps
+    /// loading — SwiftData adds an optional field without a migration — and so a
+    /// project the user never named falls back to a mode-derived title rather
+    /// than carrying a fake one.
+    public var name: String?
     public var createdAt: Date
     public var updatedAt: Date
     public var modeRaw: String

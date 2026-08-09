@@ -438,6 +438,7 @@ final class ProjectCardCell: UICollectionViewCell {
     static let reuseID = "ProjectCardCell"
 
     private let imageView = UIImageView()
+    private let nameLabel = UILabel()
     private let dateLabel = UILabel()
 
     override init(frame: CGRect) {
@@ -454,11 +455,17 @@ final class ProjectCardCell: UICollectionViewCell {
         // rounded image. The shadow path is set in layoutSubviews.
         contentView.applyCardShadow()
 
+        nameLabel.font = Theme.Typography.subheadline
+        nameLabel.textColor = Theme.Color.textPrimary
+        nameLabel.lineBreakMode = .byTruncatingTail
+        nameLabel.translatesAutoresizingMaskIntoConstraints = false
+
         dateLabel.font = Theme.Typography.caption
         dateLabel.textColor = Theme.Color.textSecondary
         dateLabel.translatesAutoresizingMaskIntoConstraints = false
 
         contentView.addSubview(imageView)
+        contentView.addSubview(nameLabel)
         contentView.addSubview(dateLabel)
         NSLayoutConstraint.activate([
             imageView.topAnchor.constraint(equalTo: contentView.topAnchor),
@@ -466,7 +473,11 @@ final class ProjectCardCell: UICollectionViewCell {
             imageView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
             imageView.heightAnchor.constraint(equalTo: imageView.widthAnchor),
 
-            dateLabel.topAnchor.constraint(equalTo: imageView.bottomAnchor, constant: 6),
+            nameLabel.topAnchor.constraint(equalTo: imageView.bottomAnchor, constant: 6),
+            nameLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 4),
+            nameLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -4),
+
+            dateLabel.topAnchor.constraint(equalTo: nameLabel.bottomAnchor, constant: 1),
             dateLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 4),
             dateLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -4),
         ])
@@ -501,10 +512,13 @@ final class ProjectCardCell: UICollectionViewCell {
 
     func configure(with summary: ProjectSummary) {
         imageView.image = summary.thumbnail
+        // Name first, date second: once projects are nameable and searchable, the
+        // name is what identifies a card.
+        nameLabel.text = summary.displayName
         let formatter = DateFormatter()
         formatter.dateStyle = .medium
-        formatter.timeStyle = .short
-        dateLabel.text = formatter.string(from: summary.updatedAt)
+        dateLabel.text = "\(summary.mode.displayName) · \(formatter.string(from: summary.updatedAt))"
+        accessibilityLabel = summary.displayName
     }
 
     override func prepareForReuse() {

@@ -13,6 +13,17 @@ public enum CollageMode: String, Codable, Sendable, CaseIterable {
     case template
     case carousel
     case video
+
+    /// Short user-facing label for a project card's subtitle.
+    public var displayName: String {
+        switch self {
+        case .grid: return "Grid"
+        case .polygon: return "Shapes"
+        case .template: return "Template"
+        case .carousel: return "Carousel"
+        case .video: return "Video"
+        }
+    }
 }
 
 public enum CarouselType: String, Codable, Sendable, CaseIterable {

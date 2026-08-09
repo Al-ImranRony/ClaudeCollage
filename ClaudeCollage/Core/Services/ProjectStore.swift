@@ -21,6 +21,14 @@ struct ProjectSummary: Identifiable, Sendable {
     let updatedAt: Date
     let thumbnail: UIImage?
     let mode: CollageMode
+    /// Nil until the user names it; `displayName` is what the UI shows.
+    let name: String?
+
+    /// What the gallery, search and Spotlight all display. Never empty.
+    var displayName: String {
+        if let name, !name.trimmingCharacters(in: .whitespaces).isEmpty { return name }
+        return SpotlightIndexer.title(for: mode)
+    }
 }
 
 @MainActor
@@ -51,7 +59,8 @@ final class ProjectStore {
                 id: project.id,
                 updatedAt: project.updatedAt,
                 thumbnail: project.previewThumbnail.flatMap(UIImage.init(data:)),
-                mode: project.mode
+                mode: project.mode,
+                name: project.name
             )
         }
     }
@@ -264,6 +273,68 @@ final class ProjectStore {
     }
 
     // MARK: - Delete
+
+    /// Renames a project. An empty name clears it back to the mode-derived title
+    /// rather than storing whitespace.
+    func rename(id: UUID, to name: String) {
+        guard let project = fetchProject(id: id) else { return }
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        project.name = trimmed.isEmpty ? nil : trimmed
+        project.updatedAt = Date()
+        try? context.save()
+    }
+
+    /// Copies a project, its state blob, and its on-disk images and media.
+    ///
+    /// The files must be copied, not referenced: the two projects are independent
+    /// from this moment, and deleting one has to leave the other whole.
+    @discardableResult
+    func duplicate(id: UUID) -> UUID? {
+        guard let original = fetchProject(id: id) else { return nil }
+
+        let copy = CollageProject(
+            id: UUID(),
+            mode: original.mode,
+            canvasSize: original.canvasSize
+        )
+        copy.name = Self.duplicateName(of: original.name ?? SpotlightIndexer.title(for: original.mode))
+        copy.templateID = original.templateID
+        copy.carouselTypeRaw = original.carouselTypeRaw
+        copy.frameCount = original.frameCount
+        copy.previewThumbnail = original.previewThumbnail
+        copy.gridStateData = original.gridStateData
+        copy.carouselData = original.carouselData
+        copy.videoData = original.videoData
+        copy.exportSettings = original.exportSettings
+
+        // Same image ids inside the state blob, so the copied directory keeps
+        // resolving without rewriting the state.
+        let source = projectDirectory(id)
+        let destination = projectDirectory(copy.id)
+        if FileManager.default.fileExists(atPath: source.path) {
+            try? FileManager.default.createDirectory(
+                at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try? FileManager.default.copyItem(at: source, to: destination)
+        }
+
+        context.insert(copy)
+        try? context.save()
+        return copy.id
+    }
+
+    /// "Sunset" → "Sunset copy" → "Sunset copy 2", so duplicating twice does not
+    /// produce two identically named projects.
+    static func duplicateName(of name: String) -> String {
+        guard let range = name.range(of: " copy", options: .backwards),
+              range.upperBound == name.endIndex || name[range.upperBound...].allSatisfy({
+                  $0.isNumber || $0 == " "
+              })
+        else { return "\(name) copy" }
+
+        let suffix = name[range.upperBound...].trimmingCharacters(in: .whitespaces)
+        let next = (Int(suffix) ?? 1) + 1
+        return "\(name[name.startIndex..<range.lowerBound]) copy \(next)"
+    }
 
     func delete(id: UUID) {
         if let project = fetchProject(id: id) {

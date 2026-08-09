@@ -27,6 +27,7 @@ final class AppCoordinator {
     /// every later one, which is the point of the workflow.
     private let personalStickers: PersonalStickerStore
     private let spotlight = SpotlightIndexer()
+    private let aiService = AIService()
     private let widgetSnapshots = WidgetSnapshotStore()
     /// Retains the panoramic PHPicker delegate for the life of the pick.
     private var panoramicPicker: PanoramicSourcePicker?
@@ -55,6 +56,18 @@ final class AppCoordinator {
         projects.summariesProvider = { [weak self] in self?.store.listSummaries() ?? [] }
         projects.onNewProject = { [weak self] in self?.startNewGridProject() }
         projects.onOpenProject = { [weak self] id in self?.openProject(id: id) }
+        projects.onRenameProject = { [weak self] id, name in
+            self?.store.rename(id: id, to: name)
+            self?.refreshPlatformSurfaces()
+        }
+        projects.onDuplicateProject = { [weak self] id in
+            self?.store.duplicate(id: id)
+            self?.refreshPlatformSurfaces()
+        }
+        // Export routes through opening the project: the export sheet lives in the
+        // editor and knows how to render that project's kind. Re-implementing it
+        // here would be a second export path to keep in sync.
+        projects.onExportProject = { [weak self] id in self?.openProject(id: id) }
         projects.onDeleteProject = { [weak self] id in
             self?.store.delete(id: id)
             self?.spotlight.remove(id: id)
@@ -219,7 +232,17 @@ final class AppCoordinator {
     /// Opens a grid whose template matches the number of photos picked, with each
     /// cell pre-filled in pick order.
     private func startGridProject(with images: [CGImage]) {
-        let template = GridTemplate.bestFit(forPhotoCount: images.count)
+        Task { @MainActor in
+            // AI auto-layout: score every grid against where the faces and salient
+            // regions actually are, and fall back to a count-based fit if analysis
+            // yields nothing (which is every simulator run — Vision needs a device).
+            let suggested = await aiService.suggestLayouts(for: images, limit: 1).first
+            self.openGridProject(with: images,
+                                 template: suggested ?? .bestFit(forPhotoCount: images.count))
+        }
+    }
+
+    private func openGridProject(with images: [CGImage], template: GridTemplate) {
         let viewModel = GridEditorViewModel(state: GridEditorState(template: template))
         for (index, image) in images.enumerated() where index < template.cellCount {
             viewModel.setImage(image, forCellAt: index)
