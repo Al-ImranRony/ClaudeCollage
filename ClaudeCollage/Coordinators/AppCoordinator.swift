@@ -16,6 +16,7 @@ import UIKit
 import SwiftData
 import SwiftUI
 import PhotosUI
+import WidgetKit
 
 @MainActor
 final class AppCoordinator {
@@ -25,6 +26,8 @@ final class AppCoordinator {
     /// One library for the whole app: a subject lifted in any editor is offered in
     /// every later one, which is the point of the workflow.
     private let personalStickers: PersonalStickerStore
+    private let spotlight = SpotlightIndexer()
+    private let widgetSnapshots = WidgetSnapshotStore()
     /// Retains the panoramic PHPicker delegate for the life of the pick.
     private var panoramicPicker: PanoramicSourcePicker?
     /// Retains the "+" flow's photo picker delegate for the life of the pick.
@@ -52,7 +55,11 @@ final class AppCoordinator {
         projects.summariesProvider = { [weak self] in self?.store.listSummaries() ?? [] }
         projects.onNewProject = { [weak self] in self?.startNewGridProject() }
         projects.onOpenProject = { [weak self] id in self?.openProject(id: id) }
-        projects.onDeleteProject = { [weak self] id in self?.store.delete(id: id) }
+        projects.onDeleteProject = { [weak self] id in
+            self?.store.delete(id: id)
+            self?.spotlight.remove(id: id)
+            self?.refreshPlatformSurfaces()
+        }
 
         let carousel = CarouselStartViewController()
         carousel.onCreate = { [weak self] config in self?.beginCarousel(config: config) }
@@ -69,6 +76,48 @@ final class AppCoordinator {
         // Home is shown first so it cannot wait for that.
         _ = TemplateService.shared.loadBundledTemplates()
         home.reload()
+
+        IntentRouter.shared.onRequest = { [weak self] request in self?.handle(request) }
+        refreshPlatformSurfaces()
+    }
+
+    // MARK: - Platform surfaces (Step 05 batch C)
+
+    /// Republishes what lives outside the app: the widget snapshot and the
+    /// Spotlight index.
+    ///
+    /// Called after anything that changes the project list. Both are best-effort —
+    /// neither may ever interfere with saving, so failures are swallowed rather
+    /// than surfaced.
+    private func refreshPlatformSurfaces() {
+        let summaries = store.listSummaries()
+        spotlight.index(summaries)
+        widgetSnapshots.write(WidgetSnapshot(
+            projects: summaries.map {
+                WidgetProjectEntry(
+                    id: $0.id, updatedAt: $0.updatedAt,
+                    thumbnailData: $0.thumbnail?.jpegData(compressionQuality: 0.7))
+            },
+            generatedAt: Date()
+        ))
+        WidgetCenter.shared.reloadAllTimelines()
+    }
+
+    /// Runs an intent's request through the same routing the UI uses, so Siri and
+    /// the app can never diverge on what "new carousel" means.
+    private func handle(_ request: IntentRouter.Request) {
+        switch request {
+        case .newGridCollage:
+            // The photo count is honoured once the picker returns; the intent
+            // deliberately does not reach into PhotoKit itself.
+            startNewGridProject()
+        case let .newStoryCarousel(frameCount):
+            beginCarousel(config: CarouselStartConfig(
+                type: .matched, frameCount: frameCount, aspectRatio: "4:5"))
+        case .exportLastProject:
+            guard let latest = store.listSummaries().first else { return }
+            openProject(id: latest.id)
+        }
     }
 
     private func tabItem(_ title: String, _ symbol: String, _ identifier: String) -> UITabBarItem {

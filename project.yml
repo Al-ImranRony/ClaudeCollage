@@ -99,6 +99,9 @@ targets:
       - path: ClaudeCollageWidgets
       # Shared with the app target: the Live Activity attributes the widget renders.
       - path: ClaudeCollage/Core/Models/ExportActivityAttributes.swift
+      # Shared with the app target: one definition of the snapshot both sides
+      # encode and decode, so they can never drift apart.
+      - path: ClaudeCollage/Core/Models/WidgetSnapshot.swift
     info:
       path: ClaudeCollageWidgets/Info.plist
       properties:

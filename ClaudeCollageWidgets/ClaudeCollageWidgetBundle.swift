@@ -12,7 +12,10 @@ import SwiftUI
 @main
 struct ClaudeCollageWidgetBundle: WidgetBundle {
     var body: some Widget {
-        PlaceholderWidget()
+        // Step 00's PlaceholderWidget is deliberately no longer offered: a real
+        // widget exists now, and shipping a stub alongside it would put an empty
+        // "ClaudeCollage" tile in the user's widget gallery.
+        RecentProjectsWidget()
         // The in-progress export Live Activity (Step 04 slice 6b).
         ExportLiveActivity()
     }
