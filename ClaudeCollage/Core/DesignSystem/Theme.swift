@@ -183,6 +183,32 @@ public enum Theme {
         /// A lively spring for selection / tap feedback.
         public static let springDamping: CGFloat = 0.72
         public static let springVelocity: CGFloat = 0.4
+
+        /// True when the user has asked the system to reduce motion.
+        @MainActor
+        public static var isReduced: Bool { UIAccessibility.isReduceMotionEnabled }
+
+        /// A duration honouring Reduce Motion: the same value normally, and a
+        /// short cross-fade instead of a spring when motion is reduced.
+        ///
+        /// Zero would make state changes snap, which reads as a glitch; a brief
+        /// fade keeps the change legible without moving anything.
+        @MainActor
+        public static func duration(_ base: TimeInterval) -> TimeInterval {
+            isReduced ? min(base, 0.12) : base
+        }
+
+        /// Spring parameters, flattened to a plain fade when motion is reduced.
+        /// Damping 1 removes the overshoot that is the point of a spring.
+        @MainActor
+        public static var effectiveSpringDamping: CGFloat {
+            isReduced ? 1 : springDamping
+        }
+
+        @MainActor
+        public static var effectiveSpringVelocity: CGFloat {
+            isReduced ? 0 : springVelocity
+        }
     }
 }
 

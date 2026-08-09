@@ -166,16 +166,16 @@ final class AppTabBarController: UITabBarController {
     }
 
     @objc private func plusPressed() {
-        UIView.animate(withDuration: Theme.Motion.quick) {
+        UIView.animate(withDuration: Theme.Motion.duration(Theme.Motion.quick)) {
             self.plusButton.transform = CGAffineTransform(scaleX: 0.92, y: 0.92)
         }
     }
 
     @objc private func plusReleased() {
         UIView.animate(
-            withDuration: Theme.Motion.standard, delay: 0,
-            usingSpringWithDamping: Theme.Motion.springDamping,
-            initialSpringVelocity: Theme.Motion.springVelocity
+            withDuration: Theme.Motion.duration(Theme.Motion.standard), delay: 0,
+            usingSpringWithDamping: Theme.Motion.effectiveSpringDamping,
+            initialSpringVelocity: Theme.Motion.effectiveSpringVelocity
         ) {
             self.plusButton.transform = .identity
         }

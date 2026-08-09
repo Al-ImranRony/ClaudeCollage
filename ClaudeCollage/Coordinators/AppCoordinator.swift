@@ -28,6 +28,7 @@ final class AppCoordinator {
     private let personalStickers: PersonalStickerStore
     private let spotlight = SpotlightIndexer()
     private let aiService = AIService()
+    private let recentPhotos = RecentPhotoProvider()
     private let widgetSnapshots = WidgetSnapshotStore()
     /// Retains the panoramic PHPicker delegate for the life of the pick.
     private var panoramicPicker: PanoramicSourcePicker?
@@ -48,6 +49,21 @@ final class AppCoordinator {
         home.onNewProject = { [weak self] in self?.startNewGridProject() }
         home.onNewPolygon = { [weak self] in self?.startNewPolygonProject() }
         home.onNewVideoCollage = { [weak self] in self?.startVideoCollage() }
+        home.photoAccessProvider = { [weak self] in self?.recentPhotos.access ?? .denied }
+        home.requestPhotoAccess = { [weak self] in
+            await self?.recentPhotos.requestAccess() ?? .denied
+        }
+        home.suggestedLayoutsProvider = { [weak self] in
+            guard let self else { return [] }
+            let photos = await self.recentPhotos.recentPhotos()
+            // Below three photos there is nothing meaningful to suggest — a single
+            // photo has exactly one sensible layout.
+            guard photos.count >= 3 else { return [] }
+            return await self.aiService.suggestLayouts(for: photos, limit: 5)
+        }
+        home.onSelectSuggestedLayout = { [weak self] template in
+            self?.startProjectFromRecentPhotos(template: template)
+        }
 
         let templates = TemplateGalleryViewController(service: .shared)
         templates.onSelectTemplate = { [weak self] template in self?.openTemplate(template) }
@@ -239,6 +255,16 @@ final class AppCoordinator {
             let suggested = await aiService.suggestLayouts(for: images, limit: 1).first
             self.openGridProject(with: images,
                                  template: suggested ?? .bestFit(forPhotoCount: images.count))
+        }
+    }
+
+    /// Builds a collage from the user's recent photos using a suggested layout —
+    /// the payoff for the Suggested Layouts row.
+    private func startProjectFromRecentPhotos(template: GridTemplate) {
+        Task { @MainActor in
+            let photos = await self.recentPhotos.recentPhotos(limit: template.cellCount)
+            guard !photos.isEmpty else { return }
+            self.openGridProject(with: photos, template: template)
         }
     }
 

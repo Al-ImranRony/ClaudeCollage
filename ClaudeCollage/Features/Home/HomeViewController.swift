@@ -26,7 +26,21 @@ final class HomeViewController: UIViewController {
     var onNewPolygon: (() -> Void)?
     var onNewVideoCollage: (() -> Void)?
 
+    /// Asks for suggested layouts for the user's recent photos. Returns an empty
+    /// list when access is absent or nothing is analysable.
+    var suggestedLayoutsProvider: (() async -> [GridTemplate])?
+    /// Current photo-library read access, and the request. Kept as closures so
+    /// Home never imports PhotoKit itself.
+    var photoAccessProvider: (() -> RecentPhotoProvider.Access)?
+    var requestPhotoAccess: (() async -> RecentPhotoProvider.Access)?
+    /// Build a collage from recent photos using the chosen layout.
+    var onSelectSuggestedLayout: ((GridTemplate) -> Void)?
+
     private var featured: [CollageTemplate] = []
+    private var suggestions: [GridTemplate] = []
+    private var suggestionsSection: UIStackView?
+    private lazy var suggestionsStrip = makeSuggestionsStrip()
+    private lazy var enableSuggestionsButton = makeEnableSuggestionsButton()
 
     private let scrollView = UIScrollView()
     private let contentStack = UIStackView()
@@ -53,6 +67,128 @@ final class HomeViewController: UIViewController {
         featured = featuredTemplatesProvider?() ?? []
         featuredStrip.reloadData()
         featuredSection?.isHidden = featured.isEmpty
+        refreshSuggestions()
+    }
+
+    // MARK: - Suggested layouts
+
+    /// Shows whichever of the three states applies: an offer to enable, the
+    /// suggestions themselves, or nothing at all.
+    ///
+    /// Deliberately does NOT prompt. Access is only requested when the user taps
+    /// the button — see `RecentPhotoProvider`.
+    private func refreshSuggestions() {
+        let access = photoAccessProvider?() ?? .denied
+        switch access {
+        case .notDetermined:
+            enableSuggestionsButton.isHidden = false
+            suggestionsStrip.isHidden = true
+            suggestionsSection?.isHidden = false
+        case .denied:
+            // iOS will not show the dialog again, so offering it would be a dead
+            // end. The row simply goes away.
+            suggestionsSection?.isHidden = true
+        case .authorized:
+            enableSuggestionsButton.isHidden = true
+            loadSuggestions()
+        }
+    }
+
+    private func loadSuggestions() {
+        Task { @MainActor in
+            let templates = await suggestedLayoutsProvider?() ?? []
+            self.suggestions = templates
+            self.suggestionsStrip.reloadData()
+            self.suggestionsStrip.isHidden = templates.isEmpty
+            // Nothing to suggest (no photos, or none analysable) hides the whole
+            // section rather than leaving an empty labelled strip.
+            self.suggestionsSection?.isHidden = templates.isEmpty
+        }
+    }
+
+    private func makeSuggestionsSection() -> UIStackView {
+        let header = sectionHeader("Suggested For You", actionTitle: nil, action: nil)
+        let section = UIStackView(arrangedSubviews: [
+            header, enableSuggestionsButton, suggestionsStrip,
+        ])
+        section.axis = .vertical
+        section.spacing = Theme.Spacing.sm
+        section.isHidden = true
+        suggestionsStrip.heightAnchor.constraint(equalToConstant: 96).isActive = true
+        return section
+    }
+
+    private func makeEnableSuggestionsButton() -> UIView {
+        var config = UIButton.Configuration.tinted()
+        config.title = "Suggest layouts from my photos"
+        config.subtitle = "Reads your recent photos on this device to pick a layout."
+        config.image = UIImage(systemName: "wand.and.stars")
+        config.imagePadding = 8
+        config.cornerStyle = .large
+        config.baseBackgroundColor = Theme.Color.accent
+        config.baseForegroundColor = Theme.Color.accent
+        config.titleAlignment = .leading
+
+        let button = UIButton(configuration: config, primaryAction: UIAction { [weak self] _ in
+            Haptics.tap()
+            self?.enableSuggestions()
+        })
+        button.accessibilityIdentifier = "enableSuggestionsButton"
+        button.contentHorizontalAlignment = .leading
+
+        let row = UIStackView(arrangedSubviews: [button])
+        row.isLayoutMarginsRelativeArrangement = true
+        row.layoutMargins = UIEdgeInsets(
+            top: 0, left: Theme.Spacing.md, bottom: 0, right: Theme.Spacing.md)
+        return row
+    }
+
+    private func enableSuggestions() {
+        Task { @MainActor in
+            let access = await requestPhotoAccess?() ?? .denied
+            self.refreshSuggestions()
+            if access == .denied {
+                self.showAccessDeniedNote()
+            }
+        }
+    }
+
+    private func showAccessDeniedNote() {
+        let alert = UIAlertController(
+            title: "Photo access is off",
+            message: "Suggestions need permission to read your recent photos. "
+                + "You can turn it on in Settings — everything else keeps working without it.",
+            preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "Not Now", style: .cancel))
+        alert.addAction(UIAlertAction(title: "Open Settings", style: .default) { _ in
+            guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+            UIApplication.shared.open(url)
+        })
+        present(alert, animated: true)
+    }
+
+    private func makeSuggestionsStrip() -> UICollectionView {
+        let item = NSCollectionLayoutItem(layoutSize: NSCollectionLayoutSize(
+            widthDimension: .fractionalWidth(1), heightDimension: .fractionalHeight(1)))
+        let group = NSCollectionLayoutGroup.horizontal(
+            layoutSize: NSCollectionLayoutSize(
+                widthDimension: .absolute(96), heightDimension: .absolute(96)),
+            subitems: [item])
+        let section = NSCollectionLayoutSection(group: group)
+        section.orthogonalScrollingBehavior = .continuous
+        section.interGroupSpacing = Theme.Spacing.sm
+        section.contentInsets = NSDirectionalEdgeInsets(
+            top: 0, leading: Theme.Spacing.md, bottom: 0, trailing: Theme.Spacing.md)
+
+        let view = UICollectionView(
+            frame: .zero, collectionViewLayout: UICollectionViewCompositionalLayout(section: section))
+        view.backgroundColor = .clear
+        view.showsHorizontalScrollIndicator = false
+        view.dataSource = self
+        view.delegate = self
+        view.accessibilityIdentifier = "suggestedLayoutsStrip"
+        view.register(LayoutSchematicCell.self, forCellWithReuseIdentifier: LayoutSchematicCell.reuseID)
+        return view
     }
 
     // MARK: - Layout
@@ -64,6 +200,10 @@ final class HomeViewController: UIViewController {
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         scrollView.showsVerticalScrollIndicator = false
         scrollView.alwaysBounceVertical = true
+
+        let suggestionsSection = makeSuggestionsSection()
+        self.suggestionsSection = suggestionsSection
+        contentStack.addArrangedSubview(suggestionsSection)
 
         let featuredSection = makeFeaturedSection()
         self.featuredSection = featuredSection
@@ -198,12 +338,24 @@ final class HomeViewController: UIViewController {
 
 extension HomeViewController: UICollectionViewDataSource, UICollectionViewDelegate {
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
-        featured.count
+        collectionView === suggestionsStrip ? suggestions.count : featured.count
     }
 
     func collectionView(
         _ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath
     ) -> UICollectionViewCell {
+        if collectionView === suggestionsStrip {
+            let cell = collectionView.dequeueReusableCell(
+                withReuseIdentifier: LayoutSchematicCell.reuseID, for: indexPath)
+            if let schematic = cell as? LayoutSchematicCell,
+               suggestions.indices.contains(indexPath.item) {
+                // Reuses the editor's own layout schematic, so a suggestion looks
+                // exactly like the chip the user will see once inside.
+                schematic.configure(with: suggestions[indexPath.item], isSelected: false)
+            }
+            return cell
+        }
+
         let cell = collectionView.dequeueReusableCell(
             withReuseIdentifier: FeaturedTemplateCell.reuseID, for: indexPath)
         if let card = cell as? FeaturedTemplateCell, featured.indices.contains(indexPath.item) {
@@ -214,8 +366,14 @@ extension HomeViewController: UICollectionViewDataSource, UICollectionViewDelega
 
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
         collectionView.deselectItem(at: indexPath, animated: true)
-        guard featured.indices.contains(indexPath.item) else { return }
         Haptics.tap()
+
+        if collectionView === suggestionsStrip {
+            guard suggestions.indices.contains(indexPath.item) else { return }
+            onSelectSuggestedLayout?(suggestions[indexPath.item])
+            return
+        }
+        guard featured.indices.contains(indexPath.item) else { return }
         onSelectTemplate?(featured[indexPath.item])
     }
 }
@@ -296,7 +454,7 @@ private final class QuickStartTile: UIControl {
     override var isHighlighted: Bool {
         didSet {
             guard isHighlighted != oldValue else { return }
-            UIView.animate(withDuration: Theme.Motion.quick) {
+            UIView.animate(withDuration: Theme.Motion.duration(Theme.Motion.quick)) {
                 self.transform = self.isHighlighted
                     ? CGAffineTransform(scaleX: 0.98, y: 0.98) : .identity
                 self.backgroundColor = self.isHighlighted
@@ -498,10 +656,10 @@ final class ProjectCardCell: UICollectionViewCell {
         didSet {
             guard isHighlighted != oldValue else { return }
             UIView.animate(
-                withDuration: Theme.Motion.quick,
+                withDuration: Theme.Motion.duration(Theme.Motion.quick),
                 delay: 0,
-                usingSpringWithDamping: Theme.Motion.springDamping,
-                initialSpringVelocity: Theme.Motion.springVelocity,
+                usingSpringWithDamping: Theme.Motion.effectiveSpringDamping,
+                initialSpringVelocity: Theme.Motion.effectiveSpringVelocity,
                 options: [.allowUserInteraction, .beginFromCurrentState]
             ) {
                 self.transform = self.isHighlighted
