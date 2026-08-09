@@ -91,6 +91,7 @@ final class GridEditorViewController: UIViewController {
         setupNavigationBar()
         setupLayout()
         setupGestures()
+        setupDropInteraction()
         bindViewModel()
         refreshToolbar()
         reconfigureCanvas()
@@ -707,6 +708,45 @@ final class GridEditorViewController: UIViewController {
         presentTextStyleSheet(for: id)
     }
 
+    // MARK: - Drag and drop (Step 05 batch C)
+
+    /// Accepts images dragged in from Photos, Files, Safari, Messages — anything
+    /// that vends an image — and drops them into whichever cell they land on.
+    ///
+    /// A `UIDropInteraction` on the canvas rather than per-cell drop targets: the
+    /// canvas already owns the cell hit-testing, and duplicating that as a second
+    /// set of drop views would be two sources of truth for the same geometry.
+    private func setupDropInteraction() {
+        canvasView.addInteraction(UIDropInteraction(delegate: self))
+    }
+
+    /// Loads a dropped image and places it in the cell under the drop point.
+    private func handleDrop(_ session: UIDropSession) {
+        let point = session.location(in: canvasView)
+        let index = cellIndex(at: point)
+
+        guard let index, viewModel.state.cells.indices.contains(index) else {
+            showToast("Drop a photo onto a cell")
+            return
+        }
+        guard let provider = session.items.first?.itemProvider else { return }
+
+        // Loaded as data and downsampled off-main, exactly like the photo pickers:
+        // a dragged 12MP photo decoded whole would blow the memory budget the
+        // editor is built around.
+        provider.loadDataRepresentation(
+            forTypeIdentifier: UTType.image.identifier
+        ) { [weak self] data, _ in
+            guard let data, let image = ImageDownsampler.downsample(data: data) else { return }
+            DispatchQueue.main.async {
+                guard let self, self.viewModel.state.cells.indices.contains(index) else { return }
+                self.viewModel.setImage(image, forCellAt: index)
+                Haptics.success()
+                self.showToast("Photo added")
+            }
+        }
+    }
+
     // MARK: - Subject lift (Step 05)
 
     /// Lifts the subject out of a cell's photo, saves it to the personal sticker
@@ -1184,5 +1224,30 @@ extension GridEditorViewController: CellGestureControllerDelegate {
 
     func gestureDidComplete() {
         viewModel.commitInteractiveChange()
+    }
+}
+
+
+// MARK: - UIDropInteractionDelegate (Step 05 batch C)
+
+extension GridEditorViewController: UIDropInteractionDelegate {
+
+    func dropInteraction(
+        _ interaction: UIDropInteraction, canHandle session: UIDropSession
+    ) -> Bool {
+        session.canLoadObjects(ofClass: UIImage.self)
+    }
+
+    func dropInteraction(
+        _ interaction: UIDropInteraction, sessionDidUpdate session: UIDropSession
+    ) -> UIDropProposal {
+        // `.copy` only over a real cell, so the cursor tells the user whether the
+        // drop will land somewhere useful before they let go.
+        let overCell = cellIndex(at: session.location(in: canvasView)) != nil
+        return UIDropProposal(operation: overCell ? .copy : .cancel)
+    }
+
+    func dropInteraction(_ interaction: UIDropInteraction, performDrop session: UIDropSession) {
+        handleDrop(session)
     }
 }
