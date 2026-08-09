@@ -95,6 +95,20 @@ final class ObjectEraserTests: XCTestCase {
         XCTAssertLessThan(pixel(wide, x: 240, y: 50).r, 60)
     }
 
+    func testStrokesUseTopLeftOrigin() throws {
+        // Every other test paints at y = 0.5, which is symmetric and would pass
+        // even with the y axis inverted. Painting near the TOP must mark the top.
+        let stroke = EraserStroke(points: [CGPoint(x: 0.5, y: 0.15)], radius: 0.08)
+        let mask = try XCTUnwrap(eraser.mask(
+            from: [stroke], size: CGSize(width: side, height: side)))
+
+        // `pixel` reads top-down, so row 18 of 120 is near the top.
+        XCTAssertGreaterThan(pixel(mask, x: side / 2, y: 18).r, 200,
+                             "A stroke at y=0.15 must paint the TOP of the image")
+        XCTAssertLessThan(pixel(mask, x: side / 2, y: side - 18).r, 60,
+                          "…and leave the bottom alone")
+    }
+
     func testDegenerateSizeIsSurvivable() {
         let stroke = EraserStroke(points: [CGPoint(x: 0.5, y: 0.5)], radius: 0.1)
         XCTAssertNil(eraser.mask(from: [stroke], size: .zero))

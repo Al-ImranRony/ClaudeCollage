@@ -239,6 +239,7 @@ final class GridEditorViewController: UIViewController {
             cornerRow,
             sectionLabel("Background"),
             backgroundPicker,
+            makeGenerativeBackgroundRow(),
         ])
         controlsStack.axis = .vertical
         controlsStack.spacing = 6
@@ -592,6 +593,12 @@ final class GridEditorViewController: UIViewController {
         }
         lift.accessibilityIdentifier = "liftSubjectAction"
         sheet.addAction(lift)
+
+        let erase = UIAlertAction(title: "Magic Eraser", style: .default) { [weak self] _ in
+            self?.presentMagicEraser(forCellAt: index)
+        }
+        erase.accessibilityIdentifier = "magicEraserAction"
+        sheet.addAction(erase)
         sheet.addAction(UIAlertAction(title: "Clear", style: .destructive) { [weak self] _ in
             self?.viewModel.clearCell(at: index)
             self?.canvasView.setSelectedCell(nil)
@@ -760,6 +767,82 @@ final class GridEditorViewController: UIViewController {
         let alert = UIAlertController(title: "Lift Subject", message: message, preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "OK", style: .default))
         present(alert, animated: true)
+    }
+
+    /// The Image Playground entry point, present ONLY on hardware that can run it.
+    ///
+    /// Hidden rather than disabled, deliberately: this is a premium feature, and
+    /// showing a locked control on a device that could never run it even after
+    /// paying would be false advertising. On the simulator and on pre-Apple
+    /// Intelligence devices the row simply does not exist.
+    private func makeGenerativeBackgroundRow() -> UIView {
+        let row = UIStackView()
+        row.isLayoutMarginsRelativeArrangement = true
+        row.layoutMargins = UIEdgeInsets(top: 0, left: 16, bottom: 2, right: 16)
+        guard aiService.generativeBackgroundsAvailable else {
+            row.isHidden = true
+            return row
+        }
+
+        var config = UIButton.Configuration.tinted()
+        config.title = "Generate Background"
+        config.image = UIImage(systemName: "sparkles")
+        config.imagePadding = 6
+        config.cornerStyle = .large
+        config.baseBackgroundColor = Theme.Color.accent
+        config.baseForegroundColor = Theme.Color.accent
+        let button = UIButton(configuration: config, primaryAction: UIAction { [weak self] _ in
+            Haptics.tap()
+            self?.presentGenerativeBackground()
+        })
+        button.accessibilityIdentifier = "generateBackgroundButton"
+        row.addArrangedSubview(button)
+        return row
+    }
+
+    private func presentGenerativeBackground() {
+        guard EntitlementStore.shared.isPremiumUnlocked else {
+            let alert = UIAlertController(
+                title: "Premium Feature",
+                message: "Generated backgrounds are part of Premium.",
+                preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: "Not Now", style: .cancel))
+            present(alert, animated: true)
+            return
+        }
+        // The Image Playground sheet itself lands with the premium flow in Step 06,
+        // where the paywall it sits behind is built.
+        let alert = UIAlertController(
+            title: "Coming Soon",
+            message: "Background generation arrives with the Premium release.",
+            preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "OK", style: .default))
+        present(alert, animated: true)
+    }
+
+    /// Opens the brush surface for one cell's photo. The erased result replaces the
+    /// cell image through the normal commit, so the collage's undo sees a single
+    /// entry for the whole erase rather than one per brush stroke.
+    private func presentMagicEraser(forCellAt index: Int) {
+        guard let photo = viewModel.displayImage(forCellAt: index) else {
+            showToast("Add a photo to this cell first")
+            return
+        }
+        canvasView.setSelectedCell(index)
+
+        let brush = EraserBrushViewController(image: photo)
+        brush.onFinish = { [weak self] erased in
+            guard let self else { return }
+            self.dismiss(animated: true) {
+                self.canvasView.setSelectedCell(nil)
+                guard let erased else { return }     // cancelled or nothing painted
+                self.viewModel.setImage(erased, forCellAt: index)
+                self.showToast("Erased")
+            }
+        }
+        let nav = UINavigationController(rootViewController: brush)
+        nav.modalPresentationStyle = .fullScreen
+        present(nav, animated: true)
     }
 
     private func presentLiftProgress() -> UIAlertController {

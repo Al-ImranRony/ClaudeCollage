@@ -27,6 +27,11 @@ import UIKit
 /// One brush stroke: a path of points in normalized image space with a radius
 /// that is also normalized (fraction of the image's smaller side), so a stroke
 /// survives the image being displayed at any size.
+///
+/// Points use a TOP-LEFT origin, matching UIKit and the convention `AIService`
+/// established for Vision rects. `mask(from:size:)` flips into Core Graphics'
+/// bottom-left space when it draws — without that, every erase lands mirrored
+/// vertically, and only an asymmetric stroke reveals it.
 public struct EraserStroke: Equatable, Sendable {
     public let points: [CGPoint]
     public let radius: CGFloat
@@ -71,8 +76,10 @@ public struct ObjectEraser: Sendable {
         for stroke in strokes where !stroke.points.isEmpty {
             let radiusPx = max(1, stroke.radius * reference)
             let path = CGMutablePath()
+            // y is flipped here: strokes come from the UI in top-left space, the
+            // context draws in bottom-left.
             let absolute = stroke.points.map {
-                CGPoint(x: $0.x * CGFloat(width), y: $0.y * CGFloat(height))
+                CGPoint(x: $0.x * CGFloat(width), y: (1 - $0.y) * CGFloat(height))
             }
             if absolute.count == 1 {
                 // A tap, not a drag — still a dab of paint.
