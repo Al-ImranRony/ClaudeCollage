@@ -103,7 +103,7 @@ struct VideoCellControlsSheet: View {
             Button("Done") {}.opacity(0).accessibilityHidden(true)
         }
         .padding()
-        .foregroundStyle(Color(Theme.Color.accent))
+        .foregroundStyle(Color.themeAccentStrong)
     }
 
     // MARK: - Trim (filmstrip + draggable handles)
@@ -222,7 +222,7 @@ struct VideoCellControlsSheet: View {
                     .clipShape(RoundedRectangle(cornerRadius: 14))
             }
             .buttonStyle(.plain)
-            .foregroundStyle(Color(Theme.Color.accent))
+            .foregroundStyle(Color.themeAccentStrong)
             .accessibilityIdentifier("cellReplaceButton")
 
             Button(action: onRemove) {

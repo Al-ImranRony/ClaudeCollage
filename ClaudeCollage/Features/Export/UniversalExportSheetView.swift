@@ -101,12 +101,12 @@ struct UniversalExportSheetView: View {
             Button("Cancel", action: onCancel)
                 .accessibilityIdentifier("exportCancelButton")
             Spacer()
-            Text("Export").font(.themeHeadline).foregroundStyle(Color(Theme.Color.textPrimary))
+            Text("Export").font(.themeHeadline).foregroundStyle(Color.themeTextPrimary)
             Spacer()
             Button("Cancel", action: onCancel).opacity(0).accessibilityHidden(true)
         }
         .padding()
-        .foregroundStyle(Color(Theme.Color.accent))
+        .foregroundStyle(Color.themeAccentStrong)
     }
 
     // MARK: - Section 1: platform presets
@@ -138,9 +138,12 @@ struct UniversalExportSheetView: View {
                     .frame(width: 54, height: 40)
                 Text(info.title).font(.themeCaption)
             }
-            .foregroundStyle(selected ? Color(Theme.Color.textOnAccent) : Color(Theme.Color.textPrimary))
+            .foregroundStyle(selected ? Color.themeTextOnAccent : Color.themeTextPrimary)
             .frame(width: 74, height: 74)
-            .background(selected ? Color(Theme.Color.accent) : Color(Theme.Color.surface))
+            // The tile carries a caption under its glyph, so the selected fill
+            // is `accentStrong` — the identity orange would leave that label at
+            // 3.1:1.
+            .background(selected ? Color.themeAccentStrong : Color.themeSurface)
             .clipShape(RoundedRectangle(cornerRadius: 14))
         }
         .buttonStyle(.plain)
@@ -223,7 +226,7 @@ struct UniversalExportSheetView: View {
             Text("Your canvas is \(CanvasSize.normalize(capabilities.canvasAspect)) but this preset prefers \(ExportPreset.preset(for: options.platform).enforcedAspect ?? "the current size"). It will export anyway, scaled to fill the frame.")
                 .font(.themeCaption)
         }
-        .foregroundStyle(Color(Theme.Color.accent))
+        .foregroundStyle(Color.themeAccentStrong)
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(Theme.Color.accentSoft))
@@ -242,8 +245,8 @@ struct UniversalExportSheetView: View {
                     .font(.themeHeadline)
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(Color(Theme.Color.accent))
-                    .foregroundStyle(Color(Theme.Color.textOnAccent))
+                    .background(Color.themeAccentStrong)
+                    .foregroundStyle(Color.themeTextOnAccent)
                     .clipShape(RoundedRectangle(cornerRadius: 14))
             }
             .buttonStyle(.plain)
@@ -256,8 +259,8 @@ struct UniversalExportSheetView: View {
                     .font(.themeHeadline)
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(Color(Theme.Color.surface))
-                    .foregroundStyle(Color(Theme.Color.accent))
+                    .background(Color.themeSurface)
+                    .foregroundStyle(Color.themeAccentStrong)
                     .clipShape(RoundedRectangle(cornerRadius: 14))
             }
             .buttonStyle(.plain)

@@ -126,7 +126,9 @@ final class HomeViewController: UIViewController {
         config.imagePadding = 8
         config.cornerStyle = .large
         config.baseBackgroundColor = Theme.Color.accent
-        config.baseForegroundColor = Theme.Color.accent
+        // The wash stays the identity orange; the label on it cannot — see
+        // `Theme.Color.accentStrong`.
+        config.baseForegroundColor = Theme.Color.accentStrong
         config.titleAlignment = .leading
 
         let button = UIButton(configuration: config, primaryAction: UIAction { [weak self] _ in
@@ -559,7 +561,7 @@ final class HomeEmptyStateView: UIView {
         config.image = UIImage(systemName: "plus")
         config.imagePadding = 8
         config.cornerStyle = .large
-        config.baseBackgroundColor = Theme.Color.accent
+        config.baseBackgroundColor = Theme.Color.accentStrong
         config.baseForegroundColor = Theme.Color.textOnAccent
         config.contentInsets = NSDirectionalEdgeInsets(top: 14, leading: 22, bottom: 14, trailing: 22)
         config.attributedTitle = AttributedString(

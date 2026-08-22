@@ -56,7 +56,7 @@ final class StickerPickerViewController: UIViewController {
 
         packControl.translatesAutoresizingMaskIntoConstraints = false
         packControl.accessibilityIdentifier = "stickerPackControl"
-        packControl.selectedSegmentTintColor = Theme.Color.accent
+        ThemeSegmentedControl.apply(to: packControl)
         packControl.setTitleTextAttributes([.foregroundColor: Theme.Color.textOnAccent], for: .selected)
         if showsPersonalTab {
             packControl.insertSegment(

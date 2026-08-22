@@ -18,6 +18,10 @@ public enum AppAppearance {
     public static func apply(to window: UIWindow) {
         window.tintColor = Theme.Color.accent
         configureNavigationBar()
+        // SwiftUI's `.pickerStyle(.segmented)` is a UISegmentedControl under the
+        // hood, so theming the appearance proxy is the only way to reach the
+        // pickers inside the app's SwiftUI sheets.
+        ThemeSegmentedControl.apply(to: UISegmentedControl.appearance())
     }
 
     private static func configureNavigationBar() {

@@ -47,7 +47,10 @@ struct CarouselTypeSelectorView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            header
+            // Only when presented as a sheet. As a tab root the navigation bar
+            // already says "New Carousel", and drawing it again below produced
+            // the title twice, the second time in orange.
+            if onCancel != nil { header }
             ScrollView {
                 VStack(spacing: 20) {
                     ForEach(infos) { info in
@@ -62,24 +65,22 @@ struct CarouselTypeSelectorView: View {
         .background(Color(Theme.Color.background).ignoresSafeArea())
     }
 
-    private var header: some View {
-        HStack {
-            if let onCancel {
+    @ViewBuilder private var header: some View {
+        if let onCancel {
+            HStack {
                 Button("Cancel", action: onCancel)
                     .accessibilityIdentifier("carouselCancelButton")
                 Spacer()
-                Text("New Carousel").font(.themeHeadline)
+                Text("New Carousel")
+                    .font(.themeHeadline)
+                    .foregroundStyle(Color.themeTextPrimary)
                 Spacer()
                 Button("Cancel", action: onCancel).opacity(0)   // balance the title
                     .accessibilityHidden(true)
-            } else {
-                Spacer()
-                Text("New Carousel").font(.themeHeadline)
-                Spacer()
             }
+            .padding()
+            .foregroundStyle(Color.themeAccentStrong)
         }
-        .padding()
-        .foregroundStyle(Color(Theme.Color.accent))
     }
 
     private func card(_ info: TypeInfo) -> some View {
@@ -153,8 +154,10 @@ struct CarouselTypeSelectorView: View {
                 .font(.themeHeadline)
                 .frame(maxWidth: .infinity)
                 .padding()
-                .background(Color(Theme.Color.accent))
-                .foregroundStyle(Color(Theme.Color.textOnAccent))
+                // `accentStrong`, not `accent`: this label is body-sized, and
+                // white on the identity orange is 3.1:1.
+                .background(Color.themeAccentStrong)
+                .foregroundStyle(Color.themeTextOnAccent)
                 .clipShape(RoundedRectangle(cornerRadius: 14))
         }
         .padding(20)

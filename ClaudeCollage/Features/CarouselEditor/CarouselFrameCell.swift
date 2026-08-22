@@ -33,7 +33,8 @@ final class CarouselFrameCell: UICollectionViewCell {
         numberBadge.font = Theme.Typography.caption
         numberBadge.textColor = Theme.Color.textOnAccent
         numberBadge.textAlignment = .center
-        numberBadge.backgroundColor = Theme.Color.accent.withAlphaComponent(0.9)
+        // Carries a caption-sized number, so it is a text-bearing fill.
+        numberBadge.backgroundColor = Theme.Color.accentStrong.withAlphaComponent(0.9)
         numberBadge.layer.cornerRadius = 11
         numberBadge.clipsToBounds = true
         numberBadge.translatesAutoresizingMaskIntoConstraints = false

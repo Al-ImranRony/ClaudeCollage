@@ -284,7 +284,7 @@ final class ShapeThumbnailCell: UICollectionViewCell {
 
     func configure(with template: PolygonTemplate, isSelected: Bool) {
         imageView.image = UIImage(systemName: template.symbolName)
-        imageView.tintColor = isSelected ? Theme.Color.accent : Theme.Color.textSecondary
+        imageView.tintColor = isSelected ? Theme.Color.accentStrong : Theme.Color.textSecondary
         contentView.backgroundColor = isSelected ? Theme.Color.accentSoft : Theme.Color.controlFill
         contentView.layer.borderColor = (isSelected ? Theme.Color.accent : Theme.Color.separator).cgColor
     }

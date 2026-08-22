@@ -527,10 +527,12 @@ final class VideoEditorViewController: UIViewController {
     // MARK: - Text / sticker overlays (#7)
 
     private func makeAddOverlayBar() -> UIView {
-        let text = makeAddButton(title: "Text", systemImage: "textformat",
-                                 identifier: "videoAddTextButton", action: #selector(addTextTapped))
-        let sticker = makeAddButton(title: "Sticker", systemImage: "face.smiling",
-                                    identifier: "videoAddStickerButton", action: #selector(addStickerTapped))
+        let text = makeAddButton(
+            title: "Text", systemImage: "textformat", identifier: "videoAddTextButton",
+            action: { [weak self] in self?.addTextTapped() })
+        let sticker = makeAddButton(
+            title: "Sticker", systemImage: "face.smiling", identifier: "videoAddStickerButton",
+            action: { [weak self] in self?.addStickerTapped() })
         let row = UIStackView(arrangedSubviews: [text, sticker])
         row.axis = .horizontal
         row.distribution = .fillEqually
@@ -539,18 +541,20 @@ final class VideoEditorViewController: UIViewController {
         return row
     }
 
-    private func makeAddButton(title: String, systemImage: String,
-                               identifier: String, action: Selector) -> UIButton {
-        var config = UIButton.Configuration.tinted()
-        config.title = title
-        config.image = UIImage(systemName: systemImage)
-        config.imagePadding = 6
-        config.cornerStyle = .large
-        config.baseForegroundColor = Theme.Color.accent
-        config.baseBackgroundColor = Theme.Color.accent
-        let button = UIButton(configuration: config)
+    /// One definition of the editors' add-overlay pill, in the component layer:
+    /// the grid and video editors each carried an identical private copy, and
+    /// they had already drifted apart on contrast.
+    private func makeAddButton(
+        title: String, systemImage: String, identifier: String,
+        action: @escaping () -> Void
+    ) -> UIButton {
+        let button = ThemeButton(
+            style: .tinted,
+            title: title,
+            image: UIImage(systemName: systemImage),
+            action: UIAction { _ in action() }
+        )
         button.accessibilityIdentifier = identifier
-        button.addTarget(self, action: action, for: .touchUpInside)
         return button
     }
 

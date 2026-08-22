@@ -28,6 +28,9 @@ public final class ThemeButton: GradientLayerButton {
         case secondary
         /// Unfilled, accent label. Low-stakes ("See all", "Cancel").
         case tertiary
+        /// A soft-accent pill. The editors' "add something" affordances (Text,
+        /// Sticker), which are peers rather than a primary and an alternative.
+        case tinted
         /// The brand gradient under a large label. At most one per screen.
         case hero
     }
@@ -74,6 +77,11 @@ public final class ThemeButton: GradientLayerButton {
         case .tertiary:
             config.baseForegroundColor = Theme.Color.accentStrong
             config.background.backgroundColor = .clear
+        case .tinted:
+            // The ink is `accentStrong`, not `accent`: on a 15% wash the
+            // identity orange is 3.6:1, a legible glyph but not legible text.
+            config.baseForegroundColor = Theme.Color.accentStrong
+            config.background.backgroundColor = Theme.Color.accentSoft
         case .hero:
             config.baseForegroundColor = Theme.Color.textOnAccent
             // The gradient is the button's own backing layer, so the

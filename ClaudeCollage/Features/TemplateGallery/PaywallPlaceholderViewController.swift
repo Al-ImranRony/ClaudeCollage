@@ -60,7 +60,7 @@ final class PaywallPlaceholderViewController: UIViewController {
 
         var config = UIButton.Configuration.filled()
         config.cornerStyle = .large
-        config.baseBackgroundColor = Theme.Color.accent
+        config.baseBackgroundColor = Theme.Color.accentStrong
         config.baseForegroundColor = Theme.Color.textOnAccent
         config.contentInsets = NSDirectionalEdgeInsets(top: 14, leading: 22, bottom: 14, trailing: 22)
         config.attributedTitle = AttributedString(

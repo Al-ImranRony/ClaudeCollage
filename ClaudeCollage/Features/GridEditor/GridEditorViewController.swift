@@ -203,8 +203,7 @@ final class GridEditorViewController: UIViewController {
         // Grid / Shapes mode switch. Selecting a segment reveals the matching
         // picker; both drive the same `setLayout` on the view model.
         layoutModeControl.selectedSegmentIndex = viewModel.state.layout.isPolygon ? 1 : 0
-        layoutModeControl.selectedSegmentTintColor = Theme.Color.accent
-        layoutModeControl.setTitleTextAttributes([.foregroundColor: Theme.Color.textOnAccent], for: .selected)
+        ThemeSegmentedControl.apply(to: layoutModeControl)
         layoutModeControl.addTarget(self, action: #selector(layoutModeChanged), for: .valueChanged)
         let modeRow = UIStackView(arrangedSubviews: [layoutModeControl])
         modeRow.isLayoutMarginsRelativeArrangement = true
@@ -486,7 +485,7 @@ final class GridEditorViewController: UIViewController {
         config.image = UIImage(systemName: "lasso")
         config.imagePadding = 6
         config.cornerStyle = .large
-        config.baseForegroundColor = Theme.Color.accent
+        config.baseForegroundColor = Theme.Color.accentStrong
         config.baseBackgroundColor = Theme.Color.accent
         // A subtle "PRO" affordance until the user unlocks premium.
         if !EntitlementStore.shared.isPremiumUnlocked {
@@ -667,10 +666,10 @@ final class GridEditorViewController: UIViewController {
     private func makeAddOverlayBar() -> UIView {
         let textButton = makeAddButton(
             title: "Text", systemImage: "textformat", identifier: "addTextButton",
-            action: #selector(addTextTapped))
+            action: { [weak self] in self?.addTextTapped() })
         let stickerButton = makeAddButton(
             title: "Sticker", systemImage: "face.smiling", identifier: "addStickerButton",
-            action: #selector(addStickerTapped))
+            action: { [weak self] in self?.addStickerTapped() })
         let row = UIStackView(arrangedSubviews: [textButton, stickerButton])
         row.axis = .horizontal
         row.distribution = .fillEqually
@@ -679,19 +678,20 @@ final class GridEditorViewController: UIViewController {
         return row
     }
 
+    /// One definition of the editors' add-overlay pill, in the component layer:
+    /// the grid and video editors each carried an identical private copy, and
+    /// they had already drifted apart on contrast.
     private func makeAddButton(
-        title: String, systemImage: String, identifier: String, action: Selector
+        title: String, systemImage: String, identifier: String,
+        action: @escaping () -> Void
     ) -> UIButton {
-        var config = UIButton.Configuration.tinted()
-        config.title = title
-        config.image = UIImage(systemName: systemImage)
-        config.imagePadding = 6
-        config.cornerStyle = .large
-        config.baseForegroundColor = Theme.Color.accent
-        config.baseBackgroundColor = Theme.Color.accent
-        let button = UIButton(configuration: config)
+        let button = ThemeButton(
+            style: .tinted,
+            title: title,
+            image: UIImage(systemName: systemImage),
+            action: UIAction { _ in action() }
+        )
         button.accessibilityIdentifier = identifier
-        button.addTarget(self, action: action, for: .touchUpInside)
         return button
     }
 
