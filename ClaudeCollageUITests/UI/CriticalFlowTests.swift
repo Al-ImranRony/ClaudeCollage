@@ -82,7 +82,7 @@ final class CriticalFlowTests: XCTestCase {
 
         // Custom Canvas gives a single full-bleed cell without the system picker.
         app.buttons["startEditingButton"].tap()
-        app.sheets.buttons["startEditingCustomCanvas"].firstMatch.tap()
+        app.buttons["startEditingCustomCanvas"].firstMatch.tap()
         XCTAssertTrue(app.textFields["freeformWidthField"].waitForExistence(timeout: 10))
         app.buttons["Create"].tap()
         XCTAssertTrue(app.navigationBars["Grid Collage"].waitForExistence(timeout: 10))

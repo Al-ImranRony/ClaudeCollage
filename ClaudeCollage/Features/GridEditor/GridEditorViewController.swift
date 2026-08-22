@@ -573,7 +573,7 @@ final class GridEditorViewController: UIViewController {
               viewModel.state.cells[index].imageID != nil else { return }
         pendingSwapSource = index
         canvasView.setSelectedCell(index)
-        haptic(.medium)
+        Haptics.impact()
         showToast("Tap another cell to swap")
     }
 
@@ -997,7 +997,7 @@ final class GridEditorViewController: UIViewController {
                 DispatchQueue.main.async {
                     spinner.dismiss(animated: true) {
                         guard let data else {
-                            self.notify(.error)
+                            Haptics.error()
                             self.showAlert("Export failed", "Could not render the collage.")
                             return
                         }
@@ -1019,7 +1019,7 @@ final class GridEditorViewController: UIViewController {
         do {
             try data.write(to: url)
         } catch {
-            notify(.error)
+            Haptics.error()
             showAlert("Share failed", "Could not prepare the file to share.")
             return
         }
@@ -1051,10 +1051,9 @@ final class GridEditorViewController: UIViewController {
                 Task { @MainActor in
                     guard let self else { return }
                     if success {
-                        self.notify(.success)
-                        self.showToast("Saved to Photos")
+                        self.showSuccess("Saved to Photos")
                     } else {
-                        self.notify(.error)
+                        Haptics.error()
                         self.showAlert("Save Failed", "The collage could not be saved to Photos.")
                     }
                 }

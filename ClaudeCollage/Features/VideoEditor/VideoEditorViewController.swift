@@ -618,7 +618,7 @@ final class VideoEditorViewController: UIViewController {
             let synced = (try? await self.viewModel.detectAndSyncBeats()) ?? false
             progressVC.dismiss(animated: true) {
                 if synced {
-                    self.notify(.success)
+                    Haptics.success()
                     self.showToast("Cells synced to the beat")
                 } else {
                     self.showInfo(title: "Couldn't Sync",
@@ -706,8 +706,7 @@ final class VideoEditorViewController: UIViewController {
                     } else {
                         try await PhotoLibrarySaver().saveVideo(at: url)
                         progressVC.dismiss(animated: true) {
-                            self.notify(.success)
-                            self.showToast("Saved to Photos")
+                            self.showSuccess("Saved to Photos")
                         }
                     }
                 } catch VideoComposer.ComposerError.cancelled {
@@ -715,7 +714,7 @@ final class VideoEditorViewController: UIViewController {
                     progressVC.dismiss(animated: true) { self.showToast("Export cancelled") }
                 } catch {
                     progressVC.dismiss(animated: true) {
-                        self.notify(.error)
+                        Haptics.error()
                         self.showInfo(title: "Export Failed",
                                       message: "The video couldn't be created. Please try again.")
                     }

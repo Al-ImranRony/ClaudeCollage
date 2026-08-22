@@ -335,15 +335,14 @@ final class CarouselEditorViewController: UIViewController {
                     } else {
                         try await PhotoLibrarySaver().saveVideo(at: url)
                         progressVC.dismiss(animated: true) {
-                            self.notify(.success)
-                            self.showToast("Saved to Photos")
+                            self.showSuccess("Saved to Photos")
                         }
                     }
                 } catch VideoComposer.ComposerError.cancelled {
                     progressVC.dismiss(animated: true) { self.showToast("Export cancelled") }
                 } catch {
                     progressVC.dismiss(animated: true) {
-                        self.notify(.error)
+                        Haptics.error()
                         self.showComingSoon(title: "Export Failed",
                                             message: "The video couldn't be created. Please try again.")
                     }
@@ -371,12 +370,11 @@ final class CarouselEditorViewController: UIViewController {
                         try await saver.saveImage(data)
                     }
                     spinner.dismiss(animated: true) {
-                        self.notify(.success)
-                        self.showToast("Saved \(frames.count) images")
+                        self.showSuccess("Saved \(frames.count) images")
                     }
                 } catch {
                     spinner.dismiss(animated: true) {
-                        self.notify(.error)
+                        Haptics.error()
                         self.showComingSoon(title: "Save Failed", message: "Couldn't save to Photos.")
                     }
                 }

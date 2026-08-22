@@ -60,7 +60,10 @@ final class SafeZoneOverlayView: UIView {
         // 3) Label each zone (when it fits) so the region is self-explanatory.
         let fontSize = max(9, min(15, bounds.width * 0.03))
         let attributes: [NSAttributedString.Key: Any] = [
-            .font: UIFont.systemFont(ofSize: fontSize, weight: .semibold),
+            // Rounded, like every other label in the app, but deliberately
+            // unscaled: the size is derived from the overlay's own width, so
+            // Dynamic Type would push the label out of the zone it names.
+            .font: Theme.Typography.roundedFixed(fontSize, .semibold),
             .foregroundColor: UIColor.white.withAlphaComponent(0.92),
         ]
         for zone in zones {

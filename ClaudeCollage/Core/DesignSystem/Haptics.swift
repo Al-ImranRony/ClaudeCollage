@@ -2,12 +2,14 @@
 //  Haptics.swift
 //  ClaudeCollage
 //
-//  A centralised, semantic haptics vocabulary. The existing
-//  `UIViewController.haptic(_:)` helper allocates a fresh `UIFeedbackGenerator`
-//  on every call, which the system has to spin up cold — adding latency and
+//  A centralised, semantic haptics vocabulary. The `UIViewController.haptic(_:)`
+//  and `notify(_:)` helpers this replaced allocated a fresh `UIFeedbackGenerator`
+//  on every call, which the system had to spin up cold — adding latency and
 //  occasionally dropping the first tap. This holds long-lived, `prepare()`-primed
 //  generators and exposes intent-named triggers so call sites read as design
 //  decisions ("selection changed", "action succeeded") rather than raw styles.
+//  Step 05b removed the last callers of the old helpers, and the helpers with
+//  them, so there is now one way to make the phone buzz.
 //
 
 import UIKit

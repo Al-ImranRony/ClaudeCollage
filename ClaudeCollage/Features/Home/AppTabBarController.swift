@@ -210,6 +210,7 @@ extension AppTabBarController: UITabBarControllerDelegate {
     func tabBarController(
         _ tabBarController: UITabBarController, didSelect viewController: UIViewController
     ) {
+        Haptics.selectionChanged()
         updatePlusVisibility()
     }
 }

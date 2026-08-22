@@ -174,32 +174,11 @@ final class AppCoordinator {
     /// Grid vs Shapes vs Freeform is deliberately NOT asked here: pick photos and
     /// start editing, then swap layout from the editor's own Layout/Shape pickers.
     private func presentStartEditingSheet() {
-        let sheet = UIAlertController(
-            title: "Start Editing", message: nil, preferredStyle: .actionSheet)
-        sheet.view.accessibilityIdentifier = "startEditingSheet"
-
-        let image = UIAlertAction(title: "Image", style: .default) { [weak self] _ in
-            self?.pickPhotosForNewCollage()
-        }
-        image.accessibilityIdentifier = "startEditingImage"
-        let video = UIAlertAction(title: "Video", style: .default) { [weak self] _ in
-            self?.startVideoCollage()
-        }
-        video.accessibilityIdentifier = "startEditingVideo"
-        let canvas = UIAlertAction(title: "Custom Canvas", style: .default) { [weak self] _ in
-            self?.promptForCustomCanvas()
-        }
-        canvas.accessibilityIdentifier = "startEditingCustomCanvas"
-
-        sheet.addAction(image)
-        sheet.addAction(video)
-        sheet.addAction(canvas)
-        sheet.addAction(UIAlertAction(title: "Cancel", style: .cancel))
-        // The "+" floats over the tab bar, so anchor the popover there on iPad.
-        sheet.popoverPresentationController?.sourceView = tabBarController.view
-        sheet.popoverPresentationController?.sourceRect = CGRect(
-            x: tabBarController.view.bounds.midX, y: tabBarController.view.bounds.maxY - 90,
-            width: 1, height: 1)
+        let sheet = StartEditingSheetViewController(
+            onImage: { [weak self] in self?.pickPhotosForNewCollage() },
+            onVideo: { [weak self] in self?.startVideoCollage() },
+            onCustomCanvas: { [weak self] in self?.promptForCustomCanvas() }
+        )
         tabBarController.present(sheet, animated: true)
     }
 

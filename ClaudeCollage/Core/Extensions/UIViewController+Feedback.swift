@@ -3,6 +3,7 @@
 //  ClaudeCollage
 //
 //  Step 01 — lightweight toast + haptic helpers shared across editors.
+//  Step 05b — themed, Reduce-Motion aware, and routed through `Haptics`.
 //
 
 import UIKit
@@ -10,43 +11,54 @@ import UIKit
 extension UIViewController {
 
     /// Shows a transient capsule toast that auto-dismisses.
+    ///
+    /// For routine confirmations ("Sticker removed"). An export finishing is not
+    /// routine — use `showSuccess` for that.
     func showToast(_ message: String, duration: TimeInterval = 1.8) {
         let label = PaddingLabel()
         label.text = message
-        label.textColor = .white
+        label.textColor = Theme.Color.textOnToast
         label.font = Theme.Typography.subheadline
         label.numberOfLines = 0
         label.textAlignment = .center
-        label.backgroundColor = UIColor(white: 0.08, alpha: 0.9)
+        label.backgroundColor = Theme.Color.toast
         label.layer.cornerRadius = Theme.Radius.md
         label.layer.cornerCurve = .continuous
         label.clipsToBounds = true
         label.alpha = 0
         label.translatesAutoresizingMaskIntoConstraints = false
+        // A toast is an announcement, not a control; VoiceOver users get it as
+        // one rather than having to find it.
+        label.isAccessibilityElement = false
 
         view.addSubview(label)
         NSLayoutConstraint.activate([
             label.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            label.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -24),
-            label.leadingAnchor.constraint(greaterThanOrEqualTo: view.leadingAnchor, constant: 32),
-            label.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -32),
+            label.bottomAnchor.constraint(
+                equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -Theme.Spacing.xl),
+            label.leadingAnchor.constraint(
+                greaterThanOrEqualTo: view.leadingAnchor, constant: Theme.Spacing.xxl),
+            label.trailingAnchor.constraint(
+                lessThanOrEqualTo: view.trailingAnchor, constant: -Theme.Spacing.xxl),
         ])
 
-        UIView.animate(withDuration: 0.25, animations: { label.alpha = 1 }) { _ in
-            UIView.animate(withDuration: 0.25, delay: duration, options: []) {
+        let fade = Theme.Motion.duration(Theme.Motion.standard)
+        UIView.animate(withDuration: fade, animations: { label.alpha = 1 }) { _ in
+            UIView.animate(withDuration: fade, delay: duration, options: []) {
                 label.alpha = 0
             } completion: { _ in
                 label.removeFromSuperview()
             }
         }
+        UIAccessibility.post(notification: .announcement, argument: message)
     }
 
-    func haptic(_ style: UIImpactFeedbackGenerator.FeedbackStyle = .light) {
-        UIImpactFeedbackGenerator(style: style).impactOccurred()
-    }
-
-    func notify(_ type: UINotificationFeedbackGenerator.FeedbackType) {
-        UINotificationFeedbackGenerator().notificationOccurred(type)
+    /// The celebration for a finished export: a gradient check that springs in,
+    /// holds, and leaves. Carries its own success haptic, so callers do not fire
+    /// one as well.
+    func showSuccess(_ message: String) {
+        Haptics.success()
+        SuccessOverlayView(message: message).present(in: view)
     }
 }
 

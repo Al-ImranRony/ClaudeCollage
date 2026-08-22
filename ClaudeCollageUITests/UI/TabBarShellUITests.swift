@@ -80,7 +80,7 @@ final class TabBarShellUITests: XCTestCase {
         // A UIAlertAction's identifier lands on more than one element in the tree, so
         // the query is scoped to the sheet and resolved to one. The assertion below
         // is what proves the right action fired.
-        app.sheets.buttons["startEditingCustomCanvas"].firstMatch.tap()
+        app.buttons["startEditingCustomCanvas"].firstMatch.tap()
 
         XCTAssertTrue(app.textFields["freeformWidthField"].waitForExistence(timeout: 5),
                       "Custom Canvas prompts for a size")
@@ -155,7 +155,11 @@ final class TabBarShellUITests: XCTestCase {
         XCTAssertTrue(app.navigationBars["Grid Collage"].waitForExistence(timeout: 8))
 
         app.sliders.element(boundBy: 0).adjust(toNormalizedSliderPosition: 0.6)
-        XCTAssertEqual(app.sheets.count, 0,
+        // Asserted by identifier rather than `app.sheets.count`: the Start
+        // Editing sheet is no longer a UIAlertController, so the old query would
+        // now be 0 whether or not the sheet opened, and the guard would pass
+        // while proving nothing.
+        XCTAssertFalse(app.descendants(matching: .any)["startEditingSheet"].exists,
                        "Dragging a slider must not reach the hidden + behind it")
 
         app.navigationBars["Grid Collage"].buttons["BackButton"].tap()

@@ -98,6 +98,14 @@ public enum Theme {
             dynamic(light: 0xFFFFFF, dark: 0x17110C)
         }
 
+        /// A toast's ground and ink.
+        ///
+        /// Fixed in both appearances on purpose: a toast floats over whatever
+        /// the screen happens to be showing — a photo, a video frame, a dark
+        /// canvas — so it cannot borrow the surface tokens and stay readable.
+        public static var toast: UIColor { UIColor(white: 0.08, alpha: 0.92) }
+        public static var textOnToast: UIColor { .white }
+
         /// The fill behind an empty photo cell, and the glyph drawn on it.
         ///
         /// Deliberately NOT dynamic. This colour is composited into exported
@@ -173,6 +181,17 @@ public enum Theme {
         public static var subheadline: UIFont { rounded(15, .medium, .subheadline) }
         public static var caption: UIFont { rounded(13, .medium, .caption1) }
         public static var button: UIFont { rounded(17, .semibold, .headline) }
+
+        /// A rounded system font at exactly `size`, with no Dynamic Type scaling.
+        ///
+        /// For type that is *drawn* rather than laid out — overlay labels whose
+        /// size is derived from the geometry they sit in. Scaling those would
+        /// push them out of the region they are labelling.
+        public static func roundedFixed(_ size: CGFloat, _ weight: UIFont.Weight) -> UIFont {
+            let base = UIFont.systemFont(ofSize: size, weight: weight)
+            guard let descriptor = base.fontDescriptor.withDesign(.rounded) else { return base }
+            return UIFont(descriptor: descriptor, size: size)
+        }
 
         /// A rounded system font at `size`/`weight`, scaled for the given text style.
         public static func rounded(
