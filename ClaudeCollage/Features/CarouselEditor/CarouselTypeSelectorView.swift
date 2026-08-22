@@ -52,13 +52,19 @@ struct CarouselTypeSelectorView: View {
             // the title twice, the second time in orange.
             if onCancel != nil { header }
             ScrollView {
-                VStack(spacing: 20) {
+                // Tight enough that the four type cards and both option controls
+                // fit without scrolling on a standard phone. At the previous
+                // spacing the aspect picker landed exactly on the scroll
+                // boundary and rendered as a control sliced in half, which reads
+                // as a bug rather than as more content below.
+                VStack(spacing: 14) {
                     ForEach(infos) { info in
                         card(info)
                     }
                     options
                 }
-                .padding(20)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
             }
             createButton
         }
@@ -107,7 +113,7 @@ struct CarouselTypeSelectorView: View {
                         .foregroundStyle(Color(Theme.Color.accent))
                 }
             }
-            .padding(16)
+            .padding(14)
             .background(Color(Theme.Color.surface))
             .clipShape(RoundedRectangle(cornerRadius: 16))
             .overlay(
@@ -143,7 +149,7 @@ struct CarouselTypeSelectorView: View {
             }
             .pickerStyle(.segmented)
         }
-        .padding(.top, 8)
+        .padding(.top, 4)
     }
 
     private var createButton: some View {
@@ -160,7 +166,8 @@ struct CarouselTypeSelectorView: View {
                 .foregroundStyle(Color.themeTextOnAccent)
                 .clipShape(RoundedRectangle(cornerRadius: 14))
         }
-        .padding(20)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 12)
         .accessibilityIdentifier("carouselCreateButton")
     }
 }

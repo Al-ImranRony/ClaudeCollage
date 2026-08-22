@@ -48,9 +48,14 @@ final class TemplateGalleryViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        title = "Templates"
+        // `navigationItem.title`, NOT `title`: the latter also rewrites this
+        // tab's bar label. It happens to say the same thing today, which is
+        // exactly why the trap survives unnoticed until someone renames one.
+        navigationItem.title = "Templates"
         view.backgroundColor = Theme.Color.background
-        navigationItem.largeTitleDisplayMode = .never
+        // Large, like Home and Projects. A browse screen that dropped to an
+        // inline title read as a pushed detail rather than a tab root.
+        navigationController?.navigationBar.prefersLargeTitles = true
 
         searchController.searchResultsUpdater = self
         searchController.obscuresBackgroundDuringPresentation = false

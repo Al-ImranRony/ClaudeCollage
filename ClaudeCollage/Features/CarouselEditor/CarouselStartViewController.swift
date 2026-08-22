@@ -28,7 +28,7 @@ final class CarouselStartViewController: UIViewController {
         // "New Carousel" the first time this tab's view loaded.
         navigationItem.title = "New Carousel"
         view.backgroundColor = Theme.Color.background
-        navigationItem.largeTitleDisplayMode = .never
+        navigationController?.navigationBar.prefersLargeTitles = true
 
         let selector = CarouselTypeSelectorView(
             onCreate: { [weak self] config in self?.onCreate?(config) },
