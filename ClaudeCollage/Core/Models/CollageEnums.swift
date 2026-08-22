@@ -14,6 +14,19 @@ public enum CollageMode: String, Codable, Sendable, CaseIterable {
     case carousel
     case video
 
+    /// SF Symbol the gallery badges a card with. A masonry grid mixes every
+    /// mode at every proportion, so the shape of a card no longer implies what
+    /// it is and the badge has to say so.
+    public var badgeSymbolName: String {
+        switch self {
+        case .grid: return "square.grid.2x2.fill"
+        case .polygon: return "triangle.fill"
+        case .template: return "sparkles"
+        case .carousel: return "rectangle.on.rectangle.angled"
+        case .video: return "play.fill"
+        }
+    }
+
     /// Short user-facing label for a project card's subtitle.
     public var displayName: String {
         switch self {

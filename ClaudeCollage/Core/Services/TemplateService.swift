@@ -124,13 +124,25 @@ public final class TemplateService {
 
     // MARK: - Thumbnails
 
+    /// Bumped whenever `CollageRenderer` changes how it draws chrome, so cached
+    /// thumbnails rendered by an older look are never served.
+    ///
+    /// 2 — Step 05b: the empty-cell well moved from the system greys to the
+    /// deterministic `Theme.Color.cellWell` tokens.
+    private static let rendererRevision = 2
+
     /// A `maxDimension`-bounded thumbnail for the template, rendered once via the
     /// shared `CollageRenderer` and cached in memory + on disk. Photo zones show
     /// the empty-cell placeholder (there is no user imagery yet).
     public func thumbnail(for template: CollageTemplate, maxDimension: CGFloat = 300) -> CGImage? {
         // The key carries a content fingerprint so a re-authored template (same
-        // id, new geometry/background) never serves its stale cached thumbnail.
-        let key = "\(template.id)-\(Self.contentFingerprint(of: template))@\(Int(maxDimension))"
+        // id, new geometry/background) never serves its stale cached thumbnail,
+        // and a renderer revision so a change to how the renderer draws does not
+        // either. The fingerprint alone cannot catch the second case: the
+        // template did not change, the renderer did — which is exactly what
+        // happened when the empty-cell well moved off the system greys.
+        let key = "\(template.id)-\(Self.contentFingerprint(of: template))"
+            + "-r\(Self.rendererRevision)@\(Int(maxDimension))"
         if let cached = thumbnailCache[key] { return cached }
         if let disk = loadDiskThumbnail(key: key) {
             thumbnailCache[key] = disk

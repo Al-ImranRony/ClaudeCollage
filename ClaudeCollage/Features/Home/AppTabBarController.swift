@@ -31,7 +31,7 @@ final class AppTabBarController: UITabBarController {
     var onStartEditing: (() -> Void)?
 
     private let plusContainer = PassthroughView()
-    private let plusButton = UIButton(type: .custom)
+    private let plusButton = GradientLayerButton(type: .custom)
 
     private let diameter: CGFloat = 56
     /// Gap between the bottom of the button and the top of the tab bar. Small
@@ -129,15 +129,37 @@ final class AppTabBarController: UITabBarController {
         let appearance = UITabBarAppearance()
         appearance.configureWithDefaultBackground()
         appearance.backgroundColor = Theme.Color.surface
+
+        // Tab labels are ~11pt, which is body text as far as contrast is
+        // concerned, so the selected state uses `accentStrong` rather than the
+        // identity orange — the latter is 3.1:1 on white.
+        let item = UITabBarItemAppearance()
+        item.normal.titleTextAttributes = [
+            .font: Theme.Typography.caption,
+            .foregroundColor: Theme.Color.textSecondary,
+        ]
+        item.normal.iconColor = Theme.Color.textSecondary
+        item.selected.titleTextAttributes = [
+            .font: Theme.Typography.caption,
+            .foregroundColor: Theme.Color.accentStrong,
+        ]
+        item.selected.iconColor = Theme.Color.accentStrong
+        appearance.stackedLayoutAppearance = item
+        appearance.inlineLayoutAppearance = item
+        appearance.compactInlineLayoutAppearance = item
+
         tabBar.standardAppearance = appearance
         tabBar.scrollEdgeAppearance = appearance
-        tabBar.tintColor = Theme.Color.accent
+        tabBar.tintColor = Theme.Color.accentStrong
         tabBar.unselectedItemTintColor = Theme.Color.textSecondary
         tabBar.accessibilityIdentifier = "mainTabBar"
     }
 
     private func setupPlusButton() {
-        plusButton.backgroundColor = Theme.Color.accent
+        // The one hero surface in the shell, so it carries the brand gradient
+        // rather than a flat fill. Running it `accentStrong → accent` keeps the
+        // glyph clear of the pale end of the ramp, where white would be 2.2:1.
+        plusButton.useBrandGradient()
         plusButton.tintColor = Theme.Color.textOnAccent
         plusButton.setImage(
             UIImage(systemName: "plus", withConfiguration:

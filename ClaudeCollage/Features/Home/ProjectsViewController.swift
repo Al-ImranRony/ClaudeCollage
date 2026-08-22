@@ -121,6 +121,10 @@ final class ProjectsViewController: UIViewController {
             }
         }
         visibleSummaries = filtered
+        // The masonry section is computed from `visibleSummaries`, so the layout
+        // has to be thrown away too — `reloadData` alone would re-use the frames
+        // computed for the previous filter.
+        collectionView.collectionViewLayout.invalidateLayout()
         collectionView.reloadData()
 
         // The empty state is for "no projects at all". A search that matches
@@ -135,8 +139,7 @@ final class ProjectsViewController: UIViewController {
         let control = UISegmentedControl(items: SortOrder.allCases.map(\.title))
         control.selectedSegmentIndex = 0
         control.accessibilityIdentifier = "projectsSortControl"
-        control.selectedSegmentTintColor = Theme.Color.accent
-        control.setTitleTextAttributes([.foregroundColor: Theme.Color.textOnAccent], for: .selected)
+        ThemeSegmentedControl.apply(to: control)
         control.addTarget(self, action: #selector(sortChanged), for: .valueChanged)
         return control
     }
@@ -148,18 +151,20 @@ final class ProjectsViewController: UIViewController {
         collectionView.setContentOffset(.zero, animated: false)
     }
 
+    // MARK: - Masonry layout
+
+    /// Room under each thumbnail for the name and date. Fixed, so captions line
+    /// up across a row even though the thumbnails above them do not.
+    private static let captionHeight: CGFloat = 44
+    private static let cardSpacing: CGFloat = 12
+
     private func makeCollectionView() -> UICollectionView {
-        let item = NSCollectionLayoutItem(
-            layoutSize: NSCollectionLayoutSize(widthDimension: .fractionalWidth(0.5), heightDimension: .fractionalHeight(1))
-        )
-        item.contentInsets = NSDirectionalEdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8)
-        let group = NSCollectionLayoutGroup.horizontal(
-            layoutSize: NSCollectionLayoutSize(widthDimension: .fractionalWidth(1), heightDimension: .fractionalWidth(0.62)),
-            subitems: [item]
-        )
-        let section = NSCollectionLayoutSection(group: group)
-        section.contentInsets = NSDirectionalEdgeInsets(top: 8, leading: 12, bottom: 24, trailing: 12)
-        let layout = UICollectionViewCompositionalLayout(section: section)
+        // The section is rebuilt on every invalidation rather than configured
+        // once, because a masonry section's height depends on the items it is
+        // laying out — which change as the user searches and re-sorts.
+        let layout = UICollectionViewCompositionalLayout { [weak self] _, environment in
+            self?.makeMasonrySection(for: environment)
+        }
 
         let view = UICollectionView(frame: .zero, collectionViewLayout: layout)
         view.backgroundColor = Theme.Color.background
@@ -169,6 +174,40 @@ final class ProjectsViewController: UIViewController {
         view.accessibilityIdentifier = "projectsGrid"
         view.register(ProjectCardCell.self, forCellWithReuseIdentifier: ProjectCardCell.reuseID)
         return view
+    }
+
+    private func makeMasonrySection(
+        for environment: NSCollectionLayoutEnvironment
+    ) -> NSCollectionLayoutSection {
+        let insets = NSDirectionalEdgeInsets(
+            top: Theme.Spacing.xs, leading: Theme.Spacing.md,
+            bottom: Theme.Spacing.xl, trailing: Theme.Spacing.md
+        )
+        let width = environment.container.effectiveContentSize.width - insets.leading - insets.trailing
+
+        let placement = MasonryLayout.frames(
+            aspectRatios: visibleSummaries.map(\.thumbnailAspectRatio),
+            columns: 2,
+            containerWidth: width,
+            spacing: Self.cardSpacing,
+            captionHeight: Self.captionHeight
+        )
+
+        // A custom group is clipped to its declared size, so the height has to
+        // be the measured total rather than an estimate. `max(1,…)` keeps an
+        // empty gallery from declaring a zero-height group, which UIKit rejects.
+        let group = NSCollectionLayoutGroup.custom(
+            layoutSize: NSCollectionLayoutSize(
+                widthDimension: .absolute(max(1, width)),
+                heightDimension: .absolute(max(1, placement.totalHeight))
+            )
+        ) { _ in
+            placement.frames.map(NSCollectionLayoutGroupCustomItem.init(frame:))
+        }
+
+        let section = NSCollectionLayoutSection(group: group)
+        section.contentInsets = insets
+        return section
     }
 }
 

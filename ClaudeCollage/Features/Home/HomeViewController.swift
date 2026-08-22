@@ -281,31 +281,12 @@ final class HomeViewController: UIViewController {
     private func sectionHeader(
         _ title: String, actionTitle: String?, action: (() -> Void)?
     ) -> UIStackView {
-        let label = UILabel()
-        label.text = title
-        label.font = Theme.Typography.title2
-        label.textColor = Theme.Color.textPrimary
-
-        var arranged: [UIView] = [label]
-        if let actionTitle, let action {
-            let button = UIButton(type: .system, primaryAction: UIAction(title: actionTitle) { _ in
-                action()
-            })
-            button.titleLabel?.font = Theme.Typography.subheadline
-            button.tintColor = Theme.Color.accent
-            button.accessibilityIdentifier = "seeAllTemplatesButton"
-            button.setContentHuggingPriority(.required, for: .horizontal)
-            arranged.append(button)
-        }
-
-        let row = UIStackView(arrangedSubviews: arranged)
-        row.axis = .horizontal
-        row.alignment = .firstBaseline
-        row.distribution = arranged.count > 1 ? .equalSpacing : .fill
-        row.isLayoutMarginsRelativeArrangement = true
-        row.layoutMargins = UIEdgeInsets(
-            top: 0, left: Theme.Spacing.md, bottom: 0, right: Theme.Spacing.md)
-        return row
+        SectionHeaderView(
+            title: title,
+            actionTitle: actionTitle,
+            actionIdentifier: actionTitle == nil ? nil : "seeAllTemplatesButton",
+            action: action
+        )
     }
 
     private func makeFeaturedStrip() -> UICollectionView {
@@ -399,13 +380,28 @@ private final class QuickStartTile: UIControl {
         backgroundColor = Theme.Color.surface
         layer.cornerRadius = Theme.Radius.lg
         layer.cornerCurve = .continuous
+        applyCardShadow()
 
         let icon = UIImageView(image: UIImage(
             systemName: symbol,
-            withConfiguration: UIImage.SymbolConfiguration(pointSize: 22, weight: .semibold)))
-        icon.tintColor = Theme.Color.accent
-        icon.contentMode = .scaleAspectFit
-        icon.setContentHuggingPriority(.required, for: .horizontal)
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: 19, weight: .semibold)))
+        icon.tintColor = Theme.Color.accentStrong
+        icon.contentMode = .center
+
+        // The glyph sits in a soft-accent well rather than floating loose: it
+        // gives the row a fixed left edge to align to, and it is what makes
+        // three stacked rows read as one list instead of three unrelated cards.
+        let iconWell = UIView()
+        iconWell.backgroundColor = Theme.Color.accentSoft
+        iconWell.layer.cornerRadius = Theme.Radius.sm
+        iconWell.layer.cornerCurve = .continuous
+        iconWell.setContentHuggingPriority(.required, for: .horizontal)
+        icon.translatesAutoresizingMaskIntoConstraints = false
+        iconWell.addSubview(icon)
+        NSLayoutConstraint.activate([
+            icon.centerXAnchor.constraint(equalTo: iconWell.centerXAnchor),
+            icon.centerYAnchor.constraint(equalTo: iconWell.centerYAnchor),
+        ])
 
         let titleLabel = UILabel()
         titleLabel.text = title
@@ -427,7 +423,7 @@ private final class QuickStartTile: UIControl {
         chevron.tintColor = Theme.Color.textSecondary
         chevron.setContentHuggingPriority(.required, for: .horizontal)
 
-        let row = UIStackView(arrangedSubviews: [icon, labels, chevron])
+        let row = UIStackView(arrangedSubviews: [iconWell, labels, chevron])
         row.axis = .horizontal
         row.spacing = Theme.Spacing.sm
         row.alignment = .center
@@ -440,7 +436,8 @@ private final class QuickStartTile: UIControl {
             row.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -Theme.Spacing.md),
             row.leadingAnchor.constraint(equalTo: leadingAnchor, constant: Theme.Spacing.md),
             row.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -Theme.Spacing.md),
-            icon.widthAnchor.constraint(equalToConstant: 30),
+            iconWell.widthAnchor.constraint(equalToConstant: 38),
+            iconWell.heightAnchor.constraint(equalToConstant: 38),
         ])
 
         addTarget(self, action: #selector(tapped), for: .touchUpInside)
@@ -449,7 +446,10 @@ private final class QuickStartTile: UIControl {
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
 
-    @objc private func tapped() { action() }
+    @objc private func tapped() {
+        Haptics.tap()
+        action()
+    }
 
     override var isHighlighted: Bool {
         didSet {
@@ -596,6 +596,7 @@ final class ProjectCardCell: UICollectionViewCell {
     static let reuseID = "ProjectCardCell"
 
     private let imageView = UIImageView()
+    private let modeBadge = UIImageView()
     private let nameLabel = UILabel()
     private let dateLabel = UILabel()
 
@@ -606,8 +607,21 @@ final class ProjectCardCell: UICollectionViewCell {
         imageView.clipsToBounds = true
         imageView.layer.cornerRadius = Theme.Radius.lg
         imageView.layer.cornerCurve = .continuous
-        imageView.backgroundColor = Theme.Color.controlFill
+        // The same well the canvas and the export renderer paint, so a project
+        // with empty cells looks like itself here too.
+        imageView.backgroundColor = Theme.Color.cellWell
         imageView.translatesAutoresizingMaskIntoConstraints = false
+
+        // A masonry grid mixes square grids, 9:16 carousels and video side by
+        // side, so the card says which is which instead of leaving the shape to
+        // imply it.
+        modeBadge.contentMode = .center
+        modeBadge.tintColor = Theme.Color.textOnAccent
+        modeBadge.backgroundColor = Theme.Color.accentStrong
+        modeBadge.layer.cornerRadius = 13
+        modeBadge.layer.cornerCurve = .continuous
+        modeBadge.clipsToBounds = true
+        modeBadge.translatesAutoresizingMaskIntoConstraints = false
 
         // Soft elevation sits on the (non-clipping) contentView, behind the
         // rounded image. The shadow path is set in layoutSubviews.
@@ -623,21 +637,38 @@ final class ProjectCardCell: UICollectionViewCell {
         dateLabel.translatesAutoresizingMaskIntoConstraints = false
 
         contentView.addSubview(imageView)
+        contentView.addSubview(modeBadge)
         contentView.addSubview(nameLabel)
         contentView.addSubview(dateLabel)
         NSLayoutConstraint.activate([
             imageView.topAnchor.constraint(equalTo: contentView.topAnchor),
             imageView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
             imageView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
-            imageView.heightAnchor.constraint(equalTo: imageView.widthAnchor),
+            // No fixed aspect: the masonry layout decides the card's height and
+            // the thumbnail takes whatever is left above the caption. A square
+            // constraint here would fight it and win, since it is the stronger
+            // of the two.
+            imageView.bottomAnchor.constraint(
+                equalTo: nameLabel.topAnchor, constant: -Theme.Spacing.xs),
 
-            nameLabel.topAnchor.constraint(equalTo: imageView.bottomAnchor, constant: 6),
+            modeBadge.topAnchor.constraint(equalTo: imageView.topAnchor, constant: Theme.Spacing.xs),
+            modeBadge.leadingAnchor.constraint(
+                equalTo: imageView.leadingAnchor, constant: Theme.Spacing.xs),
+            modeBadge.widthAnchor.constraint(equalToConstant: 26),
+            modeBadge.heightAnchor.constraint(equalToConstant: 26),
+
             nameLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 4),
             nameLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -4),
 
             dateLabel.topAnchor.constraint(equalTo: nameLabel.bottomAnchor, constant: 1),
             dateLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 4),
             dateLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -4),
+            // Equality, not `lessThanOrEqualTo`: the caption block is what pins
+            // the bottom of the stack, and with only an inequality the whole
+            // chain is satisfiable by collapsing the thumbnail to zero height
+            // and parking the labels at the top — which is exactly what it did.
+            dateLabel.bottomAnchor.constraint(
+                equalTo: contentView.bottomAnchor, constant: -2),
         ])
     }
 
@@ -670,6 +701,10 @@ final class ProjectCardCell: UICollectionViewCell {
 
     func configure(with summary: ProjectSummary) {
         imageView.image = summary.thumbnail
+        modeBadge.image = UIImage(
+            systemName: summary.mode.badgeSymbolName,
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: 11, weight: .semibold)
+        )
         // Name first, date second: once projects are nameable and searchable, the
         // name is what identifies a card.
         nameLabel.text = summary.displayName
@@ -682,5 +717,6 @@ final class ProjectCardCell: UICollectionViewCell {
     override func prepareForReuse() {
         super.prepareForReuse()
         imageView.image = nil
+        modeBadge.image = nil
     }
 }

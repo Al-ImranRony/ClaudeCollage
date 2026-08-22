@@ -44,7 +44,7 @@ final class TemplateCardCell: UICollectionViewCell {
         )
         crownBadge.tintColor = Theme.Color.textOnAccent
         crownBadge.contentMode = .center
-        crownBadge.backgroundColor = Theme.Color.accent
+        crownBadge.backgroundColor = Theme.Color.accentStrong
         crownBadge.layer.cornerRadius = 11
         crownBadge.layer.cornerCurve = .continuous
         crownBadge.isHidden = true
@@ -142,8 +142,10 @@ final class CategoryChipCell: UICollectionViewCell {
 
     func configure(title: String, isSelected: Bool) {
         label.text = title
-        label.textColor = isSelected ? Theme.Color.accent : Theme.Color.textSecondary
+        // A chip label is body-sized, so the selected state takes `accentStrong`
+        // — `accent` on the soft-accent fill is 3.6:1, short of AA.
+        label.textColor = isSelected ? Theme.Color.accentStrong : Theme.Color.textSecondary
         contentView.backgroundColor = isSelected ? Theme.Color.accentSoft : Theme.Color.controlFill
-        contentView.layer.borderColor = (isSelected ? Theme.Color.accent : Theme.Color.separator).cgColor
+        contentView.layer.borderColor = (isSelected ? Theme.Color.accentStrong : Theme.Color.separator).cgColor
     }
 }

@@ -24,6 +24,14 @@ struct ProjectSummary: Identifiable, Sendable {
     /// Nil until the user names it; `displayName` is what the UI shows.
     let name: String?
 
+    /// Width ÷ height of the saved thumbnail — what the masonry gallery lays
+    /// each card out by. A project with no thumbnail yet reads as square, which
+    /// is what `MasonryLayout` falls back to anyway.
+    var thumbnailAspectRatio: CGFloat {
+        guard let size = thumbnail?.size, size.width > 0, size.height > 0 else { return 1 }
+        return size.width / size.height
+    }
+
     /// What the gallery, search and Spotlight all display. Never empty.
     var displayName: String {
         if let name, !name.trimmingCharacters(in: .whitespaces).isEmpty { return name }

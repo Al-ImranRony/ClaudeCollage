@@ -151,6 +151,7 @@ final class TemplateGalleryViewController: UIViewController {
         let control = UISegmentedControl(items: CanvasPreset.allCases.map(\.displayName))
         control.selectedSegmentIndex = 0
         control.accessibilityIdentifier = "canvasPresetControl"
+        ThemeSegmentedControl.apply(to: control)
         control.addTarget(self, action: #selector(presetChanged), for: .valueChanged)
         return control
     }

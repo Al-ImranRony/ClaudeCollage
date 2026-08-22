@@ -19,7 +19,7 @@
 import UIKit
 
 @MainActor
-public final class ThemeButton: UIButton {
+public final class ThemeButton: GradientLayerButton {
 
     public enum Style {
         /// Filled brand. The one action the screen is for.
@@ -33,7 +33,6 @@ public final class ThemeButton: UIButton {
     }
 
     private let style: Style
-    private var gradientLayer: CAGradientLayer?
 
     public init(style: Style, title: String, image: UIImage? = nil, action: UIAction) {
         self.style = style
@@ -77,8 +76,8 @@ public final class ThemeButton: UIButton {
             config.background.backgroundColor = .clear
         case .hero:
             config.baseForegroundColor = Theme.Color.textOnAccent
-            // The gradient lives in a layer, so the configuration's own
-            // background must be clear or it paints over it.
+            // The gradient is the button's own backing layer, so the
+            // configuration must not paint a background over it.
             config.background.backgroundColor = .clear
             config.contentInsets = NSDirectionalEdgeInsets(
                 top: Theme.Spacing.md, leading: Theme.Spacing.xl,
@@ -89,33 +88,11 @@ public final class ThemeButton: UIButton {
         config.background.cornerRadius = style == .hero ? Theme.Radius.lg : Theme.Radius.md
         configuration = config
 
-        if style == .hero { installGradient() }
-    }
-
-    private func installGradient() {
-        let layer = CAGradientLayer()
-        layer.startPoint = CGPoint(x: 0, y: 0)
-        layer.endPoint = CGPoint(x: 1, y: 1)
-        layer.cornerRadius = Theme.Radius.lg
-        self.layer.insertSublayer(layer, at: 0)
-        gradientLayer = layer
-        refreshGradientColours()
-
-        // CGColors are resolved, not dynamic, so a gradient does not follow the
-        // appearance on its own — it has to be repainted or the hero button
-        // keeps light-mode colours after a switch to dark.
-        registerForTraitChanges([UITraitUserInterfaceStyle.self]) { (button: Self, _) in
-            button.refreshGradientColours()
+        if style == .hero {
+            layer.cornerRadius = Theme.Radius.lg
+            layer.cornerCurve = .continuous
+            useBrandGradient()
         }
-    }
-
-    private func refreshGradientColours() {
-        gradientLayer?.colors = Theme.Color.brandGradient(for: traitCollection)
-    }
-
-    public override func layoutSubviews() {
-        super.layoutSubviews()
-        gradientLayer?.frame = bounds
     }
 
     // MARK: - Press feedback
