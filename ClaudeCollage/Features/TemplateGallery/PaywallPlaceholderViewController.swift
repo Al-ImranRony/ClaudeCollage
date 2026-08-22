@@ -94,9 +94,12 @@ final class PaywallPlaceholderViewController: UIViewController {
         override init(frame: CGRect) {
             super.init(frame: frame)
             guard let gradient = layer as? CAGradientLayer else { return }
-            gradient.colors = Theme.Color.brandGradient
             gradient.startPoint = CGPoint(x: 0, y: 0)
             gradient.endPoint = CGPoint(x: 1, y: 1)
+            refreshColours()
+            registerForTraitChanges([UITraitUserInterfaceStyle.self]) { (view: Self, _) in
+                view.refreshColours()
+            }
         }
 
         @available(*, unavailable)
@@ -105,6 +108,10 @@ final class PaywallPlaceholderViewController: UIViewController {
         override func layoutSubviews() {
             super.layoutSubviews()
             layer.cornerRadius = bounds.width / 2
+        }
+
+        private func refreshColours() {
+            (layer as? CAGradientLayer)?.colors = Theme.Color.brandGradient(for: traitCollection)
         }
     }
 }

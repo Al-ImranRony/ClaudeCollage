@@ -87,7 +87,7 @@ final class GridEditorViewController: UIViewController {
         // browse/list screens (Home). This reclaims ~52pt for the controls area
         // and keeps the canvas visually front-and-center.
         navigationItem.largeTitleDisplayMode = .never
-        view.backgroundColor = .systemBackground
+        view.backgroundColor = Theme.Color.background
         setupNavigationBar()
         setupLayout()
         setupGestures()
@@ -177,7 +177,7 @@ final class GridEditorViewController: UIViewController {
 
     private func setupLayout() {
         canvasView.translatesAutoresizingMaskIntoConstraints = false
-        canvasView.backgroundColor = .secondarySystemBackground
+        canvasView.backgroundColor = Theme.Color.cellWell
         canvasView.layer.cornerRadius = 12
         canvasView.clipsToBounds = true
 
@@ -1091,8 +1091,8 @@ final class GridEditorViewController: UIViewController {
     private func sectionLabel(_ text: String) -> UIView {
         let label = UILabel()
         label.text = text
-        label.font = .preferredFont(forTextStyle: .headline)
-        label.textColor = .label
+        label.font = Theme.Typography.headline
+        label.textColor = Theme.Color.textPrimary
 
         let row = UIStackView(arrangedSubviews: [label])
         row.isLayoutMarginsRelativeArrangement = true
@@ -1102,12 +1102,12 @@ final class GridEditorViewController: UIViewController {
 
     private func labelledSlider(_ title: String, slider: UISlider, systemImage: String) -> UIView {
         let icon = UIImageView(image: UIImage(systemName: systemImage))
-        icon.tintColor = .secondaryLabel
+        icon.tintColor = Theme.Color.textSecondary
         icon.setContentHuggingPriority(.required, for: .horizontal)
         let label = UILabel()
         label.text = title
-        label.font = .preferredFont(forTextStyle: .subheadline)
-        label.textColor = .secondaryLabel
+        label.font = Theme.Typography.subheadline
+        label.textColor = Theme.Color.textSecondary
         label.setContentHuggingPriority(.required, for: .horizontal)
         label.widthAnchor.constraint(equalToConstant: 72).isActive = true
 

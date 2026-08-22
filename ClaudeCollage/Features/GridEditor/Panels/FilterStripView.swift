@@ -61,8 +61,8 @@ struct FilterStripView: View {
     ) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .font(.themeSubheadline)
+                .foregroundStyle(Color.themeTextSecondary)
             Slider(value: value, in: range) { editing in
                 if !editing { onChange(filters) }
             }

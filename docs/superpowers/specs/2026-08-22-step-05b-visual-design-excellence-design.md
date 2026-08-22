@@ -15,10 +15,11 @@ by the orange-and-white identity already encoded in `Theme`, and ship a custom a
 - **There is no asset catalog at all.** `project.yml:81` sets
   `ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon`, but no `.xcassets` exists anywhere in the repo,
   so the app currently ships the blank default icon. Part A starts from zero, not from a redesign.
-- **Raw system colours survive in 17 files**, concentrated in the editors
-  (`GridEditorViewController`, `CanvasView`, `GridEditorControls`) and in the SwiftUI sheets.
-- **Raw system fonts survive in 9 files**, almost all SwiftUI (`UniversalExportSheetView` alone
-  has 11).
+- **Raw system colours survive in 4 files**, not the 17 a first pass suggested — most of that
+  count was the audit regex matching `Theme.Color.separator` and `view.tintColor = …`. The real
+  sites are `CollageRenderer`, `CanvasView`, `GridEditorViewController` and `TextStyleSheet`.
+- **Raw system fonts survive in 6 SwiftUI files** (24 sites). `Theme` is a UIKit namespace, so
+  the SwiftUI sheets had no tokens to reach for — hence `Theme+SwiftUI`.
 - The design foundation itself (`Theme`, `Haptics`, `AppAppearance`) is sound and is extended,
   not rebuilt.
 

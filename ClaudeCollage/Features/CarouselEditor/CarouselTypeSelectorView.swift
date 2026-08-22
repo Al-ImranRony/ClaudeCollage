@@ -68,13 +68,13 @@ struct CarouselTypeSelectorView: View {
                 Button("Cancel", action: onCancel)
                     .accessibilityIdentifier("carouselCancelButton")
                 Spacer()
-                Text("New Carousel").font(.headline)
+                Text("New Carousel").font(.themeHeadline)
                 Spacer()
                 Button("Cancel", action: onCancel).opacity(0)   // balance the title
                     .accessibilityHidden(true)
             } else {
                 Spacer()
-                Text("New Carousel").font(.headline)
+                Text("New Carousel").font(.themeHeadline)
                 Spacer()
             }
         }
@@ -94,10 +94,10 @@ struct CarouselTypeSelectorView: View {
                     .foregroundStyle(Color(Theme.Color.accent))
                 VStack(alignment: .leading, spacing: 4) {
                     Text(info.title)
-                        .font(.headline)
+                        .font(.themeHeadline)
                         .foregroundStyle(Color(Theme.Color.textPrimary))
                     Text(info.subtitle)
-                        .font(.subheadline)
+                        .font(.themeSubheadline)
                         .foregroundStyle(Color(Theme.Color.textSecondary))
                 }
                 Spacer()
@@ -150,7 +150,7 @@ struct CarouselTypeSelectorView: View {
             onCreate(config)
         } label: {
             Text(type == .panoramic ? "Choose Photo" : "Create")
-                .font(.headline)
+                .font(.themeHeadline)
                 .frame(maxWidth: .infinity)
                 .padding()
                 .background(Color(Theme.Color.accent))

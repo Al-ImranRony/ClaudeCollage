@@ -155,8 +155,16 @@ public final class CollageRenderer: @unchecked Sendable {
         cg.restoreGState()
     }
 
+    /// Draws the "no photo here yet" well.
+    ///
+    /// This is composited into exported images, so the colours come from the
+    /// deliberately non-dynamic `cellWell` tokens. The system greys it used
+    /// before resolve against whatever trait collection happened to be current,
+    /// which meant the same project could export a light or a dark well
+    /// depending on the user's appearance setting at the moment they tapped
+    /// Export — and never matched the canvas, which resolved separately.
     private func drawEmptyPlaceholder(in frame: CGRect, context cg: CGContext) {
-        UIColor.secondarySystemBackground.setFill()
+        Theme.Color.cellWell.setFill()
         cg.fill(frame)
 
         let side = min(frame.width, frame.height) * 0.16
@@ -167,7 +175,7 @@ public final class CollageRenderer: @unchecked Sendable {
         line.addLine(to: CGPoint(x: center.x + side / 2, y: center.y))
         line.move(to: CGPoint(x: center.x, y: center.y - side / 2))
         line.addLine(to: CGPoint(x: center.x, y: center.y + side / 2))
-        UIColor.tertiaryLabel.setStroke()
+        Theme.Color.cellWellInk.setStroke()
         line.stroke()
     }
 

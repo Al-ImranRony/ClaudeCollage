@@ -537,13 +537,13 @@ final class CellContentView: UIView {
     override init(frame: CGRect) {
         super.init(frame: frame)
         clipsToBounds = true
-        backgroundColor = .secondarySystemBackground
+        backgroundColor = Theme.Color.cellWell
 
         imageView.contentMode = .scaleAspectFill
         imageView.isUserInteractionEnabled = false
         addSubview(imageView)
 
-        placeholder.tintColor = .tertiaryLabel
+        placeholder.tintColor = Theme.Color.cellWellInk
         placeholder.contentMode = .scaleAspectFit
         placeholder.isUserInteractionEnabled = false
         addSubview(placeholder)
@@ -608,7 +608,9 @@ final class CellContentView: UIView {
             imageView.image = nil
             imageView.isHidden = true
             placeholder.isHidden = false
-            backgroundColor = .secondarySystemBackground
+            // Same tokens the export renderer uses, so an empty cell looks the
+            // same on the canvas as it will in the file.
+            backgroundColor = Theme.Color.cellWell
         }
     }
 

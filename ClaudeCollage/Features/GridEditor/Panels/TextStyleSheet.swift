@@ -52,6 +52,9 @@ struct TextStyleSheet: View {
     }
 
     private var accent: Color { Color(uiColor: Theme.Color.accent) }
+    /// The fill under a selected chip's label. `accent` would be 3.1:1 against
+    /// white at this text size; `accentStrong` is the token that carries ink.
+    private var accentFill: Color { .themeAccentStrong }
 
     var body: some View {
         NavigationStack {
@@ -80,7 +83,7 @@ struct TextStyleSheet: View {
         Section("Text") {
             TextField("Enter text", text: binding(\.text), axis: .vertical)
                 .lineLimit(1...4)
-                .font(.body)
+                .font(.themeBody)
         }
     }
 
@@ -98,8 +101,8 @@ struct TextStyleSheet: View {
                                 .lineLimit(1)
                                 .padding(.horizontal, 14)
                                 .padding(.vertical, 8)
-                                .background(isSelected ? accent : Color(uiColor: .tertiarySystemFill))
-                                .foregroundStyle(isSelected ? Color(uiColor: Theme.Color.textOnAccent) : Color.primary)
+                                .background(isSelected ? accentFill : Color.themeControlFill)
+                                .foregroundStyle(isSelected ? Color.themeTextOnAccent : Color.themeTextPrimary)
                                 .clipShape(Capsule())
                         }
                         .buttonStyle(.plain)
@@ -135,7 +138,7 @@ struct TextStyleSheet: View {
                     Circle()
                         .fill(Color(uiColor: UIColor(hex: hex)))
                         .frame(height: 30)
-                        .overlay(Circle().stroke(Color(uiColor: .separator), lineWidth: 0.5))
+                        .overlay(Circle().stroke(Color.themeSeparator, lineWidth: 0.5))
                         .overlay(
                             Circle().stroke(accent, lineWidth: isSelected ? 3 : 0).padding(-3)
                         )
@@ -169,12 +172,12 @@ struct TextStyleSheet: View {
         VStack(alignment: .leading, spacing: 2) {
             HStack {
                 Text(title)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .font(.themeSubheadline)
+                    .foregroundStyle(Color.themeTextSecondary)
                 Spacer()
                 Text("\(Int((value.wrappedValue * displayScale).rounded()))\(unit)")
                     .font(.subheadline.monospacedDigit())
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.themeTextSecondary)
             }
             Slider(value: value, in: range)
         }

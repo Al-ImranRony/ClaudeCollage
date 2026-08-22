@@ -97,7 +97,7 @@ struct VideoCellControlsSheet: View {
                 .accessibilityIdentifier("cellControlsDoneButton")
             Spacer()
             Text("Clip \(cellNumber)")
-                .font(.headline)
+                .font(.themeHeadline)
                 .foregroundStyle(Color(Theme.Color.textPrimary))
             Spacer()
             Button("Done") {}.opacity(0).accessibilityHidden(true)
@@ -116,7 +116,7 @@ struct VideoCellControlsSheet: View {
                 Spacer()
                 Text("Out \(timeLabel(values.trimEnd))")
             }
-            .font(.caption)
+            .font(.themeCaption)
             .foregroundStyle(Color(Theme.Color.textSecondary))
 
             TrimStrip(
@@ -179,7 +179,7 @@ struct VideoCellControlsSheet: View {
             }
             if values.transitionStyle != nil {
                 Text("Duration \(String(format: "%.1fs", values.transitionDuration))")
-                    .font(.caption)
+                    .font(.themeCaption)
                     .foregroundStyle(Color(Theme.Color.textSecondary))
                 Slider(value: Binding(
                     get: { values.transitionDuration },
@@ -198,7 +198,7 @@ struct VideoCellControlsSheet: View {
             onCommit(values)
         } label: {
             Text(label)
-                .font(.caption)
+                .font(.themeCaption)
                 .foregroundStyle(selected ? Color(Theme.Color.textOnAccent)
                                           : Color(Theme.Color.textPrimary))
                 .padding(.horizontal, 14)
@@ -242,7 +242,7 @@ struct VideoCellControlsSheet: View {
 
     private func sectionTitle(_ text: String) -> some View {
         Text(text.uppercased())
-            .font(.caption)
+            .font(.themeCaption)
             .foregroundStyle(Color(Theme.Color.textSecondary))
     }
 

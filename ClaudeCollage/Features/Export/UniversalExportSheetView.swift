@@ -101,7 +101,7 @@ struct UniversalExportSheetView: View {
             Button("Cancel", action: onCancel)
                 .accessibilityIdentifier("exportCancelButton")
             Spacer()
-            Text("Export").font(.headline).foregroundStyle(Color(Theme.Color.textPrimary))
+            Text("Export").font(.themeHeadline).foregroundStyle(Color(Theme.Color.textPrimary))
             Spacer()
             Button("Cancel", action: onCancel).opacity(0).accessibilityHidden(true)
         }
@@ -136,7 +136,7 @@ struct UniversalExportSheetView: View {
                 Image(systemName: info.symbol)
                     .font(.system(size: 22))
                     .frame(width: 54, height: 40)
-                Text(info.title).font(.caption)
+                Text(info.title).font(.themeCaption)
             }
             .foregroundStyle(selected ? Color(Theme.Color.textOnAccent) : Color(Theme.Color.textPrimary))
             .frame(width: 74, height: 74)
@@ -174,7 +174,7 @@ struct UniversalExportSheetView: View {
             if options.imageFormat == .jpeg {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Quality \(Int(options.quality * 100))%")
-                        .font(.subheadline).foregroundStyle(Color(Theme.Color.textSecondary))
+                        .font(.themeSubheadline).foregroundStyle(Color(Theme.Color.textSecondary))
                     Slider(value: $options.quality, in: 0.5...1.0)
                         .tint(Color(Theme.Color.accent))
                         .accessibilityIdentifier("exportQualitySlider")
@@ -208,12 +208,12 @@ struct UniversalExportSheetView: View {
                 }
             } else {
                 Text("1080p · MP4 (H.264)")
-                    .font(.subheadline).foregroundStyle(Color(Theme.Color.textPrimary))
+                    .font(.themeSubheadline).foregroundStyle(Color(Theme.Color.textPrimary))
                 Text("Upgrade to Premium for 4K & HEVC")
-                    .font(.caption).foregroundStyle(Color(Theme.Color.textSecondary))
+                    .font(.themeCaption).foregroundStyle(Color(Theme.Color.textSecondary))
             }
             Text("Filters, text, stickers & transitions are always baked in.")
-                .font(.caption).foregroundStyle(Color(Theme.Color.textSecondary))
+                .font(.themeCaption).foregroundStyle(Color(Theme.Color.textSecondary))
         }
     }
 
@@ -221,7 +221,7 @@ struct UniversalExportSheetView: View {
         HStack(alignment: .top, spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill")
             Text("Your canvas is \(CanvasSize.normalize(capabilities.canvasAspect)) but this preset prefers \(ExportPreset.preset(for: options.platform).enforcedAspect ?? "the current size"). It will export anyway, scaled to fill the frame.")
-                .font(.caption)
+                .font(.themeCaption)
         }
         .foregroundStyle(Color(Theme.Color.accent))
         .padding(12)
@@ -239,7 +239,7 @@ struct UniversalExportSheetView: View {
                 onSaveToPhotos(finalOptions)
             } label: {
                 Label("Save to Photos", systemImage: "square.and.arrow.down")
-                    .font(.headline)
+                    .font(.themeHeadline)
                     .frame(maxWidth: .infinity)
                     .padding()
                     .background(Color(Theme.Color.accent))
@@ -253,7 +253,7 @@ struct UniversalExportSheetView: View {
                 onQuickShare(finalOptions)
             } label: {
                 Label("Quick Share", systemImage: "square.and.arrow.up")
-                    .font(.headline)
+                    .font(.themeHeadline)
                     .frame(maxWidth: .infinity)
                     .padding()
                     .background(Color(Theme.Color.surface))
@@ -273,7 +273,7 @@ struct UniversalExportSheetView: View {
 
     private func sectionTitle(_ text: String) -> some View {
         Text(text.uppercased())
-            .font(.caption).fontWeight(.semibold)
+            .font(.themeCaption).fontWeight(.semibold)
             .foregroundStyle(Color(Theme.Color.textSecondary))
     }
 }

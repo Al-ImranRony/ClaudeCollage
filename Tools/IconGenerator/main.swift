@@ -25,11 +25,11 @@ import UniformTypeIdentifiers
 
 /// The icon palette is the app's own accent ramp, not a separate set of oranges:
 /// `Theme.Color.accentSecondary` (#F29B3C) → `Theme.Color.accentPressed`
-/// (#CC5716), which brackets `accent` (#E86A2A). Keeping the icon inside the ramp
+/// (#CC5716), which brackets `accent` (#E56828). Keeping the icon inside the ramp
 /// is what makes the home screen and the app read as one product.
 enum Brand {
     static let warm = rgb(0xF2_9B3C)
-    static let mid = rgb(0xE8_6A2A)
+    static let mid = rgb(0xE5_6828)
     static let deep = rgb(0xCC_5716)
     static let white = CGColor(gray: 1, alpha: 1)
     static let paper = rgb(0xFF_FBF7)

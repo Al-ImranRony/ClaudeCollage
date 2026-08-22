@@ -27,13 +27,36 @@ public enum Theme {
 
         // Brand — Claude orange. The single most important token: this is the
         // app's identity, used brilliantly wherever an accent fits.
+        ///
+        /// The light value is #E56828 rather than a rounder #E86A2A because the
+        /// latter lands at 2.98:1 against `background` — a hair under the 3:1
+        /// that large text and non-text UI need. The nudge is imperceptible and
+        /// the token now passes its own documented role; `ThemeContrastTests`
+        /// is what noticed.
         public static var accent: UIColor {
-            dynamic(light: 0xE86A2A, dark: 0xF5843E)
+            dynamic(light: 0xE56828, dark: 0xF5843E)
         }
 
         /// A slightly deeper accent for pressed/active states.
         public static var accentPressed: UIColor {
             dynamic(light: 0xCC5716, dark: 0xE0702B)
+        }
+
+        /// The accent corrected for contrast, and the only accent that may
+        /// carry or be carried by body-sized text.
+        ///
+        /// The identity orange is too light to be legible as ink: white on
+        /// `accent` is 3.2:1 and `accent` on `background` is 3.0:1 — both fine
+        /// for large text and for non-text UI, both short of the 4.5:1 that
+        /// body text needs. So `accent` stays the identity (fills, gradients,
+        /// selection, display type) and this token does the reading work:
+        /// accent-coloured labels and glyphs on app surfaces, and the fill
+        /// under `textOnAccent`.
+        ///
+        /// It darkens in light mode and lightens in dark mode, which is why one
+        /// token can serve both roles — see `ThemeContrastTests`.
+        public static var accentStrong: UIColor {
+            dynamic(light: 0xB94D12, dark: 0xF5843E)
         }
 
         /// The far end of the brand gradient (accent → accentSecondary) used on
@@ -65,7 +88,24 @@ public enum Theme {
             dynamic(light: 0x6B6B70, dark: 0x9B9BA1)
         }
 
-        public static var textOnAccent: UIColor { .white }
+        /// Ink for anything sitting on `accentStrong`.
+        ///
+        /// Not simply white. In dark mode `accentStrong` is the *bright*
+        /// orange, and white on it is 2.5:1 — worse than the problem it was
+        /// meant to solve. A warm near-black gets 7.4:1 there, and reads as a
+        /// deliberate choice rather than a compromise.
+        public static var textOnAccent: UIColor {
+            dynamic(light: 0xFFFFFF, dark: 0x17110C)
+        }
+
+        /// The fill behind an empty photo cell, and the glyph drawn on it.
+        ///
+        /// Deliberately NOT dynamic. This colour is composited into exported
+        /// images, so it must not depend on whether the user happened to be in
+        /// dark mode when they hit Export; the on-screen canvas paints the same
+        /// value so the preview matches the file.
+        public static var cellWell: UIColor { rgb(0xE9E6E1) }
+        public static var cellWellInk: UIColor { rgb(0x7C766C) }
 
         // Lines & fills.
         public static var separator: UIColor {
@@ -82,8 +122,21 @@ public enum Theme {
         }
 
         /// The two-stop brand gradient, top-leading → bottom-trailing.
-        public static var brandGradient: [CGColor] {
-            [accent.cgColor, accentSecondary.cgColor]
+        ///
+        /// Takes a trait collection because `CGColor` is resolved, not dynamic:
+        /// a gradient layer keeps whatever colours it was given until something
+        /// repaints it, so the caller has to say which appearance it wants.
+        ///
+        /// The stops differ by appearance for contrast, not for taste. In light
+        /// the gradient runs `accentStrong → accent` under white; carrying it up
+        /// to `accentSecondary` would put white on a 2.2:1 amber. In dark the
+        /// ink flips to near-black, so the gradient can run the bright half of
+        /// the ramp instead.
+        public static func brandGradient(for traits: UITraitCollection) -> [CGColor] {
+            let stops = traits.userInterfaceStyle == .dark
+                ? [accent, accentSecondary]
+                : [accentStrong, accent]
+            return stops.map { $0.resolvedColor(with: traits).cgColor }
         }
 
         // MARK: helpers

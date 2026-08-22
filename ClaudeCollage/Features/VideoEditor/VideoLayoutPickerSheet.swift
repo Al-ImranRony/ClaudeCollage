@@ -33,7 +33,7 @@ struct VideoLayoutPickerSheet: View {
                                 LayoutSchematicShape(template: template, isSelected: template == selected)
                                     .frame(width: 64, height: 64)
                                 Text(template.displayName)
-                                    .font(.caption)
+                                    .font(.themeCaption)
                                     .foregroundStyle(
                                         template == selected
                                             ? Color(Theme.Color.accent)
