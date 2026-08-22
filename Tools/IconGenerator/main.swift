@@ -154,8 +154,11 @@ enum Candidate: Int, CaseIterable {
             Palette(ground: [Brand.paper, Brand.rgb(0xFF_F0E4)], card: Brand.white,
                     cell: [Brand.warm, Brand.deep], ghostAlpha: 0.42, shadows: true)
         case (_, .light):
+            // The fanned siblings sit white-on-orange, so their alpha is what
+            // decides whether the fan survives the 40pt icon. Below ~0.5 the
+            // deck collapses into a single card at that size.
             Palette(ground: [Brand.warm, Brand.deep], card: Brand.white,
-                    cell: [Brand.warm, Brand.mid], ghostAlpha: 0.45, shadows: true)
+                    cell: [Brand.warm, Brand.deep], ghostAlpha: 0.55, shadows: true)
 
         // Dark: no ground of our own. The white cards carry the shape and the
         // orange cells carry the brand, so the mark still reads as itself.
@@ -219,7 +222,7 @@ enum Candidate: Int, CaseIterable {
         ctx.withShadow(p.shadows, blur: 44, dy: 14, alpha: 0.22) {
             ctx.fill(roundedRect: front, radius: radius, color: p.card)
         }
-        drawCollage(ctx, in: front.insetBy(dx: 46, dy: 46), gap: 18, radius: 20, gradient: p.cell)
+        drawCollage(ctx, in: front.insetBy(dx: 42, dy: 42), gap: 20, radius: 22, gradient: p.cell)
     }
 
     // MARK: candidate 2 — grid + dots
@@ -289,11 +292,18 @@ enum Candidate: Int, CaseIterable {
 
 // MARK: - Rendering
 
-func makeBitmap(_ size: Int) -> CGContext {
+/// `opaque` drops the alpha channel entirely rather than leaving a fully-opaque
+/// one. App Review rejects a marketing icon that carries an alpha channel even
+/// when nothing in it is transparent, so the default appearance is written
+/// without one; the dark and tinted appearances must keep theirs, because iOS
+/// composites them over a system-supplied backdrop.
+func makeBitmap(_ size: Int, opaque: Bool) -> CGContext {
     let ctx = CGContext(
         data: nil, width: size, height: size, bitsPerComponent: 8, bytesPerRow: 0,
         space: CGColorSpaceCreateDeviceRGB(),
-        bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        bitmapInfo: opaque
+            ? CGImageAlphaInfo.noneSkipLast.rawValue
+            : CGImageAlphaInfo.premultipliedLast.rawValue
     )!
     ctx.interpolationQuality = .high
     ctx.setAllowsAntialiasing(true)
@@ -311,7 +321,7 @@ func writePNG(_ image: CGImage, to url: URL) throws {
 }
 
 func render(_ candidate: Candidate, _ variant: Variant, size: Int) -> CGImage {
-    let ctx = makeBitmap(size)
+    let ctx = makeBitmap(size, opaque: candidate.palette(variant).ground != nil)
     candidate.draw(in: ctx, variant: variant)
     return ctx.makeImage()!
 }
