@@ -20,7 +20,7 @@ This is the consolidation of all serious visual work. It runs at the *end* of de
 
 ## Already done — the design foundation (Step 01 follow-up, 2026-07-13)
 
-Do **not** rebuild these; extend them. Lives in `ClaudeCollage/Core/DesignSystem/`:
+Do **not** rebuild these; extend them. Lives in `Caroullage/Core/DesignSystem/`:
 
 - **`Theme.swift`** — `Theme.Color` (semantic, dynamic light/dark; **brand accent = Claude orange**), `Theme.Typography` (SF Pro Rounded, Dynamic-Type scaled), `Theme.Spacing` / `Radius` / `Elevation` / `Motion`. `UIView.applyCardShadow()`.
 - **`Haptics.swift`** — `@MainActor Haptics` with prepared generators + semantic API.

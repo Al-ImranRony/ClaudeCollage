@@ -1,4 +1,4 @@
-# SwiftLint config — ClaudeCollage
+# SwiftLint config — Caroullage
 # See Step 00 for required rules.
 
 disabled_rules:
@@ -60,10 +60,10 @@ type_name:
   max_length: 50
 
 included:
-  - ClaudeCollage
-  - ClaudeCollageWidgets
-  - ClaudeCollageTests
-  - ClaudeCollageUITests
+  - Caroullage
+  - CaroullageWidgets
+  - CaroullageTests
+  - CaroullageUITests
 
 excluded:
   - build

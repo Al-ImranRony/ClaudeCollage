@@ -23,11 +23,11 @@ This step is part of **Part 1 — Development**. Steps 00 through 05 are Develop
 - [ ] Set deployment target to **iOS 16.0**
 - [ ] Set Swift language version to **Swift 6** (Build Settings → Swift Language Version)
 - [ ] Enable strict concurrency checking (Build Settings → Swift → Strict Concurrency Checking → Complete)
-- [ ] Set bundle identifier: `com.devron.claudecollage`
-- [ ] Set app name: `ClaudeCollage` (display name can be finalized later)
+- [ ] Set bundle identifier: `com.devron.caroullage`
+- [ ] Set app name: `Caroullage` (display name can be finalized later)
 - [ ] Add app icon placeholder (1024×1024 solid color — real icon ships in Step 06 / Deployment)
 - [ ] Create three build configurations: **Debug**, **Staging**, **Release**
-- [ ] Create three schemes: **ClaudeCollage (Dev)**, **ClaudeCollage (Staging)**, **ClaudeCollage**
+- [ ] Create three schemes: **Caroullage (Dev)**, **Caroullage (Staging)**, **Caroullage**
 - [ ] Create `.xcconfig` files for each configuration:
   - `Config/Debug.xcconfig`
   - `Config/Staging.xcconfig`
@@ -37,7 +37,7 @@ This step is part of **Part 1 — Development**. Steps 00 through 05 are Develop
 ### Project Folder Structure
 Create these empty groups/folders inside the Xcode project now so they're ready:
 ```
-ClaudeCollage/
+Caroullage/
 ├── App/
 │   ├── AppDelegate.swift           # UIKit lifecycle
 │   ├── SceneDelegate.swift         # UIWindow root setup
@@ -95,9 +95,9 @@ ClaudeCollage/
 - [ ] Confirm `Cmd+R` launches into an empty UIKit root view controller (we will swap it out for the home screen in Step 01)
 
 ### Extension Targets (create stubs now; populate in Step 05)
-- [ ] Add **Widget Extension** target named `ClaudeCollageWidgets` — leave empty for now
+- [ ] Add **Widget Extension** target named `CaroullageWidgets` — leave empty for now
 - [ ] Add **App Intents Extension** capability to main target — App Intents live in the main app bundle, no separate target required
-- [ ] Both extensions share an **App Group** (`group.com.devron.claudecollage`) — set up the entitlement now
+- [ ] Both extensions share an **App Group** (`group.com.devron.caroullage`) — set up the entitlement now
 
 ### SwiftData Schema (Stub — no logic yet)
 Create stub model files now so the schema is defined before Step 01 coding:
@@ -106,7 +106,7 @@ Create stub model files now so the schema is defined before Step 01 coding:
 - [ ] `Core/Models/CollageEnums.swift` — `CollageMode`, `CarouselType`, `CellShape` enums
 - [ ] `Core/Models/ExportSettings.swift` — `struct ExportSettings`
 - [ ] `Core/Models/TextOverlay.swift` — `struct TextOverlay`
-- [ ] Confirm `ModelContainer` is configured in `ClaudeCollageApp.swift`
+- [ ] Confirm `ModelContainer` is configured in `CaroullageApp.swift`
 
 ### Template JSON Schema
 - [ ] Write `Resources/Templates/template_schema.json` — the spec document (not a real template, just the schema reference)
@@ -164,7 +164,7 @@ Do NOT add any other packages yet. Add only when needed in future steps.
 - [ ] Create `Fastlane/Matchfile`:
   ```ruby
   git_url("git@github.com:Al-ImranRony/ios-certs-private.git")
-  app_identifier("com.devron.claudecollage")
+  app_identifier("com.devron.caroullage")
   username("dev3@devron.com")
   storage_mode("git")
   type("development")
@@ -181,7 +181,7 @@ Choose **Xcode Cloud** (simpler, built into Xcode) or **GitHub Actions** (more c
 - [ ] Enable Xcode Cloud in Xcode → Product → Xcode Cloud → Get Started
 - [ ] Create workflow: "Pull Request" — triggers on PR to `develop`
   - Build action: Debug
-  - Test action: run `ClaudeCollageTests`
+  - Test action: run `CaroullageTests`
 - [ ] Create workflow: "Merge to Develop" — triggers on push to `develop`
   - Build action: Staging
   - TestFlight action: distribute to internal group
@@ -199,36 +199,36 @@ Choose **Xcode Cloud** (simpler, built into Xcode) or **GitHub Actions** (more c
       steps:
         - uses: actions/checkout@v4
         - name: Build & Test
-          run: xcodebuild test -scheme "ClaudeCollage (Dev)"
+          run: xcodebuild test -scheme "Caroullage (Dev)"
             -destination "platform=iOS Simulator,name=iPhone 16"
   ```
 
 ### Crash Reporting & Analytics
-- [ ] Add `FirebaseCrashlytics.start()` in `ClaudeCollageApp.init()`
-- [ ] Add `TelemetryDeck.initialize(configuration:)` in `ClaudeCollageApp.init()`
+- [ ] Add `FirebaseCrashlytics.start()` in `CaroullageApp.init()`
+- [ ] Add `TelemetryDeck.initialize(configuration:)` in `CaroullageApp.init()`
 - [ ] Add `GoogleService-Info.plist` to project (download from Firebase Console)
 - [ ] Confirm both initialize without errors on simulator launch
 
 ### StoreKit Configuration (Local Testing)
-- [ ] Create `StoreKit/ClaudeCollage.storekit` configuration file
+- [ ] Create `StoreKit/Caroullage.storekit` configuration file
 - [ ] Add 4 products:
   ```
-  com.devron.claudecollage.premium.weekly    (Auto-Renewable Subscription, $2.99/week)
-  com.devron.claudecollage.premium.monthly   (Auto-Renewable Subscription, $4.99/month)
-  com.devron.claudecollage.premium.yearly    (Auto-Renewable Subscription, $24.99/year)
-  com.devron.claudecollage.premium.lifetime  (Non-Consumable, $49.99)
+  com.devron.caroullage.premium.weekly    (Auto-Renewable Subscription, $2.99/week)
+  com.devron.caroullage.premium.monthly   (Auto-Renewable Subscription, $4.99/month)
+  com.devron.caroullage.premium.yearly    (Auto-Renewable Subscription, $24.99/year)
+  com.devron.caroullage.premium.lifetime  (Non-Consumable, $49.99)
   ```
 - [ ] Set Debug scheme to use this StoreKit configuration file
 
 ### Testing Setup
-- [ ] Confirm `ClaudeCollageTests` target exists (Xcode creates it automatically)
-- [ ] Confirm `ClaudeCollageUITests` target exists
+- [ ] Confirm `CaroullageTests` target exists (Xcode creates it automatically)
+- [ ] Confirm `CaroullageUITests` target exists
 - [ ] Create folder structure inside test targets:
   ```
-  ClaudeCollageTests/
+  CaroullageTests/
   ├── Unit/
   └── Integration/
-  ClaudeCollageUITests/
+  CaroullageUITests/
   └── UI/
   ```
 - [ ] Run `Cmd+U` → all tests pass (there are none yet — just confirm 0 failures)
@@ -261,4 +261,4 @@ All of the following must be true before moving to Step 01:
 
 ## Notes for Next Step
 
-When you start Step 01, the first thing you'll build is the `CollageLayoutEngine`. Write its unit tests in `ClaudeCollageTests/Unit/CollageLayoutEngineTests.swift` as you go.
+When you start Step 01, the first thing you'll build is the `CollageLayoutEngine`. Write its unit tests in `CaroullageTests/Unit/CollageLayoutEngineTests.swift` as you go.

@@ -1,4 +1,4 @@
-app_identifier("net.pixeltouch.claudecollage")
+app_identifier("net.pixeltouch.caroullage")
 apple_id("dev3@pixeltouch.net")
 team_id("") # Fill in with the PixelTouch Apple Developer team ID
 itc_team_id("") # App Store Connect team ID

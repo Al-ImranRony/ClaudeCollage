@@ -122,7 +122,7 @@ Distribute across categories:
 - [ ] `testStickerZoneParsesCorrectly()` — `"type": "sticker"` maps to sticker zone
 - [ ] `testCanvasAspectRatioMapsToSize()` — `"1:1"` → `CGSize(1080, 1080)`, `"9:16"` → `CGSize(1080, 1920)`
 
-**New: `ClaudeCollageTests/Integration/TemplateServiceTests.swift`:**
+**New: `CaroullageTests/Integration/TemplateServiceTests.swift`:**
 - [ ] `testBundledTemplatesLoadOnInit()` — `TemplateService` returns non-empty array at launch
 - [ ] `testThumbnailGenerationCompletesWithinTimeout()` — thumbnail rendered within 2 seconds
 - [ ] `testPremiumTemplateBlockedForFreeUser()` — `isPremium` returns true; free user cannot open it

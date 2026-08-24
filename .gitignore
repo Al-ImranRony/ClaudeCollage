@@ -30,8 +30,8 @@ Carthage/Build/
 Carthage/Checkouts/
 
 # Generated Xcode project (XcodeGen produces this from project.yml)
-ClaudeCollage.xcodeproj/
-ClaudeCollage.xcworkspace/
+Caroullage.xcodeproj/
+Caroullage.xcworkspace/
 
 # Fastlane
 fastlane/report.xml

@@ -1,12 +1,12 @@
-# ClaudeCollage — Fastlane lanes
+# Caroullage — Fastlane lanes
 # Step 00 baseline: certs + a TestFlight beta lane.
 
 default_platform(:ios)
 
-PROJECT_FILE = "ClaudeCollage.xcodeproj"
-SCHEME_DEV     = "ClaudeCollage (Dev)"
-SCHEME_STAGING = "ClaudeCollage (Staging)"
-SCHEME_RELEASE = "ClaudeCollage"
+PROJECT_FILE = "Caroullage.xcodeproj"
+SCHEME_DEV     = "Caroullage (Dev)"
+SCHEME_STAGING = "Caroullage (Staging)"
+SCHEME_RELEASE = "Caroullage"
 
 platform :ios do
 

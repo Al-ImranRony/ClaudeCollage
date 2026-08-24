@@ -1,5 +1,5 @@
 //
-//  main.swift — ClaudeCollage app-icon generator
+//  main.swift — Caroullage app-icon generator
 //
 //  Step 05b Part A. The icon is authored as CoreGraphics drawing code rather
 //  than a hand-drawn bitmap so it is genuinely resolution-independent: the same

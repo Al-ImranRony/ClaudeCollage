@@ -50,10 +50,10 @@ A single source of truth for the user's subscription tier, real-time entitlement
 - [ ] Load all 4 products at app launch:
   ```swift
   let products = try await Product.products(for: [
-      "com.devron.claudecollage.premium.weekly",
-      "com.devron.claudecollage.premium.monthly",
-      "com.devron.claudecollage.premium.yearly",
-      "com.devron.claudecollage.premium.lifetime"
+      "com.devron.caroullage.premium.weekly",
+      "com.devron.caroullage.premium.monthly",
+      "com.devron.caroullage.premium.yearly",
+      "com.devron.caroullage.premium.lifetime"
   ])
   ```
 - [ ] Handle purchase: `product.purchase()` → verify `Transaction.currentEntitlement`
@@ -103,7 +103,7 @@ The paywall is the highest-stakes screen in the app. Annual-default pricing, tra
 - [ ] Triggered when a free user taps any premium-gated feature
 - [ ] Layout (top → bottom):
   - **Header:** 3 auto-scrolling preview cards of premium templates (1.5s per card)
-  - **Title:** "Unlock ClaudeCollage Premium"
+  - **Title:** "Unlock Caroullage Premium"
   - **Feature list (5 bullets):**
     - 200+ templates + carousel types
     - All polygon shapes + custom bezier
@@ -229,7 +229,7 @@ Required since May 2024; enforced for all 2026 submissions.
 - [ ] Solo developers: declare as trader if commercial activity (selling subscriptions counts)
 
 ### Account Deletion (Guideline 5.1.1)
-- [ ] **Skip if no sign-in offered.** ClaudeCollage doesn't require an account — all data is local + iCloud (user owns).
+- [ ] **Skip if no sign-in offered.** Caroullage doesn't require an account — all data is local + iCloud (user owns).
 - [ ] If sign-in is later added: provide in-app account deletion within 1 tap
 
 ### Permission Strings (`Info.plist`)
@@ -278,7 +278,7 @@ Required since May 2024; enforced for all 2026 submissions.
 ## Phase 6.8 — Watermark System
 
 - [ ] Create `Core/Rendering/WatermarkRenderer.swift`
-- [ ] Composites "Made with ClaudeCollage" in bottom-right corner of exported files
+- [ ] Composites "Made with Caroullage" in bottom-right corner of exported files
 - [ ] Watermark applied only when `PurchaseService.currentTier == .free`
 - [ ] Watermark baked into export file (not shown in in-app preview)
 - [ ] Watermark size: 4% of canvas height, white text with 50% opacity drop shadow
@@ -313,14 +313,14 @@ Fix any failures before submission.
 ## Phase 6.11 — App Store Connect Setup
 
 ### Metadata (all 11 languages)
-- [ ] **App name:** ClaudeCollage
+- [ ] **App name:** Caroullage
 - [ ] **Subtitle (30 chars):** "Carousel & Video Collage Maker"
 - [ ] **Promotional text (170 chars):** updateable without submission — use for "New: Generative AI backgrounds!"
 - [ ] **Description (4000 chars):** structured with feature sections, social proof, monetization terms
 - [ ] **Keywords (100 chars):** strategic ASO selection (see below)
-- [ ] **Support URL:** `https://devron.com/support/claudecollage`
-- [ ] **Marketing URL:** `https://devron.com/claudecollage`
-- [ ] **Privacy Policy URL:** `https://devron.com/legal/claudecollage/privacy.html`
+- [ ] **Support URL:** `https://devron.com/support/caroullage`
+- [ ] **Marketing URL:** `https://devron.com/caroullage`
+- [ ] **Privacy Policy URL:** `https://devron.com/legal/caroullage/privacy.html`
 
 ### ASO Keyword Strategy
 **Avoid:** `collage` alone (Pic Stitch + Layout dominate this keyword).
@@ -384,7 +384,7 @@ video collage,tiktok,9:16,4:5
 
 ### Creator Seeding
 - [ ] Pay 10–20 micro-creators (10k–100k followers) $200–$1,000 per post
-- [ ] Content format: creator's "boring grid" → ClaudeCollage carousel transformation
+- [ ] Content format: creator's "boring grid" → Caroullage carousel transformation
 - [ ] Stagger posts across launch week to drive sustained downloads
 
 ### Product Hunt Launch
@@ -397,7 +397,7 @@ video collage,tiktok,9:16,4:5
 ## Phase 6.13 — App Review Submission
 
 - [ ] Version: `1.0.0 (1)` set in Xcode project
-- [ ] Archive with **ClaudeCollage (Release)** scheme — NOT Debug, NOT Staging
+- [ ] Archive with **Caroullage (Release)** scheme — NOT Debug, NOT Staging
 - [ ] Validate archive in Xcode Organizer → 0 errors, 0 critical warnings
 - [ ] Upload to App Store Connect
 - [ ] Confirm:
@@ -465,7 +465,7 @@ video collage,tiktok,9:16,4:5
 - [ ] visionOS evaluation (templates are well-suited to immersive viewing)
 
 ### Community
-- [ ] Monitor `#claudecollage` on Instagram + TikTok
+- [ ] Monitor `#caroullage` on Instagram + TikTok
 - [ ] Repost user content to PixelTouch's social accounts
 - [ ] Build a Discord or community space for power users
 

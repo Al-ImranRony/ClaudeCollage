@@ -52,7 +52,7 @@ orange must move the orange into its cells when the ground goes away.
 
 `Theme` supplies tokens; it does not supply widgets, so every screen has been hand-assembling
 buttons and headers from tokens and drifting. Step 05b adds
-`ClaudeCollage/Core/DesignSystem/Components/` — primary/secondary/tertiary button
+`Caroullage/Core/DesignSystem/Components/` — primary/secondary/tertiary button
 configurations, a card container, a section header, a pill segmented control, and an empty
 state. Screens consume components; components consume tokens. Nothing else hardcodes a colour.
 

@@ -1,4 +1,4 @@
-name: ClaudeCollage
+name: Caroullage
 options:
   bundleIdPrefix: com.devron
   deploymentTarget:
@@ -36,20 +36,20 @@ configFiles:
   Release: Config/Release.xcconfig
 
 targets:
-  ClaudeCollage:
+  Caroullage:
     type: application
     platform: iOS
     deploymentTarget: "17.0"
     sources:
-      - path: ClaudeCollage
+      - path: Caroullage
         excludes:
           - "**/.DS_Store"
     resources:
-      - path: ClaudeCollage/Resources
+      - path: Caroullage/Resources
     info:
-      path: ClaudeCollage/App/Info.plist
+      path: Caroullage/App/Info.plist
       properties:
-        CFBundleDisplayName: ClaudeCollage
+        CFBundleDisplayName: Caroullage
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         LSRequiresIPhoneOS: true
@@ -62,9 +62,9 @@ targets:
           - UIInterfaceOrientationPortraitUpsideDown
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
-        NSPhotoLibraryUsageDescription: "ClaudeCollage needs access to your photos to create collages."
-        NSPhotoLibraryAddUsageDescription: "ClaudeCollage saves your finished collages to your photo library."
-        NSMicrophoneUsageDescription: "ClaudeCollage uses the microphone when recording video for your collage."
+        NSPhotoLibraryUsageDescription: "Caroullage needs access to your photos to create collages."
+        NSPhotoLibraryAddUsageDescription: "Caroullage saves your finished collages to your photo library."
+        NSMicrophoneUsageDescription: "Caroullage uses the microphone when recording video for your collage."
         NSSupportsLiveActivities: true
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
@@ -74,93 +74,93 @@ targets:
                 UISceneDelegateClassName: $(PRODUCT_MODULE_NAME).SceneDelegate
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.devron.claudecollage
+        PRODUCT_BUNDLE_IDENTIFIER: com.devron.caroullage
         TARGETED_DEVICE_FAMILY: "1,2"
         CODE_SIGN_STYLE: Automatic
         SUPPORTS_MACCATALYST: NO
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     dependencies:
-      - target: ClaudeCollageWidgets
+      - target: CaroullageWidgets
         embed: true
         codeSign: true
     scheme:
       testTargets:
-        - ClaudeCollageTests
-        - ClaudeCollageUITests
+        - CaroullageTests
+        - CaroullageUITests
       gatherCoverageData: true
       coverageTargets:
-        - ClaudeCollage
+        - Caroullage
 
-  ClaudeCollageWidgets:
+  CaroullageWidgets:
     type: app-extension
     platform: iOS
     deploymentTarget: "17.0"
     sources:
-      - path: ClaudeCollageWidgets
+      - path: CaroullageWidgets
       # Shared with the app target: the Live Activity attributes the widget renders.
-      - path: ClaudeCollage/Core/Models/ExportActivityAttributes.swift
+      - path: Caroullage/Core/Models/ExportActivityAttributes.swift
       # Shared with the app target: one definition of the snapshot both sides
       # encode and decode, so they can never drift apart.
-      - path: ClaudeCollage/Core/Models/WidgetSnapshot.swift
+      - path: Caroullage/Core/Models/WidgetSnapshot.swift
     info:
-      path: ClaudeCollageWidgets/Info.plist
+      path: CaroullageWidgets/Info.plist
       properties:
-        CFBundleDisplayName: ClaudeCollage Widgets
+        CFBundleDisplayName: Caroullage Widgets
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.devron.claudecollage.widgets
+        PRODUCT_BUNDLE_IDENTIFIER: com.devron.caroullage.widgets
         TARGETED_DEVICE_FAMILY: "1,2"
 
-  ClaudeCollageTests:
+  CaroullageTests:
     type: bundle.unit-test
     platform: iOS
     deploymentTarget: "17.0"
     sources:
-      - path: ClaudeCollageTests
+      - path: CaroullageTests
     dependencies:
-      - target: ClaudeCollage
+      - target: Caroullage
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.devron.claudecollage.tests
+        PRODUCT_BUNDLE_IDENTIFIER: com.devron.caroullage.tests
         GENERATE_INFOPLIST_FILE: YES
 
-  ClaudeCollageUITests:
+  CaroullageUITests:
     type: bundle.ui-testing
     platform: iOS
     deploymentTarget: "17.0"
     sources:
-      - path: ClaudeCollageUITests
+      - path: CaroullageUITests
     dependencies:
-      - target: ClaudeCollage
+      - target: Caroullage
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.devron.claudecollage.uitests
+        PRODUCT_BUNDLE_IDENTIFIER: com.devron.caroullage.uitests
         GENERATE_INFOPLIST_FILE: YES
 
 schemes:
-  "ClaudeCollage (Dev)":
+  "Caroullage (Dev)":
     build:
       targets:
-        ClaudeCollage: all
+        Caroullage: all
     run:
       config: Debug
     test:
       config: Debug
       gatherCoverageData: true
       coverageTargets:
-        - ClaudeCollage
+        - Caroullage
       targets:
-        - ClaudeCollageTests
-        - ClaudeCollageUITests
+        - CaroullageTests
+        - CaroullageUITests
     archive:
       config: Debug
 
-  "ClaudeCollage (Staging)":
+  "Caroullage (Staging)":
     build:
       targets:
-        ClaudeCollage: all
+        Caroullage: all
     run:
       config: Staging
     test:
@@ -168,10 +168,10 @@ schemes:
     archive:
       config: Staging
 
-  "ClaudeCollage":
+  "Caroullage":
     build:
       targets:
-        ClaudeCollage: all
+        Caroullage: all
     run:
       config: Release
     test:

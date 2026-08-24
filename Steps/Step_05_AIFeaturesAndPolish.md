@@ -116,12 +116,12 @@ final class AIService: ObservableObject {
 - [ ] Each intent has localized titles + descriptions (localization itself happens in Step 06)
 - [ ] Test on real device: assign `CreateCollageFromRecentPhotos` to the iPhone 15 Pro Action Button
 
-### Checklist — Widgets (`ClaudeCollageWidgets` target)
+### Checklist — Widgets (`CaroullageWidgets` target)
 
 - [ ] Implement two widgets in the existing widget extension target:
   - **Recent Projects** widget — small/medium/large sizes; shows last 1/3/6 project thumbnails; tap → opens the project
   - **Photo of the Day** widget — small/medium; shows a curated photo from the user's library with an "Edit" button (uses `WidgetKit` Interactive Buttons, iOS 17+)
-- [ ] Use App Group `group.com.devron.claudecollage` to share data between app and widget
+- [ ] Use App Group `group.com.devron.caroullage` to share data between app and widget
 - [ ] Refresh policy: timeline reloaded every 30 minutes + on app state changes
 - [ ] Static fallback widget for iOS 16 (non-interactive)
 
@@ -144,7 +144,7 @@ final class AIService: ObservableObject {
 
 - [ ] Add SwiftUI `dropDestination(for: Image.self)` to every cell in every editor
 - [ ] Add `draggable()` modifier to project thumbnails on the home screen (drag a project into Messages to share)
-- [ ] Support `Transferable` for `CollageProject` (custom UTI: `com.devron.claudecollage.project`)
+- [ ] Support `Transferable` for `CollageProject` (custom UTI: `com.devron.caroullage.project`)
 - [ ] Test drag from Safari (image), Files, Photos, Messages, Notes into a cell
 
 ### Checklist — Live Activities (extends Step 04)
@@ -218,7 +218,7 @@ This is fit-and-finish. Walk every screen, every state, every gesture. The polis
 
 ---
 
-## Critical UI Tests (`ClaudeCollageUITests/UI/CriticalFlowTests.swift`)
+## Critical UI Tests (`CaroullageUITests/UI/CriticalFlowTests.swift`)
 
 Three XCUITest flows — exactly the same as in the original Step 05 design. Don't expand this list. These three flows protect the user from the worst possible regressions.
 

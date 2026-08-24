@@ -1,4 +1,4 @@
-# ClaudeCollage — One-time Setup (Step 00)
+# Caroullage — One-time Setup (Step 00)
 
 This file documents what was scaffolded in Step 00 and how to get the project
 running on a fresh Mac.
@@ -15,14 +15,14 @@ running on a fresh Mac.
 |---|---|
 | Project generator | `project.yml` (XcodeGen) |
 | Configs | `Config/Debug.xcconfig`, `Staging.xcconfig`, `Release.xcconfig` |
-| App entry (UIKit, programmatic) | `ClaudeCollage/App/AppDelegate.swift`, `SceneDelegate.swift`, `Info.plist` |
-| Root navigation | `ClaudeCollage/Coordinators/AppCoordinator.swift` |
-| SwiftData stubs | `ClaudeCollage/Core/Models/*.swift` (`CollageProject`, `CollageCell`, enums, `ExportSettings`, `TextOverlay`, `ModelContainerFactory`) |
-| Template JSON | `ClaudeCollage/Resources/Templates/{template_schema.json, grid_2up_horizontal.json, grid_4cell_square.json}`, `Resources/CarouselTemplates/carousel_schema.json` |
+| App entry (UIKit, programmatic) | `Caroullage/App/AppDelegate.swift`, `SceneDelegate.swift`, `Info.plist` |
+| Root navigation | `Caroullage/Coordinators/AppCoordinator.swift` |
+| SwiftData stubs | `Caroullage/Core/Models/*.swift` (`CollageProject`, `CollageCell`, enums, `ExportSettings`, `TextOverlay`, `ModelContainerFactory`) |
+| Template JSON | `Caroullage/Resources/Templates/{template_schema.json, grid_2up_horizontal.json, grid_4cell_square.json}`, `Resources/CarouselTemplates/carousel_schema.json` |
 | Lint / format | `.swiftlint.yml`, `.swiftformat` |
 | CI | `.github/workflows/pr.yml` (build + test on PR) |
-| Widget extension stub | `ClaudeCollageWidgets/*` |
-| Tests | `ClaudeCollageTests/Unit/*`, `ClaudeCollageUITests/UI/*` |
+| Widget extension stub | `CaroullageWidgets/*` |
+| Tests | `CaroullageTests/Unit/*`, `CaroullageUITests/UI/*` |
 | Gitignore + README | `.gitignore`, `README.md` |
 
 ---
@@ -34,11 +34,11 @@ running on a fresh Mac.
 brew install xcodegen swiftlint swiftformat
 
 # 2. Generate the Xcode project
-cd "/Users/irony/Claude/Projects/ClaudeCollage"
+cd "/Users/irony/Claude/Projects/Caroullage"
 xcodegen generate
 
 # 3. Open Xcode and run
-open ClaudeCollage.xcodeproj
+open Caroullage.xcodeproj
 # Signing is baked into project.yml (DEVELOPMENT_TEAM), so the team is already
 # set on both targets after `xcodegen generate` — no need to re-select it each time.
 # To use a different team, change DEVELOPMENT_TEAM in project.yml and regenerate.
@@ -67,7 +67,7 @@ For now the project runs on a personal team in Xcode, which is enough through St
 
 | Done criterion | How to verify |
 |---|---|
-| `xcodegen generate` produces a working project | Command exits cleanly; `ClaudeCollage.xcodeproj` opens in Xcode |
+| `xcodegen generate` produces a working project | Command exits cleanly; `Caroullage.xcodeproj` opens in Xcode |
 | App launches | Cmd+R on iPhone 16 simulator → placeholder screen appears, no crash |
 | Tests pass | Cmd+U → smoke unit tests + template parsing tests all green |
 | Code coverage enabled | Edit Scheme → Test → Code Coverage is checked (already wired in `project.yml`) |

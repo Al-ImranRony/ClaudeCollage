@@ -106,8 +106,8 @@ No new export logic needed — the Metal compositor already handles polygon cell
 
 ---
 
-## Unit Tests — `ClaudeCollageTests/Unit/CollageLayoutEngineTests.swift` (extend)
-`ClaudeCollageTests/Unit/TemplateParserTests.swift` (new file)
+## Unit Tests — `CaroullageTests/Unit/CollageLayoutEngineTests.swift` (extend)
+`CaroullageTests/Unit/TemplateParserTests.swift` (new file)
 
 **Polygon layout tests (add to existing file):**
 - [ ] `testDiagonalLeftProducesTwoCells()` — exactly 2 cells returned

@@ -224,7 +224,7 @@ Update the export button in all prior editors to present `UniversalExportSheetVi
 
 ## Unit Tests
 
-**`ClaudeCollageTests/Integration/ExportServiceTests.swift`:**
+**`CaroullageTests/Integration/ExportServiceTests.swift`:**
 - [ ] `testImageExportProducesCorrectDimensions()` — export 1080×1080 canvas → output JPEG is 1080×1080
 - [ ] `testJPEGQualitySettingApplied()` — quality 0.5 produces smaller file than quality 1.0
 - [ ] `testPNGExportIsLossless()` — re-read exported PNG → pixel values match source render

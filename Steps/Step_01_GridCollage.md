@@ -157,7 +157,7 @@ Load each `PHPickerResult` via `itemProvider.loadObject(ofClass: UIImage.self)`.
 
 ---
 
-## Unit Tests — `ClaudeCollageTests/Unit/CollageLayoutEngineTests.swift`
+## Unit Tests — `CaroullageTests/Unit/CollageLayoutEngineTests.swift`
 
 Write these tests as you build the layout engine (not after):
 

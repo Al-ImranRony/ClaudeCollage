@@ -35,15 +35,15 @@ jobs:
       - name: Resolve SPM packages
         run: |
           xcodebuild -resolvePackageDependencies \
-            -project ClaudeCollage.xcodeproj \
-            -scheme "ClaudeCollage (Dev)"
+            -project Caroullage.xcodeproj \
+            -scheme "Caroullage (Dev)"
 
       - name: Build & Test
         run: |
           set -o pipefail
           xcodebuild test \
-            -project ClaudeCollage.xcodeproj \
-            -scheme "ClaudeCollage (Dev)" \
+            -project Caroullage.xcodeproj \
+            -scheme "Caroullage (Dev)" \
             -destination "platform=iOS Simulator,name=iPhone 16,OS=latest" \
             -enableCodeCoverage YES \
             CODE_SIGNING_ALLOWED=NO | xcpretty

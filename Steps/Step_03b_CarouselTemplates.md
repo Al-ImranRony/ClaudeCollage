@@ -168,7 +168,7 @@ class CarouselService {
 
 ## Unit Tests — New Files
 
-**`ClaudeCollageTests/Unit/CarouselStitcherTests.swift`:**
+**`CaroullageTests/Unit/CarouselStitcherTests.swift`:**
 - [ ] `testSplitProducesCorrectFrameCount()` — `split(image:into: 5)` returns exactly 5 CGImages
 - [ ] `testSplitFrameWidthsAreEqual()` — each frame is `sourceWidth / 5` pixels wide
 - [ ] `testEdgeAlignmentPassesOnPerfectSplit()` — `verifyEdgeAlignment` returns `true` after a clean split
@@ -178,7 +178,7 @@ class CarouselService {
 - [ ] `testAddFrameIncreasesCountByOne()` — start with 3 frames; add 1; count = 4
 - [ ] `testDeleteFrameDecreasesCountByOne()` — start with 4 frames; delete index 1; count = 3
 
-**`ClaudeCollageTests/Integration/TemplateServiceTests.swift` (extend):**
+**`CaroullageTests/Integration/TemplateServiceTests.swift` (extend):**
 - [ ] `testCarouselTemplatesLoadFromBundle()` — at least 15 carousel templates found
 - [ ] `testPanoramicTemplateParsesFrameCount()` — `"frameCount": 5` maps to integer 5
 
