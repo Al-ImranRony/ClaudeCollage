@@ -36,6 +36,11 @@ public final class PurchaseService: ObservableObject {
     private let gateway: any PurchaseGateway
     private let defaults: UserDefaults
     private let entitlements: EntitlementStore
+    /// How long to wait on `AppStore.sync()` before telling the user it did not
+    /// work. Without a bound, a store that never answers leaves Restore looking
+    /// broken — which is exactly what it looks like on a simulator with no
+    /// store behind it.
+    private let restoreTimeout: Duration
     private var updatesTask: Task<Void, Never>?
 
     private enum Key {
@@ -46,11 +51,13 @@ public final class PurchaseService: ObservableObject {
     public init(
         gateway: any PurchaseGateway = StoreKitPurchaseGateway(),
         defaults: UserDefaults = .standard,
-        entitlements: EntitlementStore = .shared
+        entitlements: EntitlementStore = .shared,
+        restoreTimeout: Duration = .seconds(15)
     ) {
         self.gateway = gateway
         self.defaults = defaults
         self.entitlements = entitlements
+        self.restoreTimeout = restoreTimeout
         self.currentTier = defaults.string(forKey: Key.cachedTier)
             .flatMap(SubscriptionTier.init(rawValue:)) ?? .free
         applyToEntitlementStore()
@@ -143,14 +150,33 @@ public final class PurchaseService: ObservableObject {
     @discardableResult
     public func restore() async -> Bool {
         purchaseError = nil
+        isPurchasing = true
+        defer { isPurchasing = false }
+
         do {
-            try await gateway.sync()
+            try await syncWithinTimeout()
         } catch {
             purchaseError = Self.message(for: error)
             return false
         }
         await refreshEntitlements()
         return currentTier == .premium
+    }
+
+    /// `AppStore.sync()`, bounded. Whichever finishes first wins; the loser is
+    /// cancelled.
+    private func syncWithinTimeout() async throws {
+        let gateway = self.gateway
+        let timeout = self.restoreTimeout
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            group.addTask { try await gateway.sync() }
+            group.addTask {
+                try await Task.sleep(for: timeout)
+                throw PurchaseGatewayError.storeUnreachable
+            }
+            defer { group.cancelAll() }
+            try await group.next()
+        }
     }
 
     /// Whether the free trial is still on the table for this product.

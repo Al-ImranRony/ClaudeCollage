@@ -35,7 +35,42 @@ deliberately before creating them, and update `PremiumProduct.idPrefix` plus the
 | Blocked | Stand-in until then |
 |---|---|
 | Real localized prices from the App Store | Prices come from the store objects the local configuration vends, so the paywall renders `$24.99` / `$4.99` / `$2.99` / `$49.99` exactly as it would in production — but only in the `en_US` storefront the config declares. |
+| Automated coverage of the store-backed paywall | See "Local StoreKit does not reach automated tests" below. |
 | Terms of Use and Privacy Policy URLs must resolve | The footer links point at the URLs named in the brief (`devron.com/legal/caroullage/…`). App Review rejects dead links, so these must be live before submission. |
+
+---
+
+## Local StoreKit does not reach automated tests
+
+Xcode attaches `StoreKit/Caroullage.storekit` to the scheme's **Run** action, so
+launching the app from Xcode (⌘R, Dev scheme) gives the paywall real products.
+That configuration does **not** reach a test run:
+
+- XcodeGen 2.45.4 writes `storeKitConfiguration` into the Run action only; the
+  Test action has no equivalent key, and hand-patching the generated scheme's
+  `TestAction` with a `StoreKitConfigurationFileReference` changed nothing.
+- `SKTestSession(configurationFileNamed:)` from either test bundle resolves the
+  file (a bogus name throws; the real one does not) but `Product.products(for:)`
+  still returns an empty array, with or without retries.
+
+So under `xcodebuild test` the paywall renders its honest "Plans are unavailable
+right now" state. Coverage is split accordingly:
+
+- **Unit tests** (`PurchaseServiceTests`, `PaywallViewModelTests`) cover the
+  entitlement state machine and every string on the paywall against the gateway
+  stub — 44 tests.
+- **UI tests** (`PaywallUITests`) cover what does not need a store: a locked
+  template opens the paywall, the close button works on the first tap, and the
+  restore path and terms line are on screen.
+- **Manual, before submission:** run the app from Xcode with the Dev scheme and
+  confirm the four plans, the prices, the "Best Value" badge, the trial CTA, and
+  a completed purchase. This is the brief's own "tested with local StoreKit
+  config in Xcode" step and is the only part of 6.1/6.2 not automated.
+
+One real bug came out of this: with no store behind the simulator,
+`AppStore.sync()` never returns, so Restore sat there silently. `PurchaseService`
+now bounds it (15s) and reports "The App Store didn't respond." rather than
+hanging — which is also the right behaviour on a bad connection in production.
 
 ---
 

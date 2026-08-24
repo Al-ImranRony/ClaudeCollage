@@ -55,6 +55,9 @@ public struct PremiumProductInfo: Sendable, Equatable, Identifiable {
     /// The store's localized price string, e.g. "$24.99".
     public let displayPrice: String
     public let price: Decimal
+    /// The store's currency for `price`, e.g. "USD" — needed to render a
+    /// derived figure (the per-month equivalent) in the same currency.
+    public let currencyCode: String
     /// Length of the introductory free trial, if the store offers one.
     public let introductoryOfferDays: Int?
 
@@ -65,12 +68,14 @@ public struct PremiumProductInfo: Sendable, Equatable, Identifiable {
         displayName: String,
         displayPrice: String,
         price: Decimal,
+        currencyCode: String,
         introductoryOfferDays: Int? = nil
     ) {
         self.product = product
         self.displayName = displayName
         self.displayPrice = displayPrice
         self.price = price
+        self.currencyCode = currencyCode
         self.introductoryOfferDays = introductoryOfferDays
     }
 }

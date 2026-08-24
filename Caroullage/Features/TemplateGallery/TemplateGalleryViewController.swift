@@ -229,11 +229,15 @@ final class TemplateGalleryViewController: UIViewController {
         let registration = UICollectionView.CellRegistration<TemplateCardCell, String> {
             [weak self] cell, _, templateID in
             guard let self, let template = self.templatesByID[templateID] else { return }
+            let isPremium = self.service.isPremium(template)
             cell.configure(
                 name: template.name,
                 thumbnail: self.service.thumbnail(for: template),
-                isPremium: self.service.isPremium(template)
+                isPremium: isPremium
             )
+            // Locked and unlocked cards are told apart in UI tests by identifier
+            // rather than by reading the crown badge out of a screenshot.
+            cell.accessibilityIdentifier = isPremium ? "templateCard.premium" : "templateCard.free"
         }
         return UICollectionViewDiffableDataSource<Int, String>(collectionView: gridView) {
             collectionView, indexPath, templateID in
@@ -282,7 +286,7 @@ extension TemplateGalleryViewController: UICollectionViewDataSource, UICollectio
             onSelectTemplate?(template)
         } else {
             Haptics.boundary()
-            present(PaywallPlaceholderViewController.sheet(), animated: true)
+            presentPaywall { [weak self] in self?.onSelectTemplate?(template) }
         }
     }
 }

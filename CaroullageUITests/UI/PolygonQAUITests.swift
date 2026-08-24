@@ -87,14 +87,18 @@ final class PolygonQAUITests: XCTestCase {
         attach(app, "05_back_to_grid")
         shapesSeg.tap()
 
-        // Premium gate: Custom Shape must show the Premium alert on the free tier.
+        // Premium gate: Custom Shape opens the paywall on the free tier (Step 06
+        // replaced the stand-in alert with the real screen).
         let customButton = app.buttons["Custom Shape"]
         if customButton.waitForExistence(timeout: 3) {
             customButton.tap()
-            let premiumAlert = app.alerts["Premium Feature"]
-            XCTAssertTrue(premiumAlert.waitForExistence(timeout: 3), "Premium gate alert shows for free tier")
+            // The close button is the one control guaranteed present whatever the
+            // store answers; plans and pricing are covered by PaywallUITests,
+            // which stands up its own StoreKit test session.
+            let close = app.buttons["paywallCloseButton"]
+            XCTAssertTrue(close.waitForExistence(timeout: 5), "Premium gate opens the paywall for free tier")
             attach(app, "06_premium_gate")
-            premiumAlert.buttons["Not Now"].tap()
+            app.buttons["paywallCloseButton"].tap()
         } else {
             XCTFail("Custom Shape button missing in Shapes mode")
         }

@@ -43,6 +43,7 @@ public protocol PurchaseGateway: Sendable {
 public enum PurchaseGatewayError: LocalizedError {
     case productUnavailable
     case unverifiedTransaction
+    case storeUnreachable
 
     public var errorDescription: String? {
         switch self {
@@ -50,6 +51,8 @@ public enum PurchaseGatewayError: LocalizedError {
             return "That plan isn't available right now. Please try again in a moment."
         case .unverifiedTransaction:
             return "The App Store couldn't verify that purchase."
+        case .storeUnreachable:
+            return "The App Store didn't respond. Check your connection and try again."
         }
     }
 }
@@ -67,6 +70,7 @@ public struct StoreKitPurchaseGateway: PurchaseGateway {
                 displayName: storeProduct.displayName,
                 displayPrice: storeProduct.displayPrice,
                 price: storeProduct.price,
+                currencyCode: storeProduct.priceFormatStyle.currencyCode,
                 introductoryOfferDays: Self.freeTrialDays(of: storeProduct)
             )
         }

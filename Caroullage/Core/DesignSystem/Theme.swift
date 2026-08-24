@@ -124,6 +124,13 @@ public enum Theme {
             dynamic(light: 0xEFEDE9, dark: 0x2A2A2E)
         }
 
+        /// Failure text — a purchase that did not go through, a save that
+        /// could not be written. Step 06 added it: the palette had no way to
+        /// say "this went wrong" without reaching for a raw system colour.
+        public static var critical: UIColor {
+            dynamic(light: 0xB3261E, dark: 0xF2B8B5)
+        }
+
         /// The accent as a low-opacity tint, e.g. selected-swatch halo.
         public static var accentSoft: UIColor {
             accent.withAlphaComponent(0.15)

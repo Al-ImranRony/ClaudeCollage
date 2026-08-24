@@ -498,17 +498,9 @@ final class GridEditorViewController: UIViewController {
 
     private func customShapeTapped() {
         guard EntitlementStore.shared.isPremiumUnlocked else {
-            Haptics.warning()
-            let alert = UIAlertController(
-                title: "Premium Feature",
-                message: "Custom shapes let you trace your own cell boundary. Unlock with Caroullage Premium.",
-                preferredStyle: .alert)
-            alert.addAction(UIAlertAction(title: "Not Now", style: .cancel))
-            alert.addAction(UIAlertAction(title: "Learn More", style: .default) { [weak self] _ in
-                // The paywall ships in Step 06; for now, surface intent.
-                self?.showToast("Premium paywall coming soon")
-            })
-            present(alert, animated: true)
+            // Step 06: the gate opens the paywall, and a user who buys lands
+            // straight in the feature they were reaching for.
+            presentPaywall { [weak self] in self?.presentBezierEditor() }
             return
         }
         presentBezierEditor()
@@ -842,16 +834,11 @@ final class GridEditorViewController: UIViewController {
 
     private func presentGenerativeBackground() {
         guard EntitlementStore.shared.isPremiumUnlocked else {
-            let alert = UIAlertController(
-                title: "Premium Feature",
-                message: "Generated backgrounds are part of Premium.",
-                preferredStyle: .alert)
-            alert.addAction(UIAlertAction(title: "Not Now", style: .cancel))
-            present(alert, animated: true)
+            presentPaywall { [weak self] in self?.presentGenerativeBackground() }
             return
         }
-        // The Image Playground sheet itself lands with the premium flow in Step 06,
-        // where the paywall it sits behind is built.
+        // The paywall now exists; the Image Playground sheet behind it is still
+        // outstanding Step 06 work (it needs an Apple Intelligence device).
         let alert = UIAlertController(
             title: "Coming Soon",
             message: "Background generation arrives with the Premium release.",

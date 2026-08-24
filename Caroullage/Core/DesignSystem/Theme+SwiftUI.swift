@@ -39,4 +39,5 @@ public extension Color {
     static var themeTextOnAccent: Color { Color(Theme.Color.textOnAccent) }
     static var themeSeparator: Color { Color(Theme.Color.separator) }
     static var themeControlFill: Color { Color(Theme.Color.controlFill) }
+    static var themeCritical: Color { Color(Theme.Color.critical) }
 }

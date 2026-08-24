@@ -268,6 +268,24 @@ final class PurchaseServiceTests: XCTestCase {
         XCTAssertNil(service.purchaseError)
     }
 
+    func testARestoreThatNeverAnswersGivesUpAndSaysSo() async {
+        // Found in a UI test: with no store behind the simulator, `AppStore.sync()`
+        // never returns, so the user taps Restore and watches nothing happen.
+        let gateway = StubPurchaseGateway()
+        gateway.syncNeverAnswers = true
+        let service = PurchaseService(
+            gateway: gateway, defaults: defaults,
+            entitlements: EntitlementStore(isPremiumUnlocked: false),
+            restoreTimeout: .milliseconds(100)
+        )
+
+        let didRestore = await service.restore()
+
+        XCTAssertFalse(didRestore)
+        XCTAssertNotNil(service.purchaseError, "a restore that cannot finish must still report")
+        XCTAssertFalse(service.isPurchasing)
+    }
+
     func testAFailedRestoreSurfacesAMessage() async {
         let gateway = StubPurchaseGateway()
         gateway.syncError = StubError.boom
@@ -319,72 +337,5 @@ final class PurchaseServiceTests: XCTestCase {
 
         await fulfillment(of: [unlocked], timeout: 2)
         XCTAssertEqual(service.currentTier, .premium)
-    }
-}
-
-// MARK: - Stub
-
-private enum StubError: Error { case boom }
-
-/// A hand-written stand-in for StoreKit. `@unchecked Sendable` with all access on
-/// the main actor: the tests drive it from `@MainActor` test methods only.
-private final class StubPurchaseGateway: PurchaseGateway, @unchecked Sendable {
-
-    var entitled: Set<String>
-    var outcome: PurchaseOutcome = .success
-    var entitleOnPurchase = false
-    var entitleOnSync: Set<String> = []
-    var purchaseError: Error?
-    var loadError: Error?
-    var syncError: Error?
-
-    private(set) var purchasedIDs: [String] = []
-    private(set) var requestedIDs: Set<String> = []
-    private(set) var syncCount = 0
-
-    private var updateContinuation: AsyncStream<Void>.Continuation?
-
-    init(entitled: Set<String> = []) {
-        self.entitled = entitled
-    }
-
-    func loadProducts(ids: [String]) async throws -> [PremiumProductInfo] {
-        requestedIDs = Set(ids)
-        if let loadError { throw loadError }
-        return ids.compactMap { id in
-            guard let product = PremiumProduct(id: id) else { return nil }
-            return PremiumProductInfo(
-                product: product,
-                displayName: product.rawValue.capitalized,
-                displayPrice: "$0.99",
-                price: 0.99,
-                introductoryOfferDays: product == .yearly ? 7 : nil
-            )
-        }
-    }
-
-    func purchase(_ id: String) async throws -> PurchaseOutcome {
-        purchasedIDs.append(id)
-        if let purchaseError { throw purchaseError }
-        if entitleOnPurchase, outcome == .success { entitled.insert(id) }
-        return outcome
-    }
-
-    func entitledProductIDs() async -> Set<String> { entitled }
-
-    func isEligibleForIntroductoryOffer(_ id: String) async -> Bool { true }
-
-    func sync() async throws {
-        syncCount += 1
-        if let syncError { throw syncError }
-        entitled.formUnion(entitleOnSync)
-    }
-
-    func transactionUpdates() -> AsyncStream<Void> {
-        AsyncStream { continuation in self.updateContinuation = continuation }
-    }
-
-    func emitUpdate() async {
-        updateContinuation?.yield()
     }
 }
