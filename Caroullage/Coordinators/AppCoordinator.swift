@@ -108,6 +108,11 @@ final class AppCoordinator {
 
         IntentRouter.shared.onRequest = { [weak self] request in self?.handle(request) }
         refreshPlatformSurfaces()
+
+        // Reconcile the entitlement with the App Store, load the paywall's
+        // products, and start listening for renewals. Off the launch path: the
+        // cached tier already gates the UI correctly while this settles.
+        Task { await PurchaseService.shared.start() }
     }
 
     // MARK: - Platform surfaces (Step 05 batch C)

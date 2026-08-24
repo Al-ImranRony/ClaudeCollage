@@ -146,6 +146,9 @@ schemes:
         Caroullage: all
     run:
       config: Debug
+      # Local StoreKit testing: purchases, renewals, and restore run against this
+      # file, with no App Store Connect account involved.
+      storeKitConfiguration: StoreKit/Caroullage.storekit
     test:
       config: Debug
       gatherCoverageData: true

@@ -2,10 +2,11 @@
 //  EntitlementStore.swift
 //  Caroullage
 //
-//  Step 02 — a minimal premium-entitlement gate. Real StoreKit 2 purchasing and
-//  restore live in Step 06 (Deployment); this exists so premium features (the
-//  custom bezier editor) can be gated *now* with a single check that Step 06
-//  swaps for the live entitlement without touching call sites.
+//  Step 02 — the premium-entitlement gate every feature reads.
+//
+//  Step 06 kept it exactly as designed: `PurchaseService` now drives it from the
+//  live StoreKit entitlement, so the gates scattered across the editors never had
+//  to learn about products, transactions, or restore.
 //
 
 import Foundation
@@ -21,8 +22,14 @@ public final class EntitlementStore {
 
     private init() {
         // Honour a debug override so the premium flows can be exercised in the
-        // simulator before StoreKit is wired up.
+        // simulator without buying anything.
         self.isPremiumUnlocked = UserDefaults.standard.bool(forKey: "debug.premiumUnlocked")
+    }
+
+    /// A store with an explicit starting state, for tests and previews. The app
+    /// itself uses `shared`, which `PurchaseService` drives from StoreKit.
+    public init(isPremiumUnlocked: Bool) {
+        self.isPremiumUnlocked = isPremiumUnlocked
     }
 
     public func setPremiumUnlocked(_ unlocked: Bool) {
