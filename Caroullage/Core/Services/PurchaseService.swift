@@ -23,8 +23,13 @@ public final class PurchaseService: ObservableObject {
     /// What the user is entitled to right now.
     @Published public private(set) var currentTier: SubscriptionTier
 
-    /// Store metadata for the paywall, in display order. Empty until `start()`.
+    /// Store metadata for everything purchasable, in display order. Empty until
+    /// `start()`. Includes the special-offer product, which the plan picker
+    /// filters out — see `PaywallViewModel`.
     @Published public private(set) var products: [PremiumProductInfo] = []
+
+    /// The credit packs, cheapest first. Empty until `start()`.
+    @Published public private(set) var creditProducts: [CreditProductInfo] = []
 
     /// A message to show the user after a failed purchase or restore. Never set
     /// for a cancellation — declining is not an error.
@@ -36,6 +41,7 @@ public final class PurchaseService: ObservableObject {
     private let gateway: any PurchaseGateway
     private let defaults: UserDefaults
     private let entitlements: EntitlementStore
+    private let credits: CreditStore
     /// How long to wait on `AppStore.sync()` before telling the user it did not
     /// work. Without a bound, a store that never answers leaves Restore looking
     /// broken — which is exactly what it looks like on a simulator with no
@@ -52,11 +58,13 @@ public final class PurchaseService: ObservableObject {
         gateway: any PurchaseGateway = StoreKitPurchaseGateway(),
         defaults: UserDefaults = .standard,
         entitlements: EntitlementStore = .shared,
+        credits: CreditStore = .shared,
         restoreTimeout: Duration = .seconds(15)
     ) {
         self.gateway = gateway
         self.defaults = defaults
         self.entitlements = entitlements
+        self.credits = credits
         self.restoreTimeout = restoreTimeout
         self.currentTier = defaults.string(forKey: Key.cachedTier)
             .flatMap(SubscriptionTier.init(rawValue:)) ?? .free
@@ -73,15 +81,28 @@ public final class PurchaseService: ObservableObject {
     /// listening for renewals and cancellations. Safe to call more than once.
     public func start() async {
         await loadProducts()
+        await loadCreditProducts()
         await refreshEntitlements()
         listenForTransactionUpdates()
     }
 
+    private func loadCreditProducts() async {
+        do {
+            let loaded = try await gateway.loadCreditProducts(ids: CreditProduct.displayOrdered.map(\.id))
+            creditProducts = loaded.sorted {
+                let order = CreditProduct.displayOrdered
+                return (order.firstIndex(of: $0.product) ?? .max) < (order.firstIndex(of: $1.product) ?? .max)
+            }
+        } catch {
+            creditProducts = []
+        }
+    }
+
     private func loadProducts() async {
         do {
-            let loaded = try await gateway.loadProducts(ids: PremiumProduct.displayOrdered.map(\.id))
+            let loaded = try await gateway.loadProducts(ids: PremiumProduct.purchasable.map(\.id))
             products = loaded.sorted {
-                let order = PremiumProduct.displayOrdered
+                let order = PremiumProduct.purchasable
                 return (order.firstIndex(of: $0.product) ?? .max) < (order.firstIndex(of: $1.product) ?? .max)
             }
         } catch {
@@ -93,7 +114,10 @@ public final class PurchaseService: ObservableObject {
 
     private func listenForTransactionUpdates() {
         guard updatesTask == nil else { return }
-        let stream = gateway.transactionUpdates()
+        let credits = self.credits
+        let stream = gateway.transactionUpdates(deliver: { productID in
+            await credits.deliver(productID: productID)
+        })
         updatesTask = Task { [weak self] in
             for await _ in stream {
                 await self?.refreshEntitlements()
@@ -146,6 +170,27 @@ public final class PurchaseService: ObservableObject {
         }
     }
 
+    /// Buys a credit pack. Returns whether the credits landed.
+    ///
+    /// Credits buy an output, never access — a pack leaves the tier alone.
+    @discardableResult
+    public func purchaseCredits(_ product: CreditProduct) async -> Bool {
+        purchaseError = nil
+        isPurchasing = true
+        defer { isPurchasing = false }
+
+        let credits = self.credits
+        do {
+            let outcome = try await gateway.purchaseConsumable(product.id, deliver: { productID in
+                await credits.deliver(productID: productID)
+            })
+            return outcome == .success
+        } catch {
+            purchaseError = Self.message(for: error)
+            return false
+        }
+    }
+
     /// Restores an earlier purchase. Returns whether anything was restored.
     @discardableResult
     public func restore() async -> Bool {
@@ -188,5 +233,13 @@ public final class PurchaseService: ObservableObject {
     private static func message(for error: Error) -> String {
         (error as? LocalizedError)?.errorDescription
             ?? "Something went wrong with the App Store. Please try again."
+    }
+
+    /// Export credits the user currently holds.
+    public var creditBalance: Int { credits.balance }
+
+    /// Store metadata for one product, if the store returned it.
+    public func info(for product: PremiumProduct) -> PremiumProductInfo? {
+        products.first { $0.product == product }
     }
 }

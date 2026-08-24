@@ -30,12 +30,33 @@ public final class PaywallViewModel: ObservableObject {
         public var id: String { product.id }
     }
 
+    /// One credit pack, for the person who will not subscribe.
+    public struct CreditPack: Identifiable, Equatable {
+        public let product: CreditProduct
+        /// "1 export", "5 exports", …
+        public let title: String
+        public let displayPrice: String
+        /// "$1.00 each" on multi-credit packs, so the saving is visible without
+        /// arithmetic. `nil` on the single, where there is nothing to compare.
+        public let unitPriceText: String?
+
+        public var id: String { product.id }
+    }
+
     @Published public private(set) var plans: [Plan] = []
+    @Published public private(set) var creditPacks: [CreditPack] = []
+    @Published public private(set) var creditBalance: Int = 0
     @Published public private(set) var selectedProduct: PremiumProduct = .yearly
     @Published public private(set) var isPremium: Bool
     @Published public private(set) var isPurchasing = false
     @Published public private(set) var errorMessage: String?
     @Published public private(set) var restoreMessage: String?
+
+    /// What credits are and, just as importantly, what they are not. Said before
+    /// the user pays rather than discovered after.
+    public let creditExplanation =
+        "One credit exports one collage at full quality, with no watermark. "
+        + "Credits are not a subscription and stay on this device."
 
     private let service: PurchaseService
     private var info: [PremiumProduct: PremiumProductInfo] = [:]
@@ -57,7 +78,10 @@ public final class PaywallViewModel: ObservableObject {
     public func load() async {
         await service.start()
 
-        info = Dictionary(uniqueKeysWithValues: service.products.map { ($0.product, $0) })
+        // The special-offer product is bought from its own screen, never from
+        // the plan picker, so it is filtered out here.
+        let offered = service.products.filter { $0.product != .yearlyOffer }
+        info = Dictionary(uniqueKeysWithValues: offered.map { ($0.product, $0) })
 
         var trials: [PremiumProduct: Int] = [:]
         for product in service.products where product.introductoryOfferDays != nil {
@@ -67,7 +91,9 @@ public final class PaywallViewModel: ObservableObject {
         }
         availableTrialDays = trials
 
-        plans = service.products.map(makePlan)
+        plans = offered.map(makePlan)
+        creditPacks = service.creditProducts.map(makePack)
+        creditBalance = service.creditBalance
         // Keep the recommendation selected if it is on sale; otherwise fall back
         // to whatever the store did return.
         if info[selectedProduct] == nil, let first = plans.first {
@@ -84,6 +110,21 @@ public final class PaywallViewModel: ObservableObject {
             secondaryLine: secondaryLine(for: product),
             badge: product.product == .yearly ? "Best Value" : nil
         )
+    }
+
+    private func makePack(for pack: CreditProductInfo) -> CreditPack {
+        CreditPack(
+            product: pack.product,
+            title: pack.product.credits == 1 ? "1 export" : "\(pack.product.credits) exports",
+            displayPrice: pack.displayPrice,
+            unitPriceText: unitPrice(for: pack)
+        )
+    }
+
+    private func unitPrice(for pack: CreditProductInfo) -> String? {
+        guard pack.product.credits > 1 else { return nil }
+        let each = pack.price / Decimal(pack.product.credits)
+        return "\(each.formatted(pack.priceFormatStyle)) each"
     }
 
     // MARK: - Selection
@@ -140,6 +181,20 @@ public final class PaywallViewModel: ObservableObject {
         return didUnlock
     }
 
+    /// Buys a credit pack. The tier is untouched — credits buy an output.
+    @discardableResult
+    public func purchaseCredits(_ product: CreditProduct) async -> Bool {
+        errorMessage = nil
+        restoreMessage = nil
+        isPurchasing = true
+        defer { isPurchasing = false }
+
+        let didBuy = await service.purchaseCredits(product)
+        errorMessage = service.purchaseError
+        creditBalance = service.creditBalance
+        return didBuy
+    }
+
     /// Restores an earlier purchase. Always says something afterwards — a
     /// restore button that appears to do nothing is an App Review rejection.
     @discardableResult
@@ -173,18 +228,18 @@ public final class PaywallViewModel: ObservableObject {
         switch product.product {
         case .yearly:
             let monthly = product.price / 12
-            let formatted = monthly.formatted(.currency(code: product.currencyCode))
+            let formatted = monthly.formatted(product.priceFormatStyle)
             return "\(formatted) / month"
         case .lifetime:
             return "Pay once, keep forever"
-        case .monthly, .weekly:
+        case .monthly, .weekly, .yearlyOffer:
             return nil
         }
     }
 
     private static func title(for product: PremiumProduct) -> String {
         switch product {
-        case .yearly: return "Yearly"
+        case .yearly, .yearlyOffer: return "Yearly"
         case .monthly: return "Monthly"
         case .weekly: return "Weekly"
         case .lifetime: return "Lifetime"
@@ -193,7 +248,7 @@ public final class PaywallViewModel: ObservableObject {
 
     private static func periodNoun(for product: PremiumProduct) -> String {
         switch product {
-        case .yearly: return "year"
+        case .yearly, .yearlyOffer: return "year"
         case .monthly: return "month"
         case .weekly: return "week"
         case .lifetime: return "once"

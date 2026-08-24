@@ -650,12 +650,20 @@ final class VideoEditorViewController: UIViewController {
             canvasSize: viewModel.canvasSize,
             canvasAspect: CanvasSize.aspectString(for: viewModel.canvasSize),
             supportsVideo: true,
-            isPremium: EntitlementStore.shared.isPremiumUnlocked)
+            isPremium: EntitlementStore.shared.isPremiumUnlocked,
+            creditBalance: CreditStore.shared.balance)
         let sheet = UniversalExportSheetView(
             capabilities: capabilities,
-            onSaveToPhotos: { [weak self] options in self?.exportVideo(options, share: false) },
-            onQuickShare: { [weak self] options in self?.exportVideo(options, share: true) },
-            onCancel: { [weak self] in self?.dismiss(animated: true) })
+            onSaveToPhotos: { [weak self] options, payment in
+                self?.exportVideo(options, share: false, payment: payment)
+            },
+            onQuickShare: { [weak self] options, payment in
+                self?.exportVideo(options, share: true, payment: payment)
+            },
+            onCancel: { [weak self] in self?.dismiss(animated: true) },
+            onBuyCredits: { [weak self] in
+                self?.dismiss(animated: true) { self?.presentPaywall() }
+            })
         let host = UIHostingController(rootView: sheet)
         host.modalPresentationStyle = .pageSheet
         if let presentation = host.sheetPresentationController {
@@ -667,10 +675,17 @@ final class VideoEditorViewController: UIViewController {
 
     /// Composes and writes the collage through the slice-4/5a direct
     /// reader→writer path (video + muxed audio), then saves or shares it.
-    private func exportVideo(_ options: ExportOptions, share: Bool) {
+    private func exportVideo(_ options: ExportOptions, share: Bool, payment: ExportPayment = .entitled) {
+        let creditSession = ExportCreditSession()
+        if payment == .credit, !creditSession.begin() {
+            Haptics.error()
+            showInfo(title: "No Credits Left", message: "Buy a credit or start Premium to export at full quality.")
+            return
+        }
         dismiss(animated: true) { [weak self] in
             guard let self else { return }
             guard self.viewModel.hasContent else {
+                creditSession.failed()
                 self.showInfo(title: "Nothing to Export", message: "Add a video to a slot first.")
                 return
             }
@@ -702,17 +717,22 @@ final class VideoEditorViewController: UIViewController {
                         },
                         cancellation: token)
                     if share {
+                        creditSession.succeeded()
                         progressVC.dismiss(animated: true) { self.shareURL(url) }
                     } else {
                         try await PhotoLibrarySaver().saveVideo(at: url)
+                        creditSession.succeeded()
                         progressVC.dismiss(animated: true) {
                             self.showSuccess("Saved to Photos")
                         }
                     }
                 } catch VideoComposer.ComposerError.cancelled {
-                    // A deliberate cancel isn't a failure — no error alert.
+                    // A deliberate cancel isn't a failure — no error alert, and
+                    // the credit goes back: they got no file.
+                    creditSession.cancelled()
                     progressVC.dismiss(animated: true) { self.showToast("Export cancelled") }
                 } catch {
+                    creditSession.failed()
                     progressVC.dismiss(animated: true) {
                         Haptics.error()
                         self.showInfo(title: "Export Failed",

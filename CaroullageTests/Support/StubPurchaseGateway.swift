@@ -20,6 +20,8 @@ final class StubPurchaseGateway: PurchaseGateway, @unchecked Sendable {
     /// When set, `loadProducts` vends exactly these (filtered by requested id).
     var stockedProducts: [PremiumProductInfo]?
     var introOfferEligible = true
+    /// Per-pack prices for the credit packs the paywall lists.
+    var creditPrices: [CreditProduct: String] = [:]
     var outcome: PurchaseOutcome = .success
     var entitleOnPurchase = false
     var entitleOnSync: Set<String> = []
@@ -33,6 +35,11 @@ final class StubPurchaseGateway: PurchaseGateway, @unchecked Sendable {
     private(set) var purchasedIDs: [String] = []
     private(set) var requestedIDs: Set<String> = []
     private(set) var syncCount = 0
+    /// Records that the consumable reached the app before the transaction was
+    /// finished — the ordering that keeps a crash from eating a purchase.
+    private(set) var deliveredBeforeFinishing = false
+    private var didFinish = false
+    private var deliverToApp: (@Sendable (String) async -> Void)?
 
     private var updateContinuation: AsyncStream<Void>.Continuation?
 
@@ -53,8 +60,33 @@ final class StubPurchaseGateway: PurchaseGateway, @unchecked Sendable {
                 displayName: product.rawValue.capitalized,
                 displayPrice: "$0.99",
                 price: 0.99,
-                currencyCode: "USD",
+                priceFormatStyle: .usd,
                 introductoryOfferDays: product == .yearly ? 7 : nil
+            )
+        }
+    }
+
+    func purchaseConsumable(
+        _ id: String, deliver: @Sendable @escaping (String) async -> Void
+    ) async throws -> PurchaseOutcome {
+        purchasedIDs.append(id)
+        if let purchaseError { throw purchaseError }
+        guard outcome == .success else { return outcome }
+        await deliver(id)
+        deliveredBeforeFinishing = !didFinish
+        didFinish = true
+        return .success
+    }
+
+    func loadCreditProducts(ids: [String]) async throws -> [CreditProductInfo] {
+        if let loadError { throw loadError }
+        return ids.compactMap { id in
+            guard let product = CreditProduct(id: id) else { return nil }
+            let display = creditPrices[product] ?? "$1.99"
+            let amount = Decimal(string: display.replacingOccurrences(of: "$", with: "")) ?? 1.99
+            return CreditProductInfo(
+                product: product, displayName: product.rawValue,
+                displayPrice: display, price: amount, priceFormatStyle: .usd
             )
         }
     }
@@ -77,11 +109,20 @@ final class StubPurchaseGateway: PurchaseGateway, @unchecked Sendable {
         entitled.formUnion(entitleOnSync)
     }
 
-    func transactionUpdates() -> AsyncStream<Void> {
-        AsyncStream { continuation in self.updateContinuation = continuation }
+    func transactionUpdates(
+        deliver: @Sendable @escaping (String) async -> Void
+    ) -> AsyncStream<Void> {
+        deliverToApp = deliver
+        return AsyncStream { continuation in self.updateContinuation = continuation }
     }
 
     func emitUpdate() async {
+        updateContinuation?.yield()
+    }
+
+    /// A consumable arriving unprompted — approved Ask-to-Buy, another device.
+    func emitDelivery(of productID: String) async {
+        await deliverToApp?(productID)
         updateContinuation?.yield()
     }
 }

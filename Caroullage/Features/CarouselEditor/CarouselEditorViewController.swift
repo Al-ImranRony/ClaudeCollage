@@ -270,18 +270,22 @@ final class CarouselEditorViewController: UIViewController {
             canvasSize: viewModel.canvasSize,
             canvasAspect: CanvasSize.aspectString(for: viewModel.canvasSize),
             supportsVideo: true,
-            isPremium: EntitlementStore.shared.isPremiumUnlocked)
+            isPremium: EntitlementStore.shared.isPremiumUnlocked,
+            creditBalance: CreditStore.shared.balance)
         let sheet = UniversalExportSheetView(
             capabilities: capabilities,
-            onSaveToPhotos: { [weak self] options in
-                if options.media == .video { self?.exportVideo(options, share: false) }
-                else { self?.saveImagesToPhotos(options) }
+            onSaveToPhotos: { [weak self] options, payment in
+                if options.media == .video { self?.exportVideo(options, share: false, payment: payment) }
+                else { self?.saveImagesToPhotos(options, payment: payment) }
             },
-            onQuickShare: { [weak self] options in
-                if options.media == .video { self?.exportVideo(options, share: true) }
+            onQuickShare: { [weak self] options, payment in
+                if options.media == .video { self?.exportVideo(options, share: true, payment: payment) }
                 else { self?.dismiss(animated: true) { self?.shareFrameImages() } }
             },
-            onCancel: { [weak self] in self?.dismiss(animated: true) })
+            onCancel: { [weak self] in self?.dismiss(animated: true) },
+            onBuyCredits: { [weak self] in
+                self?.dismiss(animated: true) { self?.presentPaywall() }
+            })
         let host = UIHostingController(rootView: sheet)
         host.modalPresentationStyle = .pageSheet
         if let presentation = host.sheetPresentationController {
@@ -304,11 +308,19 @@ final class CarouselEditorViewController: UIViewController {
     /// Composes the frames into a slideshow video (direct AVAssetWriter) and either
     /// saves it to Photos or opens the share sheet. This is Step 03b's deferred
     /// carousel video export, now delivered through Step 04's `VideoComposer`.
-    private func exportVideo(_ options: ExportOptions, share: Bool) {
+    private func exportVideo(_ options: ExportOptions, share: Bool, payment: ExportPayment = .entitled) {
+        let creditSession = ExportCreditSession()
+        if payment == .credit, !creditSession.begin() {
+            Haptics.error()
+            showComingSoon(title: "No Credits Left",
+                           message: "Buy a credit or start Premium to export at full quality.")
+            return
+        }
         dismiss(animated: true) { [weak self] in
             guard let self else { return }
             let frames = self.renderFrames()
             guard !frames.isEmpty else {
+                creditSession.failed()
                 self.showComingSoon(title: "Export Failed", message: "There are no frames to export.")
                 return
             }
@@ -331,16 +343,20 @@ final class CarouselEditorViewController: UIViewController {
                         },
                         cancellation: token)
                     if share {
+                        creditSession.succeeded()
                         progressVC.dismiss(animated: true) { self.shareURL(url) }
                     } else {
                         try await PhotoLibrarySaver().saveVideo(at: url)
+                        creditSession.succeeded()
                         progressVC.dismiss(animated: true) {
                             self.showSuccess("Saved to Photos")
                         }
                     }
                 } catch VideoComposer.ComposerError.cancelled {
+                    creditSession.cancelled()
                     progressVC.dismiss(animated: true) { self.showToast("Export cancelled") }
                 } catch {
+                    creditSession.failed()
                     progressVC.dismiss(animated: true) {
                         Haptics.error()
                         self.showComingSoon(title: "Export Failed",
@@ -352,11 +368,19 @@ final class CarouselEditorViewController: UIViewController {
     }
 
     /// Saves each frame to Photos as an individual image asset.
-    private func saveImagesToPhotos(_ options: ExportOptions) {
+    private func saveImagesToPhotos(_ options: ExportOptions, payment: ExportPayment = .entitled) {
+        let creditSession = ExportCreditSession()
+        if payment == .credit, !creditSession.begin() {
+            Haptics.error()
+            showComingSoon(title: "No Credits Left",
+                           message: "Buy a credit or start Premium to export at full quality.")
+            return
+        }
         dismiss(animated: true) { [weak self] in
             guard let self else { return }
             let frames = self.renderFrames()
             guard !frames.isEmpty else {
+                creditSession.failed()
                 self.showComingSoon(title: "Export Failed", message: "There are no frames to export.")
                 return
             }
@@ -369,10 +393,12 @@ final class CarouselEditorViewController: UIViewController {
                             frame, format: options.imageExporterFormat, resolution: options.imageResolution)
                         try await saver.saveImage(data)
                     }
+                    creditSession.succeeded()
                     spinner.dismiss(animated: true) {
                         self.showSuccess("Saved \(frames.count) images")
                     }
                 } catch {
+                    creditSession.failed()
                     spinner.dismiss(animated: true) {
                         Haptics.error()
                         self.showComingSoon(title: "Save Failed", message: "Couldn't save to Photos.")

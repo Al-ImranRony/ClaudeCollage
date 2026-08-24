@@ -950,12 +950,20 @@ final class GridEditorViewController: UIViewController {
             canvasSize: viewModel.canvasSize,
             canvasAspect: CanvasSize.aspectString(for: viewModel.canvasSize),
             supportsVideo: false,
-            isPremium: EntitlementStore.shared.isPremiumUnlocked)
+            isPremium: EntitlementStore.shared.isPremiumUnlocked,
+            creditBalance: CreditStore.shared.balance)
         let sheet = UniversalExportSheetView(
             capabilities: capabilities,
-            onSaveToPhotos: { [weak self] options in self?.performImageExport(options, share: false) },
-            onQuickShare: { [weak self] options in self?.performImageExport(options, share: true) },
-            onCancel: { [weak self] in self?.dismiss(animated: true) })
+            onSaveToPhotos: { [weak self] options, payment in
+                self?.performImageExport(options, share: false, payment: payment)
+            },
+            onQuickShare: { [weak self] options, payment in
+                self?.performImageExport(options, share: true, payment: payment)
+            },
+            onCancel: { [weak self] in self?.dismiss(animated: true) },
+            onBuyCredits: { [weak self] in
+                self?.dismiss(animated: true) { self?.presentPaywall() }
+            })
         let host = UIHostingController(rootView: sheet)
         host.modalPresentationStyle = .pageSheet
         if let presentation = host.sheetPresentationController {
@@ -967,7 +975,15 @@ final class GridEditorViewController: UIViewController {
 
     /// Renders the canvas full-resolution off the main thread, encodes it per the
     /// export options, then saves to Photos or opens the share sheet.
-    private func performImageExport(_ options: ExportOptions, share: Bool) {
+    private func performImageExport(_ options: ExportOptions, share: Bool, payment: ExportPayment = .entitled) {
+        // The credit is taken up front and given back below if nothing comes out
+        // of the export.
+        let creditSession = ExportCreditSession()
+        if payment == .credit, !creditSession.begin() {
+            Haptics.error()
+            showAlert("No credits left", "Buy a credit or start Premium to export at full quality.")
+            return
+        }
         dismiss(animated: true) { [weak self] in
             guard let self else { return }
             let spinner = self.presentSpinner()
@@ -984,10 +1000,12 @@ final class GridEditorViewController: UIViewController {
                 DispatchQueue.main.async {
                     spinner.dismiss(animated: true) {
                         guard let data else {
+                            creditSession.failed()
                             Haptics.error()
                             self.showAlert("Export failed", "Could not render the collage.")
                             return
                         }
+                        creditSession.succeeded()
                         if share {
                             self.shareData(data, fileExtension: options.imageFormat == .png ? "png" : "jpg")
                         } else {

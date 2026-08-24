@@ -20,32 +20,50 @@ public struct ExportCapabilities: Equatable {
     public let canvasAspect: String
     public let supportsVideo: Bool
     public let isPremium: Bool
+    /// Export credits the user has bought. Ignored when they are premium.
+    public let creditBalance: Int
 
-    public init(canvasSize: CGSize, canvasAspect: String, supportsVideo: Bool, isPremium: Bool) {
+    public init(
+        canvasSize: CGSize, canvasAspect: String, supportsVideo: Bool,
+        isPremium: Bool, creditBalance: Int = 0
+    ) {
         self.canvasSize = canvasSize
         self.canvasAspect = canvasAspect
         self.supportsVideo = supportsVideo
         self.isPremium = isPremium
+        self.creditBalance = creditBalance
     }
+}
+
+/// How this export is being paid for.
+public enum ExportPayment: Equatable, Sendable {
+    /// Premium, or a free export at free-tier limits.
+    case entitled
+    /// The user chose to spend one credit to lift the free-tier limits.
+    case credit
 }
 
 struct UniversalExportSheetView: View {
 
     let capabilities: ExportCapabilities
-    let onSaveToPhotos: (ExportOptions) -> Void
-    let onQuickShare: (ExportOptions) -> Void
+    let onSaveToPhotos: (ExportOptions, ExportPayment) -> Void
+    let onQuickShare: (ExportOptions, ExportPayment) -> Void
     let onCancel: () -> Void
+    let onBuyCredits: () -> Void
 
     @State private var options: ExportOptions
+    @State private var useCredit = false
 
     init(capabilities: ExportCapabilities,
-         onSaveToPhotos: @escaping (ExportOptions) -> Void,
-         onQuickShare: @escaping (ExportOptions) -> Void,
-         onCancel: @escaping () -> Void) {
+         onSaveToPhotos: @escaping (ExportOptions, ExportPayment) -> Void,
+         onQuickShare: @escaping (ExportOptions, ExportPayment) -> Void,
+         onCancel: @escaping () -> Void,
+         onBuyCredits: @escaping () -> Void = {}) {
         self.capabilities = capabilities
         self.onSaveToPhotos = onSaveToPhotos
         self.onQuickShare = onQuickShare
         self.onCancel = onCancel
+        self.onBuyCredits = onBuyCredits
         _options = State(initialValue: ExportOptions.makeDefault(
             platform: .instagramPost,
             supportsVideo: capabilities.supportsVideo,
@@ -77,6 +95,14 @@ struct UniversalExportSheetView: View {
         !options.matchesCanvas(aspectRatio: capabilities.canvasAspect)
     }
 
+    /// Premium, or a credit standing in for it on this one export.
+    private var unlocked: Bool { capabilities.isPremium || useCredit }
+
+    /// The one-time path is offered only to people who are not subscribed.
+    private var showsCreditSection: Bool { !capabilities.isPremium }
+
+    private var payment: ExportPayment { unlocked && !capabilities.isPremium ? .credit : .entitled }
+
     var body: some View {
         VStack(spacing: 0) {
             header
@@ -86,6 +112,7 @@ struct UniversalExportSheetView: View {
                     if showsMediaSelector { mediaSection }
                     if mismatched { mismatchWarning }
                     if options.media == .image { imageSettings } else { videoSettings }
+                    if showsCreditSection { creditSection }
                 }
                 .padding(20)
             }
@@ -195,7 +222,7 @@ struct UniversalExportSheetView: View {
     private var videoSettings: some View {
         VStack(alignment: .leading, spacing: 16) {
             sectionTitle("Video Quality")
-            if capabilities.isPremium {
+            if unlocked {
                 Picker("Resolution", selection: $options.videoResolution) {
                     Text("1080p").tag(ExportOptions.VideoResolution.hd1080)
                     Text("4K").tag(ExportOptions.VideoResolution.uhd4k)
@@ -212,12 +239,53 @@ struct UniversalExportSheetView: View {
             } else {
                 Text("1080p · MP4 (H.264)")
                     .font(.themeSubheadline).foregroundStyle(Color(Theme.Color.textPrimary))
-                Text("Upgrade to Premium for 4K & HEVC")
+                Text("4K & HEVC come with Premium — or one credit.")
                     .font(.themeCaption).foregroundStyle(Color(Theme.Color.textSecondary))
             }
             Text("Filters, text, stickers & transitions are always baked in.")
                 .font(.themeCaption).foregroundStyle(Color(Theme.Color.textSecondary))
         }
+    }
+
+    // MARK: - One-time credits
+
+    /// The path for someone who will not subscribe: pay once, export once.
+    private var creditSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            sectionTitle("One-time")
+
+            if capabilities.creditBalance > 0 {
+                Toggle(isOn: $useCredit.animation(
+                    .easeOut(duration: Theme.Motion.duration(Theme.Motion.quick))
+                )) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Use 1 credit for this export")
+                            .font(.themeSubheadline).foregroundStyle(Color.themeTextPrimary)
+                        Text("\(capabilities.creditBalance) left · full resolution, 4K & HEVC, no watermark")
+                            .font(.themeCaption).foregroundStyle(Color.themeTextSecondary)
+                    }
+                }
+                .tint(Color.themeAccentStrong)
+                .accessibilityIdentifier("exportUseCreditToggle")
+            } else {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Not subscribing? Buy a single credit and export this one at full quality.")
+                        .font(.themeCaption).foregroundStyle(Color.themeTextSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Button("Get Credits") {
+                        Haptics.tap()
+                        onBuyCredits()
+                    }
+                    .font(.themeCallout)
+                    .foregroundStyle(Color.themeAccentStrong)
+                    .accessibilityIdentifier("exportGetCreditsButton")
+                }
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.themeSurface)
+        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
     }
 
     private var mismatchWarning: some View {
@@ -239,7 +307,7 @@ struct UniversalExportSheetView: View {
     private var actionBar: some View {
         VStack(spacing: 10) {
             Button {
-                onSaveToPhotos(finalOptions)
+                onSaveToPhotos(finalOptions, payment)
             } label: {
                 Label("Save to Photos", systemImage: "square.and.arrow.down")
                     .font(.themeHeadline)
@@ -253,7 +321,7 @@ struct UniversalExportSheetView: View {
             .accessibilityIdentifier("exportSaveButton")
 
             Button {
-                onQuickShare(finalOptions)
+                onQuickShare(finalOptions, payment)
             } label: {
                 Label("Quick Share", systemImage: "square.and.arrow.up")
                     .font(.themeHeadline)
@@ -269,9 +337,10 @@ struct UniversalExportSheetView: View {
         .padding(20)
     }
 
-    /// Final selections, defensively clamped to the user's entitlement.
+    /// Final selections, defensively clamped to whatever the user is entitled to
+    /// right now — which a spent credit lifts for this one export.
     private var finalOptions: ExportOptions {
-        options.clampedForEntitlement(isPremium: capabilities.isPremium)
+        options.clampedForEntitlement(isPremium: unlocked)
     }
 
     private func sectionTitle(_ text: String) -> some View {

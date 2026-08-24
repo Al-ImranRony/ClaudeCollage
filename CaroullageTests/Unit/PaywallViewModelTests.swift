@@ -36,14 +36,14 @@ final class PaywallViewModelTests: XCTestCase {
     private func storeProducts(trialOnYearly: Bool = true) -> [PremiumProductInfo] {
         [
             PremiumProductInfo(product: .yearly, displayName: "Premium Yearly", displayPrice: "$24.99",
-                               price: 24.99, currencyCode: "USD",
+                               price: 24.99, priceFormatStyle: .usd,
                                introductoryOfferDays: trialOnYearly ? 7 : nil),
             PremiumProductInfo(product: .monthly, displayName: "Premium Monthly", displayPrice: "$4.99",
-                               price: 4.99, currencyCode: "USD"),
+                               price: 4.99, priceFormatStyle: .usd),
             PremiumProductInfo(product: .weekly, displayName: "Premium Weekly", displayPrice: "$2.99",
-                               price: 2.99, currencyCode: "USD"),
+                               price: 2.99, priceFormatStyle: .usd),
             PremiumProductInfo(product: .lifetime, displayName: "Premium Lifetime", displayPrice: "$49.99",
-                               price: 49.99, currencyCode: "USD"),
+                               price: 49.99, priceFormatStyle: .usd),
         ]
     }
 

@@ -40,6 +40,20 @@ deliberately before creating them, and update `PremiumProduct.idPrefix` plus the
 
 ---
 
+## Phase 6.2b — Credits and the Special Offer
+
+| Blocked | Stand-in until then |
+|---|---|
+| Registering the three consumables in App Store Connect | Defined in `StoreKit/Caroullage.storekit` as `net.pixeltouch.caroullage.credits.{single,pack5,pack15}` at $1.99 / $4.99 / $9.99. |
+| **Credits surviving a reinstall or a new device** | They do not. The App Store never restores consumables, so `CreditStore` keeps the balance in `UserDefaults` — and the paywall says "credits stay on this device" *before* the user pays. **CloudKit private-database sync is the real fix** and is blocked on the same account; until then expect occasional "I lost my credits" support mail. |
+| The Special Offer being a genuine promotional offer | It is currently a **second product** (`…premium.yearly.offer`, $14.99) sold from its own screen, which means it renews at $14.99 rather than the standard $24.99. With an account this should become a **promotional offer on the yearly product**, signed server-side, so it renews at the standard price. Until that swap, the copy is written to be true of what is actually sold: the struck-through figure is the standard plan's real price and the terms name the price actually charged. |
+
+Consumables also cannot be Family Shared, and must never be described as a
+subscription in the UI or in App Store Connect metadata — both are reflected in
+the copy that ships.
+
+---
+
 ## Local StoreKit does not reach automated tests
 
 Xcode attaches `StoreKit/Caroullage.storekit` to the scheme's **Run** action, so

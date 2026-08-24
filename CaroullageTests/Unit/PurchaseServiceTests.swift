@@ -299,14 +299,16 @@ final class PurchaseServiceTests: XCTestCase {
 
     // MARK: - Products
 
-    func testStartLoadsTheProductsThePaywallNeeds() async {
+    func testStartLoadsEveryPurchasableProduct() async {
         let gateway = StubPurchaseGateway()
         let service = makeService(gateway: gateway)
 
         await service.start()
 
-        XCTAssertEqual(service.products.map(\.product), PremiumProduct.displayOrdered)
-        XCTAssertEqual(gateway.requestedIDs, Set(PremiumProduct.allCases.map(\.id)))
+        // Including the special-offer product, which the plan picker filters out
+        // — the offer screen needs its price to compute the discount.
+        XCTAssertEqual(service.products.map(\.product), PremiumProduct.purchasable)
+        XCTAssertEqual(gateway.requestedIDs, Set(PremiumProduct.purchasable.map(\.id)))
     }
 
     func testAProductLoadFailureLeavesTheServiceUsableRatherThanCrashing() async {

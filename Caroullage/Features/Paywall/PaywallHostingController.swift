@@ -15,6 +15,10 @@ import UIKit
 @MainActor
 final class PaywallHostingController: UIHostingController<PaywallView> {
 
+    /// Who shows the special offer after this sheet closes. Weak: it is the
+    /// screen underneath, which owns this one.
+    weak var offerPresenter: UIViewController?
+
     /// Presents the paywall as a full-height sheet. `onUnlocked` runs after the
     /// sheet has dismissed, so the caller can retry whatever the user was
     /// blocked from doing.
@@ -31,7 +35,17 @@ final class PaywallHostingController: UIHostingController<PaywallView> {
                 _ = model
                 controller?.dismiss(animated: true, completion: onUnlocked)
             },
-            onClose: { controller?.dismiss(animated: true) }
+            onClose: { [weak model] in
+                let unlocked = model?.isPremium ?? false
+                controller?.dismiss(animated: true) {
+                    // Someone who walked away without buying gets one discounted
+                    // second chance — not every time, see SpecialOfferPolicy.
+                    guard !unlocked else { return }
+                    // The screen underneath: this sheet is gone by now.
+                    controller?.offerPresenter?.presentSpecialOfferIfDue(
+                        service: service, onUnlocked: onUnlocked)
+                }
+            }
         )
 
         controller = PaywallHostingController(rootView: view)
@@ -52,6 +66,8 @@ public extension UIViewController {
     /// they are already premium — the caller's gate has the final say.
     func presentPaywall(onUnlocked: @escaping () -> Void = {}) {
         Haptics.warning()
-        present(PaywallHostingController.sheet(onUnlocked: onUnlocked), animated: true)
+        let paywall = PaywallHostingController.sheet(onUnlocked: onUnlocked)
+        paywall.offerPresenter = self
+        present(paywall, animated: true)
     }
 }

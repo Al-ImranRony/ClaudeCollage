@@ -17,6 +17,28 @@
 import Foundation
 import StoreKit
 
+/// A credit pack as the store describes it.
+public struct CreditProductInfo: Sendable, Equatable, Identifiable {
+    public let product: CreditProduct
+    public let displayName: String
+    public let displayPrice: String
+    public let price: Decimal
+    public let priceFormatStyle: Decimal.FormatStyle.Currency
+
+    public var id: String { product.id }
+
+    public init(
+        product: CreditProduct, displayName: String, displayPrice: String,
+        price: Decimal, priceFormatStyle: Decimal.FormatStyle.Currency
+    ) {
+        self.product = product
+        self.displayName = displayName
+        self.displayPrice = displayPrice
+        self.price = price
+        self.priceFormatStyle = priceFormatStyle
+    }
+}
+
 public protocol PurchaseGateway: Sendable {
 
     /// Fetches store metadata for the given identifiers. Unknown identifiers are
@@ -25,6 +47,16 @@ public protocol PurchaseGateway: Sendable {
 
     /// Runs the system purchase sheet for one product.
     func purchase(_ id: String) async throws -> PurchaseOutcome
+
+    /// Store metadata for the credit packs.
+    func loadCreditProducts(ids: [String]) async throws -> [CreditProductInfo]
+
+    /// Buys a consumable. `deliver` runs *before* the transaction is finished:
+    /// finishing first would lose the credits on a crash, and the App Store does
+    /// not restore consumables.
+    func purchaseConsumable(
+        _ id: String, deliver: @Sendable @escaping (String) async -> Void
+    ) async throws -> PurchaseOutcome
 
     /// Everything the user currently owns, ignoring revoked transactions.
     func entitledProductIDs() async -> Set<String>
@@ -35,9 +67,13 @@ public protocol PurchaseGateway: Sendable {
     /// Restores purchases made on another device or after a reinstall.
     func sync() async throws
 
-    /// Fires whenever the store changes something behind the app's back —
-    /// a renewal, a cancellation, a refund, a Family Sharing change.
-    func transactionUpdates() -> AsyncStream<Void>
+    /// Fires whenever the store changes something behind the app's back — a
+    /// renewal, a cancellation, a refund, a Family Sharing change, or a
+    /// consumable approved elsewhere. Consumables are handed to `deliver` before
+    /// they are finished, for the same reason as `purchaseConsumable`.
+    func transactionUpdates(
+        deliver: @Sendable @escaping (String) async -> Void
+    ) -> AsyncStream<Void>
 }
 
 public enum PurchaseGatewayError: LocalizedError {
@@ -70,7 +106,7 @@ public struct StoreKitPurchaseGateway: PurchaseGateway {
                 displayName: storeProduct.displayName,
                 displayPrice: storeProduct.displayPrice,
                 price: storeProduct.price,
-                currencyCode: storeProduct.priceFormatStyle.currencyCode,
+                priceFormatStyle: storeProduct.priceFormatStyle,
                 introductoryOfferDays: Self.freeTrialDays(of: storeProduct)
             )
         }
@@ -88,6 +124,45 @@ public struct StoreKitPurchaseGateway: PurchaseGateway {
             }
             // Finishing tells the App Store the app has delivered the goods;
             // an unfinished transaction is re-delivered on every launch.
+            await transaction.finish()
+            return .success
+        case .userCancelled:
+            return .userCancelled
+        case .pending:
+            return .pending
+        @unknown default:
+            return .pending
+        }
+    }
+
+    public func loadCreditProducts(ids: [String]) async throws -> [CreditProductInfo] {
+        try await Product.products(for: ids).compactMap { storeProduct in
+            guard let product = CreditProduct(id: storeProduct.id) else { return nil }
+            return CreditProductInfo(
+                product: product,
+                displayName: storeProduct.displayName,
+                displayPrice: storeProduct.displayPrice,
+                price: storeProduct.price,
+                priceFormatStyle: storeProduct.priceFormatStyle
+            )
+        }
+    }
+
+    public func purchaseConsumable(
+        _ id: String, deliver: @Sendable @escaping (String) async -> Void
+    ) async throws -> PurchaseOutcome {
+        guard let product = try await Product.products(for: [id]).first else {
+            throw PurchaseGatewayError.productUnavailable
+        }
+
+        switch try await product.purchase() {
+        case .success(let verification):
+            guard case .verified(let transaction) = verification else {
+                throw PurchaseGatewayError.unverifiedTransaction
+            }
+            // Deliver, then finish. An unfinished transaction is re-delivered on
+            // the next launch, so a crash here costs the user nothing.
+            await deliver(transaction.productID)
             await transaction.finish()
             return .success
         case .userCancelled:
@@ -121,11 +196,14 @@ public struct StoreKitPurchaseGateway: PurchaseGateway {
         try await AppStore.sync()
     }
 
-    public func transactionUpdates() -> AsyncStream<Void> {
+    public func transactionUpdates(
+        deliver: @Sendable @escaping (String) async -> Void
+    ) -> AsyncStream<Void> {
         AsyncStream { continuation in
             let task = Task {
                 for await result in Transaction.updates {
                     if case .verified(let transaction) = result {
+                        await deliver(transaction.productID)
                         await transaction.finish()
                     }
                     continuation.yield()

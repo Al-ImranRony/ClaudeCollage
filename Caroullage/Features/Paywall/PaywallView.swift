@@ -27,11 +27,10 @@ struct PaywallView: View {
     @State private var heroIndex = 0
 
     private static let features = [
-        ("square.grid.3x3.fill", "200+ templates, every carousel type"),
-        ("hexagon.fill", "All polygon shapes and custom bezier"),
-        ("4k.tv.fill", "4K video export, no watermark"),
-        ("wand.and.stars", "Generative AI backgrounds"),
-        ("icloud.fill", "Unlimited saves and iCloud sync"),
+        ("square.grid.3x3.fill", "200+ templates"),
+        ("hexagon.fill", "Every shape"),
+        ("4k.tv.fill", "4K, no watermark"),
+        ("wand.and.stars", "AI backgrounds"),
     ]
 
     var body: some View {
@@ -39,16 +38,17 @@ struct PaywallView: View {
             Color.themeBackground.ignoresSafeArea()
 
             ScrollView {
-                VStack(spacing: Theme.Spacing.xl) {
+                VStack(spacing: Theme.Spacing.lg) {
                     hero
                     headline
                     featureList
                     planPicker
                     commitSection
+                    creditSection
                     footer
                 }
                 .padding(.horizontal, Theme.Spacing.xl)
-                .padding(.top, Theme.Spacing.xxl)
+                .padding(.top, Theme.Spacing.xl)
                 .padding(.bottom, Theme.Spacing.xxl)
             }
 
@@ -79,31 +79,49 @@ struct PaywallView: View {
     // MARK: - Hero
 
     private var hero: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: Theme.Radius.xl, style: .continuous)
-                .fill(
-                    LinearGradient(
-                        colors: [.themeAccent, .themeAccentStrong],
-                        startPoint: .topLeading, endPoint: .bottomTrailing
-                    )
-                )
-
-            Image(systemName: PaywallView.heroSymbols[heroIndex])
-                .font(.system(size: 56, weight: .semibold))
-                .foregroundStyle(Color.themeTextOnAccent)
-                .transition(.opacity)
-                .id(heroIndex)
+        TabView(selection: $heroIndex) {
+            ForEach(Array(Self.heroCards.enumerated()), id: \.offset) { index, card in
+                ZStack {
+                    RoundedRectangle(cornerRadius: Theme.Radius.xl, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [.themeAccent, .themeAccentStrong],
+                                startPoint: .topLeading, endPoint: .bottomTrailing
+                            )
+                        )
+                    VStack(spacing: Theme.Spacing.xs) {
+                        Image(systemName: card.symbol)
+                            .font(.system(size: 46, weight: .semibold))
+                        Text(card.caption)
+                            .font(.themeCallout)
+                    }
+                    .foregroundStyle(Color.themeTextOnAccent)
+                }
+                .padding(.horizontal, 2)
+                .tag(index)
+            }
         }
-        .frame(height: 168)
-        .accessibilityHidden(true)
-        .onReceive(Timer.publish(every: 1.5, on: .main, in: .common).autoconnect()) { _ in
+        .tabViewStyle(.page(indexDisplayMode: .always))
+        .indexViewStyle(.page(backgroundDisplayMode: .always))
+        .frame(height: 176)
+        .accessibilityIdentifier("paywallHero")
+        // Swipeable either way; it advances on its own only when the user has
+        // not asked the system to calm down.
+        .onReceive(Timer.publish(every: 2.4, on: .main, in: .common).autoconnect()) { _ in
+            guard !Theme.Motion.isReduced else { return }
             withAnimation(.easeInOut(duration: Theme.Motion.duration(Theme.Motion.standard))) {
-                heroIndex = (heroIndex + 1) % PaywallView.heroSymbols.count
+                heroIndex = (heroIndex + 1) % Self.heroCards.count
             }
         }
     }
 
-    private static let heroSymbols = ["rectangle.stack.fill", "square.grid.3x3.fill", "wand.and.stars"]
+    private struct HeroCard { let symbol: String; let caption: String }
+
+    private static let heroCards = [
+        HeroCard(symbol: "rectangle.stack.fill", caption: "Carousels that swipe"),
+        HeroCard(symbol: "square.grid.3x3.fill", caption: "Every layout, unlocked"),
+        HeroCard(symbol: "wand.and.stars", caption: "AI that does the fiddly bits"),
+    ]
 
     // MARK: - Copy
 
@@ -121,17 +139,21 @@ struct PaywallView: View {
     }
 
     private var featureList: some View {
-        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+        LazyVGrid(
+            columns: [GridItem(.flexible(), alignment: .leading), GridItem(.flexible(), alignment: .leading)],
+            alignment: .leading, spacing: Theme.Spacing.xs
+        ) {
             ForEach(Self.features, id: \.1) { symbol, text in
-                HStack(spacing: Theme.Spacing.sm) {
+                HStack(spacing: 6) {
                     Image(systemName: symbol)
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(Color.themeAccentStrong)
-                        .frame(width: 26)
+                        .frame(width: 20)
                     Text(text)
-                        .font(.themeBody)
+                        .font(.themeSubheadline)
                         .foregroundStyle(Color.themeTextPrimary)
-                    Spacer(minLength: 0)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
                 }
             }
         }
@@ -216,6 +238,7 @@ struct PaywallView: View {
                     .stroke(isSelected ? Color.themeAccentStrong : Color.themeSeparator,
                             lineWidth: isSelected ? 2 : 1)
             )
+            .scaleEffect(isSelected && !Theme.Motion.isReduced ? 1.02 : 1)
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("paywallPlan.\(plan.product.rawValue)")
@@ -279,6 +302,68 @@ struct PaywallView: View {
                     .accessibilityIdentifier("paywallRestoreMessage")
             }
         }
+    }
+
+    // MARK: - Credits
+
+    @ViewBuilder
+    private var creditSection: some View {
+        if !model.creditPacks.isEmpty {
+            VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+                HStack {
+                    Text("Just need this one?")
+                        .font(.themeHeadline)
+                        .foregroundStyle(Color.themeTextPrimary)
+                    Spacer(minLength: 0)
+                    if model.creditBalance > 0 {
+                        Text("\(model.creditBalance) left")
+                            .font(.themeCaption)
+                            .foregroundStyle(Color.themeAccentStrong)
+                            .accessibilityIdentifier("paywallCreditBalance")
+                    }
+                }
+
+                Text(model.creditExplanation)
+                    .font(.themeCaption)
+                    .foregroundStyle(Color.themeTextSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                HStack(spacing: Theme.Spacing.xs) {
+                    ForEach(model.creditPacks) { pack in
+                        creditChip(pack)
+                    }
+                }
+            }
+            .padding(Theme.Spacing.md)
+            .background(Color.themeSurface, in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
+        }
+    }
+
+    private func creditChip(_ pack: PaywallViewModel.CreditPack) -> some View {
+        Button(action: {
+            Task {
+                Haptics.tap()
+                if await model.purchaseCredits(pack.product) { Haptics.success() }
+            }
+        }) {
+            VStack(spacing: 2) {
+                Text(pack.title)
+                    .font(.themeCaption)
+                    .foregroundStyle(Color.themeTextSecondary)
+                Text(pack.displayPrice)
+                    .font(.themeHeadline)
+                    .foregroundStyle(Color.themeTextPrimary)
+                Text(pack.unitPriceText ?? " ")
+                    .font(.system(size: 10))
+                    .foregroundStyle(Color.themeAccentStrong)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, Theme.Spacing.xs)
+            .background(Color.themeControlFill, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .disabled(model.isPurchasing)
+        .accessibilityIdentifier("paywallCreditPack.\(pack.product.rawValue)")
     }
 
     // MARK: - Footer

@@ -29,6 +29,9 @@ public enum PremiumProduct: String, CaseIterable, Sendable, Equatable {
     case monthly
     case weekly
     case lifetime
+    /// The same year of Premium at the special-offer price, shown once to
+    /// someone who closed the paywall without buying. Never in the plan picker.
+    case yearlyOffer = "yearly.offer"
 
     private static let idPrefix = "net.pixeltouch.caroullage.premium."
 
@@ -43,6 +46,10 @@ public enum PremiumProduct: String, CaseIterable, Sendable, Equatable {
     /// second, the worst-value option third, and the one-off purchase last.
     public static let displayOrdered: [PremiumProduct] = [.yearly, .monthly, .weekly, .lifetime]
 
+    /// Everything the store should be asked about, including the offer product
+    /// the plan picker never shows.
+    public static let purchasable: [PremiumProduct] = displayOrdered + [.yearlyOffer]
+
     /// Whether the product renews. Lifetime does not.
     public var isSubscription: Bool { self != .lifetime }
 }
@@ -55,9 +62,10 @@ public struct PremiumProductInfo: Sendable, Equatable, Identifiable {
     /// The store's localized price string, e.g. "$24.99".
     public let displayPrice: String
     public let price: Decimal
-    /// The store's currency for `price`, e.g. "USD" — needed to render a
-    /// derived figure (the per-month equivalent) in the same currency.
-    public let currencyCode: String
+    /// The store's own price format — currency *and* storefront locale. Derived
+    /// figures (the per-month equivalent) are formatted with it so they read
+    /// like the price beside them, whatever locale the device is in.
+    public let priceFormatStyle: Decimal.FormatStyle.Currency
     /// Length of the introductory free trial, if the store offers one.
     public let introductoryOfferDays: Int?
 
@@ -68,14 +76,14 @@ public struct PremiumProductInfo: Sendable, Equatable, Identifiable {
         displayName: String,
         displayPrice: String,
         price: Decimal,
-        currencyCode: String,
+        priceFormatStyle: Decimal.FormatStyle.Currency,
         introductoryOfferDays: Int? = nil
     ) {
         self.product = product
         self.displayName = displayName
         self.displayPrice = displayPrice
         self.price = price
-        self.currencyCode = currencyCode
+        self.priceFormatStyle = priceFormatStyle
         self.introductoryOfferDays = introductoryOfferDays
     }
 }
