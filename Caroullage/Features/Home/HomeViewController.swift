@@ -216,13 +216,18 @@ final class HomeViewController: UIViewController {
         view.addSubview(scrollView)
 
         NSLayoutConstraint.activate([
-            scrollView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            // Under the nav bar, not below it. Pinned to the safe area the large
+            // title became a fixed 96pt block that never collapsed — which is why
+            // every one of these screens started a third of the way down.
+            scrollView.topAnchor.constraint(equalTo: view.topAnchor),
             scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
 
+            // Tight to the title, the way a system list is: the large title's own
+            // block already carries the breathing room.
             contentStack.topAnchor.constraint(
-                equalTo: scrollView.contentLayoutGuide.topAnchor, constant: Theme.Spacing.md),
+                equalTo: scrollView.contentLayoutGuide.topAnchor, constant: Theme.Spacing.xs),
             contentStack.bottomAnchor.constraint(
                 equalTo: scrollView.contentLayoutGuide.bottomAnchor, constant: -Theme.Spacing.xxl),
             contentStack.leadingAnchor.constraint(equalTo: scrollView.frameLayoutGuide.leadingAnchor),

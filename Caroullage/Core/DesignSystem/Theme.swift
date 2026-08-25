@@ -187,6 +187,10 @@ public enum Theme {
         public static var callout: UIFont { rounded(16, .medium, .callout) }
         public static var subheadline: UIFont { rounded(15, .medium, .subheadline) }
         public static var caption: UIFont { rounded(13, .medium, .caption1) }
+
+        /// Tab bar labels. Smaller and tighter than `caption`, because four of
+        /// them plus their icons have to fit a phone's width without truncating.
+        public static var tabLabel: UIFont { rounded(10, .semibold, .caption2) }
         public static var button: UIFont { rounded(17, .semibold, .headline) }
 
         /// A rounded system font at exactly `size`, with no Dynamic Type scaling.

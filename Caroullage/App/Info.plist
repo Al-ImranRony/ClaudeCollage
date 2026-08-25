@@ -22,6 +22,8 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Caroullage uses the camera when you shoot a photo for a collage.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Caroullage uses the microphone when recording video for your collage.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>

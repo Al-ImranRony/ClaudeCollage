@@ -29,8 +29,18 @@ final class ImageFilterProcessor: @unchecked Sendable {
     func apply(_ filters: CellFilters, to source: CGImage) -> CGImage {
         guard filters != CellFilters() else { return source }
 
-        var ciImage = CIImage(cgImage: source)
+        let ciImage = CIImage(cgImage: source)
         let extent = ciImage.extent
+        let filtered = applyToCIImage(filters, ciImage)
+        return context.createCGImage(filtered, from: extent) ?? source
+    }
+
+    /// The same chain without the CGImage round trip, for the camera's live
+    /// preview: a frame arrives as a `CIImage` and is drawn straight back out.
+    func applyToCIImage(_ filters: CellFilters, _ source: CIImage) -> CIImage {
+        guard filters != CellFilters() else { return source }
+
+        var ciImage = source
 
         let colorControls = CIFilter.colorControls()
         colorControls.inputImage = ciImage
@@ -54,6 +64,6 @@ final class ImageFilterProcessor: @unchecked Sendable {
             ciImage = sharpen.outputImage ?? ciImage
         }
 
-        return context.createCGImage(ciImage, from: extent) ?? source
+        return ciImage
     }
 }

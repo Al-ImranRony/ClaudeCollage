@@ -43,7 +43,9 @@ final class CarouselStartViewController: UIViewController {
         host.view.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(host.view)
         NSLayoutConstraint.activate([
-            host.view.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            // The hosted scroll view needs to reach under the nav bar for the
+            // large title to collapse; SwiftUI reads the safe area for its inset.
+            host.view.topAnchor.constraint(equalTo: view.topAnchor),
             host.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             host.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             host.view.bottomAnchor.constraint(equalTo: view.bottomAnchor),

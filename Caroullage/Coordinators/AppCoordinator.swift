@@ -201,10 +201,10 @@ final class AppCoordinator {
         }
     }
 
-    private func tabItem(_ title: String, _ symbol: String, _ identifier: String) -> UITabBarItem {
-        let item = UITabBarItem(title: title, image: UIImage(systemName: symbol), tag: 0)
-        item.accessibilityIdentifier = identifier
-        return item
+    private func tabItem(
+        _ title: String, _ symbol: String, _ identifier: String
+    ) -> FloatingTabBarView.Item {
+        FloatingTabBarView.Item(title: title, symbol: symbol, identifier: identifier)
     }
 
     // MARK: - Navigation helpers
@@ -227,11 +227,28 @@ final class AppCoordinator {
     /// start editing, then swap layout from the editor's own Layout/Shape pickers.
     private func presentStartEditingSheet() {
         let sheet = StartEditingSheetViewController(
+            onCamera: { [weak self] in self?.presentCamera() },
             onImage: { [weak self] in self?.pickPhotosForNewCollage() },
             onVideo: { [weak self] in self?.startVideoCollage() },
             onCustomCanvas: { [weak self] in self?.promptForCustomCanvas() }
         )
         tabBarController.present(sheet, animated: true)
+    }
+
+    /// Shoot a photo and go straight into a collage with it — the same landing
+    /// as picking one from the library, so the two entries converge immediately.
+    private func presentCamera() {
+        let camera = CameraCaptureViewController()
+        camera.modalPresentationStyle = .fullScreen
+        camera.onCapture = { [weak self] image in
+            self?.startGridProject(with: [image])
+        }
+        // No camera on this device: the screen offers the library instead of
+        // dead-ending, and that choice lands back in the normal photo flow.
+        camera.onChooseFromLibrary = { [weak self] in
+            self?.pickPhotosForNewCollage()
+        }
+        tabBarController.present(camera, animated: true)
     }
 
     /// Photos-first entry: pick up to nine images, then open a grid sized to fit

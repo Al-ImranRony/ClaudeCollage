@@ -80,6 +80,7 @@ targets:
         NSPhotoLibraryUsageDescription: "Caroullage needs access to your photos to create collages."
         NSPhotoLibraryAddUsageDescription: "Caroullage saves your finished collages to your photo library."
         NSMicrophoneUsageDescription: "Caroullage uses the microphone when recording video for your collage."
+        NSCameraUsageDescription: "Caroullage uses the camera when you shoot a photo for a collage."
         NSSupportsLiveActivities: true
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false

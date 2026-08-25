@@ -53,6 +53,10 @@ final class LocalizationTests: XCTestCase {
         XCTAssertFalse(entries.isEmpty)
 
         for (key, entry) in entries {
+            // Format tokens and product names carry `shouldTranslate: false` —
+            // a recorded decision, not an unfinished string.
+            guard entry["shouldTranslate"] as? Bool != false else { continue }
+
             for language in Self.shipping {
                 let translation = value(entry, language: language)
                 XCTAssertNotNil(translation, "\(language) is missing for \"\(key)\"")
@@ -69,6 +73,7 @@ final class LocalizationTests: XCTestCase {
 
         XCTAssertFalse(entries.isEmpty, "the widget extension cannot read the app's catalog")
         for (key, entry) in entries {
+            guard entry["shouldTranslate"] as? Bool != false else { continue }
             for language in Self.shipping {
                 XCTAssertNotNil(value(entry, language: language), "\(language) is missing for \"\(key)\"")
             }

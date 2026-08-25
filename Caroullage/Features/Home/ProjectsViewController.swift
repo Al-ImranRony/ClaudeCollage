@@ -70,6 +70,10 @@ final class ProjectsViewController: UIViewController {
         view.addSubview(sortControl)
         view.addSubview(collectionView)
         view.addSubview(emptyStateView)
+        // Same as the gallery: the grid is full-height and must sit behind the
+        // sort control it scrolls under.
+        view.sendSubviewToBack(collectionView)
+
         NSLayoutConstraint.activate([
             sortControl.topAnchor.constraint(
                 equalTo: view.safeAreaLayoutGuide.topAnchor, constant: Theme.Spacing.xs),
@@ -78,8 +82,10 @@ final class ProjectsViewController: UIViewController {
             sortControl.trailingAnchor.constraint(
                 equalTo: view.trailingAnchor, constant: -Theme.Spacing.md),
 
-            collectionView.topAnchor.constraint(
-                equalTo: sortControl.bottomAnchor, constant: Theme.Spacing.xs),
+            // The grid runs the full height so the large title collapses as it
+            // scrolls; `contentInset` (set in viewDidLayoutSubviews) keeps the
+            // first row clear of the pinned sort control.
+            collectionView.topAnchor.constraint(equalTo: view.topAnchor),
             collectionView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             collectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             collectionView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
@@ -89,6 +95,18 @@ final class ProjectsViewController: UIViewController {
             emptyStateView.leadingAnchor.constraint(greaterThanOrEqualTo: view.leadingAnchor, constant: 32),
             emptyStateView.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -32),
         ])
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        // The grid sits under the pinned sort control, so its first row has to
+        // start below it. Measured rather than hard-coded: the control grows with
+        // Dynamic Type.
+        let inset = sortControl.frame.maxY - view.safeAreaInsets.top + Theme.Spacing.xs
+        if abs(collectionView.contentInset.top - inset) > 0.5 {
+            collectionView.contentInset.top = inset
+            collectionView.verticalScrollIndicatorInsets.top = inset
+        }
     }
 
     override func viewWillAppear(_ animated: Bool) {

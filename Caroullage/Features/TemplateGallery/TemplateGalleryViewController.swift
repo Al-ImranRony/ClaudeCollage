@@ -46,6 +46,16 @@ final class TemplateGalleryViewController: UIViewController {
 
     // MARK: - Lifecycle
 
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        // Clears the pinned preset control and category chips above the grid.
+        let inset = chipsView.frame.maxY - view.safeAreaInsets.top + Theme.Spacing.xs
+        if abs(gridView.contentInset.top - inset) > 0.5 {
+            gridView.contentInset.top = inset
+            gridView.verticalScrollIndicatorInsets.top = inset
+        }
+    }
+
     override func viewDidLoad() {
         super.viewDidLoad()
         // `navigationItem.title`, NOT `title`: the latter also rewrites this
@@ -73,6 +83,9 @@ final class TemplateGalleryViewController: UIViewController {
             subview.translatesAutoresizingMaskIntoConstraints = false
             view.addSubview(subview)
         }
+        // The grid runs under the pinned controls now, so it belongs behind them.
+        view.sendSubviewToBack(gridView)
+
         NSLayoutConstraint.activate([
             presetControl.topAnchor.constraint(
                 equalTo: view.safeAreaLayoutGuide.topAnchor, constant: Theme.Spacing.sm),
@@ -86,7 +99,9 @@ final class TemplateGalleryViewController: UIViewController {
             chipsView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             chipsView.heightAnchor.constraint(equalToConstant: 48),
 
-            gridView.topAnchor.constraint(equalTo: chipsView.bottomAnchor),
+            // Same as Projects: the grid scrolls under the nav bar so the large
+            // title collapses, and the pinned controls sit on top of it.
+            gridView.topAnchor.constraint(equalTo: view.topAnchor),
             gridView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             gridView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             gridView.bottomAnchor.constraint(equalTo: view.bottomAnchor),

@@ -24,15 +24,18 @@ import UIKit
 @MainActor
 final class StartEditingSheetViewController: UIViewController {
 
+    private let onCamera: () -> Void
     private let onImage: () -> Void
     private let onVideo: () -> Void
     private let onCustomCanvas: () -> Void
 
     init(
+        onCamera: @escaping () -> Void,
         onImage: @escaping () -> Void,
         onVideo: @escaping () -> Void,
         onCustomCanvas: @escaping () -> Void
     ) {
+        self.onCamera = onCamera
         self.onImage = onImage
         self.onVideo = onVideo
         self.onCustomCanvas = onCustomCanvas
@@ -54,7 +57,7 @@ final class StartEditingSheetViewController: UIViewController {
 
     /// Title + three rows + margins. Kept as a constant because the detent has to
     /// be known before the view exists.
-    private static let contentHeight: CGFloat = 336
+    private static let contentHeight: CGFloat = 420
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -68,6 +71,12 @@ final class StartEditingSheetViewController: UIViewController {
         title.adjustsFontForContentSizeCategory = true
 
         let rows = [
+            // Camera first: it is the only row that makes something that does not
+            // exist yet, and it is the reason to open the app in the moment.
+            QuickStartTile(
+                title: "Camera", subtitle: "Shoot one now, with a filter",
+                symbol: "camera.fill", identifier: "startEditingCamera"
+            ) { [weak self] in self?.finish(self?.onCamera) },
             QuickStartTile(
                 title: "Image", subtitle: "Pick photos, we'll fit a layout",
                 symbol: "photo.on.rectangle.angled", identifier: "startEditingImage"

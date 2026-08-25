@@ -1,9 +1,164 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "Caroullage": {
+      "shouldTranslate": false
+    },
+    "Make one to see it here": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Make one to see it here"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Crea uno y aparecerá aquí"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Créez-en un pour le voir ici"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Erstelle eine, dann steht sie hier"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Crie uma para vê-la aqui"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "作るとここに表示されます"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "하나 만들면 여기에 표시됩니다"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "创建一个就会显示在这里"
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "एक बनाएँ, यहाँ दिखेगा"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Creane uno e lo vedrai qui"
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "أنشئ واحدًا ليظهر هنا"
+          }
+        }
+      }
+    },
+    "No collages yet": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No collages yet"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aún no hay collages"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pas encore de collages"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Noch keine Collagen"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nenhuma colagem ainda"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "コラージュはまだありません"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "아직 콜라주가 없어요"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "还没有拼贴"
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "अभी कोई कोलाज नहीं"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ancora nessun collage"
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "لا توجد مجمّعات بعد"
+          }
+        }
+      }
+    },
     "Recent Collages": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "أحدث المجمّعات"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Neueste Collagen"
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -22,16 +177,16 @@
             "value": "Collages récents"
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Neueste Collagen"
+            "value": "हाल के कोलाज"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Colagens recentes"
+            "value": "Collage recenti"
           }
         },
         "ja": {
@@ -46,28 +201,16 @@
             "value": "최근 콜라주"
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Colagens recentes"
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "最近的拼贴"
-          }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "हाल के कोलाज"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Collage recenti"
-          }
-        },
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "أحدث المجمّعات"
           }
         }
       }
@@ -75,6 +218,18 @@
     "Your latest collages, one tap away.": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "أحدث مجمّعاتك على بُعد نقرة."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deine neuesten Collagen, einen Tipp entfernt."
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -93,16 +248,16 @@
             "value": "Vos derniers collages, à un toucher."
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Deine neuesten Collagen, einen Tipp entfernt."
+            "value": "आपके नए कोलाज, एक टैप दूर।"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Suas colagens mais recentes, a um toque."
+            "value": "I tuoi ultimi collage, a un tocco."
           }
         },
         "ja": {
@@ -117,28 +272,16 @@
             "value": "최근 만든 콜라주를 한 번의 탭으로."
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Suas colagens mais recentes, a um toque."
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "轻点一下，打开最近的拼贴。"
-          }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "आपके नए कोलाज, एक टैप दूर।"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "I tuoi ultimi collage, a un tocco."
-          }
-        },
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "أحدث مجمّعاتك على بُعد نقرة."
           }
         }
       }

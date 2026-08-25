@@ -4,6 +4,18 @@
     "%@ / month": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ / شهر"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ / Monat"
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -22,16 +34,16 @@
             "value": "%@ / mois"
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@ / Monat"
+            "value": "%@ / माह"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@ / mês"
+            "value": "%@ / mese"
           }
         },
         "ja": {
@@ -46,28 +58,16 @@
             "value": "%@ / 월"
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ / mês"
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "%@ / 月"
-          }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ / माह"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ / mese"
-          }
-        },
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ / شهر"
           }
         }
       }
@@ -75,6 +75,18 @@
     "%@ / week": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ / أسبوع"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ / Woche"
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -93,16 +105,16 @@
             "value": "%@ / semaine"
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@ / Woche"
+            "value": "%@ / सप्ताह"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@ / semana"
+            "value": "%@ / settimana"
           }
         },
         "ja": {
@@ -117,28 +129,16 @@
             "value": "%@ / 주"
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ / semana"
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "%@ / 周"
-          }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ / सप्ताह"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ / settimana"
-          }
-        },
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ / أسبوع"
           }
         }
       }
@@ -146,6 +146,18 @@
     "%@ / year": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ / سنة"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ / Jahr"
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -164,16 +176,16 @@
             "value": "%@ / an"
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@ / Jahr"
+            "value": "%@ / वर्ष"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@ / ano"
+            "value": "%@ / anno"
           }
         },
         "ja": {
@@ -188,28 +200,16 @@
             "value": "%@ / 년"
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ / ano"
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "%@ / 年"
-          }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ / वर्ष"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ / anno"
-          }
-        },
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ / سنة"
           }
         }
       }
@@ -217,6 +217,18 @@
     "%@ each": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ لكل واحدة"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ pro Stück"
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -235,16 +247,16 @@
             "value": "%@ l'unité"
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@ pro Stück"
+            "value": "%@ प्रति"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@ cada"
+            "value": "%@ ciascuna"
           }
         },
         "ja": {
@@ -259,28 +271,156 @@
             "value": "개당 %@"
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ cada"
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "每次 %@"
           }
+        }
+      }
+    },
+    "%@ left": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ left"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quedan %@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ restants"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "noch %@"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ restantes"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "残り%@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@개 남음"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "剩余 %@"
+          }
         },
         "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@ प्रति"
+            "value": "%@ शेष"
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@ ciascuna"
+            "value": "%@ rimasti"
           }
         },
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@ لكل واحدة"
+            "value": "بقي %@"
+          }
+        }
+      }
+    },
+    "%@ left · full resolution, 4K & HEVC, no watermark": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ left · full resolution, 4K & HEVC, no watermark"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quedan %@ · resolución completa, 4K y HEVC, sin marca de agua"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ restants · pleine résolution, 4K et HEVC, sans filigrane"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "noch %@ · volle Auflösung, 4K und HEVC, ohne Wasserzeichen"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ restantes · resolução total, 4K e HEVC, sem marca d'água"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "残り%@・フル解像度、4K と HEVC、透かしなし"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@개 남음 · 최대 해상도, 4K 및 HEVC, 워터마크 없음"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "剩余 %@ · 全分辨率、4K 与 HEVC、无水印"
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ शेष · पूर्ण रिज़ॉल्यूशन, 4K और HEVC, बिना वॉटरमार्क"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ rimasti · risoluzione piena, 4K e HEVC, senza filigrana"
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "بقي %@ · دقة كاملة، 4K و HEVC، بلا علامة مائية"
           }
         }
       }
@@ -288,6 +428,18 @@
     "%@ once": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ مرة واحدة"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ einmalig"
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -306,16 +458,16 @@
             "value": "%@ une fois"
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@ einmalig"
+            "value": "%@ एक बार"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@ uma vez"
+            "value": "%@ una tantum"
           }
         },
         "ja": {
@@ -330,28 +482,16 @@
             "value": "%@ 1회"
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ uma vez"
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "%@ 一次性"
-          }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ एक बार"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ una tantum"
-          }
-        },
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ مرة واحدة"
           }
         }
       }
@@ -359,6 +499,18 @@
     "%@ once. Not a subscription — pay once and keep Caroullage Premium forever.": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ مرة واحدة. ليس اشتراكًا — ادفع مرة واحدة واحتفظ بـ Caroullage Premium للأبد."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ einmalig. Kein Abo – einmal zahlen und Caroullage Premium für immer behalten."
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -377,16 +529,16 @@
             "value": "%@ une fois. Ce n'est pas un abonnement : payez une fois et gardez Caroullage Premium à vie."
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@ einmalig. Kein Abo – einmal zahlen und Caroullage Premium für immer behalten."
+            "value": "%@ एक बार। यह सब्सक्रिप्शन नहीं है — एक बार भुगतान करें और Caroullage Premium हमेशा के लिए रखें।"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@ uma vez. Não é assinatura: pague uma vez e fique com o Caroullage Premium para sempre."
+            "value": "%@ una tantum. Non è un abbonamento: paghi una volta e Caroullage Premium è tuo per sempre."
           }
         },
         "ja": {
@@ -401,28 +553,16 @@
             "value": "%@ 1회 결제. 구독이 아니며, 한 번 결제하면 Caroullage 프리미엄을 계속 사용할 수 있습니다."
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ uma vez. Não é assinatura: pague uma vez e fique com o Caroullage Premium para sempre."
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "一次性 %@。不是订阅：付一次，Caroullage Premium 永久归你。"
-          }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ एक बार। यह सब्सक्रिप्शन नहीं है — एक बार भुगतान करें और Caroullage Premium हमेशा के लिए रखें।"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ una tantum. Non è un abbonamento: paghi una volta e Caroullage Premium è tuo per sempre."
-          }
-        },
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ مرة واحدة. ليس اشتراكًا — ادفع مرة واحدة واحتفظ بـ Caroullage Premium للأبد."
           }
         }
       }
@@ -430,6 +570,18 @@
     "%@ per month. Renews automatically until cancelled. Cancel anytime in Settings.": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ شهريًا. يتجدّد تلقائيًا حتى تلغيه. يمكنك الإلغاء في أي وقت من الإعدادات."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ pro Monat. Verlängert sich automatisch bis zur Kündigung. Jederzeit in den Einstellungen kündbar."
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -448,16 +600,16 @@
             "value": "%@ par mois. Renouvellement automatique jusqu'à annulation. Annulez quand vous voulez dans Réglages."
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@ pro Monat. Verlängert sich automatisch bis zur Kündigung. Jederzeit in den Einstellungen kündbar."
+            "value": "%@ प्रति माह। रद्द करने तक अपने आप नवीनीकृत होता है। सेटिंग में कभी भी रद्द करें।"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@ por mês. Renova automaticamente até você cancelar. Cancele quando quiser em Ajustes."
+            "value": "%@ al mese. Si rinnova automaticamente fino alla disdetta. Disdici quando vuoi in Impostazioni."
           }
         },
         "ja": {
@@ -472,28 +624,16 @@
             "value": "월 %@. 해지할 때까지 자동 갱신됩니다. 설정에서 언제든 해지할 수 있습니다."
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ por mês. Renova automaticamente até você cancelar. Cancele quando quiser em Ajustes."
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "每月 %@。在取消前将自动续订。可随时在“设置”中取消。"
-          }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ प्रति माह। रद्द करने तक अपने आप नवीनीकृत होता है। सेटिंग में कभी भी रद्द करें।"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ al mese. Si rinnova automaticamente fino alla disdetta. Disdici quando vuoi in Impostazioni."
-          }
-        },
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ شهريًا. يتجدّد تلقائيًا حتى تلغيه. يمكنك الإلغاء في أي وقت من الإعدادات."
           }
         }
       }
@@ -501,6 +641,18 @@
     "%@ per week. Renews automatically until cancelled. Cancel anytime in Settings.": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ أسبوعيًا. يتجدّد تلقائيًا حتى تلغيه. يمكنك الإلغاء في أي وقت من الإعدادات."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ pro Woche. Verlängert sich automatisch bis zur Kündigung. Jederzeit in den Einstellungen kündbar."
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -519,16 +671,16 @@
             "value": "%@ par semaine. Renouvellement automatique jusqu'à annulation. Annulez quand vous voulez dans Réglages."
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@ pro Woche. Verlängert sich automatisch bis zur Kündigung. Jederzeit in den Einstellungen kündbar."
+            "value": "%@ प्रति सप्ताह। रद्द करने तक अपने आप नवीनीकृत होता है। सेटिंग में कभी भी रद्द करें।"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@ por semana. Renova automaticamente até você cancelar. Cancele quando quiser em Ajustes."
+            "value": "%@ a settimana. Si rinnova automaticamente fino alla disdetta. Disdici quando vuoi in Impostazioni."
           }
         },
         "ja": {
@@ -543,28 +695,16 @@
             "value": "주 %@. 해지할 때까지 자동 갱신됩니다. 설정에서 언제든 해지할 수 있습니다."
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ por semana. Renova automaticamente até você cancelar. Cancele quando quiser em Ajustes."
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "每周 %@。在取消前将自动续订。可随时在“设置”中取消。"
-          }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ प्रति सप्ताह। रद्द करने तक अपने आप नवीनीकृत होता है। सेटिंग में कभी भी रद्द करें।"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ a settimana. Si rinnova automaticamente fino alla disdetta. Disdici quando vuoi in Impostazioni."
-          }
-        },
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ أسبوعيًا. يتجدّد تلقائيًا حتى تلغيه. يمكنك الإلغاء في أي وقت من الإعدادات."
           }
         }
       }
@@ -572,6 +712,18 @@
     "%@ per year. Renews automatically until cancelled. Cancel anytime in Settings.": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ سنويًا. يتجدّد تلقائيًا حتى تلغيه. يمكنك الإلغاء في أي وقت من الإعدادات."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ pro Jahr. Verlängert sich automatisch bis zur Kündigung. Jederzeit in den Einstellungen kündbar."
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -590,16 +742,16 @@
             "value": "%@ par an. Renouvellement automatique jusqu'à annulation. Annulez quand vous voulez dans Réglages."
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@ pro Jahr. Verlängert sich automatisch bis zur Kündigung. Jederzeit in den Einstellungen kündbar."
+            "value": "%@ प्रति वर्ष। रद्द करने तक अपने आप नवीनीकृत होता है। सेटिंग में कभी भी रद्द करें।"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@ por ano. Renova automaticamente até você cancelar. Cancele quando quiser em Ajustes."
+            "value": "%@ all'anno. Si rinnova automaticamente fino alla disdetta. Disdici quando vuoi in Impostazioni."
           }
         },
         "ja": {
@@ -614,35 +766,46 @@
             "value": "연 %@. 해지할 때까지 자동 갱신됩니다. 설정에서 언제든 해지할 수 있습니다."
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ por ano. Renova automaticamente até você cancelar. Cancele quando quiser em Ajustes."
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "每年 %@。在取消前将自动续订。可随时在“设置”中取消。"
           }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ प्रति वर्ष। रद्द करने तक अपने आप नवीनीकृत होता है। सेटिंग में कभी भी रद्द करें।"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ all'anno. Si rinnova automaticamente fino alla disdetta. Disdici quando vuoi in Impostazioni."
-          }
-        },
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ سنويًا. يتجدّد تلقائيًا حتى تلغيه. يمكنك الإلغاء في أي وقت من الإعدادات."
-          }
         }
       }
+    },
+    "%@%@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "%1$@%2$@"
+          }
+        }
+      },
+      "shouldTranslate": false
     },
     "%lld days free, then %@ per year. Renews automatically until cancelled. Cancel anytime in Settings.": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld أيام مجانًا، ثم %2$@ سنويًا. يتجدّد تلقائيًا حتى تلغيه. يمكنك الإلغاء في أي وقت من الإعدادات."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld Tage gratis, danach %2$@ pro Jahr. Verlängert sich automatisch bis zur Kündigung. Jederzeit in den Einstellungen kündbar."
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -661,16 +824,16 @@
             "value": "%1$lld jours gratuits, puis %2$@ par an. Renouvellement automatique jusqu'à annulation. Annulez quand vous voulez dans Réglages."
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "%1$lld Tage gratis, danach %2$@ pro Jahr. Verlängert sich automatisch bis zur Kündigung. Jederzeit in den Einstellungen kündbar."
+            "value": "%1$lld दिन मुफ़्त, फिर %2$@ प्रति वर्ष। रद्द करने तक अपने आप नवीनीकृत होता है। सेटिंग में कभी भी रद्द करें।"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "%1$lld dias grátis e depois %2$@ por ano. Renova automaticamente até você cancelar. Cancele quando quiser em Ajustes."
+            "value": "%1$lld giorni gratis, poi %2$@ all'anno. Si rinnova automaticamente fino alla disdetta. Disdici quando vuoi in Impostazioni."
           }
         },
         "ja": {
@@ -685,28 +848,16 @@
             "value": "%1$lld일 무료 후 연 %2$@. 해지할 때까지 자동 갱신됩니다. 설정에서 언제든 해지할 수 있습니다."
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld dias grátis e depois %2$@ por ano. Renova automaticamente até você cancelar. Cancele quando quiser em Ajustes."
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "免费 %1$lld 天，之后每年 %2$@。在取消前将自动续订。可随时在“设置”中取消。"
-          }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%1$lld दिन मुफ़्त, फिर %2$@ प्रति वर्ष। रद्द करने तक अपने आप नवीनीकृत होता है। सेटिंग में कभी भी रद्द करें।"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%1$lld giorni gratis, poi %2$@ all'anno. Si rinnova automaticamente fino alla disdetta. Disdici quando vuoi in Impostazioni."
-          }
-        },
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%1$lld أيام مجانًا، ثم %2$@ سنويًا. يتجدّد تلقائيًا حتى تلغيه. يمكنك الإلغاء في أي وقت من الإعدادات."
           }
         }
       }
@@ -714,6 +865,18 @@
     "%lld exports": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld عمليات تصدير"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld Exporte"
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -732,16 +895,16 @@
             "value": "%lld exports"
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld Exporte"
+            "value": "%lld एक्सपोर्ट"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld exportações"
+            "value": "%lld esportazioni"
           }
         },
         "ja": {
@@ -756,28 +919,16 @@
             "value": "내보내기 %lld회"
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld exportações"
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "%lld 次导出"
-          }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld एक्सपोर्ट"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld esportazioni"
-          }
-        },
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld عمليات تصدير"
           }
         }
       }
@@ -785,6 +936,18 @@
     "%lld left": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "بقي %lld"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "noch %lld"
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -803,16 +966,16 @@
             "value": "%lld restants"
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "noch %lld"
+            "value": "%lld शेष"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld restantes"
+            "value": "%lld rimasti"
           }
         },
         "ja": {
@@ -827,28 +990,16 @@
             "value": "%lld개 남음"
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld restantes"
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "剩余 %lld"
-          }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld शेष"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld rimasti"
-          }
-        },
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "بقي %lld"
           }
         }
       }
@@ -856,6 +1007,18 @@
     "%lld left · full resolution, 4K & HEVC, no watermark": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "بقي %lld · دقة كاملة، 4K و HEVC، بلا علامة مائية"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "noch %lld · volle Auflösung, 4K und HEVC, ohne Wasserzeichen"
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -874,16 +1037,16 @@
             "value": "%lld restants · pleine résolution, 4K et HEVC, sans filigrane"
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "noch %lld · volle Auflösung, 4K und HEVC, ohne Wasserzeichen"
+            "value": "%lld शेष · पूर्ण रिज़ॉल्यूशन, 4K और HEVC, बिना वॉटरमार्क"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld restantes · resolução total, 4K e HEVC, sem marca d'água"
+            "value": "%lld rimasti · risoluzione piena, 4K e HEVC, senza filigrana"
           }
         },
         "ja": {
@@ -898,28 +1061,16 @@
             "value": "%lld개 남음 · 최대 해상도, 4K 및 HEVC, 워터마크 없음"
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld restantes · resolução total, 4K e HEVC, sem marca d'água"
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "剩余 %lld · 全分辨率、4K 与 HEVC、无水印"
-          }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld शेष · पूर्ण रिज़ॉल्यूशन, 4K और HEVC, बिना वॉटरमार्क"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld rimasti · risoluzione piena, 4K e HEVC, senza filigrana"
-          }
-        },
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "بقي %lld · دقة كاملة، 4K و HEVC، بلا علامة مائية"
           }
         }
       }
@@ -927,6 +1078,18 @@
     "1 export": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تصدير واحد"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 Export"
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -945,16 +1108,16 @@
             "value": "1 export"
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "1 Export"
+            "value": "1 एक्सपोर्ट"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "1 exportação"
+            "value": "1 esportazione"
           }
         },
         "ja": {
@@ -969,35 +1132,41 @@
             "value": "내보내기 1회"
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 exportação"
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "1 次导出"
           }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "1 एक्सपोर्ट"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "1 esportazione"
-          }
-        },
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "تصدير واحد"
-          }
         }
       }
+    },
+    "1080p": {
+      "shouldTranslate": false
+    },
+    "1080p · MP4 (H.264)": {
+      "shouldTranslate": false
     },
     "12 months:": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "12 شهرًا:"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "12 Monate:"
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -1016,16 +1185,16 @@
             "value": "12 mois :"
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "12 Monate:"
+            "value": "12 महीने:"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "12 meses:"
+            "value": "12 mesi:"
           }
         },
         "ja": {
@@ -1040,35 +1209,41 @@
             "value": "12개월:"
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "12 meses:"
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "12 个月："
           }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "12 महीने:"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "12 mesi:"
-          }
-        },
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "12 شهرًا:"
-          }
         }
       }
+    },
+    "16:9": {
+      "shouldTranslate": false
+    },
+    "1:1": {
+      "shouldTranslate": false
     },
     "200+ templates": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "أكثر من 200 قالب"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Über 200 Vorlagen"
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -1087,16 +1262,16 @@
             "value": "Plus de 200 modèles"
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Über 200 Vorlagen"
+            "value": "200+ टेम्पलेट"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Mais de 200 modelos"
+            "value": "Oltre 200 modelli"
           }
         },
         "ja": {
@@ -1111,35 +1286,41 @@
             "value": "200개 이상 템플릿"
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mais de 200 modelos"
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "200+ 模板"
           }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "200+ टेम्पलेट"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Oltre 200 modelli"
-          }
-        },
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "أكثر من 200 قالب"
-          }
         }
       }
+    },
+    "4:5": {
+      "shouldTranslate": false
+    },
+    "4K": {
+      "shouldTranslate": false
     },
     "4K & HEVC come with Premium — or one credit.": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "يتوفر 4K و HEVC مع Premium — أو برصيد واحد."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "4K und HEVC gibt es mit Premium – oder für ein Guthaben."
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -1158,16 +1339,16 @@
             "value": "La 4K et le HEVC sont inclus avec Premium — ou avec un crédit."
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "4K und HEVC gibt es mit Premium – oder für ein Guthaben."
+            "value": "4K और HEVC Premium के साथ मिलते हैं — या एक क्रेडिट से।"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "4K e HEVC vêm com o Premium — ou com um crédito."
+            "value": "4K e HEVC arrivano con Premium — o con un credito."
           }
         },
         "ja": {
@@ -1182,28 +1363,16 @@
             "value": "4K와 HEVC는 프리미엄에 포함되며, 크레딧 하나로도 됩니다."
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "4K e HEVC vêm com o Premium — ou com um crédito."
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "4K 与 HEVC 随 Premium 提供，也可用 1 个点数解锁。"
-          }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "4K और HEVC Premium के साथ मिलते हैं — या एक क्रेडिट से।"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "4K e HEVC arrivano con Premium — o con un credito."
-          }
-        },
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "يتوفر 4K و HEVC مع Premium — أو برصيد واحد."
           }
         }
       }
@@ -1211,6 +1380,18 @@
     "4K, no watermark": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "4K بلا علامة مائية"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "4K, ohne Wasserzeichen"
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -1229,16 +1410,16 @@
             "value": "4K, sans filigrane"
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "4K, ohne Wasserzeichen"
+            "value": "4K, बिना वॉटरमार्क"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "4K, sem marca d'água"
+            "value": "4K, senza filigrana"
           }
         },
         "ja": {
@@ -1253,35 +1434,38 @@
             "value": "4K, 워터마크 없음"
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "4K, sem marca d'água"
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "4K，无水印"
           }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "4K, बिना वॉटरमार्क"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "4K, senza filigrana"
-          }
-        },
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "4K بلا علامة مائية"
-          }
         }
       }
+    },
+    "9:16": {
+      "shouldTranslate": false
     },
     "AI backgrounds": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "خلفيات بالذكاء الاصطناعي"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "KI-Hintergründe"
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -1300,16 +1484,16 @@
             "value": "Arrière-plans IA"
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "KI-Hintergründe"
+            "value": "AI बैकग्राउंड"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Fundos com IA"
+            "value": "Sfondi IA"
           }
         },
         "ja": {
@@ -1324,28 +1508,16 @@
             "value": "AI 배경"
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fundos com IA"
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "AI 背景"
-          }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "AI बैकग्राउंड"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sfondi IA"
-          }
-        },
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "خلفيات بالذكاء الاصطناعي"
           }
         }
       }
@@ -1353,6 +1525,18 @@
     "AI that does the fiddly bits": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ذكاء اصطناعي يتولّى التفاصيل المرهقة"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "KI für das Kleinklein"
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -1371,16 +1555,16 @@
             "value": "L'IA s'occupe des détails pénibles"
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "KI für das Kleinklein"
+            "value": "झंझट वाले काम AI करे"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "IA para as partes chatas"
+            "value": "L'IA fa le parti noiose"
           }
         },
         "ja": {
@@ -1395,28 +1579,16 @@
             "value": "손 많이 가는 작업은 AI가"
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "IA para as partes chatas"
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "麻烦的细节交给 AI"
-          }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "झंझट वाले काम AI करे"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "L'IA fa le parti noiose"
-          }
-        },
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ذكاء اصطناعي يتولّى التفاصيل المرهقة"
           }
         }
       }
@@ -1424,6 +1596,18 @@
     "Best Value": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "الأفضل قيمة"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bestes Angebot"
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -1442,16 +1626,16 @@
             "value": "Meilleur rapport"
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Bestes Angebot"
+            "value": "सबसे किफ़ायती"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Melhor custo-benefício"
+            "value": "Miglior valore"
           }
         },
         "ja": {
@@ -1466,28 +1650,16 @@
             "value": "가장 알뜰"
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Melhor custo-benefício"
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "最超值"
-          }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "सबसे किफ़ायती"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Miglior valore"
-          }
-        },
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "الأفضل قيمة"
           }
         }
       }
@@ -1495,6 +1667,18 @@
     "Caroullage reads your recent photos to show you a collage of your own instead of a stock one. Nothing leaves your phone.": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "يقرأ Caroullage صورك الأخيرة ليعرض مجمّعًا من صورك أنت، لا صورًا جاهزة. ولا يغادر شيء هاتفك."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Caroullage liest deine letzten Fotos und zeigt dir eine eigene Collage statt einer Stockvorlage. Nichts verlässt dein Gerät."
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -1513,16 +1697,16 @@
             "value": "Caroullage lit vos photos récentes pour vous montrer un collage à vous, pas une image d'archive. Rien ne quitte votre téléphone."
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Caroullage liest deine letzten Fotos und zeigt dir eine eigene Collage statt einer Stockvorlage. Nichts verlässt dein Gerät."
+            "value": "Caroullage आपकी हाल की फ़ोटो पढ़कर स्टॉक नहीं, आपका अपना कोलाज दिखाता है। कुछ भी फ़ोन से बाहर नहीं जाता।"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "O Caroullage lê suas fotos recentes para mostrar uma colagem sua, não de banco de imagens. Nada sai do seu celular."
+            "value": "Caroullage legge le tue foto recenti per mostrarti un collage tuo, non di repertorio. Nulla lascia il telefono."
           }
         },
         "ja": {
@@ -1537,28 +1721,16 @@
             "value": "Caroullage는 최근 사진을 읽어 스톡 이미지 대신 내 사진으로 만든 콜라주를 보여줍니다. 어떤 것도 기기를 벗어나지 않습니다."
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O Caroullage lê suas fotos recentes para mostrar uma colagem sua, não de banco de imagens. Nada sai do seu celular."
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "Caroullage 读取你最近的照片，展示属于你的拼贴，而不是素材图。所有内容都留在手机上。"
-          }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Caroullage आपकी हाल की फ़ोटो पढ़कर स्टॉक नहीं, आपका अपना कोलाज दिखाता है। कुछ भी फ़ोन से बाहर नहीं जाता।"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Caroullage legge le tue foto recenti per mostrarti un collage tuo, non di repertorio. Nulla lascia il telefono."
-          }
-        },
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "يقرأ Caroullage صورك الأخيرة ليعرض مجمّعًا من صورك أنت، لا صورًا جاهزة. ولا يغادر شيء هاتفك."
           }
         }
       }
@@ -1566,6 +1738,18 @@
     "Carousels that swipe": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "كاروسيل يمرَّر بالسحب"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Karussells zum Wischen"
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -1584,16 +1768,16 @@
             "value": "Des carrousels qui défilent"
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Karussells zum Wischen"
+            "value": "स्वाइप होने वाले कैरोसेल"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Carrosséis que deslizam"
+            "value": "Caroselli da scorrere"
           }
         },
         "ja": {
@@ -1608,28 +1792,16 @@
             "value": "넘겨보는 캐러셀"
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Carrosséis que deslizam"
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "可以滑动的轮播"
-          }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "स्वाइप होने वाले कैरोसेल"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Caroselli da scorrere"
-          }
-        },
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "كاروسيل يمرَّر بالسحب"
           }
         }
       }
@@ -1637,6 +1809,18 @@
     "Check your connection and try again in a moment.": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تحقّق من اتصالك وحاول مرة أخرى بعد قليل."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prüfe deine Verbindung und versuch es gleich noch einmal."
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -1655,16 +1839,16 @@
             "value": "Vérifiez votre connexion et réessayez dans un instant."
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Prüfe deine Verbindung und versuch es gleich noch einmal."
+            "value": "अपना कनेक्शन जाँचें और थोड़ी देर बाद दोबारा कोशिश करें।"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Verifique sua conexão e tente de novo em instantes."
+            "value": "Controlla la connessione e riprova tra un momento."
           }
         },
         "ja": {
@@ -1679,28 +1863,16 @@
             "value": "연결을 확인하고 잠시 후 다시 시도해 주세요."
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verifique sua conexão e tente de novo em instantes."
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "请检查网络连接，稍后再试。"
-          }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "अपना कनेक्शन जाँचें और थोड़ी देर बाद दोबारा कोशिश करें।"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Controlla la connessione e riprova tra un momento."
-          }
-        },
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "تحقّق من اتصالك وحاول مرة أخرى بعد قليل."
           }
         }
       }
@@ -1708,6 +1880,18 @@
     "Choose Photos": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "اختيار الصور"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fotos auswählen"
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -1726,16 +1910,16 @@
             "value": "Choisir des photos"
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Fotos auswählen"
+            "value": "फ़ोटो चुनें"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Escolher fotos"
+            "value": "Scegli le foto"
           }
         },
         "ja": {
@@ -1750,28 +1934,86 @@
             "value": "사진 선택"
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Escolher fotos"
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "选择照片"
           }
+        }
+      }
+    },
+    "Clip %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clip %@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clip %@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clip %@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clip %@"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clipe %@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "クリップ %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "클립 %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "片段 %@"
+          }
         },
         "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "फ़ोटो चुनें"
+            "value": "क्लिप %@"
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Scegli le foto"
+            "value": "Clip %@"
           }
         },
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "اختيار الصور"
+            "value": "مقطع %@"
           }
         }
       }
@@ -1779,6 +2021,18 @@
     "Collages, carousels and video — made on your phone, in a couple of minutes.": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "مجمّعات وكاروسيل وفيديو — من هاتفك، في دقائق."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Collagen, Karussells und Videos – auf dem Handy, in ein paar Minuten."
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -1797,16 +2051,16 @@
             "value": "Collages, carrousels et vidéos, créés sur votre téléphone en deux minutes."
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Collagen, Karussells und Videos – auf dem Handy, in ein paar Minuten."
+            "value": "कोलाज, कैरोसेल और वीडियो — अपने फ़ोन पर, कुछ ही मिनटों में।"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Colagens, carrosséis e vídeo — feitos no celular, em poucos minutos."
+            "value": "Collage, caroselli e video: dal telefono, in un paio di minuti."
           }
         },
         "ja": {
@@ -1821,28 +2075,16 @@
             "value": "콜라주, 캐러셀, 영상까지 휴대폰으로 몇 분이면 완성돼요."
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Colagens, carrosséis e vídeo — feitos no celular, em poucos minutos."
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "拼贴、轮播和视频，在手机上几分钟就能做好。"
-          }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "कोलाज, कैरोसेल और वीडियो — अपने फ़ोन पर, कुछ ही मिनटों में।"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Collage, caroselli e video: dal telefono, in un paio di minuti."
-          }
-        },
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "مجمّعات وكاروسيل وفيديو — من هاتفك، في دقائق."
           }
         }
       }
@@ -1850,6 +2092,18 @@
     "Continue": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "متابعة"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Weiter"
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -1868,16 +2122,16 @@
             "value": "Continuer"
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Weiter"
+            "value": "जारी रखें"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Continuar"
+            "value": "Continua"
           }
         },
         "ja": {
@@ -1892,28 +2146,16 @@
             "value": "계속"
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continuar"
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "继续"
-          }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "जारी रखें"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Continua"
-          }
-        },
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "متابعة"
           }
         }
       }
@@ -1921,6 +2163,18 @@
     "Drop photos into a grid or a shape and it arranges itself around them.": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "أفلِت صورك في شبكة أو شكل، ويرتّب نفسه حولها."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fotos in ein Raster oder eine Form ziehen – der Rest ordnet sich."
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -1939,16 +2193,16 @@
             "value": "Déposez vos photos dans une grille ou une forme : tout s'ajuste."
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Fotos in ein Raster oder eine Form ziehen – der Rest ordnet sich."
+            "value": "ग्रिड या आकार में फ़ोटो डालें, बाकी सब अपने आप सज जाता है।"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Solte fotos em uma grade ou forma e tudo se organiza sozinho."
+            "value": "Trascina le foto in una griglia o in una forma: si sistema da sé."
           }
         },
         "ja": {
@@ -1963,28 +2217,86 @@
             "value": "그리드나 도형에 사진을 놓으면 나머지는 알아서 정리돼요."
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Solte fotos em uma grade ou forma e tudo se organiza sozinho."
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "把照片放进网格或形状里，其余部分会自动排好。"
           }
+        }
+      }
+    },
+    "Duration %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Duration %@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Duración %@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Durée %@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dauer %@"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Duração %@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "長さ %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "길이 %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "时长 %@"
+          }
         },
         "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "ग्रिड या आकार में फ़ोटो डालें, बाकी सब अपने आप सज जाता है।"
+            "value": "अवधि %@"
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Trascina le foto in una griglia o in una forma: si sistema da sé."
+            "value": "Durata %@"
           }
         },
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "أفلِت صورك في شبكة أو شكل، ويرتّب نفسه حولها."
+            "value": "المدة %@"
           }
         }
       }
@@ -1992,6 +2304,18 @@
     "Every layout, unlocked": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "كل التخطيطات مفتوحة"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alle Layouts freigeschaltet"
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -2010,16 +2334,16 @@
             "value": "Toutes les mises en page, débloquées"
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Alle Layouts freigeschaltet"
+            "value": "हर लेआउट, अनलॉक"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Todos os layouts, liberados"
+            "value": "Tutti i layout, sbloccati"
           }
         },
         "ja": {
@@ -2034,28 +2358,16 @@
             "value": "모든 레이아웃 잠금 해제"
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Todos os layouts, liberados"
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "所有版式，全部解锁"
-          }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "हर लेआउट, अनलॉक"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Tutti i layout, sbloccati"
-          }
-        },
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "كل التخطيطات مفتوحة"
           }
         }
       }
@@ -2063,6 +2375,18 @@
     "Every shape": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "كل الأشكال"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alle Formen"
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -2081,16 +2405,16 @@
             "value": "Toutes les formes"
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Alle Formen"
+            "value": "हर आकार"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Todas as formas"
+            "value": "Tutte le forme"
           }
         },
         "ja": {
@@ -2105,28 +2429,16 @@
             "value": "모든 도형"
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Todas as formas"
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "所有形状"
-          }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "हर आकार"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Tutte le forme"
-          }
-        },
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "كل الأشكال"
           }
         }
       }
@@ -2134,6 +2446,18 @@
     "Everything, unlocked. Cancel whenever you like.": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "كل شيء مفتوح. ألغِ متى شئت."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alles freigeschaltet. Jederzeit kündbar."
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -2152,16 +2476,16 @@
             "value": "Tout est débloqué. Annulez quand vous voulez."
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Alles freigeschaltet. Jederzeit kündbar."
+            "value": "सब कुछ अनलॉक। जब चाहें रद्द करें।"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Tudo liberado. Cancele quando quiser."
+            "value": "Tutto sbloccato. Disdici quando vuoi."
           }
         },
         "ja": {
@@ -2176,28 +2500,296 @@
             "value": "전부 열립니다. 언제든 해지할 수 있어요."
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tudo liberado. Cancele quando quiser."
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "全部解锁，随时可取消。"
           }
+        }
+      }
+    },
+    "Export": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Export"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Exportar"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Exporter"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Exportieren"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Exportar"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "書き出す"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "내보내기"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "导出"
+          }
         },
         "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "सब कुछ अनलॉक। जब चाहें रद्द करें।"
+            "value": "एक्सपोर्ट"
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Tutto sbloccato. Disdici quando vuoi."
+            "value": "Esporta"
           }
         },
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "كل شيء مفتوح. ألغِ متى شئت."
+            "value": "تصدير"
+          }
+        }
+      }
+    },
+    "Filters, text, stickers & transitions are always baked in.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filters, text, stickers & transitions are always baked in."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Los filtros, el texto, los stickers y las transiciones siempre se incrustan."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filtres, texte, stickers et transitions sont toujours intégrés."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filter, Text, Sticker und Übergänge werden immer mit eingebrannt."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filtros, texto, stickers e transições sempre entram no arquivo."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "フィルタ、テキスト、ステッカー、トランジションは常に焼き込まれます。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "필터, 텍스트, 스티커, 전환 효과는 항상 파일에 포함됩니다."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "滤镜、文字、贴纸和转场始终会合成到文件中。"
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "फ़िल्टर, टेक्स्ट, स्टिकर और ट्रांज़िशन हमेशा फ़ाइल में शामिल होते हैं।"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filtri, testo, sticker e transizioni sono sempre inclusi nel file."
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تُدمج الفلاتر والنصوص والملصقات والانتقالات دائمًا في الملف."
+          }
+        }
+      }
+    },
+    "Frames: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Frames: %@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fotogramas: %@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Images : %@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Frames: %@"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quadros: %@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "フレーム: %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "프레임: %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "帧数：%@"
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "फ़्रेम: %@"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fotogrammi: %@"
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "الإطارات: %@"
+          }
+        }
+      }
+    },
+    "Full": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Full"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Completa"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pleine"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Voll"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Completa"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "フル"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "전체"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "完整"
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "पूर्ण"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Piena"
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "كاملة"
           }
         }
       }
@@ -2205,6 +2797,18 @@
     "Get Credits": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "احصل على أرصدة"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Guthaben kaufen"
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -2223,16 +2827,16 @@
             "value": "Obtenir des crédits"
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Guthaben kaufen"
+            "value": "क्रेडिट लें"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Obter créditos"
+            "value": "Ottieni crediti"
           }
         },
         "ja": {
@@ -2247,28 +2851,86 @@
             "value": "크레딧 구매"
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Obter créditos"
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "获取点数"
           }
+        }
+      }
+    },
+    "Half": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Half"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Media"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Moitié"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hälfte"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Metade"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ハーフ"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "절반"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "一半"
+          }
         },
         "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "क्रेडिट लें"
+            "value": "आधा"
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ottieni crediti"
+            "value": "Metà"
           }
         },
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "احصل على أرصدة"
+            "value": "نصف"
           }
         }
       }
@@ -2276,6 +2938,18 @@
     "Here's yours": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "هذا مجمّعك"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hier ist deine"
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -2294,16 +2968,16 @@
             "value": "Voici le vôtre"
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Hier ist deine"
+            "value": "यह रहा आपका"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Aqui está o seu"
+            "value": "Ecco il tuo"
           }
         },
         "ja": {
@@ -2318,28 +2992,226 @@
             "value": "여기 있어요"
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aqui está o seu"
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "这是你的"
           }
+        }
+      }
+    },
+    "Horizontal": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Horizontal"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Horizontal"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Horizontal"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Horizontal"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Horizontal"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "横"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "가로"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "横向"
+          }
         },
         "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "यह रहा आपका"
+            "value": "क्षैतिज"
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ecco il tuo"
+            "value": "Orizzontale"
           }
         },
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "هذا مجمّعك"
+            "value": "أفقي"
+          }
+        }
+      }
+    },
+    "Image": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Image"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Imagen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Image"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bild"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Imagem"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "画像"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이미지"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "图片"
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "इमेज"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Immagine"
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "صورة"
+          }
+        }
+      }
+    },
+    "In %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In %@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Entrada %@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Début %@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start %@"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Início %@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "開始 %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "시작 %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "入点 %@"
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "शुरू %@"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Inizio %@"
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "بداية %@"
           }
         }
       }
@@ -2347,6 +3219,18 @@
     "Instagram Carousels": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "كاروسيل إنستغرام"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Instagram-Karussells"
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -2365,16 +3249,16 @@
             "value": "Carrousels Instagram"
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Instagram-Karussells"
+            "value": "Instagram कैरोसेल"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Carrosséis do Instagram"
+            "value": "Caroselli Instagram"
           }
         },
         "ja": {
@@ -2389,35 +3273,38 @@
             "value": "인스타그램 캐러셀"
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Carrosséis do Instagram"
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "Instagram 轮播"
           }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Instagram कैरोसेल"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Caroselli Instagram"
-          }
-        },
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "كاروسيل إنستغرام"
-          }
         }
       }
+    },
+    "JPEG": {
+      "shouldTranslate": false
     },
     "Just for fun": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "لمجرّد المتعة"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Einfach so"
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -2436,16 +3323,16 @@
             "value": "Juste pour le plaisir"
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Einfach so"
+            "value": "बस मज़े के लिए"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Só por diversão"
+            "value": "Solo per divertimento"
           }
         },
         "ja": {
@@ -2460,28 +3347,16 @@
             "value": "그냥 재미로"
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Só por diversão"
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "只是好玩"
-          }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "बस मज़े के लिए"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Solo per divertimento"
-          }
-        },
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "لمجرّد المتعة"
           }
         }
       }
@@ -2489,6 +3364,18 @@
     "Just need this one?": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تحتاج هذه المرة فقط؟"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nur dieses eine Mal?"
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -2507,16 +3394,16 @@
             "value": "Besoin d'une seule fois ?"
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Nur dieses eine Mal?"
+            "value": "सिर्फ़ यही चाहिए?"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Precisa só desta vez?"
+            "value": "Ti serve solo questo?"
           }
         },
         "ja": {
@@ -2531,28 +3418,16 @@
             "value": "이번 한 번만 필요하세요?"
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Precisa só desta vez?"
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "只需要这一个？"
-          }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "सिर्फ़ यही चाहिए?"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ti serve solo questo?"
-          }
-        },
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "تحتاج هذه المرة فقط؟"
           }
         }
       }
@@ -2560,6 +3435,18 @@
     "Layouts that fit": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تخطيطات تناسب صورك"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Layouts, die passen"
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -2578,16 +3465,16 @@
             "value": "Des mises en page qui tombent juste"
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Layouts, die passen"
+            "value": "ऐसे लेआउट जो फ़िट बैठें"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Layouts que se encaixam"
+            "value": "Layout che tornano"
           }
         },
         "ja": {
@@ -2602,28 +3489,16 @@
             "value": "딱 맞는 레이아웃"
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Layouts que se encaixam"
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "刚好合适的版式"
-          }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ऐसे लेआउट जो फ़िट बैठें"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Layout che tornano"
-          }
-        },
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "تخطيطات تناسب صورك"
           }
         }
       }
@@ -2631,6 +3506,18 @@
     "Let's use your photos": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "لنستخدم صورك"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nehmen wir deine Fotos"
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -2649,16 +3536,16 @@
             "value": "Utilisons vos photos"
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Nehmen wir deine Fotos"
+            "value": "आपकी फ़ोटो इस्तेमाल करते हैं"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Vamos usar suas fotos"
+            "value": "Usiamo le tue foto"
           }
         },
         "ja": {
@@ -2673,28 +3560,16 @@
             "value": "내 사진으로 시작해요"
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vamos usar suas fotos"
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "来用你的照片"
-          }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "आपकी फ़ोटो इस्तेमाल करते हैं"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Usiamo le tue foto"
-          }
-        },
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "لنستخدم صورك"
           }
         }
       }
@@ -2702,6 +3577,18 @@
     "Lifetime": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "مدى الحياة"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lebenslang"
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -2720,16 +3607,16 @@
             "value": "À vie"
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Lebenslang"
+            "value": "आजीवन"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Vitalício"
+            "value": "A vita"
           }
         },
         "ja": {
@@ -2744,35 +3631,41 @@
             "value": "평생"
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vitalício"
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "永久"
           }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "आजीवन"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "A vita"
-          }
-        },
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "مدى الحياة"
-          }
         }
       }
+    },
+    "MOV · HEVC": {
+      "shouldTranslate": false
+    },
+    "MP4 · H.264": {
+      "shouldTranslate": false
     },
     "Mix clips and photos, cut to the beat, and lift a subject out of its background.": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "امزج المقاطع والصور، وقُصّ على الإيقاع، وافصل العنصر عن خلفيته."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clips und Fotos mischen, im Takt schneiden, Motive freistellen."
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -2791,16 +3684,16 @@
             "value": "Mélangez clips et photos, calez sur le rythme, détourez un sujet."
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Clips und Fotos mischen, im Takt schneiden, Motive freistellen."
+            "value": "क्लिप और फ़ोटो मिलाएँ, बीट पर काटें, और विषय को बैकग्राउंड से अलग करें।"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Misture clipes e fotos, corte no ritmo e recorte o objeto do fundo."
+            "value": "Unisci clip e foto, taglia a tempo ed estrai il soggetto dallo sfondo."
           }
         },
         "ja": {
@@ -2815,28 +3708,16 @@
             "value": "영상과 사진을 섞고, 비트에 맞춰 자르고, 피사체만 배경에서 분리하세요."
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Misture clipes e fotos, corte no ritmo e recorte o objeto do fundo."
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "混剪视频与照片，卡着节拍切换，还能把主体从背景中抠出来。"
-          }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "क्लिप और फ़ोटो मिलाएँ, बीट पर काटें, और विषय को बैकग्राउंड से अलग करें।"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Unisci clip e foto, taglia a tempo ed estrai il soggetto dallo sfondo."
-          }
-        },
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "امزج المقاطع والصور، وقُصّ على الإيقاع، وافصل العنصر عن خلفيته."
           }
         }
       }
@@ -2844,6 +3725,18 @@
     "Monthly": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "شهري"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Monatlich"
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -2862,16 +3755,16 @@
             "value": "Mensuel"
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Monatlich"
+            "value": "मासिक"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Mensal"
+            "value": "Mensile"
           }
         },
         "ja": {
@@ -2886,28 +3779,86 @@
             "value": "월간"
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mensal"
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "按月"
           }
+        }
+      }
+    },
+    "New Carousel": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New Carousel"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nuevo carrusel"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nouveau carrousel"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Neues Karussell"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Novo carrossel"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "新しいカルーセル"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "새 캐러셀"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "新建轮播"
+          }
         },
         "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "मासिक"
+            "value": "नया कैरोसेल"
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Mensile"
+            "value": "Nuovo carosello"
           }
         },
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "شهري"
+            "value": "كاروسيل جديد"
           }
         }
       }
@@ -2915,6 +3866,18 @@
     "No previous purchase found on this Apple Account.": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "لم يُعثر على عملية شراء سابقة في حساب Apple هذا."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Für dieses Apple-Konto wurde kein früherer Kauf gefunden."
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -2933,16 +3896,16 @@
             "value": "Aucun achat antérieur trouvé sur ce compte Apple."
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Für dieses Apple-Konto wurde kein früherer Kauf gefunden."
+            "value": "इस Apple खाते पर पहले की कोई खरीदारी नहीं मिली।"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Nenhuma compra anterior encontrada nesta Conta Apple."
+            "value": "Nessun acquisto precedente trovato su questo Account Apple."
           }
         },
         "ja": {
@@ -2957,28 +3920,16 @@
             "value": "이 Apple 계정에서 이전 구매를 찾을 수 없습니다."
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nenhuma compra anterior encontrada nesta Conta Apple."
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "未在此 Apple 账户中找到以往的购买记录。"
-          }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "इस Apple खाते पर पहले की कोई खरीदारी नहीं मिली।"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nessun acquisto precedente trovato su questo Account Apple."
-          }
-        },
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "لم يُعثر على عملية شراء سابقة في حساب Apple هذا."
           }
         }
       }
@@ -2986,6 +3937,18 @@
     "Not subscribing? Buy a single credit and export this one at full quality.": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "لا ترغب في الاشتراك؟ اشترِ رصيدًا واحدًا وصدّر هذا العمل بالجودة الكاملة."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kein Abo? Kauf ein einzelnes Guthaben und exportiere dieses in voller Qualität."
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -3004,16 +3967,16 @@
             "value": "Pas d'abonnement ? Achetez un crédit et exportez celui-ci en pleine qualité."
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Kein Abo? Kauf ein einzelnes Guthaben und exportiere dieses in voller Qualität."
+            "value": "सब्सक्राइब नहीं करना? एक क्रेडिट खरीदें और इसे पूरी क्वालिटी में एक्सपोर्ट करें।"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Sem assinatura? Compre um crédito e exporte esta em qualidade total."
+            "value": "Niente abbonamento? Compra un credito ed esporta questo in qualità piena."
           }
         },
         "ja": {
@@ -3028,28 +3991,16 @@
             "value": "구독은 부담스럽나요? 크레딧 하나만 사면 이번 작업을 최고 품질로 내보낼 수 있어요."
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sem assinatura? Compre um crédito e exporte esta em qualidade total."
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "不想订阅？买一个点数，就能以完整画质导出这一个。"
-          }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "सब्सक्राइब नहीं करना? एक क्रेडिट खरीदें और इसे पूरी क्वालिटी में एक्सपोर्ट करें।"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Niente abbonamento? Compra un credito ed esporta questo in qualità piena."
-          }
-        },
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "لا ترغب في الاشتراك؟ اشترِ رصيدًا واحدًا وصدّر هذا العمل بالجودة الكاملة."
           }
         }
       }
@@ -3057,6 +4008,18 @@
     "One credit exports one collage at full quality, with no watermark. Credits are not a subscription and stay on this device.": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "رصيد واحد يصدّر مجمّعًا واحدًا بالجودة الكاملة وبلا علامة مائية. الأرصدة ليست اشتراكًا وتبقى على هذا الجهاز."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ein Guthaben exportiert eine Collage in voller Qualität, ohne Wasserzeichen. Guthaben ist kein Abo und bleibt auf diesem Gerät."
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -3075,16 +4038,16 @@
             "value": "Un crédit exporte un collage en pleine qualité, sans filigrane. Les crédits ne sont pas un abonnement et restent sur cet appareil."
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ein Guthaben exportiert eine Collage in voller Qualität, ohne Wasserzeichen. Guthaben ist kein Abo und bleibt auf diesem Gerät."
+            "value": "एक क्रेडिट से एक कोलाज पूरी क्वालिटी में, बिना वॉटरमार्क एक्सपोर्ट होता है। क्रेडिट सब्सक्रिप्शन नहीं हैं और इसी डिवाइस पर रहते हैं।"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Um crédito exporta uma colagem em qualidade total, sem marca d'água. Créditos não são assinatura e ficam neste aparelho."
+            "value": "Un credito esporta un collage in qualità piena, senza filigrana. I crediti non sono un abbonamento e restano su questo dispositivo."
           }
         },
         "ja": {
@@ -3099,28 +4062,16 @@
             "value": "크레딧 1개로 콜라주 1개를 최고 품질·워터마크 없이 내보냅니다. 크레딧은 구독이 아니며 이 기기에만 저장됩니다."
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Um crédito exporta uma colagem em qualidade total, sem marca d'água. Créditos não são assinatura e ficam neste aparelho."
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "1 个点数可导出 1 个全画质、无水印的拼贴。点数不是订阅，且仅保存在本机。"
-          }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "एक क्रेडिट से एक कोलाज पूरी क्वालिटी में, बिना वॉटरमार्क एक्सपोर्ट होता है। क्रेडिट सब्सक्रिप्शन नहीं हैं और इसी डिवाइस पर रहते हैं।"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Un credito esporta un collage in qualità piena, senza filigrana. I crediti non sono un abbonamento e restano su questo dispositivo."
-          }
-        },
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "رصيد واحد يصدّر مجمّعًا واحدًا بالجودة الكاملة وبلا علامة مائية. الأرصدة ليست اشتراكًا وتبقى على هذا الجهاز."
           }
         }
       }
@@ -3128,6 +4079,18 @@
     "One picture cut across several posts, lined up so it flows as people swipe.": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "صورة واحدة موزّعة على عدّة منشورات، مُحاذاة لتنساب مع التمرير."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ein Bild über mehrere Posts, so ausgerichtet, dass es beim Wischen fließt."
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -3146,16 +4109,16 @@
             "value": "Une image répartie sur plusieurs posts, alignée pour couler au fil du swipe."
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ein Bild über mehrere Posts, so ausgerichtet, dass es beim Wischen fließt."
+            "value": "एक तस्वीर कई पोस्ट में बँटी, ऐसे सजी कि स्वाइप करते ही बहती लगे।"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Uma imagem dividida em vários posts, alinhada para fluir ao deslizar."
+            "value": "Un'immagine divisa su più post, allineata per scorrere con lo swipe."
           }
         },
         "ja": {
@@ -3170,28 +4133,16 @@
             "value": "사진 한 장을 여러 게시물로 나눠, 넘길 때 자연스럽게 이어지도록 맞춰줍니다."
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uma imagem dividida em vários posts, alinhada para fluir ao deslizar."
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "把一张图切成多条帖子，滑动时能连贯衔接。"
-          }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "एक तस्वीर कई पोस्ट में बँटी, ऐसे सजी कि स्वाइप करते ही बहती लगे।"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Un'immagine divisa su più post, allineata per scorrere con lo swipe."
-          }
-        },
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "صورة واحدة موزّعة على عدّة منشورات، مُحاذاة لتنساب مع التمرير."
           }
         }
       }
@@ -3199,6 +4150,18 @@
     "One-time": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "دفعة واحدة"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Einmalig"
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -3217,16 +4180,16 @@
             "value": "Paiement unique"
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Einmalig"
+            "value": "एक बार"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pagamento único"
+            "value": "Una tantum"
           }
         },
         "ja": {
@@ -3241,35 +4204,108 @@
             "value": "1회 결제"
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pagamento único"
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "一次性"
           }
+        }
+      }
+    },
+    "Out %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Out %@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Salida %@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fin %@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ende %@"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fim %@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "終了 %@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "종료 %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "出点 %@"
+          }
         },
         "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "एक बार"
+            "value": "अंत %@"
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Una tantum"
+            "value": "Fine %@"
           }
         },
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "دفعة واحدة"
+            "value": "نهاية %@"
           }
         }
       }
     },
+    "PNG": {
+      "shouldTranslate": false
+    },
     "Pay once, keep forever": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ادفع مرة واحدة، واحتفظ به للأبد"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Einmal zahlen, für immer behalten"
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -3288,16 +4324,16 @@
             "value": "Payez une fois, c'est à vie"
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Einmal zahlen, für immer behalten"
+            "value": "एक बार भुगतान, हमेशा के लिए"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pague uma vez, é seu para sempre"
+            "value": "Paghi una volta, per sempre"
           }
         },
         "ja": {
@@ -3312,28 +4348,16 @@
             "value": "한 번 결제로 평생"
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pague uma vez, é seu para sempre"
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "一次付费，永久使用"
-          }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "एक बार भुगतान, हमेशा के लिए"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Paghi una volta, per sempre"
-          }
-        },
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ادفع مرة واحدة، واحتفظ به للأبد"
           }
         }
       }
@@ -3341,6 +4365,18 @@
     "Pinterest Boards": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "لوحات بينتريست"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pinterest-Pinnwände"
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -3359,16 +4395,16 @@
             "value": "Tableaux Pinterest"
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pinterest-Pinnwände"
+            "value": "Pinterest बोर्ड"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pastas do Pinterest"
+            "value": "Bacheche Pinterest"
           }
         },
         "ja": {
@@ -3383,28 +4419,16 @@
             "value": "핀터레스트 보드"
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pastas do Pinterest"
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "Pinterest 图板"
-          }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Pinterest बोर्ड"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Bacheche Pinterest"
-          }
-        },
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "لوحات بينتريست"
           }
         }
       }
@@ -3412,6 +4436,18 @@
     "Plans are unavailable right now": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "الخطط غير متاحة الآن"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tarife sind gerade nicht verfügbar"
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -3430,16 +4466,16 @@
             "value": "Les formules sont indisponibles pour le moment"
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Tarife sind gerade nicht verfügbar"
+            "value": "प्लान अभी उपलब्ध नहीं हैं"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Os planos estão indisponíveis no momento"
+            "value": "I piani non sono disponibili ora"
           }
         },
         "ja": {
@@ -3454,28 +4490,16 @@
             "value": "지금은 요금제를 불러올 수 없어요"
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Os planos estão indisponíveis no momento"
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "当前无法获取订阅方案"
-          }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "प्लान अभी उपलब्ध नहीं हैं"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "I piani non sono disponibili ora"
-          }
-        },
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "الخطط غير متاحة الآن"
           }
         }
       }
@@ -3483,6 +4507,18 @@
     "Prices are shown in your local currency at checkout.": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تظهر الأسعار بعملتك المحلية عند الدفع."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Preise werden beim Bezahlen in deiner Landeswährung angezeigt."
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -3501,16 +4537,16 @@
             "value": "Les prix sont affichés dans votre devise locale au paiement."
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Die Preise werden beim Bezahlen in deiner Landeswährung angezeigt."
+            "value": "कीमतें चेकआउट पर आपकी स्थानीय मुद्रा में दिखेंगी।"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Os preços aparecem na sua moeda local no pagamento."
+            "value": "I prezzi sono mostrati nella tua valuta locale al pagamento."
           }
         },
         "ja": {
@@ -3525,28 +4561,16 @@
             "value": "가격은 결제 시 현지 통화로 표시됩니다."
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Os preços aparecem na sua moeda local no pagamento."
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "价格将在结账时以你的当地货币显示。"
-          }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "कीमतें चेकआउट पर आपकी स्थानीय मुद्रा में दिखेंगी।"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "I prezzi sono mostrati nella tua valuta locale al pagamento."
-          }
-        },
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "تظهر الأسعار بعملتك المحلية عند الدفع."
           }
         }
       }
@@ -3554,6 +4578,18 @@
     "Privacy": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "الخصوصية"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Datenschutz"
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -3572,16 +4608,16 @@
             "value": "Confidentialité"
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Datenschutz"
+            "value": "गोपनीयता"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Privacidade"
+            "value": "Privacy"
           }
         },
         "ja": {
@@ -3596,28 +4632,16 @@
             "value": "개인정보"
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Privacidade"
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "隐私"
-          }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "गोपनीयता"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Privacy"
-          }
-        },
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "الخصوصية"
           }
         }
       }
@@ -3625,6 +4649,18 @@
     "Privacy Policy": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "سياسة الخصوصية"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Datenschutzrichtlinie"
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -3643,16 +4679,16 @@
             "value": "Politique de confidentialité"
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Datenschutzrichtlinie"
+            "value": "गोपनीयता नीति"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Política de privacidade"
+            "value": "Informativa sulla privacy"
           }
         },
         "ja": {
@@ -3667,28 +4703,86 @@
             "value": "개인정보 처리방침"
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Política de privacidade"
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "隐私政策"
           }
+        }
+      }
+    },
+    "Quality %@%%": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quality %@%%"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Calidad %@ %%"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Qualité %@ %%"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Qualität %@ %%"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Qualidade %@ %%"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "画質 %@%%"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "품질 %@%%"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "画质 %@%%"
+          }
         },
         "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "गोपनीयता नीति"
+            "value": "क्वालिटी %@%%"
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Informativa sulla privacy"
+            "value": "Qualità %@ %%"
           }
         },
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "سياسة الخصوصية"
+            "value": "الجودة %@%%"
           }
         }
       }
@@ -3696,6 +4790,18 @@
     "Recent Collages": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "أحدث المجمّعات"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Neueste Collagen"
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -3714,16 +4820,16 @@
             "value": "Collages récents"
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Neueste Collagen"
+            "value": "हाल के कोलाज"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Colagens recentes"
+            "value": "Collage recenti"
           }
         },
         "ja": {
@@ -3738,28 +4844,16 @@
             "value": "최근 콜라주"
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Colagens recentes"
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "最近的拼贴"
-          }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "हाल के कोलाज"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Collage recenti"
-          }
-        },
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "أحدث المجمّعات"
           }
         }
       }
@@ -3767,6 +4861,18 @@
     "Restore Purchase": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "استعادة الشراء"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kauf wiederherstellen"
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -3785,16 +4891,16 @@
             "value": "Restaurer l'achat"
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Kauf wiederherstellen"
+            "value": "खरीदारी बहाल करें"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Restaurar compra"
+            "value": "Ripristina acquisto"
           }
         },
         "ja": {
@@ -3809,28 +4915,16 @@
             "value": "구매 복원"
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restaurar compra"
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "恢复购买"
-          }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "खरीदारी बहाल करें"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ripristina acquisto"
-          }
-        },
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "استعادة الشراء"
           }
         }
       }
@@ -3838,6 +4932,18 @@
     "Restore Purchases": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "استعادة المشتريات"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Käufe wiederherstellen"
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -3856,16 +4962,16 @@
             "value": "Restaurer les achats"
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Käufe wiederherstellen"
+            "value": "खरीदारी बहाल करें"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Restaurar compras"
+            "value": "Ripristina acquisti"
           }
         },
         "ja": {
@@ -3880,28 +4986,16 @@
             "value": "구매 복원"
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restaurar compras"
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "恢复购买"
-          }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "खरीदारी बहाल करें"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ripristina acquisti"
-          }
-        },
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "استعادة المشتريات"
           }
         }
       }
@@ -3909,6 +5003,18 @@
     "See Premium": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "استعراض Premium"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Premium ansehen"
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -3927,16 +5033,16 @@
             "value": "Découvrir Premium"
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Premium ansehen"
+            "value": "Premium देखें"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ver o Premium"
+            "value": "Scopri Premium"
           }
         },
         "ja": {
@@ -3951,28 +5057,16 @@
             "value": "프리미엄 보기"
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ver o Premium"
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "查看 Premium"
-          }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Premium देखें"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Scopri Premium"
-          }
-        },
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "استعراض Premium"
           }
         }
       }
@@ -3980,6 +5074,18 @@
     "Skip": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تخطٍّ"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Überspringen"
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -3998,16 +5104,16 @@
             "value": "Passer"
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Überspringen"
+            "value": "छोड़ें"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pular"
+            "value": "Salta"
           }
         },
         "ja": {
@@ -4022,28 +5128,16 @@
             "value": "건너뛰기"
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pular"
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "跳过"
-          }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "छोड़ें"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Salta"
-          }
-        },
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "تخطٍّ"
           }
         }
       }
@@ -4051,6 +5145,18 @@
     "So the first thing you see is something you'd actually use.": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "لكي يكون أول ما تراه شيئًا ستستخدمه فعلًا."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Damit das Erste, was du siehst, auch wirklich passt."
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -4069,16 +5175,16 @@
             "value": "Pour que la première chose affichée vous serve vraiment."
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Damit das Erste, was du siehst, auch wirklich passt."
+            "value": "ताकि पहली नज़र में वही दिखे जो आप सच में इस्तेमाल करें।"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Assim a primeira coisa que você vê é algo que usaria mesmo."
+            "value": "Così la prima cosa che vedi è qualcosa che useresti davvero."
           }
         },
         "ja": {
@@ -4093,28 +5199,16 @@
             "value": "처음 보이는 것이 실제로 쓸 만한 것이 되도록요."
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Assim a primeira coisa que você vê é algo que usaria mesmo."
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "这样你看到的第一样东西就是真正用得上的。"
-          }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ताकि पहली नज़र में वही दिखे जो आप सच में इस्तेमाल करें।"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Così la prima cosa che vedi è qualcosa che useresti davvero."
-          }
-        },
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "لكي يكون أول ما تراه شيئًا ستستخدمه فعلًا."
           }
         }
       }
@@ -4122,6 +5216,18 @@
     "Special Offer": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "عرض خاص"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sonderangebot"
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -4140,16 +5246,16 @@
             "value": "Offre spéciale"
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Sonderangebot"
+            "value": "विशेष ऑफ़र"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Oferta especial"
+            "value": "Offerta speciale"
           }
         },
         "ja": {
@@ -4164,28 +5270,16 @@
             "value": "특별 혜택"
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Oferta especial"
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "特别优惠"
-          }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "विशेष ऑफ़र"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Offerta speciale"
-          }
-        },
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "عرض خاص"
           }
         }
       }
@@ -4193,6 +5287,18 @@
     "Start %lld-Day Free Trial": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ابدأ تجربة مجانية لمدة %lld أيام"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld Tage gratis testen"
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -4211,16 +5317,16 @@
             "value": "Commencer l'essai gratuit de %lld jours"
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld Tage gratis testen"
+            "value": "%lld दिन का मुफ़्त ट्रायल शुरू करें"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Iniciar teste grátis de %lld dias"
+            "value": "Inizia la prova gratuita di %lld giorni"
           }
         },
         "ja": {
@@ -4235,28 +5341,16 @@
             "value": "%lld일 무료 체험 시작"
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Iniciar teste grátis de %lld dias"
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "开始 %lld 天免费试用"
-          }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld दिन का मुफ़्त ट्रायल शुरू करें"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Inizia la prova gratuita di %lld giorni"
-          }
-        },
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ابدأ تجربة مجانية لمدة %lld أيام"
           }
         }
       }
@@ -4264,6 +5358,18 @@
     "Subscribe": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "اشترك"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abonnieren"
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -4282,16 +5388,16 @@
             "value": "S'abonner"
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Abonnieren"
+            "value": "सब्सक्राइब करें"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Assinar"
+            "value": "Abbonati"
           }
         },
         "ja": {
@@ -4306,28 +5412,16 @@
             "value": "구독하기"
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Assinar"
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "订阅"
-          }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "सब्सक्राइब करें"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Abbonati"
-          }
-        },
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "اشترك"
           }
         }
       }
@@ -4335,6 +5429,18 @@
     "Terms": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "الشروط"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AGB"
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -4353,16 +5459,16 @@
             "value": "Conditions"
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "AGB"
+            "value": "शर्तें"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Termos"
+            "value": "Termini"
           }
         },
         "ja": {
@@ -4377,28 +5483,16 @@
             "value": "약관"
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Termos"
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "条款"
-          }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "शर्तें"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Termini"
-          }
-        },
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "الشروط"
           }
         }
       }
@@ -4406,6 +5500,18 @@
     "Terms of Use": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "شروط الاستخدام"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nutzungsbedingungen"
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -4424,16 +5530,16 @@
             "value": "Conditions d'utilisation"
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Nutzungsbedingungen"
+            "value": "उपयोग की शर्तें"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Termos de uso"
+            "value": "Condizioni d'uso"
           }
         },
         "ja": {
@@ -4448,28 +5554,16 @@
             "value": "이용약관"
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Termos de uso"
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "使用条款"
-          }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "उपयोग की शर्तें"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Condizioni d'uso"
-          }
-        },
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "شروط الاستخدام"
           }
         }
       }
@@ -4477,6 +5571,18 @@
     "Three taps from here to a finished carousel.": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ثلاث نقرات من هنا ويكتمل الكاروسيل."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Drei Tipps bis zum fertigen Karussell."
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -4495,16 +5601,16 @@
             "value": "À trois touchers d'un carrousel terminé."
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Drei Tipps bis zum fertigen Karussell."
+            "value": "यहाँ से तीन टैप और कैरोसेल तैयार।"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "A três toques de um carrossel pronto."
+            "value": "Tre tocchi e il carosello è pronto."
           }
         },
         "ja": {
@@ -4519,28 +5625,16 @@
             "value": "여기서 세 번만 누르면 캐러셀이 완성돼요."
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A três toques de um carrossel pronto."
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "从这里再点三下，轮播就完成了。"
-          }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "यहाँ से तीन टैप और कैरोसेल तैयार।"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Tre tocchi e il carosello è pronto."
-          }
-        },
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ثلاث نقرات من هنا ويكتمل الكاروسيل."
           }
         }
       }
@@ -4548,6 +5642,18 @@
     "TikTok / Reels": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تيك توك / ريلز"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "TikTok / Reels"
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -4566,13 +5672,13 @@
             "value": "TikTok / Reels"
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
             "value": "TikTok / Reels"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
             "value": "TikTok / Reels"
@@ -4590,28 +5696,16 @@
             "value": "틱톡 / 릴스"
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "TikTok / Reels"
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "TikTok / Reels"
-          }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "TikTok / Reels"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "TikTok / Reels"
-          }
-        },
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "تيك توك / ريلز"
           }
         }
       }
@@ -4619,6 +5713,18 @@
     "Unlock Caroullage Premium": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "افتح Caroullage Premium"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Caroullage Premium freischalten"
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -4637,16 +5743,16 @@
             "value": "Débloquez Caroullage Premium"
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Caroullage Premium freischalten"
+            "value": "Caroullage Premium अनलॉक करें"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Desbloqueie o Caroullage Premium"
+            "value": "Sblocca Caroullage Premium"
           }
         },
         "ja": {
@@ -4661,28 +5767,16 @@
             "value": "Caroullage 프리미엄 잠금 해제"
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Desbloqueie o Caroullage Premium"
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "解锁 Caroullage Premium"
-          }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Caroullage Premium अनलॉक करें"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sblocca Caroullage Premium"
-          }
-        },
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "افتح Caroullage Premium"
           }
         }
       }
@@ -4690,6 +5784,18 @@
     "Unlock Forever": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "افتحه للأبد"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Für immer freischalten"
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -4708,16 +5814,16 @@
             "value": "Débloquer à vie"
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Für immer freischalten"
+            "value": "हमेशा के लिए अनलॉक करें"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Desbloquear para sempre"
+            "value": "Sblocca per sempre"
           }
         },
         "ja": {
@@ -4732,28 +5838,16 @@
             "value": "영구 잠금 해제"
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Desbloquear para sempre"
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "永久解锁"
-          }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "हमेशा के लिए अनलॉक करें"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sblocca per sempre"
-          }
-        },
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "افتحه للأبد"
           }
         }
       }
@@ -4761,6 +5855,18 @@
     "Use 1 credit for this export": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "استخدم رصيدًا واحدًا لهذا التصدير"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 Guthaben für diesen Export verwenden"
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -4779,16 +5885,16 @@
             "value": "Utiliser 1 crédit pour cet export"
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "1 Guthaben für diesen Export verwenden"
+            "value": "इस एक्सपोर्ट के लिए 1 क्रेडिट इस्तेमाल करें"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Usar 1 crédito nesta exportação"
+            "value": "Usa 1 credito per questa esportazione"
           }
         },
         "ja": {
@@ -4803,28 +5909,156 @@
             "value": "이번 내보내기에 크레딧 1개 사용"
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Usar 1 crédito nesta exportação"
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "本次导出使用 1 个点数"
           }
+        }
+      }
+    },
+    "Vertical": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vertical"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vertical"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vertical"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vertikal"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vertical"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "縦"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "세로"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "纵向"
+          }
         },
         "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "इस एक्सपोर्ट के लिए 1 क्रेडिट इस्तेमाल करें"
+            "value": "लंबवत"
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Usa 1 credito per questa esportazione"
+            "value": "Verticale"
           }
         },
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "استخدم رصيدًا واحدًا لهذا التصدير"
+            "value": "رأسي"
+          }
+        }
+      }
+    },
+    "Video": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Video"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vídeo"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vidéo"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Video"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vídeo"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "動画"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "동영상"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "视频"
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "वीडियो"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Video"
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "فيديو"
           }
         }
       }
@@ -4832,6 +6066,18 @@
     "Video, and the fiddly bits": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "الفيديو، والتفاصيل المرهقة"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Video und das Kleinklein"
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -4850,16 +6096,16 @@
             "value": "La vidéo, et les détails pénibles"
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Video und das Kleinklein"
+            "value": "वीडियो, और झंझट वाले काम"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Vídeo e as partes chatas"
+            "value": "Il video e le parti noiose"
           }
         },
         "ja": {
@@ -4874,28 +6120,16 @@
             "value": "영상과 손 많이 가는 작업까지"
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vídeo e as partes chatas"
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "视频，以及那些麻烦的细节"
-          }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "वीडियो, और झंझट वाले काम"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Il video e le parti noiose"
-          }
-        },
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "الفيديو، والتفاصيل المرهقة"
           }
         }
       }
@@ -4903,6 +6137,18 @@
     "Weekly": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "أسبوعي"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wöchentlich"
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -4921,16 +6167,16 @@
             "value": "Hebdomadaire"
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Wöchentlich"
+            "value": "साप्ताहिक"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Semanal"
+            "value": "Settimanale"
           }
         },
         "ja": {
@@ -4945,28 +6191,16 @@
             "value": "주간"
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Semanal"
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "按周"
-          }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "साप्ताहिक"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Settimanale"
-          }
-        },
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "أسبوعي"
           }
         }
       }
@@ -4974,6 +6208,18 @@
     "Welcome to Caroullage": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "مرحبًا بك في Caroullage"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Willkommen bei Caroullage"
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -4992,16 +6238,16 @@
             "value": "Bienvenue dans Caroullage"
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Willkommen bei Caroullage"
+            "value": "Caroullage में आपका स्वागत है"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Boas-vindas ao Caroullage"
+            "value": "Ti diamo il benvenuto in Caroullage"
           }
         },
         "ja": {
@@ -5016,28 +6262,16 @@
             "value": "Caroullage에 오신 것을 환영합니다"
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Boas-vindas ao Caroullage"
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "欢迎使用 Caroullage"
-          }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Caroullage में आपका स्वागत है"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ti diamo il benvenuto in Caroullage"
-          }
-        },
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "مرحبًا بك في Caroullage"
           }
         }
       }
@@ -5045,6 +6279,18 @@
     "What do you make most?": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ما الذي تصنعه أكثر؟"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Was machst du am meisten?"
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -5063,16 +6309,16 @@
             "value": "Que créez-vous le plus ?"
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Was machst du am meisten?"
+            "value": "आप सबसे ज़्यादा क्या बनाते हैं?"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "O que você mais cria?"
+            "value": "Cosa crei più spesso?"
           }
         },
         "ja": {
@@ -5087,28 +6333,16 @@
             "value": "주로 무엇을 만드시나요?"
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O que você mais cria?"
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "你最常做什么？"
-          }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "आप सबसे ज़्यादा क्या बनाते हैं?"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Cosa crei più spesso?"
-          }
-        },
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ما الذي تصنعه أكثر؟"
           }
         }
       }
@@ -5116,6 +6350,18 @@
     "Yearly": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "سنوي"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jährlich"
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -5134,16 +6380,16 @@
             "value": "Annuel"
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Jährlich"
+            "value": "वार्षिक"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Anual"
+            "value": "Annuale"
           }
         },
         "ja": {
@@ -5158,28 +6404,86 @@
             "value": "연간"
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anual"
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "按年"
           }
+        }
+      }
+    },
+    "Your canvas is %@ but this preset prefers %@. It will export anyway, scaled to fill the frame.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "Your canvas is %1$@ but this preset prefers %2$@. It will export anyway, scaled to fill the frame."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tu lienzo es %1$@ pero este ajuste prefiere %2$@. Se exportará igualmente, escalado para llenar el marco."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Votre toile est en %1$@ mais ce préréglage préfère %2$@. L'export se fera quand même, mis à l'échelle pour remplir le cadre."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deine Fläche ist %1$@, dieses Preset erwartet %2$@. Es wird trotzdem exportiert und formatfüllend skaliert."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sua tela é %1$@, mas este preset prefere %2$@. A exportação vai acontecer mesmo assim, escalada para preencher o quadro."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "キャンバスは %1$@ ですが、このプリセットは %2$@ を想定しています。フレームいっぱいに拡大して書き出します。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "캔버스는 %1$@이지만 이 프리셋은 %2$@를 권장합니다. 프레임에 맞춰 확대해 그대로 내보냅니다."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "你的画布是 %1$@，而此预设更适合 %2$@。仍会导出，并缩放以填满画面。"
+          }
         },
         "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "वार्षिक"
+            "value": "आपका कैनवास %1$@ है, पर यह प्रीसेट %2$@ पसंद करता है। फिर भी एक्सपोर्ट होगा, फ़्रेम भरने के लिए स्केल करके।"
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Annuale"
+            "value": "La tua tela è %1$@ ma questo preset preferisce %2$@. Verrà esportata comunque, ridimensionata per riempire il fotogramma."
           }
         },
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "سنوي"
+            "value": "مساحتك %1$@ لكن هذا الإعداد يفضّل %2$@. سيتم التصدير على أي حال مع التحجيم لملء الإطار."
           }
         }
       }
@@ -5187,6 +6491,18 @@
     "Your latest collages, one tap away.": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "أحدث مجمّعاتك على بُعد نقرة."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deine neuesten Collagen, einen Tipp entfernt."
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -5205,16 +6521,16 @@
             "value": "Vos derniers collages, à un toucher."
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Deine neuesten Collagen, einen Tipp entfernt."
+            "value": "आपके नए कोलाज, एक टैप दूर।"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Suas colagens mais recentes, a um toque."
+            "value": "I tuoi ultimi collage, a un tocco."
           }
         },
         "ja": {
@@ -5229,28 +6545,16 @@
             "value": "최근 만든 콜라주를 한 번의 탭으로."
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Suas colagens mais recentes, a um toque."
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "轻点一下，打开最近的拼贴。"
-          }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "आपके नए कोलाज, एक टैप दूर।"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "I tuoi ultimi collage, a un tocco."
-          }
-        },
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "أحدث مجمّعاتك على بُعد نقرة."
           }
         }
       }
@@ -5258,6 +6562,18 @@
     "Your purchase has been restored.": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تمت استعادة عملية الشراء."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dein Kauf wurde wiederhergestellt."
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -5276,16 +6592,16 @@
             "value": "Votre achat a été restauré."
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Dein Kauf wurde wiederhergestellt."
+            "value": "आपकी खरीदारी बहाल कर दी गई है।"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Sua compra foi restaurada."
+            "value": "Il tuo acquisto è stato ripristinato."
           }
         },
         "ja": {
@@ -5300,28 +6616,16 @@
             "value": "구매가 복원되었습니다."
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sua compra foi restaurada."
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "已恢复你的购买。"
-          }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "आपकी खरीदारी बहाल कर दी गई है।"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Il tuo acquisto è stato ripristinato."
-          }
-        },
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "تمت استعادة عملية الشراء."
           }
         }
       }
@@ -5329,6 +6633,18 @@
     "only %@": {
       "extractionState": "manual",
       "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "فقط %@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "nur %@"
+          }
+        },
         "en": {
           "stringUnit": {
             "state": "translated",
@@ -5347,16 +6663,16 @@
             "value": "seulement %@"
           }
         },
-        "de": {
+        "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "nur %@"
+            "value": "सिर्फ़ %@"
           }
         },
-        "pt-BR": {
+        "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "apenas %@"
+            "value": "solo %@"
           }
         },
         "ja": {
@@ -5371,31 +6687,22 @@
             "value": "단 %@"
           }
         },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "apenas %@"
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "仅 %@"
           }
-        },
-        "hi": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "सिर्फ़ %@"
-          }
-        },
-        "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "solo %@"
-          }
-        },
-        "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "فقط %@"
-          }
         }
       }
+    },
+    "|": {
+      "shouldTranslate": false
     }
   },
   "version": "1.0"

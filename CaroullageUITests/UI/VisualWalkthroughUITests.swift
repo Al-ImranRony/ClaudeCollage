@@ -43,7 +43,7 @@ final class VisualWalkthroughUITests: XCTestCase {
     @MainActor
     func testWalkthroughOfEveryPrimarySurface() throws {
         let app = launchedApp()
-        let tabBar = app.tabBars["mainTabBar"]
+        let tabBar = app.otherElements["mainTabBar"]
         XCTAssertTrue(tabBar.waitForExistence(timeout: 10), "Tab shell")
         capture("01-home", of: app)
 
