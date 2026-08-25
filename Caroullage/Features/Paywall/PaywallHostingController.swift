@@ -19,6 +19,17 @@ final class PaywallHostingController: UIHostingController<PaywallView> {
     /// screen underneath, which owns this one.
     weak var offerPresenter: UIViewController?
 
+    /// Runs when this sheet goes away, however it went — the close button, a
+    /// completed purchase, or a swipe down. Onboarding uses it to know the
+    /// funnel is over.
+    var onDismissed: (() -> Void)?
+
+    override func viewDidDisappear(_ animated: Bool) {
+        super.viewDidDisappear(animated)
+        guard isBeingDismissed || presentingViewController == nil else { return }
+        onDismissed?()
+    }
+
     /// Presents the paywall as a full-height sheet. `onUnlocked` runs after the
     /// sheet has dismissed, so the caller can retry whatever the user was
     /// blocked from doing.

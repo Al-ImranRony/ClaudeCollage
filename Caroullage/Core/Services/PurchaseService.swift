@@ -42,6 +42,7 @@ public final class PurchaseService: ObservableObject {
     private let defaults: UserDefaults
     private let entitlements: EntitlementStore
     private let credits: CreditStore
+    private let trialReminders: TrialReminderScheduler
     /// How long to wait on `AppStore.sync()` before telling the user it did not
     /// work. Without a bound, a store that never answers leaves Restore looking
     /// broken — which is exactly what it looks like on a simulator with no
@@ -59,12 +60,14 @@ public final class PurchaseService: ObservableObject {
         defaults: UserDefaults = .standard,
         entitlements: EntitlementStore = .shared,
         credits: CreditStore = .shared,
+        trialReminders: TrialReminderScheduler = TrialReminderScheduler(),
         restoreTimeout: Duration = .seconds(15)
     ) {
         self.gateway = gateway
         self.defaults = defaults
         self.entitlements = entitlements
         self.credits = credits
+        self.trialReminders = trialReminders
         self.restoreTimeout = restoreTimeout
         self.currentTier = defaults.string(forKey: Key.cachedTier)
             .flatMap(SubscriptionTier.init(rawValue:)) ?? .free
@@ -132,6 +135,26 @@ public final class PurchaseService: ObservableObject {
         let owned = await gateway.entitledProductIDs()
         let isPremium = owned.contains { PremiumProduct(id: $0) != nil }
         setTier(isPremium ? .premium : .free)
+
+        // Nothing is going to be charged, so the warning about it goes too.
+        if !isPremium {
+            await trialReminders.cancelReminder()
+        }
+    }
+
+    /// The trial length this user can still take on a product, if any.
+    private func trialDaysIfEligible(for product: PremiumProduct) async -> Int? {
+        guard let days = info(for: product)?.introductoryOfferDays else { return nil }
+        return await isEligibleForTrial(product) ? days : nil
+    }
+
+    private static func periodNoun(for product: PremiumProduct) -> String {
+        switch product {
+        case .yearly, .yearlyOffer: return "year"
+        case .monthly: return "month"
+        case .weekly: return "week"
+        case .lifetime: return "once"
+        }
     }
 
     private func setTier(_ tier: SubscriptionTier) {
@@ -156,10 +179,20 @@ public final class PurchaseService: ObservableObject {
         isPurchasing = true
         defer { isPurchasing = false }
 
+        // Eligibility has to be read before the purchase: afterwards the trial
+        // has been taken and the store rightly says no.
+        let trialDays = await trialDaysIfEligible(for: product)
+
         do {
             switch try await gateway.purchase(product.id) {
             case .success:
                 await refreshEntitlements()
+                if currentTier == .premium, let trialDays, let info = info(for: product) {
+                    await trialReminders.scheduleReminder(
+                        trialDays: trialDays,
+                        price: info.displayPrice,
+                        period: Self.periodNoun(for: product))
+                }
                 return currentTier == .premium
             case .userCancelled, .pending:
                 return false

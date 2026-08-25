@@ -27,7 +27,7 @@ final class CarouselPreviewUITests: XCTestCase {
 
     @MainActor
     func testPreviewOpensAndShowsCounter() {
-        let app = XCUIApplication()
+        let app = XCUIApplication.underTest()
         openCarousel(app)
         app.buttons["carouselPreviewButton"].tap()
         XCTAssertTrue(app.otherElements["carouselPreview"].waitForExistence(timeout: 8),
@@ -40,7 +40,7 @@ final class CarouselPreviewUITests: XCTestCase {
 
     @MainActor
     func testPreviewClosesBackToEditor() {
-        let app = XCUIApplication()
+        let app = XCUIApplication.underTest()
         openCarousel(app)
         app.buttons["carouselPreviewButton"].tap()
         XCTAssertTrue(app.buttons["previewCloseButton"].waitForExistence(timeout: 8))

@@ -16,7 +16,7 @@ final class GridEditorFlowUITests: XCTestCase {
 
     @MainActor
     func testNewCollageOpensGridEditor() throws {
-        let app = XCUIApplication()
+        let app = XCUIApplication.underTest()
         app.launch()
 
         // Start a new collage via the always-present navigation "+" button
@@ -57,7 +57,7 @@ final class GridEditorFlowUITests: XCTestCase {
     /// capturing a screenshot of the masked canvas.
     @MainActor
     func testShapesModeRendersPolygonLayout() throws {
-        let app = XCUIApplication()
+        let app = XCUIApplication.underTest()
         app.launch()
 
         let addButton = app.buttons["newProjectButton"]

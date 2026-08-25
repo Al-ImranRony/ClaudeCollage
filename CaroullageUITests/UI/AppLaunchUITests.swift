@@ -15,7 +15,7 @@ final class AppLaunchUITests: XCTestCase {
 
     @MainActor
     func testAppLaunchesAndShowsPlaceholder() throws {
-        let app = XCUIApplication()
+        let app = XCUIApplication.underTest()
         app.launch()
         XCTAssertTrue(app.staticTexts["Caroullage"].waitForExistence(timeout: 5)
                       || app.navigationBars["Caroullage"].waitForExistence(timeout: 5))

@@ -245,6 +245,54 @@ final class PurchaseServiceTests: XCTestCase {
         XCTAssertFalse(service.isPurchasing, "a stuck spinner is worse than an error message")
     }
 
+    // MARK: - Trial reminder
+
+    func testStartingATrialSchedulesTheWarningBeforeTheCharge() async {
+        let notifications = ReminderSpy()
+        let gateway = StubPurchaseGateway()
+        gateway.entitleOnPurchase = true
+        let service = PurchaseService(
+            gateway: gateway, defaults: defaults,
+            entitlements: EntitlementStore(isPremiumUnlocked: false),
+            trialReminders: TrialReminderScheduler(notifications: notifications)
+        )
+        await service.start()
+
+        _ = await service.purchase(.yearly)
+
+        XCTAssertNotNil(notifications.scheduled, "a trial the user is not warned about is the dark pattern")
+    }
+
+    func testBuyingSomethingWithoutATrialSchedulesNothing() async {
+        let notifications = ReminderSpy()
+        let gateway = StubPurchaseGateway()
+        gateway.entitleOnPurchase = true
+        let service = PurchaseService(
+            gateway: gateway, defaults: defaults,
+            entitlements: EntitlementStore(isPremiumUnlocked: false),
+            trialReminders: TrialReminderScheduler(notifications: notifications)
+        )
+        await service.start()
+
+        _ = await service.purchase(.lifetime)
+
+        XCTAssertNil(notifications.scheduled)
+    }
+
+    func testALapsedSubscriptionTakesTheReminderAwayWithIt() async {
+        let notifications = ReminderSpy()
+        let gateway = StubPurchaseGateway(entitled: [])
+        let service = PurchaseService(
+            gateway: gateway, defaults: defaults,
+            entitlements: EntitlementStore(isPremiumUnlocked: false),
+            trialReminders: TrialReminderScheduler(notifications: notifications)
+        )
+
+        await service.start()
+
+        XCTAssertTrue(notifications.didCancel, "a reminder about a charge that will not happen is noise")
+    }
+
     // MARK: - Restore
 
     func testRestoreSyncsWithTheStoreAndRestoresAPreviousPurchase() async {
@@ -340,4 +388,15 @@ final class PurchaseServiceTests: XCTestCase {
         await fulfillment(of: [unlocked], timeout: 2)
         XCTAssertEqual(service.currentTier, .premium)
     }
+}
+
+/// Minimal notification spy for the trial-reminder assertions above.
+@MainActor
+private final class ReminderSpy: TrialNotificationScheduling {
+    var scheduled: TrialReminderRequest?
+    var didCancel = false
+
+    func requestAuthorization() async -> Bool { true }
+    func schedule(_ request: TrialReminderRequest) async { scheduled = request }
+    func cancel(identifier: String) async { didCancel = true }
 }

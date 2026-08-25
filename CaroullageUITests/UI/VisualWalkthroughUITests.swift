@@ -25,7 +25,7 @@ final class VisualWalkthroughUITests: XCTestCase {
     /// the app is launched inside each test rather than shared from setup.
     @MainActor
     private func launchedApp() -> XCUIApplication {
-        let app = XCUIApplication()
+        let app = XCUIApplication.underTest()
         app.launch()
         return app
     }

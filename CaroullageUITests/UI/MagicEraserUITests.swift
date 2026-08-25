@@ -22,7 +22,7 @@ final class MagicEraserUITests: XCTestCase {
 
     @MainActor
     private func openEditor() -> XCUIApplication {
-        let app = XCUIApplication()
+        let app = XCUIApplication.underTest()
         app.launch()
         app.buttons["newProjectButton"].tap()
         XCTAssertTrue(app.navigationBars["Grid Collage"].waitForExistence(timeout: 8))

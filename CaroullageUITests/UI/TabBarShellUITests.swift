@@ -20,7 +20,7 @@ final class TabBarShellUITests: XCTestCase {
 
     @MainActor
     private func launch() -> XCUIApplication {
-        let app = XCUIApplication()
+        let app = XCUIApplication.underTest()
         app.launch()
         XCTAssertTrue(app.navigationBars["Caroullage"].waitForExistence(timeout: 8),
                       "Home is the initial tab")

@@ -29,6 +29,11 @@ final class AppTabBarController: UITabBarController {
 
     /// Tapped the floating "Start Editing" button.
     var onStartEditing: (() -> Void)?
+    /// Called once, after the shell is actually on screen. Anything presented
+    /// from `AppCoordinator.start()` would otherwise be presenting from a view
+    /// controller that is not yet in a window, which UIKit drops on the floor.
+    var onFirstAppearance: (() -> Void)?
+    private var didReportFirstAppearance = false
 
     private let plusContainer = PassthroughView()
     private let plusButton = GradientLayerButton(type: .custom)
@@ -42,6 +47,13 @@ final class AppTabBarController: UITabBarController {
     /// Vertical space a tab root must leave free so its content can scroll clear
     /// of the button instead of being covered — and, worse, having its taps eaten.
     private var plusClearance: CGFloat { diameter + barGap }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        guard !didReportFirstAppearance else { return }
+        didReportFirstAppearance = true
+        onFirstAppearance?()
+    }
 
     override func viewDidLoad() {
         super.viewDidLoad()

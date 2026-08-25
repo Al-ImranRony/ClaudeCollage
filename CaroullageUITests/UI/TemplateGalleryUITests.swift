@@ -25,7 +25,7 @@ final class TemplateGalleryUITests: XCTestCase {
 
     @MainActor
     func testGalleryFiltersAndOpensFreeTemplate() throws {
-        let app = XCUIApplication()
+        let app = XCUIApplication.underTest()
         app.launch()
 
         // Enter the gallery from Home.
@@ -65,7 +65,7 @@ final class TemplateGalleryUITests: XCTestCase {
 
     @MainActor
     func testNonGridTemplateOpensViaTemplateLayout() throws {
-        let app = XCUIApplication()
+        let app = XCUIApplication.underTest()
         app.launch()
 
         app.buttons["templatesButton"].tap()

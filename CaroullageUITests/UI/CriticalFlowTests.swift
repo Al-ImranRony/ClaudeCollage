@@ -28,7 +28,7 @@ final class CriticalFlowTests: XCTestCase {
 
     @MainActor
     private func launch() -> XCUIApplication {
-        let app = XCUIApplication()
+        let app = XCUIApplication.underTest()
         app.launch()
         XCTAssertTrue(app.navigationBars["Caroullage"].waitForExistence(timeout: 10),
                       "App launches to Home")

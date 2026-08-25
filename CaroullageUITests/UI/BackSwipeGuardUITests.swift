@@ -29,7 +29,7 @@ final class BackSwipeGuardUITests: XCTestCase {
     /// drag that used to race the back-swipe. Editor must stay put.
     @MainActor
     func testLeftToRightDragOverCanvasDoesNotPop() {
-        let app = XCUIApplication()
+        let app = XCUIApplication.underTest()
         openEditor(app)
 
         // dy 0.30 lands on the square canvas near the top; dx 0.06 is just inside the
@@ -48,7 +48,7 @@ final class BackSwipeGuardUITests: XCTestCase {
     /// canvas (outside it, in the controls area) should still pop to Home.
     @MainActor
     func testEdgeSwipeOutsideCanvasStillPops() {
-        let app = XCUIApplication()
+        let app = XCUIApplication.underTest()
         openEditor(app)
 
         // dx 0.02 (~8pt) is inside the left-edge band; dy 0.80 is below the square

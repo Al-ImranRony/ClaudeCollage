@@ -31,7 +31,7 @@ final class PaywallUITests: XCTestCase {
     /// Opens the paywall the way a user does: by reaching for a locked feature.
     @MainActor
     private func launchAndOpenPaywall() -> XCUIApplication {
-        let app = XCUIApplication()
+        let app = XCUIApplication.underTest()
         app.launchArguments += ["-UITestMode", "1"]
         app.launch()
 

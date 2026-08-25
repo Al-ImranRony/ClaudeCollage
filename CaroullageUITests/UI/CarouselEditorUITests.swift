@@ -33,7 +33,7 @@ final class CarouselEditorUITests: XCTestCase {
 
     @MainActor
     func testCarouselOpensWithSeededFrames() {
-        let app = XCUIApplication()
+        let app = XCUIApplication.underTest()
         openCarousel(app)
         let strip = app.collectionViews["carouselFrameStrip"]
         XCTAssertTrue(strip.waitForExistence(timeout: 5), "Frame navigator is shown")
@@ -43,7 +43,7 @@ final class CarouselEditorUITests: XCTestCase {
 
     @MainActor
     func testAddFrameGrowsTheStrip() {
-        let app = XCUIApplication()
+        let app = XCUIApplication.underTest()
         openCarousel(app)
         let strip = app.collectionViews["carouselFrameStrip"]
         XCTAssertTrue(strip.waitForExistence(timeout: 5))
@@ -54,7 +54,7 @@ final class CarouselEditorUITests: XCTestCase {
 
     @MainActor
     func testCarouselResumesFromHome() {
-        let app = XCUIApplication()
+        let app = XCUIApplication.underTest()
         openCarousel(app)
         // Add a 4th frame so the resumed carousel is distinguishable from a fresh one.
         app.buttons["addFrameButton"].tap()
@@ -79,7 +79,7 @@ final class CarouselEditorUITests: XCTestCase {
 
     @MainActor
     func testTappingFrameOpensEditorAndReturns() {
-        let app = XCUIApplication()
+        let app = XCUIApplication.underTest()
         openCarousel(app)
         let strip = app.collectionViews["carouselFrameStrip"]
         XCTAssertTrue(strip.waitForExistence(timeout: 5))

@@ -27,7 +27,7 @@ final class CarouselExportUITests: XCTestCase {
 
     @MainActor
     func testExportOffersImageAndVideoOptions() {
-        let app = XCUIApplication()
+        let app = XCUIApplication.underTest()
         openCarousel(app)
         app.buttons["carouselExportButton"].tap()
 

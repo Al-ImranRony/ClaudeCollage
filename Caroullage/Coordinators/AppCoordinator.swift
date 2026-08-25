@@ -34,6 +34,8 @@ final class AppCoordinator {
     private var panoramicPicker: PanoramicSourcePicker?
     /// Retains the "+" flow's photo picker delegate for the life of the pick.
     private var startEditingPicker: StartEditingPhotoPicker?
+    /// Home, kept so onboarding's answer can reorder what it leads with.
+    private weak var homeViewController: HomeViewController?
 
     init(tabBarController: AppTabBarController, container: ModelContainer) {
         self.tabBarController = tabBarController
@@ -43,6 +45,7 @@ final class AppCoordinator {
 
     func start() {
         let home = HomeViewController()
+        homeViewController = home
         home.featuredTemplatesProvider = { TemplateService.shared.templates }
         home.onSelectTemplate = { [weak self] template in self?.openTemplate(template) }
         home.onBrowseTemplates = { [weak self] in self?.selectTemplatesTab() }
@@ -113,6 +116,50 @@ final class AppCoordinator {
         // products, and start listening for renewals. Off the launch path: the
         // cached tier already gates the UI correctly while this settles.
         Task { await PurchaseService.shared.start() }
+
+        // Presented once the shell is on screen — see `onFirstAppearance`.
+        tabBarController.onFirstAppearance = { [weak self] in
+            self?.presentOnboardingIfFirstLaunch()
+        }
+    }
+
+    // MARK: - Onboarding (Step 06 phase 6.3)
+
+    /// First launch only. The funnel ends on the paywall, and however that ends
+    /// the app drops into Home on the free tier — no relaunch, and no second run.
+    private func presentOnboardingIfFirstLaunch() {
+        guard OnboardingViewModel.shouldPresent() else { return }
+
+        let onboarding = OnboardingHostingController.make(
+            requestPhotoAccess: { [weak self] in
+                await self?.recentPhotos.requestAccess() ?? .denied
+            }
+        )
+        onboarding.recentPhotosProvider = { [weak self] in
+            await self?.recentPhotos.recentPhotos(limit: 4) ?? []
+        }
+        onboarding.onFinished = { [weak self] in
+            // What they said they make decides which template Home leads with.
+            self?.applyOnboardingPreference()
+        }
+        tabBarController.present(onboarding, animated: false)
+    }
+
+    /// Puts the templates matching the user's stated interest first on Home.
+    private func applyOnboardingPreference() {
+        guard let kind = OnboardingViewModel.storedCreatorKind() else { return }
+        let preferred: String? = switch kind {
+        case .carousels: "Story"
+        case .reels: "Story"
+        case .pinterest: "Grid"
+        case .fun: nil
+        }
+        guard let preferred, let home = homeViewController else { return }
+        let all = TemplateService.shared.templates
+        let matching = all.filter { $0.category.caseInsensitiveCompare(preferred) == .orderedSame }
+        guard !matching.isEmpty else { return }
+        home.featuredTemplatesProvider = { matching + all.filter { !matching.contains($0) } }
+        home.reload()
     }
 
     // MARK: - Platform surfaces (Step 05 batch C)

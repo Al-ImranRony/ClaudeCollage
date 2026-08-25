@@ -28,7 +28,7 @@ final class CarouselTypeSelectorUITests: XCTestCase {
 
     @MainActor
     func testMatchedTypeCreatesThreeFrames() {
-        let app = XCUIApplication()
+        let app = XCUIApplication.underTest()
         openSelector(app)
         app.buttons["carouselType-matched"].tap()
         app.buttons["carouselCreateButton"].tap()
@@ -39,7 +39,7 @@ final class CarouselTypeSelectorUITests: XCTestCase {
 
     @MainActor
     func testGridPreviewCreatesGridPlusCellFrames() {
-        let app = XCUIApplication()
+        let app = XCUIApplication.underTest()
         openSelector(app)
         app.buttons["carouselType-gridPreview"].tap()
         app.buttons["carouselCreateButton"].tap()

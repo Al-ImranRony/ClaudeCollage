@@ -26,7 +26,7 @@ final class PolygonQAUITests: XCTestCase {
 
     @MainActor
     func testPolygonEditorQASweep() throws {
-        let app = XCUIApplication()
+        let app = XCUIApplication.underTest()
         app.launch()
 
         // Enter the editor.

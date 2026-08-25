@@ -28,7 +28,7 @@ final class VideoEditorUITests: XCTestCase {
 
     @MainActor
     func testVideoEditorOpensWithCanvasAndControls() {
-        let app = XCUIApplication()
+        let app = XCUIApplication.underTest()
         openVideoEditor(app)
 
         XCTAssertTrue(app.otherElements["videoCanvas"].waitForExistence(timeout: 5),
@@ -44,7 +44,7 @@ final class VideoEditorUITests: XCTestCase {
 
     @MainActor
     func testVideoCollageResumesFromHome() {
-        let app = XCUIApplication()
+        let app = XCUIApplication.underTest()
         openVideoEditor(app)
         // Switch to a 4-up grid so the resumed project is distinguishable from a
         // fresh one (which starts as a 2-up stack).
@@ -72,7 +72,7 @@ final class VideoEditorUITests: XCTestCase {
 
     @MainActor
     func testAddingTextPlacesAnEditableOverlay() {
-        let app = XCUIApplication()
+        let app = XCUIApplication.underTest()
         openVideoEditor(app)
         XCTAssertTrue(app.buttons["videoAddTextButton"].waitForExistence(timeout: 5),
                       "the add-text button is present")
@@ -86,7 +86,7 @@ final class VideoEditorUITests: XCTestCase {
 
     @MainActor
     func testChangingLayoutChangesSlotCount() {
-        let app = XCUIApplication()
+        let app = XCUIApplication.underTest()
         openVideoEditor(app)
         XCTAssertTrue(app.otherElements["videoCell-1"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.otherElements["videoCell-3"].exists, "2-up starts with two slots")
