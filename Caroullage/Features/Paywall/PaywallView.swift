@@ -92,7 +92,7 @@ struct PaywallView: View {
                     VStack(spacing: Theme.Spacing.xs) {
                         Image(systemName: card.symbol)
                             .font(.system(size: 46, weight: .semibold))
-                        Text(card.caption)
+                        Text(LocalizedStringKey(card.caption))
                             .font(.themeCallout)
                     }
                     .foregroundStyle(Color.themeTextOnAccent)
@@ -149,7 +149,9 @@ struct PaywallView: View {
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(Color.themeAccentStrong)
                         .frame(width: 20)
-                    Text(text)
+                    // A `String` in a variable is not a localizable literal, so
+                    // the key is made explicit.
+                    Text(LocalizedStringKey(text))
                         .font(.themeSubheadline)
                         .foregroundStyle(Color.themeTextPrimary)
                         .lineLimit(1)

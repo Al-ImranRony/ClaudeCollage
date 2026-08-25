@@ -114,11 +114,11 @@ struct OnboardingView: View {
                     .font(.system(size: 68, weight: .semibold))
                     .foregroundStyle(Color.themeTextOnAccent)
             }
-            Text(title)
+            Text(LocalizedStringKey(title))
                 .font(.themeLargeTitle)
                 .foregroundStyle(Color.themeTextPrimary)
                 .multilineTextAlignment(.center)
-            Text(body)
+            Text(LocalizedStringKey(body))
                 .font(.themeBody)
                 .foregroundStyle(Color.themeTextSecondary)
                 .multilineTextAlignment(.center)
@@ -268,9 +268,9 @@ struct OnboardingView: View {
 
     private var buttonTitle: String {
         switch model.step {
-        case .photoPriming: return "Choose Photos"
-        case .preview, .paywall: return "See Premium"
-        default: return "Continue"
+        case .photoPriming: return String(localized: "Choose Photos")
+        case .preview, .paywall: return String(localized: "See Premium")
+        default: return String(localized: "Continue")
         }
     }
 }

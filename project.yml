@@ -4,6 +4,21 @@ options:
   deploymentTarget:
     iOS: "17.0"
   developmentLanguage: en
+  # Phase 6.4 — the 11 day-one languages. Apple's editorial team counts
+  # localization as a Featuring signal, and the String Catalog carries the
+  # translations for all of them.
+  knownRegions:
+    - en
+    - es
+    - fr
+    - de
+    - pt-BR
+    - ja
+    - ko
+    - zh-Hans
+    - hi
+    - it
+    - ar
   createIntermediateGroups: true
   generateEmptyDirectories: true
   groupSortPosition: top

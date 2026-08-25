@@ -54,9 +54,8 @@ public final class PaywallViewModel: ObservableObject {
 
     /// What credits are and, just as importantly, what they are not. Said before
     /// the user pays rather than discovered after.
-    public let creditExplanation =
-        "One credit exports one collage at full quality, with no watermark. "
-        + "Credits are not a subscription and stay on this device."
+    public let creditExplanation = String(localized:
+        "One credit exports one collage at full quality, with no watermark. Credits are not a subscription and stay on this device.")
 
     private let service: PurchaseService
     private var info: [PremiumProduct: PremiumProductInfo] = [:]
@@ -108,14 +107,16 @@ public final class PaywallViewModel: ObservableObject {
             title: Self.title(for: product.product),
             priceLine: priceLine(for: product),
             secondaryLine: secondaryLine(for: product),
-            badge: product.product == .yearly ? "Best Value" : nil
+            badge: product.product == .yearly ? String(localized: "Best Value") : nil
         )
     }
 
     private func makePack(for pack: CreditProductInfo) -> CreditPack {
         CreditPack(
             product: pack.product,
-            title: pack.product.credits == 1 ? "1 export" : "\(pack.product.credits) exports",
+            title: pack.product.credits == 1
+                ? String(localized: "1 export")
+                : String(localized: "\(pack.product.credits) exports"),
             displayPrice: pack.displayPrice,
             unitPriceText: unitPrice(for: pack)
         )
@@ -123,8 +124,8 @@ public final class PaywallViewModel: ObservableObject {
 
     private func unitPrice(for pack: CreditProductInfo) -> String? {
         guard pack.product.credits > 1 else { return nil }
-        let each = pack.price / Decimal(pack.product.credits)
-        return "\(each.formatted(pack.priceFormatStyle)) each"
+        let each = (pack.price / Decimal(pack.product.credits)).formatted(pack.priceFormatStyle)
+        return String(localized: "\(each) each")
     }
 
     // MARK: - Selection
@@ -139,29 +140,40 @@ public final class PaywallViewModel: ObservableObject {
     /// The button. `nil` when there is nothing to buy.
     public var callToAction: String? {
         guard !plans.isEmpty, info[selectedProduct] != nil else { return nil }
-        if !selectedProduct.isSubscription { return "Unlock Forever" }
-        if let days = availableTrialDays[selectedProduct] { return "Start \(days)-Day Free Trial" }
-        return "Subscribe"
+        if !selectedProduct.isSubscription { return String(localized: "Unlock Forever") }
+        if let days = availableTrialDays[selectedProduct] {
+            return String(localized: "Start \(days)-Day Free Trial")
+        }
+        return String(localized: "Subscribe")
     }
 
     /// The small print under the button. App Store §3.1.1 requires the price and
     /// the renewal terms to be on the screen where the user commits.
     public var termsText: String {
         guard let product = info[selectedProduct] else {
-            return "Prices are shown in your local currency at checkout."
+            return String(localized: "Prices are shown in your local currency at checkout.")
         }
+
+        let price = product.displayPrice
 
         guard selectedProduct.isSubscription else {
-            return "\(product.displayPrice) once. Not a subscription — pay once and keep Caroullage Premium forever."
+            return String(localized: "\(price) once. Not a subscription — pay once and keep Caroullage Premium forever.")
         }
-
-        let period = Self.periodNoun(for: selectedProduct)
-        let renewal = "Renews automatically until cancelled. Cancel anytime in Settings."
 
         if let days = availableTrialDays[selectedProduct] {
-            return "\(days) days free, then \(product.displayPrice) per \(period). \(renewal)"
+            return String(localized: "\(days) days free, then \(price) per year. Renews automatically until cancelled. Cancel anytime in Settings.")
         }
-        return "\(product.displayPrice) per \(period). \(renewal)"
+
+        switch selectedProduct {
+        case .yearly, .yearlyOffer:
+            return String(localized: "\(price) per year. Renews automatically until cancelled. Cancel anytime in Settings.")
+        case .monthly:
+            return String(localized: "\(price) per month. Renews automatically until cancelled. Cancel anytime in Settings.")
+        case .weekly:
+            return String(localized: "\(price) per week. Renews automatically until cancelled. Cancel anytime in Settings.")
+        case .lifetime:
+            return String(localized: "\(price) once. Not a subscription — pay once and keep Caroullage Premium forever.")
+        }
     }
 
     // MARK: - Buying
@@ -208,11 +220,11 @@ public final class PaywallViewModel: ObservableObject {
         isPremium = service.currentTier == .premium
 
         if didRestore {
-            restoreMessage = "Your purchase has been restored."
+            restoreMessage = String(localized: "Your purchase has been restored.")
         } else if let failure = service.purchaseError {
             errorMessage = failure
         } else {
-            restoreMessage = "No previous purchase found on this Apple Account."
+            restoreMessage = String(localized: "No previous purchase found on this Apple Account.")
         }
         return didRestore
     }
@@ -220,8 +232,13 @@ public final class PaywallViewModel: ObservableObject {
     // MARK: - Formatting
 
     private func priceLine(for product: PremiumProductInfo) -> String {
-        guard product.product.isSubscription else { return "\(product.displayPrice) once" }
-        return "\(product.displayPrice) / \(Self.periodNoun(for: product.product))"
+        let price = product.displayPrice
+        switch product.product {
+        case .lifetime: return String(localized: "\(price) once")
+        case .yearly, .yearlyOffer: return String(localized: "\(price) / year")
+        case .monthly: return String(localized: "\(price) / month")
+        case .weekly: return String(localized: "\(price) / week")
+        }
     }
 
     private func secondaryLine(for product: PremiumProductInfo) -> String? {
@@ -229,9 +246,9 @@ public final class PaywallViewModel: ObservableObject {
         case .yearly:
             let monthly = product.price / 12
             let formatted = monthly.formatted(product.priceFormatStyle)
-            return "\(formatted) / month"
+            return String(localized: "\(formatted) / month")
         case .lifetime:
-            return "Pay once, keep forever"
+            return String(localized: "Pay once, keep forever")
         case .monthly, .weekly, .yearlyOffer:
             return nil
         }
@@ -239,19 +256,11 @@ public final class PaywallViewModel: ObservableObject {
 
     private static func title(for product: PremiumProduct) -> String {
         switch product {
-        case .yearly, .yearlyOffer: return "Yearly"
-        case .monthly: return "Monthly"
-        case .weekly: return "Weekly"
-        case .lifetime: return "Lifetime"
+        case .yearly, .yearlyOffer: return String(localized: "Yearly")
+        case .monthly: return String(localized: "Monthly")
+        case .weekly: return String(localized: "Weekly")
+        case .lifetime: return String(localized: "Lifetime")
         }
     }
 
-    private static func periodNoun(for product: PremiumProduct) -> String {
-        switch product {
-        case .yearly, .yearlyOffer: return "year"
-        case .monthly: return "month"
-        case .weekly: return "week"
-        case .lifetime: return "once"
-        }
-    }
 }

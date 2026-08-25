@@ -42,7 +42,7 @@ public final class SpecialOfferViewModel: ObservableObject {
         isAvailable = regular != nil && offer != nil
     }
 
-    public let headline = "Special Offer"
+    public let headline = String(localized: "Special Offer")
 
     /// The saving, rounded down so the number on screen is never generous.
     public var discountPercent: Int {
@@ -54,11 +54,12 @@ public final class SpecialOfferViewModel: ObservableObject {
     public var savingText: String { "\(discountPercent)%" }
     public var regularPriceText: String { regular?.displayPrice ?? "" }
     public var offerPriceText: String { offer?.displayPrice ?? "" }
-    public let periodText = "12 months:"
+    public let periodText = String(localized: "12 months:")
 
     public var termsText: String {
         guard let offer else { return "" }
-        return "\(offer.displayPrice) per year. Renews automatically until cancelled. Cancel anytime in Settings."
+        let price = offer.displayPrice
+        return String(localized: "\(price) per year. Renews automatically until cancelled. Cancel anytime in Settings.")
     }
 
     /// Buys the discounted year. Returns whether the user is now premium.

@@ -252,7 +252,7 @@ struct UniversalExportSheetView: View {
     /// The path for someone who will not subscribe: pay once, export once.
     private var creditSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            sectionTitle("One-time")
+            sectionTitle(String(localized: "One-time"))
 
             if capabilities.creditBalance > 0 {
                 Toggle(isOn: $useCredit.animation(

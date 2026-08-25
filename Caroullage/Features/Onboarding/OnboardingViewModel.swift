@@ -47,10 +47,10 @@ public enum CreatorKind: String, CaseIterable, Sendable, Equatable {
 
     public var title: String {
         switch self {
-        case .carousels: return "Instagram Carousels"
-        case .reels: return "TikTok / Reels"
-        case .pinterest: return "Pinterest Boards"
-        case .fun: return "Just for fun"
+        case .carousels: return String(localized: "Instagram Carousels")
+        case .reels: return String(localized: "TikTok / Reels")
+        case .pinterest: return String(localized: "Pinterest Boards")
+        case .fun: return String(localized: "Just for fun")
         }
     }
 

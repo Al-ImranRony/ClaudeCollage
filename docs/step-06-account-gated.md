@@ -88,6 +88,44 @@ hanging — which is also the right behaviour on a bad connection in production.
 
 ---
 
+## Phase 6.4 — Localization
+
+The String Catalog (`Caroullage/Resources/Localizable.xcstrings`, plus a small
+one in `CaroullageWidgets/` because an extension cannot read the app's bundle)
+ships all 11 day-one languages, and the project declares them as known regions,
+so every `.lproj` is in the built app. Tests assert that no key is missing a
+language and that no translation drops a format specifier — a translation that
+loses its `%@` crashes when the string is used, and nothing else catches it.
+
+**The translations need a human pass before submission.** The brief calls for a
+professional service (Smartling, Lokalise, Crowdin); these were written in-house
+and are good enough to demo and to test layout against, but two categories
+should be reviewed by a native speaker who has seen the screen:
+
+1. **Anything with a price or renewal terms.** These are legally load-bearing
+   and are what App Review reads. The sentences are localized whole, per billing
+   period, rather than assembled from a translated price and a translated noun —
+   assembling them produces broken grammar in Japanese, Korean and Arabic — so a
+   reviewer only needs to check complete sentences.
+2. **Arabic and the CJK languages**, where register and line-breaking are easy to
+   get subtly wrong.
+
+**What is not localized yet.** This pass covered the launch-critical, reviewer-
+facing surfaces: onboarding, the paywall, the special offer, the credits path,
+the widget, and the App Intents (already `LocalizedStringResource`). The older
+editor chrome — the export sheet's format and quality controls, the alert copy
+in the editors, template category names — is still English-only and needs the
+same treatment before submission. `Tools/` has no generator for the catalog; it
+is edited directly, in Xcode's String Catalog editor.
+
+Verified on the simulator in Spanish, Arabic and Japanese: onboarding and the
+paywall render translated, and Arabic mirrors correctly (close button, feature
+grid, footer and the page indicator all flip). The plan rows could not be
+verified translated because the local StoreKit configuration does not reach an
+app launched by `simctl` — see the section above.
+
+---
+
 ## Blocked capabilities (entitlements the account unlocks)
 
 These need a paid team to register identifiers in the Developer portal:
