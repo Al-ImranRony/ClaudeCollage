@@ -83,8 +83,10 @@ final class TemplateGalleryViewController: UIViewController {
             subview.translatesAutoresizingMaskIntoConstraints = false
             view.addSubview(subview)
         }
-        // The grid runs under the pinned controls now, so it belongs behind them.
+        // The grid runs under the pinned controls now, so it belongs behind them,
+        // with the fade between the two.
         view.sendSubviewToBack(gridView)
+        TopFadeView.install(in: self, above: gridView)
 
         NSLayoutConstraint.activate([
             presetControl.topAnchor.constraint(

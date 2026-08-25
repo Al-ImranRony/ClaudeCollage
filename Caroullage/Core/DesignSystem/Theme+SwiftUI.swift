@@ -40,4 +40,6 @@ public extension Color {
     static var themeSeparator: Color { Color(Theme.Color.separator) }
     static var themeControlFill: Color { Color(Theme.Color.controlFill) }
     static var themeCritical: Color { Color(Theme.Color.critical) }
+    static var themeSuccess: Color { Color(Theme.Color.success) }
+    static var themeWarning: Color { Color(Theme.Color.warning) }
 }

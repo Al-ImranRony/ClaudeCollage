@@ -71,8 +71,9 @@ final class ProjectsViewController: UIViewController {
         view.addSubview(collectionView)
         view.addSubview(emptyStateView)
         // Same as the gallery: the grid is full-height and must sit behind the
-        // sort control it scrolls under.
+        // sort control it scrolls under, with the fade between the two.
         view.sendSubviewToBack(collectionView)
+        TopFadeView.install(in: self, above: collectionView)
 
         NSLayoutConstraint.activate([
             sortControl.topAnchor.constraint(

@@ -50,7 +50,10 @@ public final class SuccessOverlayView: UIView {
         )
         badge.layer.cornerRadius = 34
         badge.layer.cornerCurve = .continuous
-        badge.useBrandGradient()
+        // Green, not brand orange: this badge exists to say "that worked", and
+        // the palette has a token for exactly that. On the brand gradient every
+        // outcome looked identical.
+        badge.useGradient(from: Theme.Color.success, to: Theme.Color.successBright)
         badge.translatesAutoresizingMaskIntoConstraints = false
 
         label.text = message

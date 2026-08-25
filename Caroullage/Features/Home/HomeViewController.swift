@@ -214,6 +214,7 @@ final class HomeViewController: UIViewController {
 
         scrollView.addSubview(contentStack)
         view.addSubview(scrollView)
+        TopFadeView.install(in: self, above: scrollView)
 
         NSLayoutConstraint.activate([
             // Under the nav bar, not below it. Pinned to the safe area the large

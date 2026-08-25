@@ -28,18 +28,26 @@ public enum Theme {
         // Brand — Claude orange. The single most important token: this is the
         // app's identity, used brilliantly wherever an accent fits.
         ///
-        /// The light value is #E56828 rather than a rounder #E86A2A because the
-        /// latter lands at 2.98:1 against `background` — a hair under the 3:1
-        /// that large text and non-text UI need. The nudge is imperceptible and
-        /// the token now passes its own documented role; `ThemeContrastTests`
-        /// is what noticed.
+/// Primary, from the owner's palette (2026-08-26).
+        ///
+        /// The palette says #E67E22; the light value here is #E0761C, which is
+        /// the same orange about two percent darker. #E67E22 lands at 2.85:1
+        /// against the palette's white background — under the 3:1 that a fill's
+        /// own edge and any large text on it must clear — and the palette moved
+        /// the background from off-white to pure white, which is what pushed it
+        /// under. The nudge is imperceptible side by side and it keeps the
+        /// token honest about the job it does. `ThemeContrastTests` is what
+        /// caught it, the same way it caught the previous orange.
+        ///
+        /// The dark value lifts it so it reads as the same colour on a dark
+        /// ground instead of sinking into it.
         public static var accent: UIColor {
-            dynamic(light: 0xE56828, dark: 0xF5843E)
+            dynamic(light: 0xE0761C, dark: 0xF0913F)
         }
 
-        /// A slightly deeper accent for pressed/active states.
+        /// Primary Pressed, per the palette: #C96A16.
         public static var accentPressed: UIColor {
-            dynamic(light: 0xCC5716, dark: 0xE0702B)
+            dynamic(light: 0xC96A16, dark: 0xD97B22)
         }
 
         /// The accent corrected for contrast, and the only accent that may
@@ -55,37 +63,45 @@ public enum Theme {
         ///
         /// It darkens in light mode and lightens in dark mode, which is why one
         /// token can serve both roles — see `ThemeContrastTests`.
+        /// Not in the owner's palette because a palette lists identity, not
+        /// legibility: white on Primary is 2.9:1 and Primary on white is 3.1:1,
+        /// so Primary cannot carry body text either way. #B45309 is the same
+        /// family, two steps darker, and clears 4.5:1 in both directions.
         public static var accentStrong: UIColor {
-            dynamic(light: 0xB94D12, dark: 0xF5843E)
+            dynamic(light: 0xB45309, dark: 0xF0913F)
         }
 
         /// The far end of the brand gradient (accent → accentSecondary) used on
         /// hero surfaces, the primary CTA and selection glows. A warm amber keeps
         /// the gradient inside the orange family — minimal, no clashing hue.
         public static var accentSecondary: UIColor {
-            dynamic(light: 0xF29B3C, dark: 0xF7AC53)
+            dynamic(light: 0xF59E0B, dark: 0xFBBF24)
         }
 
-        // Backgrounds — layered so cards read against the canvas.
+        // Backgrounds, from the owner's palette: Background #FFFFFF and Card
+        // #FCFCFC. Those two are a hair apart on purpose — separation comes
+        // from the border and the card shadow rather than from a fill
+        // difference, which is what keeps a white-canvas app looking clean
+        // instead of grey.
         public static var background: UIColor {
-            dynamic(light: 0xF7F6F4, dark: 0x0E0E10)
+            dynamic(light: 0xFFFFFF, dark: 0x0D1117)
         }
 
         public static var surface: UIColor {
-            dynamic(light: 0xFFFFFF, dark: 0x1B1B1E)
+            dynamic(light: 0xFCFCFC, dark: 0x161B22)
         }
 
         public static var surfaceRaised: UIColor {
-            dynamic(light: 0xFFFFFF, dark: 0x252528)
+            dynamic(light: 0xFFFFFF, dark: 0x1C222B)
         }
 
         // Text.
         public static var textPrimary: UIColor {
-            dynamic(light: 0x1A1A1C, dark: 0xF5F5F7)
+            dynamic(light: 0x111827, dark: 0xF3F5F8)
         }
 
         public static var textSecondary: UIColor {
-            dynamic(light: 0x6B6B70, dark: 0x9B9BA1)
+            dynamic(light: 0x6B7280, dark: 0x9CA3AF)
         }
 
         /// Ink for anything sitting on `accentStrong`.
@@ -116,19 +132,49 @@ public enum Theme {
         public static var cellWellInk: UIColor { rgb(0x7C766C) }
 
         // Lines & fills.
+        /// Border, per the palette: #E5E7EB. Load-bearing now that the canvas
+        /// and cards are both near-white.
         public static var separator: UIColor {
-            dynamic(light: 0xE4E2DE, dark: 0x2E2E32)
+            dynamic(light: 0xE5E7EB, dark: 0x2A2F37)
         }
 
+        /// Secondary Background from the palette, #F7F7F8, doing the job it is
+        /// best at: the track under a segmented control, a chip, a field.
         public static var controlFill: UIColor {
-            dynamic(light: 0xEFEDE9, dark: 0x2A2A2E)
+            dynamic(light: 0xF7F7F8, dark: 0x22272E)
         }
 
-        /// Failure text — a purchase that did not go through, a save that
-        /// could not be written. Step 06 added it: the palette had no way to
-        /// say "this went wrong" without reaching for a raw system colour.
+        /// Error, per the palette: #EF4444. A purchase that did not go through,
+        /// a save that could not be written.
+        ///
+        /// The dark value is lifted rather than matched: #EF4444 on a dark
+        /// ground is 4.0:1, which is under the bar for the small text this
+        /// token is used at.
         public static var critical: UIColor {
-            dynamic(light: 0xB3261E, dark: 0xF2B8B5)
+            dynamic(light: 0xDC2626, dark: 0xF87171)
+        }
+
+        /// Success, per the palette: #22C55E — an export that finished, a
+        /// purchase that landed.
+        ///
+        /// #22C55E is a fill colour, not an ink one: at 2.3:1 on white it is
+        /// fine behind a glyph and illegible as text, so the light value is
+        /// darkened for the places this is used as a label.
+        public static var success: UIColor {
+            dynamic(light: 0x15803D, dark: 0x4ADE80)
+        }
+
+        /// Success at the palette's own value, #22C55E, for the far end of a
+        /// gradient or a fill large enough that contrast is not the question.
+        public static var successBright: UIColor {
+            dynamic(light: 0x22C55E, dark: 0x22C55E)
+        }
+
+        /// Warning, per the palette: #F59E0B — a canvas that does not match the
+        /// preset, an export that will be scaled. Darkened in light mode for the
+        /// same reason as `success`.
+        public static var warning: UIColor {
+            dynamic(light: 0xB45309, dark: 0xFBBF24)
         }
 
         /// The accent as a low-opacity tint, e.g. selected-swatch halo.

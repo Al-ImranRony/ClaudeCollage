@@ -97,7 +97,10 @@ final class AppCoordinator {
         carousel.onCreate = { [weak self] config in self?.beginCarousel(config: config) }
 
         tabBarController.setTabs([
-            (home, tabItem("Home", "house.fill", "homeTab")),
+            // Home is the one tab a user returns to rather than visits, so it
+            // gets the outline-to-filled treatment: a plain house that fills in
+            // when you are there. The rest stay filled — one moving part, not four.
+            (home, tabItem("Home", "house", selected: "house.fill", "homeTab")),
             (templates, tabItem("Templates", "rectangle.3.group.fill", "templatesButton")),
             (projects, tabItem("Projects", "square.grid.2x2.fill", "projectsTab")),
             (carousel, tabItem("Carousel", "rectangle.stack.fill", "carouselButton")),
@@ -202,9 +205,9 @@ final class AppCoordinator {
     }
 
     private func tabItem(
-        _ title: String, _ symbol: String, _ identifier: String
-    ) -> FloatingTabBarView.Item {
-        FloatingTabBarView.Item(title: title, symbol: symbol, identifier: identifier)
+        _ title: String, _ symbol: String, selected: String? = nil, _ identifier: String
+    ) -> TabDescriptor {
+        TabDescriptor(title: title, symbol: symbol, selectedSymbol: selected, identifier: identifier)
     }
 
     // MARK: - Navigation helpers

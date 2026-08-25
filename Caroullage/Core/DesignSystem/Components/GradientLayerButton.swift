@@ -29,6 +29,8 @@ public class GradientLayerButton: UIButton {
 
     public var gradientLayer: CAGradientLayer? { layer as? CAGradientLayer }
 
+    private var customGradient: (start: UIColor, end: UIColor)?
+
     /// Paints the brand gradient for the current appearance and keeps it in step
     /// with later appearance changes. CGColors are resolved, not dynamic, so
     /// nothing repaints a gradient on its own.
@@ -41,7 +43,28 @@ public class GradientLayerButton: UIButton {
         }
     }
 
+    /// Paints a gradient from any two theme colours, resolving them for the
+    /// current appearance and re-resolving on change — CGColors are static, so
+    /// without this a themed gradient keeps its light-mode colours in the dark.
+    public func useGradient(from start: UIColor, to end: UIColor) {
+        gradientLayer?.startPoint = CGPoint(x: 0, y: 0)
+        gradientLayer?.endPoint = CGPoint(x: 1, y: 1)
+        customGradient = (start, end)
+        refreshCustomGradient()
+        registerForTraitChanges([UITraitUserInterfaceStyle.self]) { (button: Self, _) in
+            button.refreshCustomGradient()
+        }
+    }
+
     private func refreshBrandGradient() {
         gradientLayer?.colors = Theme.Color.brandGradient(for: traitCollection)
+    }
+
+    private func refreshCustomGradient() {
+        guard let customGradient else { return }
+        gradientLayer?.colors = [
+            customGradient.start.resolvedColor(with: traitCollection).cgColor,
+            customGradient.end.resolvedColor(with: traitCollection).cgColor,
+        ]
     }
 }

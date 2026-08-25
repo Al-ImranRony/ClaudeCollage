@@ -26,8 +26,13 @@ public enum AppAppearance {
 
     private static func configureNavigationBar() {
         let appearance = UINavigationBarAppearance()
-        appearance.configureWithDefaultBackground()
-        appearance.backgroundColor = Theme.Color.background
+        // Transparent, with `TopFadeView` behind it: an opaque bar draws a hard
+        // line across the screen and flattens the depth the floating tab bar
+        // just bought. Content should dissolve toward the top edge, not stop at
+        // a rule.
+        appearance.configureWithTransparentBackground()
+        appearance.backgroundColor = .clear
+        appearance.shadowColor = nil
 
         let title = Theme.Color.textPrimary
         appearance.titleTextAttributes = [

@@ -49,7 +49,7 @@ final class TabBarShellUITests: XCTestCase {
         for identifier in ["templatesButton", "projectsTab", "carouselButton", "homeTab"] {
             app.buttons[identifier].tap()
         }
-        let tabBar = app.otherElements["mainTabBar"]
+        let tabBar = app.tabBars["mainTabBar"]
         for label in ["Home", "Templates", "Projects", "Carousel"] {
             XCTAssertTrue(tabBar.buttons[label].exists,
                           "Tab labelled \(label) after every tab has loaded")
@@ -111,7 +111,7 @@ final class TabBarShellUITests: XCTestCase {
         let app = launch()
         let plus = app.buttons["startEditingButton"]
         XCTAssertTrue(plus.waitForExistence(timeout: 5))
-        let tabBar = app.otherElements["mainTabBar"]
+        let tabBar = app.tabBars["mainTabBar"]
         XCTAssertTrue(tabBar.waitForExistence(timeout: 5))
 
         XCTAssertLessThanOrEqual(plus.frame.maxY, tabBar.frame.minY + 0.5,
@@ -123,7 +123,7 @@ final class TabBarShellUITests: XCTestCase {
         // The centre placeholder that used to hold a slot open for a notched "+" is
         // gone, so all four items are real and selectable.
         let app = launch()
-        let tabBar = app.otherElements["mainTabBar"]
+        let tabBar = app.tabBars["mainTabBar"]
         XCTAssertTrue(tabBar.waitForExistence(timeout: 5))
         XCTAssertEqual(tabBar.buttons.count, 4, "Four real tabs, no spacer")
     }
@@ -172,7 +172,7 @@ final class TabBarShellUITests: XCTestCase {
         // hidesBottomBarWhenPushed — without it the bar sits under the editor's
         // bottom control strip.
         let app = launch()
-        let tabBar = app.otherElements["mainTabBar"]
+        let tabBar = app.tabBars["mainTabBar"]
         XCTAssertTrue(tabBar.waitForExistence(timeout: 5), "The bar shows on a tab root")
 
         app.buttons["newProjectButton"].tap()

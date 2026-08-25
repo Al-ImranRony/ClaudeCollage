@@ -5,17 +5,21 @@
 //  Step 04.5 batch C — the app's root shell. Restyled in Step 06's UI pass.
 //
 //  Module selection used to be five UIBarButtonItems crammed into the Home nav
-//  bar. It is now a floating pill bar with a wide "Start Editing" pill sitting
-//  clear above it:
+//  bar. It is now a tab bar with a wide "Start Editing" pill sitting clear
+//  above it:
 //
 //               ( +  Start Editing )
 //      ( Home | Templates | Projects | Carousel )
 //
-//  The system `UITabBar` is hidden and `FloatingTabBarView` draws the bar, which
-//  is the only way to get a bar that floats clear of the screen edge with a
-//  capsule behind the selected item. `UITabBarController` is still underneath,
-//  because the thing it is genuinely good at — a navigation stack per tab — is
-//  exactly what a hand-rolled shell gets wrong.
+//  The bar is the system `UITabBar`, and that is the whole point. On iOS 26 the
+//  platform already draws it as a floating pill with Liquid Glass and a capsule
+//  behind the selected item — the exact shape this app wants. A hand-drawn bar
+//  with a `UIVisualEffectView` gets close but renders a *material*, not glass:
+//  it does not refract, it does not pick up the scroll-edge treatment, and on a
+//  device it reads as flat. That regression is why this went back.
+//
+//  What the appearance below must never do is set an opaque `backgroundColor`,
+//  which replaces the material with a fill and takes the glass with it.
 //
 //  Each tab owns its own UINavigationController, so pushing an editor keeps that
 //  tab's back stack intact. Editors set `hidesBottomBarWhenPushed`, so the bar is
@@ -30,6 +34,24 @@
 
 import UIKit
 
+/// What a tab is, before UIKit's `UITabBarItem` is built from it. Keeps the
+/// symbol name and the accessibility identifier together at the call site.
+struct TabDescriptor {
+    let title: String
+    let symbol: String
+    /// Drawn while the tab is selected. Defaults to `symbol`, so a tab only
+    /// carries two glyphs when the change is worth making.
+    let selectedSymbol: String?
+    let identifier: String
+
+    init(title: String, symbol: String, selectedSymbol: String? = nil, identifier: String) {
+        self.title = title
+        self.symbol = symbol
+        self.selectedSymbol = selectedSymbol
+        self.identifier = identifier
+    }
+}
+
 @MainActor
 final class AppTabBarController: UITabBarController {
 
@@ -42,26 +64,20 @@ final class AppTabBarController: UITabBarController {
     private var didReportFirstAppearance = false
 
     private let shellContainer = PassthroughView()
-    private let floatingBar = FloatingTabBarView()
     private let plusButton = GradientLayerButton(type: .custom)
 
-    /// The pill's height, and the bar's. Both stay above the 44pt minimum touch
-    /// target — the pill is 46 tall, and each tab item gets 44 of the bar's 56.
+    /// The pill's height. 46 keeps it above the 44pt minimum touch target.
     private let plusHeight: CGFloat = 46
-    private let barHeight: CGFloat = 56
-    /// Gap between the pill and the bar. Small enough to read as one control
-    /// cluster, large enough that the pill is clearly floating above the bar.
+    /// Gap between the pill and the bar: close enough to read as one cluster,
+    /// far enough that the pill is clearly floating above it.
     private let barGap: CGFloat = 12
-    /// Inset of the floating bar from the screen edges.
     private let barInset: CGFloat = 14
 
     /// Vertical space a tab root must leave free so its content can scroll clear
-    /// of the cluster instead of being covered — and, worse, having its taps eaten.
-    ///
-    /// Includes the bar's own gap from the bottom edge and a margin above the
-    /// pill, so the last row of a list clears the cluster instead of hiding
-    /// under it.
-    private var shellClearance: CGFloat { plusHeight + barGap + barHeight + 16 }
+    /// of the pill instead of being covered — and, worse, having its taps eaten.
+    /// The tab bar's own height is already in the safe area; this is the pill on
+    /// top of it.
+    private var shellClearance: CGFloat { plusHeight + barGap + 8 }
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
@@ -81,23 +97,12 @@ final class AppTabBarController: UITabBarController {
         super.viewDidLayoutSubviews()
 
         let width = view.bounds.width
-        // Where a bottom bar belongs: its bottom edge just below the safe-area
-        // line, which puts it ~28pt off the screen edge on a home-indicator
-        // phone — clear of the indicator, and not floating in mid-air the way a
-        // fully inset bar does. Devices without an indicator get a plain margin.
-        let bottomInset = view.safeAreaInsets.bottom
-        let bottomMargin = bottomInset > 0 ? bottomInset - 6 : 10
-        let barY = view.bounds.height - bottomMargin - barHeight
-        let plusY = barY - barGap - plusHeight
+        // Sits on the bar the system drew, wherever it put it.
+        let plusY = tabBar.frame.minY - barGap - plusHeight
 
-        shellContainer.frame = CGRect(
-            x: 0, y: plusY, width: width, height: barY + barHeight - plusY)
+        shellContainer.frame = CGRect(x: 0, y: plusY, width: width, height: plusHeight)
 
-        floatingBar.frame = CGRect(
-            x: barInset, y: barY - plusY, width: width - barInset * 2, height: barHeight)
-        floatingBar.layer.cornerRadius = barHeight / 2
-
-        let plusWidth = min(width - barInset * 4, max(180, plusButton.intrinsicContentSize.width + 40))
+        let plusWidth = min(width - barInset * 4, max(150, plusButton.intrinsicContentSize.width + 26))
         plusButton.frame = CGRect(
             x: (width - plusWidth) / 2, y: 0, width: plusWidth, height: plusHeight)
         plusButton.layer.cornerRadius = plusHeight / 2
@@ -130,7 +135,7 @@ final class AppTabBarController: UITabBarController {
 
     /// Wraps each root in its own navigation controller. All items are real — the
     /// "+" sits above the bar rather than inside it, so nothing holds a slot open.
-    func setTabs(_ roots: [(root: UIViewController, item: FloatingTabBarView.Item)]) {
+    func setTabs(_ roots: [(root: UIViewController, item: TabDescriptor)]) {
         let controllers: [UIViewController] = roots.map { entry in
             // Applied to the ROOT, not the nav: a pushed editor hides the whole
             // cluster, so it must not inherit the reserved space.
@@ -138,11 +143,12 @@ final class AppTabBarController: UITabBarController {
             let nav = UINavigationController(rootViewController: entry.root)
             // The system item still exists — the hidden bar and the controller's
             // own bookkeeping read it — but nothing draws from it.
-            // No accessibility identifier here: the hidden bar still publishes
-            // its items, and two elements answering to "projectsTab" makes every
-            // query ambiguous. Only the drawn bar's buttons are addressable.
-            nav.tabBarItem = UITabBarItem(
-                title: entry.item.title, image: UIImage(systemName: entry.item.symbol), tag: 0)
+            let item = UITabBarItem(
+                title: entry.item.title,
+                image: UIImage(systemName: entry.item.symbol),
+                selectedImage: UIImage(systemName: entry.item.selectedSymbol ?? entry.item.symbol))
+            item.accessibilityIdentifier = entry.item.identifier
+            nav.tabBarItem = item
             // Watched so the floating "+" disappears the moment an editor is pushed.
             nav.delegate = self
             return nav
@@ -150,8 +156,6 @@ final class AppTabBarController: UITabBarController {
 
         setViewControllers(controllers, animated: false)
         selectedIndex = 0
-
-        floatingBar.setItems(roots.map(\.item))
     }
 
     /// The navigation stack a newly created project should be pushed onto.
@@ -173,16 +177,11 @@ final class AppTabBarController: UITabBarController {
     }
 
     private func configureAppearance() {
-        // The system bar is hidden, not restyled — `FloatingTabBarView` draws
-        // what the user sees. The appearance below still runs so that anything
-        // UIKit renders from the bar during a transition matches the theme
-        // instead of flashing a default grey.
-        tabBar.isHidden = true
-        tabBar.accessibilityElementsHidden = true
-
         let appearance = UITabBarAppearance()
+        // The default background IS the material — on iOS 26, Liquid Glass.
+        // Assigning a `backgroundColor` here replaces it with a flat fill, which
+        // is how a themed app loses the platform's glass without noticing.
         appearance.configureWithDefaultBackground()
-        appearance.backgroundColor = Theme.Color.surface
 
         // Tab labels are ~11pt, which is body text as far as contrast is
         // concerned, so the selected state uses `accentStrong` rather than the
@@ -206,15 +205,10 @@ final class AppTabBarController: UITabBarController {
         tabBar.scrollEdgeAppearance = appearance
         tabBar.tintColor = Theme.Color.accentStrong
         tabBar.unselectedItemTintColor = Theme.Color.textSecondary
+        tabBar.accessibilityIdentifier = "mainTabBar"
     }
 
     private func setupShell() {
-        floatingBar.onSelect = { [weak self] index in
-            guard let self, self.selectedIndex != index else { return }
-            self.selectedIndex = index
-            self.updateShellVisibility()
-        }
-        shellContainer.addSubview(floatingBar)
         setupPlusButton()
         view.addSubview(shellContainer)
     }
@@ -229,12 +223,12 @@ final class AppTabBarController: UITabBarController {
         config.image = UIImage(
             systemName: "plus",
             withConfiguration: UIImage.SymbolConfiguration(pointSize: 15, weight: .bold))
-        config.imagePadding = 7
+        config.imagePadding = 6
         config.attributedTitle = AttributedString(
             String(localized: "Start Editing"),
             attributes: AttributeContainer([.font: Theme.Typography.callout]))
         config.baseForegroundColor = Theme.Color.textOnAccent
-        config.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: 18, bottom: 0, trailing: 20)
+        config.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: 14, bottom: 0, trailing: 16)
         plusButton.configuration = config
         plusButton.accessibilityIdentifier = "startEditingButton"
         plusButton.accessibilityLabel = "Start Editing"
@@ -282,10 +276,7 @@ extension AppTabBarController: UITabBarControllerDelegate {
     func tabBarController(
         _ tabBarController: UITabBarController, didSelect viewController: UIViewController
     ) {
-        // Keeps the drawn bar in step with selection changes that did not come
-        // from a tap — a deep link, or the coordinator sending the user to
-        // Projects after a save.
-        floatingBar.select(index: selectedIndex)
+        Haptics.selectionChanged()
         updateShellVisibility()
     }
 }

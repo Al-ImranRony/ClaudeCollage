@@ -294,10 +294,10 @@ struct UniversalExportSheetView: View {
             Text("Your canvas is \(CanvasSize.normalize(capabilities.canvasAspect)) but this preset prefers \(ExportPreset.preset(for: options.platform).enforcedAspect ?? "the current size"). It will export anyway, scaled to fill the frame.")
                 .font(.themeCaption)
         }
-        .foregroundStyle(Color.themeAccentStrong)
+        .foregroundStyle(Color.themeWarning)
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(Theme.Color.accentSoft))
+        .background(Color.themeWarning.opacity(0.12))
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .accessibilityIdentifier("exportMismatchWarning")
     }
