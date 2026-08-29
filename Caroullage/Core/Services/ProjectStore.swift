@@ -174,6 +174,7 @@ final class ProjectStore {
 
         project.mode = .carousel
         project.carouselType = viewModel.carouselType
+        project.carouselAxis = viewModel.axis
         project.frameCount = frames.count
         project.canvasSize = viewModel.canvasSize
         project.carouselData = framesData
@@ -193,7 +194,8 @@ final class ProjectStore {
         let images = loadImages(forProject: id, referenced: referencedImageIDs(in: frames))
         return CarouselEditorViewModel(
             frames: frames, images: images, canvasSize: project.canvasSize,
-            carouselType: project.carouselType ?? .matched, projectID: project.id)
+            carouselType: project.carouselType ?? .matched, axis: project.carouselAxis,
+            projectID: project.id)
     }
 
     private func carouselThumbnailData(_ viewModel: CarouselEditorViewModel) -> Data? {

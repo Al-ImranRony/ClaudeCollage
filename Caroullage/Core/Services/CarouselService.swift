@@ -48,8 +48,13 @@ public struct CarouselStartConfig: Equatable, Sendable {
         self.aspectRatio = aspectRatio
     }
 
-    /// The split-axis control applies to panoramic carousels only.
-    public var showsSplitAxis: Bool { type == .panoramic }
+    /// Offered for every type since Step 06.
+    ///
+    /// It began as "which way do we cut the source photo", which only panoramic
+    /// carousels needed. It now also decides which way the editor lays the frames
+    /// out and which way they scroll, and that is a question every carousel has an
+    /// answer to — a Scroll-Through story most of all.
+    public var showsSplitAxis: Bool { true }
     /// Grid-preview derives its frame count from the source grid, so no count picker.
     public var showsFrameCount: Bool { type != .gridPreview }
 }

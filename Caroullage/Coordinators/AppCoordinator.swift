@@ -52,6 +52,7 @@ final class AppCoordinator {
         home.onNewProject = { [weak self] in self?.startNewGridProject() }
         home.onNewPolygon = { [weak self] in self?.startNewPolygonProject() }
         home.onNewVideoCollage = { [weak self] in self?.startVideoCollage() }
+        home.onNewCarousel = { [weak self] in self?.presentCarouselTypePicker() }
         home.photoAccessProvider = { [weak self] in self?.recentPhotos.access ?? .denied }
         home.requestPhotoAccess = { [weak self] in
             await self?.recentPhotos.requestAccess() ?? .denied
@@ -71,30 +72,15 @@ final class AppCoordinator {
         let templates = TemplateGalleryViewController(service: .shared)
         templates.onSelectTemplate = { [weak self] template in self?.openTemplate(template) }
 
-        let projects = ProjectsViewController()
-        projects.summariesProvider = { [weak self] in self?.store.listSummaries() ?? [] }
-        projects.onNewProject = { [weak self] in self?.startNewGridProject() }
-        projects.onOpenProject = { [weak self] id in self?.openProject(id: id) }
-        projects.onRenameProject = { [weak self] id, name in
-            self?.store.rename(id: id, to: name)
-            self?.refreshPlatformSurfaces()
+        let projects = makeGallery(configuration: .allProjects) { [weak self] in
+            self?.startNewGridProject()
         }
-        projects.onDuplicateProject = { [weak self] id in
-            self?.store.duplicate(id: id)
-            self?.refreshPlatformSurfaces()
+        // The Carousel tab used to be the type picker itself. It is now a place
+        // like every other tab — the carousels you have made — and the picker is
+        // a sheet reached from "+" or from this tab's empty state.
+        let carousels = makeGallery(configuration: .carousels) { [weak self] in
+            self?.presentCarouselTypePicker()
         }
-        // Export routes through opening the project: the export sheet lives in the
-        // editor and knows how to render that project's kind. Re-implementing it
-        // here would be a second export path to keep in sync.
-        projects.onExportProject = { [weak self] id in self?.openProject(id: id) }
-        projects.onDeleteProject = { [weak self] id in
-            self?.store.delete(id: id)
-            self?.spotlight.remove(id: id)
-            self?.refreshPlatformSurfaces()
-        }
-
-        let carousel = CarouselStartViewController()
-        carousel.onCreate = { [weak self] config in self?.beginCarousel(config: config) }
 
         tabBarController.setTabs([
             // Home is the one tab a user returns to rather than visits, so it
@@ -102,8 +88,11 @@ final class AppCoordinator {
             // when you are there. The rest stay filled — one moving part, not four.
             (home, tabItem("Home", "house", selected: "house.fill", "homeTab")),
             (templates, tabItem("Templates", "rectangle.3.group.fill", "templatesButton")),
+            // Carousel sits mid-bar, where the thumb lands, because it is the
+            // app's signature format. Projects is the archive you visit least, so
+            // it takes the edge.
+            (carousels, tabItem("Carousel", "rectangle.stack.fill", "carouselButton")),
             (projects, tabItem("Projects", "square.grid.2x2.fill", "projectsTab")),
-            (carousel, tabItem("Carousel", "rectangle.stack.fill", "carouselButton")),
         ])
         tabBarController.onStartEditing = { [weak self] in self?.presentStartEditingSheet() }
 
@@ -210,6 +199,50 @@ final class AppCoordinator {
         TabDescriptor(title: title, symbol: symbol, selectedSymbol: selected, identifier: identifier)
     }
 
+    // MARK: - Galleries
+
+    /// Projects and Carousels are the same screen with a different filter, so the
+    /// wiring lives here once. Only "new" differs: Projects starts a grid collage,
+    /// Carousels opens the type picker.
+    private func makeGallery(
+        configuration: ProjectsViewController.Configuration,
+        onNew: @escaping () -> Void
+    ) -> ProjectsViewController {
+        let gallery = ProjectsViewController(configuration: configuration)
+        gallery.summariesProvider = { [weak self] in self?.store.listSummaries() ?? [] }
+        gallery.onNewProject = onNew
+        gallery.onOpenProject = { [weak self] id in self?.openProject(id: id) }
+        gallery.onRenameProject = { [weak self] id, name in
+            self?.store.rename(id: id, to: name)
+            self?.refreshPlatformSurfaces()
+        }
+        gallery.onDuplicateProject = { [weak self] id in
+            self?.store.duplicate(id: id)
+            self?.refreshPlatformSurfaces()
+        }
+        // Export routes through opening the project: the export sheet lives in the
+        // editor and knows how to render that project's kind. Re-implementing it
+        // here would be a second export path to keep in sync.
+        gallery.onExportProject = { [weak self] id in self?.openProject(id: id) }
+        gallery.onDeleteProject = { [weak self] id in
+            self?.store.delete(id: id)
+            self?.spotlight.remove(id: id)
+            self?.refreshPlatformSurfaces()
+        }
+        return gallery
+    }
+
+    /// The carousel type picker, as a sheet over whichever tab you are on.
+    ///
+    /// Two doors reach it — the "+" menu's Carousel row and the Carousel tab's
+    /// empty state. The `NewStoryCarousel` intent is a third entry to carousels
+    /// but skips the picker: it already knows the type and frame count.
+    private func presentCarouselTypePicker() {
+        let picker = CarouselStartViewController()
+        picker.onCreate = { [weak self] config in self?.beginCarousel(config: config) }
+        tabBarController.present(picker, animated: true)
+    }
+
     // MARK: - Navigation helpers
 
     /// The stack a newly created project is pushed onto: whichever tab the user
@@ -233,6 +266,7 @@ final class AppCoordinator {
             onCamera: { [weak self] in self?.presentCamera() },
             onImage: { [weak self] in self?.pickPhotosForNewCollage() },
             onVideo: { [weak self] in self?.startVideoCollage() },
+            onCarousel: { [weak self] in self?.presentCarouselTypePicker() },
             onCustomCanvas: { [weak self] in self?.promptForCustomCanvas() }
         )
         tabBarController.present(sheet, animated: true)
@@ -382,13 +416,15 @@ final class AppCoordinator {
         case .matched, .scrollThrough:
             let frames = service.blankCarousel(
                 type: config.type, frameCount: config.frameCount, aspectRatio: config.aspectRatio)
-            presentCarouselEditor(frames: frames, images: [:], canvasSize: canvasSize, type: config.type)
+            presentCarouselEditor(frames: frames, images: [:], canvasSize: canvasSize,
+                                  type: config.type, axis: config.splitAxis)
         case .gridPreview:
             // v1 seeds a default 4-up grid; picking an existing grid project as the
             // source is a follow-up. Frame count derives from the grid.
             let grid = GridEditorState(template: .fourSquare)
             let frames = service.buildGridPreviewCarousel(from: grid, aspectRatio: config.aspectRatio)
-            presentCarouselEditor(frames: frames, images: [:], canvasSize: canvasSize, type: .gridPreview)
+            presentCarouselEditor(frames: frames, images: [:], canvasSize: canvasSize,
+                                  type: .gridPreview, axis: config.splitAxis)
         case .panoramic:
             pickPanoramicSource(config: config, canvasSize: canvasSize)
         }
@@ -403,17 +439,19 @@ final class AppCoordinator {
                 from: image, frameCount: config.frameCount, axis: config.splitAxis,
                 aspectRatio: config.aspectRatio)
             self.presentCarouselEditor(
-                frames: build.frames, images: build.images, canvasSize: canvasSize, type: .panoramic)
+                frames: build.frames, images: build.images, canvasSize: canvasSize,
+                type: .panoramic, axis: config.splitAxis)
         }
         panoramicPicker = picker
         navigationController.present(picker.makePicker(), animated: true)
     }
 
     private func presentCarouselEditor(
-        frames: [CarouselFrame], images: [UUID: CGImage], canvasSize: CGSize, type: CarouselType
+        frames: [CarouselFrame], images: [UUID: CGImage], canvasSize: CGSize,
+        type: CarouselType, axis: SplitAxis
     ) {
         let viewModel = CarouselEditorViewModel(
-            frames: frames, images: images, canvasSize: canvasSize, carouselType: type)
+            frames: frames, images: images, canvasSize: canvasSize, carouselType: type, axis: axis)
         attachCarouselAutosave(to: viewModel)
         store.saveCarousel(viewModel)   // persist immediately so it lands on Home
         presentCarouselEditor(viewModel: viewModel)
@@ -422,6 +460,9 @@ final class AppCoordinator {
     private func presentCarouselEditor(viewModel: CarouselEditorViewModel) {
         let editor = CarouselEditorViewController(viewModel: viewModel)
         editor.onEditFrame = { [weak self] frameVM in self?.pushEditor(with: frameVM) }
+        // The axis is presentation, but it is the user's choice, so it persists
+        // with the project rather than resetting on the next open.
+        editor.onAxisChanged = { [weak self] _ in self?.store.scheduleSaveCarousel(viewModel) }
         push(editor)
     }
 

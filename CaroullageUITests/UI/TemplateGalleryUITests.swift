@@ -16,6 +16,44 @@ final class TemplateGalleryUITests: XCTestCase {
     }
 
     @MainActor
+    func testTheFilterRowIsASingleRow() {
+        // The search bar used to be followed by a full-width ratio segmented
+        // control AND a category chip row — two stacked bands of what read as the
+        // same kind of control, before any content. They are not the same kind:
+        // a category is a tag, the ratio is a mode that reshapes every card.
+        let app = XCUIApplication.underTest()
+        app.launch()
+        app.buttons["templatesButton"].tap()
+        XCTAssertTrue(app.navigationBars["Templates"].waitForExistence(timeout: 8))
+
+        XCTAssertFalse(app.segmentedControls["canvasPresetControl"].exists,
+                       "The stacked ratio segmented control is gone")
+
+        let ratio = app.buttons["canvasRatioChip"]
+        let chips = app.collectionViews["categoryChips"]
+        XCTAssertTrue(ratio.waitForExistence(timeout: 5), "Ratio is a chip in the filter row")
+        XCTAssertTrue(chips.exists)
+        XCTAssertLessThan(
+            abs(ratio.frame.midY - chips.frame.midY), 12,
+            "Ratio and the category chips share one row, rather than stacking")
+    }
+
+    /// Picks a canvas ratio from the filter row's menu chip.
+    ///
+    /// Matched with BEGINSWITH because the menu items carry the aspect as a
+    /// subtitle, which UIKit may fold into the element's label. The category chips
+    /// are static texts rather than buttons, so a title like "Story" does not
+    /// collide here.
+    @MainActor
+    private func selectRatio(_ app: XCUIApplication, _ name: String) {
+        app.buttons["canvasRatioChip"].tap()
+        let option = app.buttons
+            .matching(NSPredicate(format: "label BEGINSWITH %@", name)).firstMatch
+        XCTAssertTrue(option.waitForExistence(timeout: 5), "Ratio menu offers \(name)")
+        option.tap()
+    }
+
+    @MainActor
     private func attach(_ name: String) {
         let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         shot.name = name
@@ -39,8 +77,8 @@ final class TemplateGalleryUITests: XCTestCase {
         XCTAssertTrue(grid.cells.firstMatch.waitForExistence(timeout: 5), "Gallery shows template cards")
         attach("01_gallery_square")
 
-        // The Story preset has its own catalog templates.
-        app.buttons["Story"].tap()
+        // The ratio is a menu chip now, not a segmented control.
+        selectRatio(app, "Story")
         XCTAssertTrue(grid.cells.firstMatch.waitForExistence(timeout: 3), "Story preset shows templates")
         attach("02_gallery_story")
 
@@ -53,7 +91,7 @@ final class TemplateGalleryUITests: XCTestCase {
 
         // Back to Square + All; the grid templates return.
         app.collectionViews["categoryChips"].staticTexts["All"].tap()
-        app.buttons["Square"].tap()
+        selectRatio(app, "Square")
         XCTAssertTrue(grid.cells.firstMatch.waitForExistence(timeout: 3), "Square templates return")
 
         // Tapping a free grid template routes into the grid editor.

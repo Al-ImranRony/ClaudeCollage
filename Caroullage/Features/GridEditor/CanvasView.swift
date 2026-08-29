@@ -301,6 +301,7 @@ final class CanvasView: UIView {
                 height: cell.frame.height * factor
             )
             view.layer.cornerRadius = cell.cornerRadius * factor
+            view.canvasShortSide = min(square.width, square.height)
             view.setClipShape(cell.clipShape, cornerRadius: cell.cornerRadius * factor)
             view.setGeometryTransform(cell.transform, factor: factor)
         }
@@ -521,7 +522,23 @@ final class CanvasView: UIView {
 final class CellContentView: UIView {
 
     private let imageView = UIImageView()
-    private let placeholder = UIImageView(image: UIImage(systemName: "plus"))
+    /// The empty-zone chrome: a hairline tracing the cell's boundary and a filled
+    /// "+" chip at its centre. Layers rather than views because neither ever moves
+    /// independently of the cell, and both are hidden the moment a photo lands.
+    ///
+    /// Geometry comes from `EmptyCellChrome`, the same source the export renderer
+    /// draws from, so an empty zone looks identical on the canvas and in the file.
+    private let outlineLayer = CAShapeLayer()
+    private let chipLayer = CAShapeLayer()
+    private let plusLayer = CAShapeLayer()
+
+    /// The canvas's short side in on-screen points, set by the canvas on layout.
+    /// The chip is capped against it so one full-bleed zone doesn't get a chip the
+    /// size of a dinner plate, and the outline is weighted off it so every zone in
+    /// a template is traced with the same line.
+    var canvasShortSide: CGFloat = 0 {
+        didSet { if canvasShortSide != oldValue { setNeedsLayout() } }
+    }
 
     /// The cell boundary. `.rectangle` uses the fast layer-cornerRadius path with
     /// no mask; any other shape installs a `CAShapeLayer` mask rebuilt on layout.
@@ -543,10 +560,17 @@ final class CellContentView: UIView {
         imageView.isUserInteractionEnabled = false
         addSubview(imageView)
 
-        placeholder.tintColor = Theme.Color.cellWellInk
-        placeholder.contentMode = .scaleAspectFit
-        placeholder.isUserInteractionEnabled = false
-        addSubview(placeholder)
+        outlineLayer.fillColor = UIColor.clear.cgColor
+        outlineLayer.strokeColor = Theme.Color.cellWellOutline.cgColor
+        layer.addSublayer(outlineLayer)
+
+        chipLayer.fillColor = Theme.Color.cellWellChip.cgColor
+        layer.addSublayer(chipLayer)
+
+        plusLayer.fillColor = UIColor.clear.cgColor
+        plusLayer.strokeColor = Theme.Color.cellWellChipInk.cgColor
+        plusLayer.lineCap = .round
+        layer.addSublayer(plusLayer)
     }
 
     @available(*, unavailable)
@@ -561,11 +585,43 @@ final class CellContentView: UIView {
         imageView.frame = bounds
         imageView.transform = priorTransform
 
-        let side = min(bounds.width, bounds.height) * 0.22
-        placeholder.bounds = CGRect(x: 0, y: 0, width: side, height: side)
-        placeholder.center = CGPoint(x: bounds.midX, y: bounds.midY)
-
+        layoutEmptyChrome()
         updateMask()
+    }
+
+    /// Re-traces the outline and the "+" chip for the current bounds. Runs inside
+    /// a disabled-action transaction so a border / corner drag doesn't leave the
+    /// chrome animating a frame behind the cell it belongs to.
+    private func layoutEmptyChrome() {
+        guard !outlineLayer.isHidden, bounds.width > 0, bounds.height > 0 else { return }
+        // Before the canvas has reported its size, fall back to the cell — the
+        // caps then simply don't bind, and the next layout pass corrects it.
+        let reference = canvasShortSide > 0 ? canvasShortSide : min(bounds.width, bounds.height)
+
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+
+        let lineWidth = EmptyCellChrome.outlineWidth(canvasShortSide: reference)
+        outlineLayer.frame = bounds
+        outlineLayer.lineWidth = lineWidth
+        outlineLayer.path = EmptyCellChrome.outlinePath(
+            shape: clipShape, frame: bounds,
+            cornerRadius: shapeCornerRadius.isZero ? layer.cornerRadius : shapeCornerRadius,
+            lineWidth: lineWidth
+        )
+
+        let (center, diameter) = EmptyCellChrome.chipPlacement(
+            shape: clipShape, frame: bounds, canvasShortSide: reference)
+        let chip = CGRect(
+            x: center.x - diameter / 2, y: center.y - diameter / 2,
+            width: diameter, height: diameter)
+        chipLayer.frame = bounds
+        chipLayer.path = CGPath(ellipseIn: chip, transform: nil)
+        plusLayer.frame = bounds
+        plusLayer.lineWidth = EmptyCellChrome.plusLineWidth(chipDiameter: diameter)
+        plusLayer.path = EmptyCellChrome.plusPath(center: center, chipDiameter: diameter)
+
+        CATransaction.commit()
     }
 
     /// Installs (or removes) the shape mask. Non-rectangular cells clip to a
@@ -602,16 +658,21 @@ final class CellContentView: UIView {
         if let image {
             imageView.image = UIImage(cgImage: image)
             imageView.isHidden = false
-            placeholder.isHidden = true
+            setEmptyChromeHidden(true)
             backgroundColor = .black
         } else {
             imageView.image = nil
             imageView.isHidden = true
-            placeholder.isHidden = false
+            setEmptyChromeHidden(false)
             // Same tokens the export renderer uses, so an empty cell looks the
             // same on the canvas as it will in the file.
             backgroundColor = Theme.Color.cellWell
+            setNeedsLayout()
         }
+    }
+
+    private func setEmptyChromeHidden(_ hidden: Bool) {
+        [outlineLayer, chipLayer, plusLayer].forEach { $0.isHidden = hidden }
     }
 
     /// Applies pan (reference pts × factor), rotation and zoom around the centre.

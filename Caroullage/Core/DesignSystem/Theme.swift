@@ -122,14 +122,36 @@ public enum Theme {
         public static var toast: UIColor { UIColor(white: 0.08, alpha: 0.92) }
         public static var textOnToast: UIColor { .white }
 
-        /// The fill behind an empty photo cell, and the glyph drawn on it.
+        /// The fill behind an empty photo cell.
         ///
         /// Deliberately NOT dynamic. This colour is composited into exported
         /// images, so it must not depend on whether the user happened to be in
         /// dark mode when they hit Export; the on-screen canvas paints the same
         /// value so the preview matches the file.
-        public static var cellWell: UIColor { rgb(0xE9E6E1) }
-        public static var cellWellInk: UIColor { rgb(0x7C766C) }
+        ///
+        /// The value is `controlFill`'s light tone rather than a warm grey of its
+        /// own. The warm well was a dark enough fill that the hairline tracing it
+        /// had nothing to read against, so a grid of empty zones came out as one
+        /// beige slab; the video editor, whose slots have always been this near-
+        /// white, was visibly the clearer of the two. Both editors now paint the
+        /// same well, and the boundary is what carries the zone.
+        public static var cellWell: UIColor { rgb(0xF7F7F8) }
+
+        /// The hairline tracing an empty zone's boundary, and the "+" chip that
+        /// sits at its centre. Fixed for the same reason as `cellWell`: they are
+        /// composited into exported files and template thumbnails.
+        ///
+        /// The outline is `separator`'s family, one shade down from its #E5E7EB:
+        /// a template thumbnail is rendered at 300px and then shown at 132pt, and
+        /// at that reduction a true #E5E7EB hairline resolves away to nothing —
+        /// which is precisely where the zones most need to be legible.
+        ///
+        /// The chip is the counterweight — a warm near-black disc with white ink,
+        /// so the tap target is the one thing in an empty zone carrying real
+        /// contrast (12:1 on the well).
+        public static var cellWellOutline: UIColor { rgb(0xE0E2E7) }
+        public static var cellWellChip: UIColor { rgb(0x4D4842).withAlphaComponent(0.92) }
+        public static var cellWellChipInk: UIColor { UIColor.white }
 
         // Lines & fills.
         /// Border, per the palette: #E5E7EB. Load-bearing now that the canvas

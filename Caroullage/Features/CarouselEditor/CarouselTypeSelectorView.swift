@@ -135,11 +135,16 @@ struct CarouselTypeSelectorView: View {
                 .accessibilityIdentifier("carouselFrameCountStepper")
             }
             if config.showsSplitAxis {
-                Picker("Split", selection: $splitAxis) {
-                    Text("Horizontal").tag(SplitAxis.horizontal)
-                    Text("Vertical").tag(SplitAxis.vertical)
+                // "Direction", not "Split": for panoramic it still decides how the
+                // source photo is cut, but for every other type it decides which
+                // way the frames are laid out and swiped.
+                Picker("Direction", selection: $splitAxis) {
+                    ForEach(SplitAxis.allCases, id: \.self) { axis in
+                        Text(axis.displayName).tag(axis)
+                    }
                 }
                 .pickerStyle(.segmented)
+                .accessibilityIdentifier("carouselDirectionPicker")
             }
             Picker("Aspect", selection: $aspect) {
                 Text("1:1").tag("1:1")

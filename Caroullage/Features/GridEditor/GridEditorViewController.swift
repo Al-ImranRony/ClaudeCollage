@@ -258,6 +258,10 @@ final class GridEditorViewController: UIViewController {
         let scroll = UIScrollView()
         scroll.translatesAutoresizingMaskIntoConstraints = false
         scroll.showsVerticalScrollIndicator = false
+        // The tray reaches the screen edge (see its bottom constraint), so the
+        // automatic behaviour would hand the home-indicator inset straight back
+        // as content inset and restore the empty band it was pinned past.
+        scroll.contentInsetAdjustmentBehavior = .never
         scroll.addSubview(controlsStack)
 
         // A compact "add overlay" bar between the canvas and the controls: drop a
@@ -287,7 +291,11 @@ final class GridEditorViewController: UIViewController {
             scroll.topAnchor.constraint(equalTo: addBar.bottomAnchor, constant: 8),
             scroll.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             scroll.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            scroll.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
+            // The real bottom, not the safe-area bottom. The tab bar is hidden
+            // while an editor is pushed, so pinning to the safe area left ~34pt
+            // of empty background under the last row of controls that nothing
+            // could ever scroll into — a dead band, not breathing room.
+            scroll.bottomAnchor.constraint(equalTo: view.bottomAnchor),
 
             controlsStack.topAnchor.constraint(equalTo: scroll.contentLayoutGuide.topAnchor, constant: 4),
             controlsStack.bottomAnchor.constraint(equalTo: scroll.contentLayoutGuide.bottomAnchor, constant: -4),

@@ -61,14 +61,12 @@ final class CriticalFlowTests: XCTestCase {
     func testCarouselThreeFramesExportFlow() {
         let app = launch()
 
-        app.buttons["carouselButton"].tap()
-        XCTAssertTrue(app.buttons["carouselCreateButton"].waitForExistence(timeout: 10),
-                      "The carousel tab offers the type selector")
+        app.openCarouselTypePicker()
         app.buttons["carouselCreateButton"].tap()
 
         let strip = app.collectionViews["carouselFrameStrip"]
         XCTAssertTrue(strip.waitForExistence(timeout: 10), "Carousel editor opens")
-        XCTAssertEqual(strip.cells.count, 3, "Matched carousel seeds three frames")
+        XCTAssertEqual(strip.value as? String, "3", "Matched carousel seeds three frames")
 
         app.buttons["carouselExportButton"].tap()
         XCTAssertTrue(app.buttons["exportSaveButton"].waitForExistence(timeout: 10),

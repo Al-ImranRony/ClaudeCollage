@@ -26,9 +26,15 @@ public final class CarouselEditorViewModel {
 
     public private(set) var frames: [CarouselFrame]
     public private(set) var currentIndex: Int
-    /// When on, background/font/border edits broadcast to every frame (matched
-    /// carousels default this on; other types default off).
-    public var isSyncEditEnabled: Bool
+
+    /// How the navigator lays the frames out and which way it scrolls.
+    ///
+    /// Presentation only. It must never reach `frames`, because the frames are
+    /// what gets exported — a carousel that rendered differently depending on how
+    /// its navigator happened to be arranged would be a bug you could not see
+    /// until the post was published. (For panoramic carousels the same axis also
+    /// chose how the source photo was cut, but that happened once, at build time.)
+    public var axis: SplitAxis
 
     /// Shared source pixels across all frames (grid-preview frames reuse the grid's
     /// ids, panoramic frames each own a distinct slice). Keyed by image id.
@@ -50,6 +56,7 @@ public final class CarouselEditorViewModel {
         images: [UUID: CGImage] = [:],
         canvasSize: CGSize,
         carouselType: CarouselType,
+        axis: SplitAxis = .horizontal,
         projectID: UUID = UUID()
     ) {
         self.projectID = projectID
@@ -57,17 +64,17 @@ public final class CarouselEditorViewModel {
         self.images = images
         self.canvasSize = canvasSize
         self.carouselType = carouselType
+        self.axis = axis
         self.currentIndex = 0
-        self.isSyncEditEnabled = (carouselType == .matched)
         undoStack.push(self.frames)
     }
 
     public convenience init(
         build: CarouselBuild, canvasSize: CGSize, carouselType: CarouselType,
-        projectID: UUID = UUID()
+        axis: SplitAxis = .horizontal, projectID: UUID = UUID()
     ) {
         self.init(frames: build.frames, images: build.images, canvasSize: canvasSize,
-                  carouselType: carouselType, projectID: projectID)
+                  carouselType: carouselType, axis: axis, projectID: projectID)
     }
 
     // MARK: - Accessors
@@ -88,9 +95,17 @@ public final class CarouselEditorViewModel {
     /// Persists the embedded editor's live state back into the current frame and
     /// merges any new source images. Called by the VC before a frame switch / save.
     public func commitCurrentFrame(state: GridEditorState, images newImages: [UUID: CGImage]) {
-        frames[currentIndex].state = state
         images.merge(newImages) { _, new in new }
-        onCommit?(self)
+        // Editing a frame is a carousel-level change and belongs on this stack.
+        // It used not to be recorded, which made the nav bar's Undo lie: undoing
+        // anything structural afterwards silently threw the frame edit away too,
+        // because the snapshot it stepped back to predated it.
+        guard frames[currentIndex].state != state else {
+            onCommit?(self)
+            return
+        }
+        frames[currentIndex].state = state
+        record()
     }
 
     // MARK: - Selection
@@ -138,11 +153,30 @@ public final class CarouselEditorViewModel {
         onFramesChanged?()
     }
 
-    // MARK: - Sync edit
+    // MARK: - Style sync
 
-    /// Broadcasts one style change to every frame (matched-carousel sync edit).
-    public func applySyncEdit(_ change: StyleChange) {
-        frames = service.syncEdit(change: change, to: frames)
+    /// Gives every frame the current frame's look, in one undoable step.
+    ///
+    /// This replaced a "Sync Edit" toggle. The capability was right — a carousel
+    /// that does not look like one carousel is the format's main failure — but a
+    /// switch made it hidden modal state: flip it on, edit a frame twenty minutes
+    /// later, and four other frames change with nothing to say so. As an action it
+    /// happens when you ask, once, and Undo puts it back.
+    ///
+    /// Type styling only rides along when the source frame actually has text.
+    /// Broadcasting from a photo-only frame would otherwise reset every caption in
+    /// the carousel to the default font, which is a destructive edit dressed up as
+    /// a style sync.
+    public func applyStyleToAllFrames() {
+        let source = frames[currentIndex].state
+        var updated = service.syncEdit(change: .backgroundColor(source.background), to: frames)
+        updated = service.syncEdit(change: .borderWidth(source.borderWidth), to: updated)
+        if let type = source.textOverlays.first {
+            updated = service.syncEdit(change: .font(type.fontName), to: updated)
+            updated = service.syncEdit(change: .textColor(type.colorHex), to: updated)
+        }
+        guard updated != frames else { return }
+        frames = updated
         record()
         onFramesChanged?()
         onCurrentFrameChanged?()

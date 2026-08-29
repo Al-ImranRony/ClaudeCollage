@@ -28,6 +28,17 @@ final class TabBarShellUITests: XCTestCase {
     }
 
     @MainActor
+    func testTabsAreInTheIntendedOrder() {
+        // Carousel sits third — mid-bar, where the thumb lands — because it is the
+        // app's signature format; Projects, the archive, takes the edge.
+        let app = launch()
+        let tabBar = app.tabBars["mainTabBar"]
+        XCTAssertTrue(tabBar.waitForExistence(timeout: 5))
+        let labels = (0..<4).map { tabBar.buttons.element(boundBy: $0).label }
+        XCTAssertEqual(labels, ["Home", "Templates", "Carousel", "Projects"])
+    }
+
+    @MainActor
     func testAllFourTabsAreReachable() {
         let app = launch()
         for identifier in ["templatesButton", "projectsTab", "carouselButton", "homeTab"] {
@@ -69,6 +80,10 @@ final class TabBarShellUITests: XCTestCase {
         XCTAssertTrue(app.buttons["startEditingImage"].waitForExistence(timeout: 5),
                       "Start Editing offers Image")
         XCTAssertTrue(app.buttons["startEditingVideo"].exists, "…and Video")
+        // Step 06: the global create menu could make everything except the app's
+        // signature format, which is what left the Carousel tab hosting a create
+        // form of its own.
+        XCTAssertTrue(app.buttons["startEditingCarousel"].exists, "…and Carousel")
         XCTAssertTrue(app.buttons["startEditingCustomCanvas"].exists, "…and Custom Canvas")
     }
 
@@ -195,6 +210,22 @@ final class TabBarShellUITests: XCTestCase {
                       "Shapes opens the editor")
         XCTAssertTrue(app.collectionViews["shapePicker"].waitForExistence(timeout: 5),
                       "…already in Shapes mode, not Grid")
+    }
+
+    @MainActor
+    func testHomeOffersCarouselLikeTheStartEditingSheetDoes() {
+        // Home's "Start Something" and the "+" sheet deliberately overlap — that is
+        // why `QuickStartTile` was lifted into the component layer. Carousel joined
+        // the sheet in Step 06 and Home was left a format short, so the app's
+        // signature output was missing from one of its two front doors.
+        let app = launch()
+        let carousel = app.buttons["carouselQuickStartButton"]
+        XCTAssertTrue(carousel.waitForExistence(timeout: 5),
+                      "Home offers Carousel alongside Grid, Shapes and Video")
+
+        carousel.tap()
+        XCTAssertTrue(app.buttons["carouselType-matched"].waitForExistence(timeout: 8),
+                      "…and opens the same type picker the + sheet does")
     }
 
     @MainActor

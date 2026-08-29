@@ -103,9 +103,13 @@ final class AppTabBarController: UITabBarController {
         shellContainer.frame = CGRect(x: 0, y: plusY, width: width, height: plusHeight)
 
         let plusWidth = min(width - barInset * 4, max(150, plusButton.intrinsicContentSize.width + 26))
-        plusButton.frame = CGRect(
-            x: (width - plusWidth) / 2, y: 0, width: plusWidth, height: plusHeight)
-        plusButton.layer.cornerRadius = plusHeight / 2
+        // `bounds` + `center`, never `frame`. The press animation leaves a 0.92
+        // scale on the button, and assigning `frame` to a transformed view makes
+        // UIKit solve for the bounds that would produce it — inflating a 46pt
+        // button to 50pt and compounding with every press. Both of these are
+        // transform-independent.
+        plusButton.bounds = CGRect(x: 0, y: 0, width: plusWidth, height: plusHeight)
+        plusButton.center = CGPoint(x: width / 2, y: plusHeight / 2)
 
         updateShellVisibility()
     }
@@ -229,10 +233,22 @@ final class AppTabBarController: UITabBarController {
             attributes: AttributeContainer([.font: Theme.Typography.callout]))
         config.baseForegroundColor = Theme.Color.textOnAccent
         config.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: 14, bottom: 0, trailing: 16)
+        // The configuration owns the corner radius, not us.
+        //
+        // A configured UIButton writes its resolved background radius onto the
+        // button's own layer during layout — which for this button IS the brand
+        // gradient. Setting `layer.cornerRadius` from `viewDidLayoutSubviews` as
+        // well made the two writers race: the shell's 23pt won at launch, and the
+        // default `.dynamic` style's 17pt won the moment a tap made the button
+        // lay out again. That is the pill visibly squaring off after being
+        // pressed. `.capsule` states the intent once and holds at any height.
+        config.cornerStyle = .capsule
         plusButton.configuration = config
         plusButton.accessibilityIdentifier = "startEditingButton"
         plusButton.accessibilityLabel = "Start Editing"
-        plusButton.layer.cornerCurve = .continuous
+        // A capsule's ends are semicircles; `.continuous` at that radius renders a
+        // squircle instead, which is the shape the pill must never drift toward.
+        plusButton.layer.cornerCurve = .circular
         plusButton.layer.shadowColor = UIColor.black.cgColor
         plusButton.layer.shadowOpacity = 0.22
         plusButton.layer.shadowRadius = 10

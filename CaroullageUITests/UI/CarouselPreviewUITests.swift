@@ -17,11 +17,8 @@ final class CarouselPreviewUITests: XCTestCase {
 
     @MainActor
     private func openCarousel(_ app: XCUIApplication) {
-        app.launch()
-        app.buttons["carouselButton"].tap()
-        let create = app.buttons["carouselCreateButton"]
-        XCTAssertTrue(create.waitForExistence(timeout: 8))
-        create.tap()
+        app.launchIntoCarouselTypePicker()
+        app.buttons["carouselCreateButton"].tap()
         XCTAssertTrue(app.navigationBars["Carousel"].waitForExistence(timeout: 8))
     }
 

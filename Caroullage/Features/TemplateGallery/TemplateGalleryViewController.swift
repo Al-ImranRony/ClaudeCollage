@@ -29,7 +29,16 @@ final class TemplateGalleryViewController: UIViewController {
     /// The templates currently shown, keyed for cell configuration.
     private var templatesByID: [String: CollageTemplate] = [:]
 
-    private lazy var presetControl = makePresetControl()
+    /// One filter row, not two.
+    ///
+    /// The ratio used to be a full-width segmented control stacked above the
+    /// category chips, so a search bar was followed by two rows of what read as
+    /// the same kind of control. They are not the same kind: a category is a tag,
+    /// and the ratio is a mode — it reshapes every card on screen. Pinning the
+    /// ratio as a menu chip at the head of the row, with a hairline between it and
+    /// the tags, says that, and gives the grid back most of a row.
+    private lazy var ratioChip = makeRatioChip()
+    private let filterDivider = UIView()
     private lazy var chipsView = makeChipsView()
     private lazy var gridView = makeGridView()
     private lazy var dataSource = makeDataSource()
@@ -79,7 +88,9 @@ final class TemplateGalleryViewController: UIViewController {
         emptyLabel.numberOfLines = 0
         emptyLabel.accessibilityIdentifier = "galleryEmptyLabel"
 
-        for subview in [presetControl, chipsView, gridView, emptyLabel] {
+        filterDivider.backgroundColor = Theme.Color.separator
+
+        for subview in [ratioChip, filterDivider, chipsView, gridView, emptyLabel] {
             subview.translatesAutoresizingMaskIntoConstraints = false
             view.addSubview(subview)
         }
@@ -89,15 +100,20 @@ final class TemplateGalleryViewController: UIViewController {
         TopFadeView.install(in: self, above: gridView)
 
         NSLayoutConstraint.activate([
-            presetControl.topAnchor.constraint(
-                equalTo: view.safeAreaLayoutGuide.topAnchor, constant: Theme.Spacing.sm),
-            presetControl.leadingAnchor.constraint(
+            ratioChip.leadingAnchor.constraint(
                 equalTo: view.leadingAnchor, constant: Theme.Spacing.md),
-            presetControl.trailingAnchor.constraint(
-                equalTo: view.trailingAnchor, constant: -Theme.Spacing.md),
+            ratioChip.centerYAnchor.constraint(equalTo: chipsView.centerYAnchor),
 
-            chipsView.topAnchor.constraint(equalTo: presetControl.bottomAnchor, constant: Theme.Spacing.xs),
-            chipsView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            filterDivider.leadingAnchor.constraint(
+                equalTo: ratioChip.trailingAnchor, constant: Theme.Spacing.sm),
+            filterDivider.centerYAnchor.constraint(equalTo: chipsView.centerYAnchor),
+            filterDivider.widthAnchor.constraint(equalToConstant: 1),
+            filterDivider.heightAnchor.constraint(equalToConstant: 20),
+
+            chipsView.topAnchor.constraint(
+                equalTo: view.safeAreaLayoutGuide.topAnchor, constant: Theme.Spacing.xs),
+            chipsView.leadingAnchor.constraint(
+                equalTo: filterDivider.trailingAnchor, constant: Theme.Spacing.xs),
             chipsView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             chipsView.heightAnchor.constraint(equalToConstant: 48),
 
@@ -157,10 +173,11 @@ final class TemplateGalleryViewController: UIViewController {
         emptyLabel.isHidden = !ids.isEmpty
     }
 
-    @objc private func presetChanged() {
-        let index = presetControl.selectedSegmentIndex
-        guard CanvasPreset.allCases.indices.contains(index) else { return }
-        selectedPreset = CanvasPreset.allCases[index]
+    private func select(_ preset: CanvasPreset) {
+        guard selectedPreset != preset else { return }
+        selectedPreset = preset
+        ratioChip.setValue(preset.displayName)
+        ratioChip.menu = makeRatioMenu()
         Haptics.selectionChanged()
         // Card heights follow the preset's aspect ratio.
         gridView.collectionViewLayout.invalidateLayout()
@@ -169,13 +186,28 @@ final class TemplateGalleryViewController: UIViewController {
 
     // MARK: - Subview factories
 
-    private func makePresetControl() -> UISegmentedControl {
-        let control = UISegmentedControl(items: CanvasPreset.allCases.map(\.displayName))
-        control.selectedSegmentIndex = 0
-        control.accessibilityIdentifier = "canvasPresetControl"
-        ThemeSegmentedControl.apply(to: control)
-        control.addTarget(self, action: #selector(presetChanged), for: .valueChanged)
-        return control
+    private func makeRatioChip() -> FilterMenuChip {
+        let chip = FilterMenuChip(
+            symbolName: "aspectratio",
+            identifier: "canvasRatioChip",
+            accessibilityLabel: "Canvas ratio")
+        chip.setValue(selectedPreset.displayName)
+        chip.menu = makeRatioMenu()
+        chip.setContentCompressionResistancePriority(.required, for: .horizontal)
+        return chip
+    }
+
+    /// Rebuilt on every change so the checkmark follows the selection.
+    private func makeRatioMenu() -> UIMenu {
+        UIMenu(title: "Canvas Ratio", children: CanvasPreset.allCases.map { preset in
+            // The subtitle is the aspect itself, which the old segmented control
+            // never showed — "Story" told you nothing about 9:16.
+            UIAction(
+                title: preset.displayName,
+                subtitle: preset.aspectRatio,
+                state: preset == selectedPreset ? .on : .off
+            ) { [weak self] _ in self?.select(preset) }
+        })
     }
 
     private func makeChipsView() -> UICollectionView {

@@ -110,8 +110,8 @@ final class VideoCanvasView: UIView {
             cellView.layer.borderColor = (isSelected ? Theme.Color.accent
                                                      : Theme.Color.separator).cgColor
             cellView.accessibilityIdentifier = "videoCell-\(index)"
-            if let plus = cellView.subviews.first as? UILabel {
-                plus.isHidden = isFilled
+            if let chip = cellView.subviews.first as? EmptyZoneChipView {
+                chip.isHidden = isFilled
             }
         }
         setNeedsLayout()
@@ -176,6 +176,8 @@ final class VideoCanvasView: UIView {
         let transform = canvasToView()
         for (index, cellView) in cellViews.enumerated() where cellFrames.indices.contains(index) {
             cellView.frame = cellFrames[index].applying(transform)
+            (cellView.subviews.first as? EmptyZoneChipView)?.canvasShortSide =
+                min(bounds.width, bounds.height)
         }
         layoutOverlays()
     }
@@ -223,16 +225,16 @@ final class VideoCanvasView: UIView {
         // rectangular video underneath it.
         cellView.clipsToBounds = true
 
-        let plus = UILabel()
-        plus.text = "+"
-        plus.font = Theme.Typography.title
-        plus.textColor = Theme.Color.textSecondary
-        plus.textAlignment = .center
-        plus.translatesAutoresizingMaskIntoConstraints = false
-        cellView.addSubview(plus)
+        // The same "+" chip the photo canvas shows in an empty zone, so a slot
+        // that wants media looks the same in both editors.
+        let chip = EmptyZoneChipView()
+        chip.translatesAutoresizingMaskIntoConstraints = false
+        cellView.addSubview(chip)
         NSLayoutConstraint.activate([
-            plus.centerXAnchor.constraint(equalTo: cellView.centerXAnchor),
-            plus.centerYAnchor.constraint(equalTo: cellView.centerYAnchor),
+            chip.leadingAnchor.constraint(equalTo: cellView.leadingAnchor),
+            chip.trailingAnchor.constraint(equalTo: cellView.trailingAnchor),
+            chip.topAnchor.constraint(equalTo: cellView.topAnchor),
+            chip.bottomAnchor.constraint(equalTo: cellView.bottomAnchor),
         ])
         return cellView
     }

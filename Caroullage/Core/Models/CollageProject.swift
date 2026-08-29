@@ -26,6 +26,12 @@ public final class CollageProject {
     public var canvasHeight: Double
     public var templateID: String?
     public var carouselTypeRaw: String?
+    /// Which way a carousel's frames are laid out and swiped (Step 06).
+    ///
+    /// Optional so existing carousels migrate for free — a project saved before
+    /// this existed decodes as `nil` and reads back as the horizontal default,
+    /// which is how every carousel was arranged until now.
+    public var carouselAxisRaw: String?
     public var frameCount: Int
     @Relationship(deleteRule: .cascade) public var cells: [CollageCell]
     public var previewThumbnail: Data?
@@ -76,6 +82,13 @@ public final class CollageProject {
     public var carouselType: CarouselType? {
         get { carouselTypeRaw.flatMap(CarouselType.init(rawValue:)) }
         set { carouselTypeRaw = newValue?.rawValue }
+    }
+
+    /// Defaults to `.horizontal`, which is how carousels were arranged before the
+    /// axis was persisted.
+    public var carouselAxis: SplitAxis {
+        get { carouselAxisRaw.flatMap(SplitAxis.init(rawValue:)) ?? .horizontal }
+        set { carouselAxisRaw = newValue.rawValue }
     }
 
     public var canvasSize: CGSize {

@@ -2,15 +2,19 @@
 //  CarouselStartViewController.swift
 //  Caroullage
 //
-//  Step 04.5 batch C — the Carousel tab's root.
+//  The host for the carousel type picker.
 //
-//  The carousel type selector used to be a modal presented from a Home nav-bar
-//  button. Now that Carousel is a tab, the selector IS the tab: hosting it inline
-//  removes a presentation step and gives the tab something to be. The SwiftUI view
-//  itself is unchanged from Step 03b slice 5.
+//  Step 04.5 batch C made this the Carousel tab's root: the selector WAS the tab.
+//  Step 06 undid that. It left Carousel as the only tab whose root was a form
+//  rather than a place, so the selector's full-width "Create" bar and the shell's
+//  floating "+ Start Editing" pill sat in the same band as two filled brand CTAs
+//  with nothing to say which was the action — and the tab gave finished carousels
+//  nowhere to live.
 //
-//  Titled "New Carousel" rather than "Carousel" so it does not collide with the
-//  carousel editor's own nav-bar title.
+//  The picker is now a sheet, reached from the "+" menu or from the Carousel
+//  tab's empty state, and the tab itself is a gallery of the carousels you have
+//  made. `CarouselTypeSelectorView` already drew a Cancel header whenever
+//  `onCancel` was non-nil; until now nothing passed one.
 //
 
 import UIKit
@@ -22,18 +26,38 @@ final class CarouselStartViewController: UIViewController {
     /// Wired by AppCoordinator — turns the chosen config into a carousel.
     var onCreate: ((CarouselStartConfig) -> Void)?
 
+    init() {
+        super.init(nibName: nil, bundle: nil)
+        modalPresentationStyle = .pageSheet
+        if let sheet = sheetPresentationController {
+            // Four type cards, the frame/aspect controls and the Create bar are
+            // very nearly a full screen; a medium detent would open with the
+            // options already cut off.
+            sheet.detents = [.large()]
+            sheet.prefersGrabberVisible = true
+            sheet.preferredCornerRadius = Theme.Radius.xl
+        }
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
+
     override func viewDidLoad() {
         super.viewDidLoad()
-        // `navigationItem.title`, NOT `title` — the latter would relabel the tab
-        // "New Carousel" the first time this tab's view loaded.
-        navigationItem.title = "New Carousel"
         view.backgroundColor = Theme.Color.background
-        navigationController?.navigationBar.prefersLargeTitles = true
 
         let selector = CarouselTypeSelectorView(
-            onCreate: { [weak self] config in self?.onCreate?(config) },
-            // Nothing to dismiss — this is a tab root, not a sheet.
-            onCancel: nil
+            onCreate: { [weak self] config in
+                guard let self else { return }
+                // Dismiss FIRST, then act. The editor is pushed onto the
+                // presenting tab's navigation stack — and panoramic opens a photo
+                // picker — neither of which UIKit will do from behind this sheet.
+                // The handler is captured before dismissing because `self` may be
+                // released by the time the completion runs.
+                let handler = self.onCreate
+                self.dismiss(animated: true) { handler?(config) }
+            },
+            onCancel: { [weak self] in self?.dismiss(animated: true) }
         )
         let host = UIHostingController(rootView: selector)
         host.view.accessibilityIdentifier = "carouselTypeSelector"
@@ -42,10 +66,7 @@ final class CarouselStartViewController: UIViewController {
         addChild(host)
         host.view.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(host.view)
-        TopFadeView.install(in: self, above: host.view)
         NSLayoutConstraint.activate([
-            // The hosted scroll view needs to reach under the nav bar for the
-            // large title to collapse; SwiftUI reads the safe area for its inset.
             host.view.topAnchor.constraint(equalTo: view.topAnchor),
             host.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             host.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),

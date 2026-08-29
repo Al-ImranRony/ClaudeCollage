@@ -20,13 +20,8 @@ final class CarouselEditorUITests: XCTestCase {
     /// (matched, 3 frames).
     @MainActor
     private func openCarousel(_ app: XCUIApplication) {
-        app.launch()
-        let carousel = app.buttons["carouselButton"]
-        XCTAssertTrue(carousel.waitForExistence(timeout: 8), "Home shows the Carousel button")
-        carousel.tap()
-        let create = app.buttons["carouselCreateButton"]
-        XCTAssertTrue(create.waitForExistence(timeout: 8), "The type selector is presented")
-        create.tap()
+        app.launchIntoCarouselTypePicker()
+        app.buttons["carouselCreateButton"].tap()
         XCTAssertTrue(app.navigationBars["Carousel"].waitForExistence(timeout: 8),
                       "Carousel editor pushes")
     }
@@ -37,8 +32,12 @@ final class CarouselEditorUITests: XCTestCase {
         openCarousel(app)
         let strip = app.collectionViews["carouselFrameStrip"]
         XCTAssertTrue(strip.waitForExistence(timeout: 5), "Frame navigator is shown")
-        XCTAssertEqual(strip.cells.count, 3, "A new carousel seeds 3 frames")
-        XCTAssertTrue(app.switches["syncEditSwitch"].exists, "Sync-edit toggle is present")
+        // The strip shows a panel and a half at a time, so `cells.count` is a
+        // count of what fits on screen, not of what the carousel holds. The
+        // navigator publishes the real count as its accessibility value.
+        XCTAssertEqual(strip.value as? String, "3", "A new carousel seeds 3 frames")
+        XCTAssertTrue(app.buttons["carouselDirectionButton"].exists,
+                      "The direction control took the sync-edit switch's place")
     }
 
     @MainActor
@@ -47,9 +46,9 @@ final class CarouselEditorUITests: XCTestCase {
         openCarousel(app)
         let strip = app.collectionViews["carouselFrameStrip"]
         XCTAssertTrue(strip.waitForExistence(timeout: 5))
-        XCTAssertEqual(strip.cells.count, 3)
+        XCTAssertEqual(strip.value as? String, "3")
         app.buttons["addFrameButton"].tap()
-        XCTAssertEqual(strip.cells.count, 4, "Adding a frame grows the navigator")
+        XCTAssertEqual(strip.value as? String, "4", "Adding a frame grows the navigator")
     }
 
     @MainActor
@@ -58,13 +57,16 @@ final class CarouselEditorUITests: XCTestCase {
         openCarousel(app)
         // Add a 4th frame so the resumed carousel is distinguishable from a fresh one.
         app.buttons["addFrameButton"].tap()
-        XCTAssertEqual(app.collectionViews["carouselFrameStrip"].cells.count, 4)
+        XCTAssertEqual(app.collectionViews["carouselFrameStrip"].value as? String, "4")
 
         // Back out of the editor, then over to the Projects tab: the saved gallery
         // lives there since Home became a discovery screen (Step 04.5 batch C).
         app.navigationBars["Carousel"].buttons.element(boundBy: 0).tap()
-        XCTAssertTrue(app.navigationBars["New Carousel"].waitForExistence(timeout: 8),
-                      "Backing out returns to the Carousel tab's own root")
+        // Home, not the Carousel tab. The editor is pushed onto whichever tab you
+        // started from, and since Step 06 the picker is a sheet over that tab
+        // rather than the Carousel tab's root.
+        XCTAssertTrue(app.navigationBars["Caroullage"].waitForExistence(timeout: 8),
+                      "Backing out returns to the tab the carousel was started from")
 
         // The most-recent project is the carousel just made; reopening resumes it.
         app.buttons["projectsTab"].tap()
@@ -73,7 +75,7 @@ final class CarouselEditorUITests: XCTestCase {
         card.tap()
         XCTAssertTrue(app.navigationBars["Carousel"].waitForExistence(timeout: 8),
                       "Reopening resumes the carousel editor")
-        XCTAssertEqual(app.collectionViews["carouselFrameStrip"].cells.count, 4,
+        XCTAssertEqual(app.collectionViews["carouselFrameStrip"].value as? String, "4",
                        "The 4-frame carousel resumed with its frames intact")
     }
 

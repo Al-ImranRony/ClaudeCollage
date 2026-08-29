@@ -344,8 +344,23 @@ public final class GridEditorViewModel {
 
     /// Small composite for the gallery thumbnail.
     public func renderThumbnail(maxDimension: CGFloat = 320) -> CGImage? {
-        let scale = canvasSize.width > 0 ? maxDimension / canvasSize.width : 1
-        return renderer.render(makeRenderRequest(), scale: scale)
+        renderer.render(makeRenderRequest(), scale: thumbnailScale(maxDimension: maxDimension))
+    }
+
+    /// The render request for the current state, so a caller can rasterize it off
+    /// the main actor.
+    ///
+    /// Building the request has to stay on the actor — it reads `state` — but it
+    /// is the cheap half. `RenderRequest` is `Sendable` and `CollageRenderer` is
+    /// `@unchecked Sendable` precisely so the expensive half need not be: the
+    /// carousel navigator renders a strip of frame thumbnails this way rather
+    /// than compositing each one inside `cellForItemAt`.
+    public func renderRequestSnapshot() -> RenderRequest { makeRenderRequest() }
+
+    /// The scale `renderThumbnail` would use, for callers rendering the snapshot
+    /// themselves.
+    public func thumbnailScale(maxDimension: CGFloat) -> CGFloat {
+        canvasSize.width > 0 ? maxDimension / canvasSize.width : 1
     }
 
     /// Bitmaps for whatever personal stickers the current state references.

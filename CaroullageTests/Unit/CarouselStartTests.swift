@@ -22,9 +22,19 @@ final class CarouselStartTests: XCTestCase {
         XCTAssertEqual(CarouselStartConfig(type: .matched, frameCount: 6).frameCount, 6)
     }
 
-    func testSplitAxisOptionOnlyForPanoramic() {
-        XCTAssertTrue(CarouselStartConfig(type: .panoramic, frameCount: 3).showsSplitAxis)
-        XCTAssertFalse(CarouselStartConfig(type: .matched, frameCount: 3).showsSplitAxis)
+    func testEveryCarouselTypeOffersADirection() {
+        // Step 06: the axis was panoramic-only when it meant nothing but "which way
+        // do we cut the source photo". It now also decides how the editor lays the
+        // frames out and which way they are swiped, which every type has an answer
+        // to — a Scroll-Through story most obviously of all.
+        for type in CarouselType.allCases {
+            XCTAssertTrue(CarouselStartConfig(type: type, frameCount: 3).showsSplitAxis,
+                          "\(type) should offer a direction")
+        }
+    }
+
+    func testTheDirectionDefaultsToHorizontal() {
+        XCTAssertEqual(CarouselStartConfig(type: .matched, frameCount: 3).splitAxis, .horizontal)
     }
 
     func testFrameCountHiddenForGridPreview() {

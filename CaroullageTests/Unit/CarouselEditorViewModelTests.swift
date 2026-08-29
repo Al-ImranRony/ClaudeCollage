@@ -104,14 +104,39 @@ final class CarouselEditorViewModelTests: XCTestCase {
         XCTAssertEqual(vm.frameCount, 3, "redo re-adds the frame")
     }
 
-    func testSyncEditAppliesToEveryFrame() {
-        let vm = makeVM(3)
-        vm.applySyncEdit(.backgroundColor(.black))
-        XCTAssertTrue(vm.frames.allSatisfy { $0.state.background == .black })
+    // `applySyncEdit` broadcast one `StyleChange` and recorded an undo step per
+    // call. `applyStyleToAllFrames` replaced it with a batched, single-step
+    // version, leaving the old primitive reachable only from this test — coverage
+    // that proved a path nothing took. Both are gone; `CarouselStyleSyncTests`
+    // covers the broadcast that ships.
+
+    // Step 06 removed `isSyncEditEnabled`. The toggle's default is no longer a
+    // thing to assert — style sync is an explicit action, covered by
+    // `CarouselStyleSyncTests`. What replaced it here is the undo behaviour that
+    // change depended on.
+
+    func testEditingAFrameIsItsOwnUndoStep() {
+        // `commitCurrentFrame` used not to record, so the nav bar's Undo skipped
+        // straight past a frame edit to whatever structural change preceded it —
+        // silently discarding the edit along the way.
+        let vm = makeVM(2)
+        var edited = GridEditorState()
+        edited.background = .black
+        vm.commitCurrentFrame(state: edited, images: [:])
+
+        XCTAssertTrue(vm.canUndo)
+        vm.undo()
+        XCTAssertNotEqual(vm.frames[0].state.background, .black,
+                          "Undo steps back over the frame edit")
     }
 
-    func testMatchedCarouselDefaultsSyncEditOn() {
-        XCTAssertTrue(makeVM(3, type: .matched).isSyncEditEnabled)
-        XCTAssertFalse(makeVM(3, type: .panoramic).isSyncEditEnabled)
+    func testCommittingAnUnchangedFrameDoesNotAddAnUndoStep() {
+        // `commitCurrentFrame` runs on every return to the navigator, including
+        // returns from an editor that changed nothing. Recording those would fill
+        // the stack with no-ops and make Undo appear to do nothing.
+        let vm = makeVM(2)
+        let unchanged = vm.currentFrame.state
+        vm.commitCurrentFrame(state: unchanged, images: [:])
+        XCTAssertFalse(vm.canUndo)
     }
 }

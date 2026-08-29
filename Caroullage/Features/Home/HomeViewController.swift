@@ -25,6 +25,7 @@ final class HomeViewController: UIViewController {
     var onNewProject: (() -> Void)?
     var onNewPolygon: (() -> Void)?
     var onNewVideoCollage: (() -> Void)?
+    var onNewCarousel: (() -> Void)?
 
     /// Asks for suggested layouts for the user's recent photos. Returns an empty
     /// list when access is absent or nothing is analysable.
@@ -272,8 +273,20 @@ final class HomeViewController: UIViewController {
             Haptics.tap()
             self?.onNewVideoCollage?()
         }
+        // Home and the "+" sheet overlap on purpose — it is why `QuickStartTile`
+        // was lifted into the component layer. Carousel joined the sheet in Step 06
+        // and Home was left a format short, so the app's signature output was
+        // missing from one of its two front doors.
+        let carousel = QuickStartTile(
+            title: "Carousel", subtitle: "A multi-frame post for the feed",
+            symbol: CollageMode.carousel.badgeSymbolName,
+            identifier: "carouselQuickStartButton"
+        ) { [weak self] in
+            Haptics.tap()
+            self?.onNewCarousel?()
+        }
 
-        let tiles = UIStackView(arrangedSubviews: [grid, polygon, video])
+        let tiles = UIStackView(arrangedSubviews: [grid, polygon, video, carousel])
         tiles.axis = .vertical
         tiles.spacing = Theme.Spacing.sm
         tiles.isLayoutMarginsRelativeArrangement = true
@@ -379,9 +392,16 @@ final class FeaturedTemplateCell: UICollectionViewCell {
     override init(frame: CGRect) {
         super.init(frame: frame)
 
-        imageView.contentMode = .scaleAspectFill
+        // Fit, not fill. The strip's tile is a fixed 132×~170 box while templates
+        // are authored 1:1, 4:5 and 9:16, so filling cropped a square template's
+        // left and right edges away — which does not just hide a sliver, it moves
+        // every zone's centre outward from the tile's centre. A 2-up came out with
+        // its two "+" chips pushed apart and its divider no longer reading as the
+        // middle: the template looked lopsided when it is perfectly symmetrical.
+        // Fitting shows the whole authored shape, letterboxed onto the well.
+        imageView.contentMode = .scaleAspectFit
         imageView.clipsToBounds = true
-        imageView.backgroundColor = Theme.Color.controlFill
+        imageView.backgroundColor = Theme.Color.cellWell
         imageView.layer.cornerRadius = Theme.Radius.md
         imageView.layer.cornerCurve = .continuous
         imageView.translatesAutoresizingMaskIntoConstraints = false
@@ -432,33 +452,62 @@ final class FeaturedTemplateCell: UICollectionViewCell {
 // MARK: - Empty state
 
 /// Shown by `ProjectsViewController` when nothing has been saved yet.
+///
+/// Step 06: the gallery runs twice, so the panel's words come in rather than
+/// being baked in. On the Carousel tab "No collages yet" would be wrong twice
+/// over — you may well have collages, just no carousels.
 final class HomeEmptyStateView: UIView {
+
+    struct Content {
+        let symbol: String
+        let title: String
+        let subtitle: String
+        let buttonTitle: String
+        let buttonIdentifier: String
+
+        static let projects = Content(
+            symbol: "square.grid.2x2.fill",
+            title: "No collages yet",
+            subtitle: "Create your first grid collage to get started.",
+            buttonTitle: "New Collage",
+            buttonIdentifier: "emptyStateCreateButton")
+
+        static let carousels = Content(
+            // The same glyph the gallery badges a carousel card with, so the
+            // empty state and the thing it promises are visibly the same idea.
+            symbol: CollageMode.carousel.badgeSymbolName,
+            title: "No carousels yet",
+            subtitle: "Build a multi-frame post for the feed.",
+            buttonTitle: "New Carousel",
+            buttonIdentifier: "carouselsEmptyStateCreateButton")
+    }
+
     var onCreate: (() -> Void)?
 
-    override init(frame: CGRect) {
-        super.init(frame: frame)
+    init(content: Content = .projects) {
+        super.init(frame: .zero)
 
         let symbolConfig = UIImage.SymbolConfiguration(pointSize: 52, weight: .regular)
-        let icon = UIImageView(image: UIImage(systemName: "square.grid.2x2.fill", withConfiguration: symbolConfig))
+        let icon = UIImageView(image: UIImage(systemName: content.symbol, withConfiguration: symbolConfig))
         icon.tintColor = Theme.Color.accent
         icon.contentMode = .scaleAspectFit
         icon.heightAnchor.constraint(equalToConstant: 64).isActive = true
 
         let title = UILabel()
-        title.text = "No collages yet"
+        title.text = content.title
         title.font = Theme.Typography.title2
         title.textColor = Theme.Color.textPrimary
         title.textAlignment = .center
 
         let subtitle = UILabel()
-        subtitle.text = "Create your first grid collage to get started."
+        subtitle.text = content.subtitle
         subtitle.font = Theme.Typography.body
         subtitle.textColor = Theme.Color.textSecondary
         subtitle.numberOfLines = 0
         subtitle.textAlignment = .center
 
         var config = UIButton.Configuration.filled()
-        config.title = "New Collage"
+        config.title = content.buttonTitle
         config.image = UIImage(systemName: "plus")
         config.imagePadding = 8
         config.cornerStyle = .large
@@ -466,13 +515,13 @@ final class HomeEmptyStateView: UIView {
         config.baseForegroundColor = Theme.Color.textOnAccent
         config.contentInsets = NSDirectionalEdgeInsets(top: 14, leading: 22, bottom: 14, trailing: 22)
         config.attributedTitle = AttributedString(
-            "New Collage", attributes: AttributeContainer([.font: Theme.Typography.button])
+            content.buttonTitle, attributes: AttributeContainer([.font: Theme.Typography.button])
         )
         let button = UIButton(configuration: config, primaryAction: UIAction { [weak self] _ in
             Haptics.tap()
             self?.onCreate?()
         })
-        button.accessibilityIdentifier = "emptyStateCreateButton"
+        button.accessibilityIdentifier = content.buttonIdentifier
 
         let stack = UIStackView(arrangedSubviews: [icon, title, subtitle, button])
         stack.axis = .vertical
@@ -615,6 +664,10 @@ final class ProjectCardCell: UICollectionViewCell {
         formatter.dateStyle = .medium
         dateLabel.text = "\(summary.mode.displayName) · \(formatter.string(from: summary.updatedAt))"
         accessibilityLabel = summary.displayName
+        // The kind is on the card as a badge glyph, which no assistive technology
+        // and no test can read. Naming it here is what lets the Carousel tab be
+        // checked for what it is filtering rather than for how many cards fit.
+        accessibilityIdentifier = "projectCard-\(summary.mode.rawValue)"
     }
 
     override func prepareForReuse() {

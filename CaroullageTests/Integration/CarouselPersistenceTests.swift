@@ -48,6 +48,39 @@ final class CarouselPersistenceTests: XCTestCase {
         XCTAssertEqual(loaded.frames[1].state.background, .black, "per-frame edits survive the round-trip")
     }
 
+    func testTheLayoutAxisRoundTrips() throws {
+        // Step 06: the axis used to exist only at creation, consumed by the
+        // panoramic builder and then discarded. It now decides how the editor lays
+        // the frames out, so it has to come back with the project.
+        let store = try makeStore()
+        let vm = CarouselEditorViewModel(
+            frames: [CarouselFrame(index: 0)], canvasSize: CGSize(width: 1080, height: 1350),
+            carouselType: .scrollThrough, axis: .vertical)
+
+        store.saveCarousel(vm)
+
+        let loaded = try XCTUnwrap(store.loadCarouselViewModel(id: vm.projectID))
+        XCTAssertEqual(loaded.axis, .vertical)
+    }
+
+    func testACarouselSavedBeforeTheAxisExistedReadsAsHorizontal() {
+        // `carouselAxisRaw` is optional so no migration was needed; the cost of
+        // that is a nil to resolve, and it must resolve to how every carousel was
+        // already arranged. Asserted on the model rather than through the store,
+        // which would need a test-only hook to forge an older record.
+        let project = CollageProject(
+            mode: .carousel, canvasSize: CGSize(width: 1080, height: 1350),
+            carouselType: .matched)
+        XCTAssertNil(project.carouselAxisRaw, "A record written before Step 06 has no axis")
+        XCTAssertEqual(project.carouselAxis, .horizontal)
+    }
+
+    func testAnUnrecognisedStoredAxisFallsBackRatherThanTrapping() {
+        let project = CollageProject(mode: .carousel, canvasSize: CGSize(width: 1080, height: 1350))
+        project.carouselAxisRaw = "diagonal"
+        XCTAssertEqual(project.carouselAxis, .horizontal)
+    }
+
     func testCarouselAppearsInSummariesTaggedCarousel() throws {
         let store = try makeStore()
         let vm = CarouselEditorViewModel(

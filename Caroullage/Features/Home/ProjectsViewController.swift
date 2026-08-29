@@ -25,49 +25,102 @@ final class ProjectsViewController: UIViewController {
     var onDuplicateProject: ((UUID) -> Void)?
     var onExportProject: ((UUID) -> Void)?
 
-    /// How the gallery is ordered. Search filters within the chosen order.
-    private enum SortOrder: Int, CaseIterable {
-        case recent, oldest, byMode
-        var title: String {
-            switch self {
-            case .recent: return "Recent"
-            case .oldest: return "Oldest"
-            case .byMode: return "By type"
-            }
-        }
+    /// Everything that differs between the two galleries this class now runs:
+    /// the Projects tab, which shows every saved project, and the Carousel tab,
+    /// which shows carousels only.
+    ///
+    /// Configuring one class rather than forking a second is the same call the
+    /// codebase made for `QuickStartTile` — two surfaces built from different
+    /// parts stop looking like one feature.
+    struct Configuration {
+        /// Which kind this gallery shows. `nil` shows every kind.
+        let modeFilter: CollageMode?
+        let navigationTitle: String
+        let searchPlaceholder: String
+        let gridIdentifier: String
+        let searchIdentifier: String
+        let sortIdentifier: String
+        let sortOrders: [GallerySortOrder]
+        let emptyState: HomeEmptyStateView.Content
+        /// What this gallery calls one of its items, for the header count.
+        let itemSingular: String
+        let itemPlural: String
+
+        static let allProjects = Configuration(
+            modeFilter: nil,
+            navigationTitle: "Projects",
+            searchPlaceholder: "Search your collages",
+            gridIdentifier: "projectsGrid",
+            searchIdentifier: "projectsSearchField",
+            sortIdentifier: "projectsSortControl",
+            sortOrders: GallerySortOrder.allCases,
+            emptyState: .projects,
+            itemSingular: "Collage",
+            itemPlural: "Collages")
+
+        static let carousels = Configuration(
+            modeFilter: .carousel,
+            navigationTitle: "Carousels",
+            searchPlaceholder: "Search your carousels",
+            gridIdentifier: "carouselsGrid",
+            searchIdentifier: "carouselsSearchField",
+            sortIdentifier: "carouselsSortControl",
+            // Nothing to group when every card is the same type.
+            sortOrders: GallerySortOrder.withoutModeGrouping,
+            emptyState: .carousels,
+            itemSingular: "Carousel",
+            itemPlural: "Carousels")
     }
-    private var sortOrder: SortOrder = .recent
+
+    private let configuration: Configuration
+
+    init(configuration: Configuration = .allProjects) {
+        self.configuration = configuration
+        super.init(nibName: nil, bundle: nil)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
+
+    private var sortOrder: GallerySortOrder = .recent
     private var searchText = ""
-    private lazy var sortControl = makeSortControl()
+    /// The header row that replaced a full-width Recent/Oldest segmented control:
+    /// a live count on the left, a compact sort menu on the right. A binary or
+    /// ternary sort does not deserve a whole row, and the row it was occupying
+    /// said nothing about what you were looking at.
+    private lazy var headerRow = makeHeaderRow()
+    private let countLabel = UILabel()
+    private lazy var sortChip = makeSortChip()
     private let searchController = UISearchController(searchResultsController: nil)
 
-    /// What the grid actually shows: `summaries` narrowed by search and ordered.
+    /// What the grid actually shows: `summaries` narrowed by mode and search,
+    /// then ordered.
     private var visibleSummaries: [ProjectSummary] = []
 
     private var summaries: [ProjectSummary] = []
     private lazy var collectionView = makeCollectionView()
-    private let emptyStateView = HomeEmptyStateView()
+    private lazy var emptyStateView = HomeEmptyStateView(content: configuration.emptyState)
 
     override func viewDidLoad() {
         super.viewDidLoad()
         // See HomeViewController — `title` on a tab root rewrites the tab label.
-        navigationItem.title = "Projects"
+        navigationItem.title = configuration.navigationTitle
         view.backgroundColor = Theme.Color.background
         navigationController?.navigationBar.prefersLargeTitles = true
 
         searchController.searchResultsUpdater = self
         searchController.obscuresBackgroundDuringPresentation = false
-        searchController.searchBar.placeholder = "Search your collages"
-        searchController.searchBar.accessibilityIdentifier = "projectsSearchField"
+        searchController.searchBar.placeholder = configuration.searchPlaceholder
+        searchController.searchBar.accessibilityIdentifier = configuration.searchIdentifier
         navigationItem.searchController = searchController
         definesPresentationContext = true
 
-        sortControl.translatesAutoresizingMaskIntoConstraints = false
+        headerRow.translatesAutoresizingMaskIntoConstraints = false
         collectionView.translatesAutoresizingMaskIntoConstraints = false
         emptyStateView.translatesAutoresizingMaskIntoConstraints = false
         emptyStateView.onCreate = { [weak self] in self?.onNewProject?() }
 
-        view.addSubview(sortControl)
+        view.addSubview(headerRow)
         view.addSubview(collectionView)
         view.addSubview(emptyStateView)
         // Same as the gallery: the grid is full-height and must sit behind the
@@ -76,11 +129,11 @@ final class ProjectsViewController: UIViewController {
         TopFadeView.install(in: self, above: collectionView)
 
         NSLayoutConstraint.activate([
-            sortControl.topAnchor.constraint(
+            headerRow.topAnchor.constraint(
                 equalTo: view.safeAreaLayoutGuide.topAnchor, constant: Theme.Spacing.xs),
-            sortControl.leadingAnchor.constraint(
+            headerRow.leadingAnchor.constraint(
                 equalTo: view.leadingAnchor, constant: Theme.Spacing.md),
-            sortControl.trailingAnchor.constraint(
+            headerRow.trailingAnchor.constraint(
                 equalTo: view.trailingAnchor, constant: -Theme.Spacing.md),
 
             // The grid runs the full height so the large title collapses as it
@@ -103,7 +156,7 @@ final class ProjectsViewController: UIViewController {
         // The grid sits under the pinned sort control, so its first row has to
         // start below it. Measured rather than hard-coded: the control grows with
         // Dynamic Type.
-        let inset = sortControl.frame.maxY - view.safeAreaInsets.top + Theme.Spacing.xs
+        let inset = headerRow.frame.maxY - view.safeAreaInsets.top + Theme.Spacing.xs
         if abs(collectionView.contentInset.top - inset) > 0.5 {
             collectionView.contentInset.top = inset
             collectionView.verticalScrollIndicatorInsets.top = inset
@@ -120,54 +173,81 @@ final class ProjectsViewController: UIViewController {
         applyFilters()
     }
 
-    /// Narrows by search text, then orders. Kept separate from `reload` so typing
-    /// never re-reads the store.
+    /// Narrows by mode and search text, then orders. Kept separate from `reload`
+    /// so typing never re-reads the store. The rules themselves live in
+    /// `GalleryFilter`, where both configurations are unit-tested.
     private func applyFilters() {
-        let query = searchText.trimmingCharacters(in: .whitespaces)
-        var filtered = summaries
-        if !query.isEmpty {
-            filtered = filtered.filter { $0.displayName.localizedCaseInsensitiveContains(query) }
-        }
-        switch sortOrder {
-        case .recent: filtered.sort { $0.updatedAt > $1.updatedAt }
-        case .oldest: filtered.sort { $0.updatedAt < $1.updatedAt }
-        case .byMode:
-            // Grouped by type, newest first inside each group.
-            filtered.sort {
-                $0.mode.rawValue == $1.mode.rawValue
-                    ? $0.updatedAt > $1.updatedAt
-                    : $0.mode.rawValue < $1.mode.rawValue
-            }
-        }
-        visibleSummaries = filtered
+        visibleSummaries = GalleryFilter.visible(
+            summaries, mode: configuration.modeFilter, search: searchText, sort: sortOrder)
         // The masonry section is computed from `visibleSummaries`, so the layout
         // has to be thrown away too — `reloadData` alone would re-use the frames
         // computed for the previous filter.
         collectionView.collectionViewLayout.invalidateLayout()
         collectionView.reloadData()
 
-        // The empty state is for "no projects at all". A search that matches
+        // The empty state is for "none of this kind at all". A search that matches
         // nothing is a different situation and must not invite creating one.
-        let hasProjects = !summaries.isEmpty
-        emptyStateView.isHidden = hasProjects
-        collectionView.isHidden = !hasProjects
-        sortControl.isHidden = !hasProjects
+        let isEmpty = GalleryFilter.showsEmptyState(
+            summaries, mode: configuration.modeFilter, search: searchText)
+        emptyStateView.isHidden = !isEmpty
+        collectionView.isHidden = isEmpty
+        headerRow.isHidden = isEmpty
+
+        countLabel.text = GalleryFilter.countLabel(
+            count: visibleSummaries.count,
+            singular: configuration.itemSingular,
+            plural: configuration.itemPlural)
     }
 
-    private func makeSortControl() -> UISegmentedControl {
-        let control = UISegmentedControl(items: SortOrder.allCases.map(\.title))
-        control.selectedSegmentIndex = 0
-        control.accessibilityIdentifier = "projectsSortControl"
-        ThemeSegmentedControl.apply(to: control)
-        control.addTarget(self, action: #selector(sortChanged), for: .valueChanged)
-        return control
+    private func makeHeaderRow() -> UIStackView {
+        countLabel.font = Theme.Typography.caption
+        countLabel.textColor = Theme.Color.textSecondary
+        countLabel.adjustsFontForContentSizeCategory = true
+        countLabel.accessibilityIdentifier = "\(configuration.gridIdentifier)Count"
+        countLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+
+        let row = UIStackView(arrangedSubviews: [countLabel, UIView(), sortChip])
+        row.axis = .horizontal
+        row.alignment = .center
+        row.spacing = Theme.Spacing.sm
+        return row
     }
 
-    @objc private func sortChanged() {
-        sortOrder = SortOrder(rawValue: sortControl.selectedSegmentIndex) ?? .recent
+    private func makeSortChip() -> FilterMenuChip {
+        let chip = FilterMenuChip(
+            symbolName: "arrow.up.arrow.down",
+            identifier: configuration.sortIdentifier,
+            accessibilityLabel: "Sort")
+        chip.setValue(sortOrder.title)
+        chip.menu = makeSortMenu()
+        return chip
+    }
+
+    /// Rebuilt on every change so the checkmark follows the selection.
+    private func makeSortMenu() -> UIMenu {
+        UIMenu(title: "Sort by", children: configuration.sortOrders.map { order in
+            UIAction(
+                title: order.title,
+                image: UIImage(systemName: order.symbolName),
+                state: order == sortOrder ? .on : .off
+            ) { [weak self] _ in self?.select(order) }
+        })
+    }
+
+    private func select(_ order: GallerySortOrder) {
+        guard sortOrder != order else { return }
+        sortOrder = order
+        sortChip.setValue(order.title)
+        sortChip.menu = makeSortMenu()
         Haptics.selectionChanged()
         applyFilters()
-        collectionView.setContentOffset(.zero, animated: false)
+        // `.zero` is not the top of this grid. It runs the full height of the view
+        // and carries a content inset that holds the first row clear of the pinned
+        // sort control, so offset 0 parks that row *under* the control and the nav
+        // bar, where the top fade leaves it as a ghost. With less than a screenful
+        // of cards there is nothing to bounce it back, so it stays there.
+        collectionView.setContentOffset(
+            CGPoint(x: 0, y: -collectionView.adjustedContentInset.top), animated: false)
     }
 
     // MARK: - Masonry layout
@@ -190,7 +270,7 @@ final class ProjectsViewController: UIViewController {
         view.showsVerticalScrollIndicator = false
         view.dataSource = self
         view.delegate = self
-        view.accessibilityIdentifier = "projectsGrid"
+        view.accessibilityIdentifier = configuration.gridIdentifier
         view.register(ProjectCardCell.self, forCellWithReuseIdentifier: ProjectCardCell.reuseID)
         return view
     }

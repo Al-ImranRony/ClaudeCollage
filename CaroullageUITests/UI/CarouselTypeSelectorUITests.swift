@@ -18,12 +18,7 @@ final class CarouselTypeSelectorUITests: XCTestCase {
 
     @MainActor
     private func openSelector(_ app: XCUIApplication) {
-        app.launch()
-        let carousel = app.buttons["carouselButton"]
-        XCTAssertTrue(carousel.waitForExistence(timeout: 8))
-        carousel.tap()
-        XCTAssertTrue(app.buttons["carouselType-matched"].waitForExistence(timeout: 8),
-                      "The type selector shows the four type cards")
+        app.launchIntoCarouselTypePicker()
     }
 
     @MainActor
@@ -34,7 +29,7 @@ final class CarouselTypeSelectorUITests: XCTestCase {
         app.buttons["carouselCreateButton"].tap()
         let strip = app.collectionViews["carouselFrameStrip"]
         XCTAssertTrue(strip.waitForExistence(timeout: 8))
-        XCTAssertEqual(strip.cells.count, 3, "matched carousel defaults to 3 frames")
+        XCTAssertEqual(strip.value as? String, "3", "matched carousel defaults to 3 frames")
     }
 
     @MainActor
@@ -46,6 +41,6 @@ final class CarouselTypeSelectorUITests: XCTestCase {
         let strip = app.collectionViews["carouselFrameStrip"]
         XCTAssertTrue(strip.waitForExistence(timeout: 8))
         // A default 4-up grid → frame 0 (the grid) + one zoom frame per cell = 5.
-        XCTAssertEqual(strip.cells.count, 5, "grid preview = the grid plus one frame per cell")
+        XCTAssertEqual(strip.value as? String, "5", "grid preview = the grid plus one frame per cell")
     }
 }
