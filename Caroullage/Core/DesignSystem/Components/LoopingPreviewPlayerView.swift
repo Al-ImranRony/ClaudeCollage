@@ -34,7 +34,7 @@ final class LoopingPreviewPlayerView: UIView {
     /// Either one means the poster is not a placeholder — it is the finished
     /// state, and no player is ever created.
     static var isMotionAllowed: Bool {
-        !UIAccessibility.isReduceMotionEnabled
+        !Theme.Motion.isReduced
             && !ProcessInfo.processInfo.isLowPowerModeEnabled
     }
 

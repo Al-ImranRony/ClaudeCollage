@@ -239,7 +239,8 @@ final class ShowcaseTemplateCell: UICollectionViewCell {
     ///   - preview: the render, invoked off the first layout pass. The caller
     ///     supplies a closure rather than an image so a cold showcase render —
     ///     which composites real photographs through `CollageRenderer` — is
-    ///     never paid for by a cell that scrolls past before it is needed.
+    ///     never paid for by a cell that has already been cancelled (recycled
+    ///     or reconfigured) before it runs.
     func configure(
         name: String,
         identifier: String,
@@ -260,6 +261,7 @@ final class ShowcaseTemplateCell: UICollectionViewCell {
 
         previewTask?.cancel()
         previewTask = Task { @MainActor [weak self] in
+            guard !Task.isCancelled else { return }
             let rendered = preview()
             guard !Task.isCancelled, let self else { return }
             // Cross-dissolve rather than a hard swap: the well → photograph pop
