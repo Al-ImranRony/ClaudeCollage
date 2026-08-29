@@ -2,12 +2,24 @@
 //  HomeViewController.swift
 //  Caroullage
 //
-//  Step 04.5 batch C — the discovery screen.
+//  Step 04.5 batch C made this the discovery screen; Step 07 made it a showcase.
 //
-//  Home used to be the saved-project gallery with five module buttons packed into
-//  its nav bar. The gallery moved to `ProjectsViewController` (its own tab) and
-//  this became a landing screen: a featured template strip and large quick-start
-//  tiles, so the module entry points finally get real touch targets.
+//  The screen it replaced previewed templates as empty layout SCHEMATICS and led
+//  with four icon tiles. That is an honest picture of the app's structure and a
+//  terrible picture of its output: it reads as a dev tool, and it asks a first-run
+//  user to imagine the result instead of showing it. So Home now opens on finished
+//  work — a rotating hero card and three strips of photo-real collages dressed in
+//  bundled sample photography — and every one of them is rendered through the SAME
+//  `CollageRenderer` the editor and the exporter use. Tapping one opens exactly
+//  that structure with the photo zones EMPTY, so the picture on Home is a promise
+//  the editor can keep rather than marketing art.
+//
+//  Section order is the argument the screen makes, top to bottom: here is what
+//  this app makes (hero) → the three things it makes (Photo Collages, Video
+//  Collages, Carousels) → something made from YOUR photos (Suggested For You) →
+//  and if you already know what you want, start here (the quick-start chips).
+//  The chips are the four Step 04.5 tiles compressed into one scrolling row: they
+//  are shortcuts, and shortcuts do not deserve half the screen.
 //
 //  "Custom Size" is deliberately absent — it lives in the floating "+" sheet
 //  alongside Image and Video, so all creation-with-a-choice starts in one place.
@@ -18,10 +30,20 @@ import UIKit
 @MainActor
 final class HomeViewController: UIViewController {
 
-    // Wired by AppCoordinator.
+    // MARK: - Wiring (AppCoordinator)
+
+    /// Every standard template. Filtered here to the ones the sample-content
+    /// manifest dresses — see `showcasedPhotoTemplates()`. It stays a provider of
+    /// the FULL list because onboarding re-orders it to lead with what the user
+    /// said they make, and that ordering has to survive the filter.
     var featuredTemplatesProvider: (() -> [CollageTemplate])?
     var onSelectTemplate: ((CollageTemplate) -> Void)?
     var onBrowseTemplates: (() -> Void)?
+    var carouselTemplatesProvider: (() -> [CarouselTemplate])?
+    var onSelectCarouselTemplate: ((CarouselTemplate) -> Void)?
+    var videoShowcasesProvider: (() -> [SampleContentManifest.VideoShowcase])?
+    var onSelectVideoShowcase: ((SampleContentManifest.VideoShowcase) -> Void)?
+    var onBrowseCarousels: (() -> Void)?
     var onNewProject: (() -> Void)?
     var onNewPolygon: (() -> Void)?
     var onNewVideoCollage: (() -> Void)?
@@ -37,16 +59,54 @@ final class HomeViewController: UIViewController {
     /// Build a collage from recent photos using the chosen layout.
     var onSelectSuggestedLayout: ((GridTemplate) -> Void)?
 
-    private var featured: [CollageTemplate] = []
+    // MARK: - Showcase geometry
+
+    /// A showcase card is portrait-ish, which is what most of the catalog is.
+    private static let cardHeight: CGFloat = 200
+    private static let cardWidth: CGFloat = 160
+    /// A carousel's preview is three pages laid side by side, so its card is
+    /// wider: at 160pt the centre crop shows one page and the strip stops saying
+    /// the only thing it exists to say.
+    private static let carouselCardWidth: CGFloat = 240
+    /// The hero's height as a share of its width. Portrait enough to sell a 4:5
+    /// or 9:16 piece without pushing the first strip off the screen.
+    private static let heroAspectRatio: CGFloat = 1.15
+
+    // MARK: - State
+
+    private let sampleContent = SampleContentCatalog.shared
+
+    private var photoTemplates: [CollageTemplate] = []
+    private var videoShowcases: [SampleContentManifest.VideoShowcase] = []
+    private var carouselTemplates: [CarouselTemplate] = []
     private var suggestions: [GridTemplate] = []
+
+    private let scrollView = UIScrollView()
+    private let contentStack = UIStackView()
+
+    private let heroView = HeroShowcaseView()
+    private var heroSection: UIStackView?
+
+    private lazy var photoStrip = makeShowcaseStrip(
+        identifier: "photoShowcaseStrip", itemWidth: Self.cardWidth,
+        cellClass: ShowcaseTemplateCell.self, reuseID: ShowcaseTemplateCell.reuseID)
+    private lazy var videoStrip = makeShowcaseStrip(
+        identifier: "videoShowcaseStrip", itemWidth: Self.cardWidth,
+        cellClass: ShowcaseVideoCell.self, reuseID: ShowcaseVideoCell.reuseID)
+    private lazy var carouselStrip = makeShowcaseStrip(
+        identifier: "carouselShowcaseStrip", itemWidth: Self.carouselCardWidth,
+        cellClass: ShowcaseTemplateCell.self, reuseID: ShowcaseTemplateCell.reuseID)
+    private var photoSection: UIStackView?
+    private var videoSection: UIStackView?
+    private var carouselSection: UIStackView?
+
     private var suggestionsSection: UIStackView?
     private lazy var suggestionsStrip = makeSuggestionsStrip()
     private lazy var enableSuggestionsButton = makeEnableSuggestionsButton()
 
-    private let scrollView = UIScrollView()
-    private let contentStack = UIStackView()
-    private lazy var featuredStrip = makeFeaturedStrip()
-    private var featuredSection: UIStackView?
+    /// Whether Home is on screen. Everything that costs battery — the hero's
+    /// rotation timer, every video decoder in the video strip — is gated on it.
+    private var isVisible = false
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -57,18 +117,150 @@ final class HomeViewController: UIViewController {
         view.backgroundColor = Theme.Color.background
         navigationController?.navigationBar.prefersLargeTitles = true
         setupLayout()
+
+        // Backgrounding is not a view transition, so `viewDidDisappear` never
+        // fires for it: without these two, Home would keep a rotation timer and up
+        // to one video pipeline alive behind the home screen, and would come back
+        // to the foreground showing a frozen last frame.
+        //
+        // Selector-based observers rather than the block API on purpose: the block
+        // form takes a `@Sendable` closure, which cannot capture this non-Sendable
+        // `@MainActor` controller under strict concurrency.
+        let center = NotificationCenter.default
+        center.addObserver(
+            self, selector: #selector(appDidEnterBackground),
+            name: UIApplication.didEnterBackgroundNotification, object: nil)
+        center.addObserver(
+            self, selector: #selector(appWillEnterForeground),
+            name: UIApplication.willEnterForegroundNotification, object: nil)
     }
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
+        isVisible = true
         reload()
+        setShowcaseActive(true)
+    }
+
+    override func viewDidDisappear(_ animated: Bool) {
+        super.viewDidDisappear(animated)
+        isVisible = false
+        setShowcaseActive(false)
+    }
+
+    @objc private func appDidEnterBackground() {
+        setShowcaseActive(false)
+    }
+
+    @objc private func appWillEnterForeground() {
+        guard isVisible else { return }
+        setShowcaseActive(true)
+    }
+
+    /// Starts or stops everything that moves.
+    private func setShowcaseActive(_ active: Bool) {
+        heroView.setActive(active)
+        for case let cell as ShowcaseVideoCell in videoStrip.visibleCells {
+            if active { cell.play() } else { cell.stop() }
+        }
     }
 
     func reload() {
-        featured = featuredTemplatesProvider?() ?? []
-        featuredStrip.reloadData()
-        featuredSection?.isHidden = featured.isEmpty
+        photoTemplates = showcasedPhotoTemplates()
+        videoShowcases = videoShowcasesProvider?() ?? []
+        carouselTemplates = showcasedCarouselTemplates()
+
+        photoStrip.reloadData()
+        videoStrip.reloadData()
+        carouselStrip.reloadData()
+
+        // A labelled strip with nothing in it is worse than no strip: it reads as
+        // a load that failed. Each section carries its own header, so hiding the
+        // section takes the header with it.
+        photoSection?.isHidden = photoTemplates.isEmpty
+        videoSection?.isHidden = videoShowcases.isEmpty
+        carouselSection?.isHidden = carouselTemplates.isEmpty
+
+        let pages = makeHeroPages()
+        heroView.configure(pages: pages)
+        heroSection?.isHidden = pages.isEmpty
+        if isVisible { setShowcaseActive(true) }
+
         refreshSuggestions()
+    }
+
+    // MARK: - Showcase data
+
+    /// The templates the manifest dresses in sample photography, in the order the
+    /// provider supplied them (premium last, then alphabetical — or onboarding's
+    /// preferred category first).
+    ///
+    /// Falls back to the full catalog if the manifest is missing or empty: those
+    /// cards then render the schematic `thumbnail(for:)`, which is the old Home's
+    /// look but still a working screen — much better than an empty one.
+    private func showcasedPhotoTemplates() -> [CollageTemplate] {
+        let all = featuredTemplatesProvider?() ?? []
+        let showcased = Set(sampleContent.manifest?.templates.keys.map { $0 } ?? [])
+        guard !showcased.isEmpty else { return all }
+        return all.filter { showcased.contains($0.id) }
+    }
+
+    /// Carousel templates the manifest dresses. No fallback here, deliberately:
+    /// unlike a standard template, a carousel has no schematic thumbnail to
+    /// degrade to, so an undressed one would render as a card full of empty wells.
+    private func showcasedCarouselTemplates() -> [CarouselTemplate] {
+        let all = carouselTemplatesProvider?() ?? []
+        let showcased = Set(sampleContent.manifest?.carousels.keys.map { $0 } ?? [])
+        return all.filter { showcased.contains($0.id) }
+    }
+
+    /// The hero's pages, resolved from the manifest's ordered hero list against
+    /// the three showcases. A reference that resolves to nothing is skipped rather
+    /// than rendered as a blank page.
+    private func makeHeroPages() -> [HeroShowcaseView.Page] {
+        sampleContent.heroRefs.compactMap { ref -> HeroShowcaseView.Page? in
+            switch ref.kind {
+            case .template:
+                guard let template = photoTemplates.first(where: { $0.id == ref.id })
+                else { return nil }
+                return HeroShowcaseView.Page(
+                    title: template.name,
+                    subtitle: String(localized: "Photo collage · Tap to create"),
+                    identifier: "heroPage-\(template.id)",
+                    preview: {
+                        TemplateService.shared.showcasePreview(for: template, maxDimension: 900)
+                            ?? TemplateService.shared.thumbnail(for: template)
+                    },
+                    onTap: { [weak self] in self?.onSelectTemplate?(template) })
+
+            case .video:
+                guard let showcase = videoShowcases.first(where: { $0.id == ref.id })
+                else { return nil }
+                return HeroShowcaseView.Page(
+                    title: showcase.title,
+                    subtitle: String(localized: "Video collage · Tap to create"),
+                    identifier: "heroPage-\(showcase.id)",
+                    poster: sampleContent.image(named: showcase.poster),
+                    loopURL: sampleContent.videoURL(named: showcase.loop),
+                    onTap: { [weak self] in self?.onSelectVideoShowcase?(showcase) })
+
+            case .carousel:
+                guard let template = carouselTemplates.first(where: { $0.id == ref.id })
+                else { return nil }
+                return HeroShowcaseView.Page(
+                    title: template.name,
+                    subtitle: String(localized: "Carousel · Tap to create"),
+                    identifier: "heroPage-\(template.id)",
+                    // A three-page strip fitted whole, not cropped to a sliver of
+                    // its middle page.
+                    presentation: .fitOnBlurredBed,
+                    preview: {
+                        TemplateService.shared.showcasePreview(
+                            for: template, frameMaxDimension: 640)
+                    },
+                    onTap: { [weak self] in self?.onSelectCarouselTemplate?(template) })
+            }
+        }
     }
 
     // MARK: - Suggested layouts
@@ -108,7 +300,7 @@ final class HomeViewController: UIViewController {
     }
 
     private func makeSuggestionsSection() -> UIStackView {
-        let header = sectionHeader("Suggested For You", actionTitle: nil, action: nil)
+        let header = sectionHeader("Suggested For You")
         let section = UIStackView(arrangedSubviews: [
             header, enableSuggestionsButton, suggestionsStrip,
         ])
@@ -204,13 +396,42 @@ final class HomeViewController: UIViewController {
         scrollView.showsVerticalScrollIndicator = false
         scrollView.alwaysBounceVertical = true
 
+        let heroSection = makeHeroSection()
+        self.heroSection = heroSection
+        contentStack.addArrangedSubview(heroSection)
+
+        let photoSection = makeStripSection(
+            title: String(localized: "Photo Collages"), strip: photoStrip,
+            height: Self.cardHeight, actionIdentifier: "seeAllTemplatesButton"
+        ) { [weak self] in
+            Haptics.tap()
+            self?.onBrowseTemplates?()
+        }
+        self.photoSection = photoSection
+        contentStack.addArrangedSubview(photoSection)
+
+        // No "See All" for video: there is no gallery of video showcases to send
+        // anyone to, and a button that goes nowhere is worse than none.
+        let videoSection = makeStripSection(
+            title: String(localized: "Video Collages"), strip: videoStrip,
+            height: Self.cardHeight, actionIdentifier: nil, action: nil)
+        self.videoSection = videoSection
+        contentStack.addArrangedSubview(videoSection)
+
+        let carouselSection = makeStripSection(
+            title: String(localized: "Carousels"), strip: carouselStrip,
+            height: Self.cardHeight, actionIdentifier: "seeAllCarouselsButton"
+        ) { [weak self] in
+            Haptics.tap()
+            self?.onBrowseCarousels?()
+        }
+        self.carouselSection = carouselSection
+        contentStack.addArrangedSubview(carouselSection)
+
         let suggestionsSection = makeSuggestionsSection()
         self.suggestionsSection = suggestionsSection
         contentStack.addArrangedSubview(suggestionsSection)
 
-        let featuredSection = makeFeaturedSection()
-        self.featuredSection = featuredSection
-        contentStack.addArrangedSubview(featuredSection)
         contentStack.addArrangedSubview(makeQuickStartSection())
 
         scrollView.addSubview(contentStack)
@@ -237,87 +458,118 @@ final class HomeViewController: UIViewController {
         ])
     }
 
-    private func makeFeaturedSection() -> UIStackView {
-        let header = sectionHeader("Featured Templates", actionTitle: "See All") { [weak self] in
-            Haptics.tap()
-            self?.onBrowseTemplates?()
-        }
-        let section = UIStackView(arrangedSubviews: [header, featuredStrip])
-        section.axis = .vertical
-        section.spacing = Theme.Spacing.sm
-        featuredStrip.heightAnchor.constraint(equalToConstant: 190).isActive = true
+    /// The hero, inset from both edges so it reads as a card on the page rather
+    /// than as a banner bolted to the top of the screen.
+    private func makeHeroSection() -> UIStackView {
+        let section = UIStackView(arrangedSubviews: [heroView])
+        section.isLayoutMarginsRelativeArrangement = true
+        section.layoutMargins = UIEdgeInsets(
+            top: 0, left: Theme.Spacing.md, bottom: 0, right: Theme.Spacing.md)
+        section.isHidden = true
+        heroView.heightAnchor.constraint(
+            equalTo: heroView.widthAnchor, multiplier: Self.heroAspectRatio).isActive = true
         return section
     }
 
+    private func makeStripSection(
+        title: String, strip: UICollectionView, height: CGFloat,
+        actionIdentifier: String?, action: (() -> Void)?
+    ) -> UIStackView {
+        let header = sectionHeader(
+            title,
+            actionTitle: action == nil ? nil : String(localized: "See All"),
+            actionIdentifier: actionIdentifier,
+            action: action)
+        let section = UIStackView(arrangedSubviews: [header, strip])
+        section.axis = .vertical
+        section.spacing = Theme.Spacing.sm
+        section.isHidden = true
+        strip.heightAnchor.constraint(equalToConstant: height).isActive = true
+        return section
+    }
+
+    /// The four Step 04.5 quick-start tiles, compressed into one scrolling row of
+    /// chips. They keep their accessibility identifiers and their closures: this
+    /// is the same four doors, taking a tenth of the space they used to.
     private func makeQuickStartSection() -> UIStackView {
-        let header = sectionHeader("Start Something", actionTitle: nil, action: nil)
+        let header = sectionHeader("Start Something")
 
-        let grid = QuickStartTile(
-            title: "Grid", subtitle: "Classic photo grid", symbol: "square.grid.2x2.fill",
-            identifier: "newProjectButton"
-        ) { [weak self] in
-            Haptics.tap()
-            self?.onNewProject?()
-        }
-        let polygon = QuickStartTile(
-            title: "Shapes", subtitle: "Diagonal & polygon cuts", symbol: "triangle.fill",
-            identifier: "polygonQuickStartButton"
-        ) { [weak self] in
-            Haptics.tap()
-            self?.onNewPolygon?()
-        }
-        let video = QuickStartTile(
-            title: "Video", subtitle: "Moving collage", symbol: "play.rectangle.fill",
-            identifier: "videoCollageButton"
-        ) { [weak self] in
-            Haptics.tap()
-            self?.onNewVideoCollage?()
-        }
-        // Home and the "+" sheet overlap on purpose — it is why `QuickStartTile`
-        // was lifted into the component layer. Carousel joined the sheet in Step 06
-        // and Home was left a format short, so the app's signature output was
-        // missing from one of its two front doors.
-        let carousel = QuickStartTile(
-            title: "Carousel", subtitle: "A multi-frame post for the feed",
-            symbol: CollageMode.carousel.badgeSymbolName,
-            identifier: "carouselQuickStartButton"
-        ) { [weak self] in
-            Haptics.tap()
-            self?.onNewCarousel?()
-        }
+        let chips = [
+            QuickStartChip(
+                title: String(localized: "Grid"), symbol: "square.grid.2x2.fill",
+                identifier: "newProjectButton"
+            ) { [weak self] in
+                Haptics.tap()
+                self?.onNewProject?()
+            },
+            QuickStartChip(
+                title: String(localized: "Shapes"), symbol: "triangle.fill",
+                identifier: "polygonQuickStartButton"
+            ) { [weak self] in
+                Haptics.tap()
+                self?.onNewPolygon?()
+            },
+            QuickStartChip(
+                title: String(localized: "Video"), symbol: "play.rectangle.fill",
+                identifier: "videoCollageButton"
+            ) { [weak self] in
+                Haptics.tap()
+                self?.onNewVideoCollage?()
+            },
+            // Home and the "+" sheet overlap on purpose — the app's signature
+            // format has to be on both of its front doors.
+            QuickStartChip(
+                title: String(localized: "Carousel"),
+                symbol: CollageMode.carousel.badgeSymbolName,
+                identifier: "carouselQuickStartButton"
+            ) { [weak self] in
+                Haptics.tap()
+                self?.onNewCarousel?()
+            },
+        ]
 
-        let tiles = UIStackView(arrangedSubviews: [grid, polygon, video, carousel])
-        tiles.axis = .vertical
-        tiles.spacing = Theme.Spacing.sm
-        tiles.isLayoutMarginsRelativeArrangement = true
-        tiles.layoutMargins = UIEdgeInsets(
+        // Four across, sharing the width equally — NOT a scrolling row. A row of
+        // labelled pills is wider than any iPhone: laid out that way the fourth
+        // door (Carousel, the app's signature format) sat off the right edge,
+        // where a user has no reason to look for it and where a tap cannot land.
+        // Everything on this screen scrolls sideways already; the one section
+        // that is a fixed set of four choices should not.
+        let row = UIStackView(arrangedSubviews: chips)
+        row.axis = .horizontal
+        row.spacing = Theme.Spacing.sm
+        row.distribution = .fillEqually
+        row.isLayoutMarginsRelativeArrangement = true
+        row.layoutMargins = UIEdgeInsets(
             top: 0, left: Theme.Spacing.md, bottom: 0, right: Theme.Spacing.md)
+        row.accessibilityIdentifier = "quickStartChipRow"
 
-        let section = UIStackView(arrangedSubviews: [header, tiles])
+        let section = UIStackView(arrangedSubviews: [header, row])
         section.axis = .vertical
         section.spacing = Theme.Spacing.sm
         return section
     }
 
     private func sectionHeader(
-        _ title: String, actionTitle: String?, action: (() -> Void)?
-    ) -> UIStackView {
+        _ title: String, actionTitle: String? = nil, actionIdentifier: String? = nil,
+        action: (() -> Void)? = nil
+    ) -> SectionHeaderView {
         SectionHeaderView(
-            title: title,
-            actionTitle: actionTitle,
-            actionIdentifier: actionTitle == nil ? nil : "seeAllTemplatesButton",
-            action: action
-        )
+            title: title, actionTitle: actionTitle,
+            actionIdentifier: actionIdentifier, action: action)
     }
 
-    private func makeFeaturedStrip() -> UICollectionView {
+    private func makeShowcaseStrip(
+        identifier: String, itemWidth: CGFloat,
+        cellClass: AnyClass, reuseID: String
+    ) -> UICollectionView {
         let item = NSCollectionLayoutItem(
             layoutSize: NSCollectionLayoutSize(
                 widthDimension: .fractionalWidth(1), heightDimension: .fractionalHeight(1))
         )
         let group = NSCollectionLayoutGroup.horizontal(
             layoutSize: NSCollectionLayoutSize(
-                widthDimension: .absolute(132), heightDimension: .absolute(190)),
+                widthDimension: .absolute(itemWidth),
+                heightDimension: .absolute(Self.cardHeight)),
             subitems: [item]
         )
         let section = NSCollectionLayoutSection(group: group)
@@ -332,36 +584,102 @@ final class HomeViewController: UIViewController {
         view.showsHorizontalScrollIndicator = false
         view.dataSource = self
         view.delegate = self
-        view.accessibilityIdentifier = "featuredTemplateStrip"
-        view.register(FeaturedTemplateCell.self, forCellWithReuseIdentifier: FeaturedTemplateCell.reuseID)
+        view.accessibilityIdentifier = identifier
+        view.register(cellClass, forCellWithReuseIdentifier: reuseID)
         return view
     }
 }
 
+// MARK: - Data source & delegate
+
 extension HomeViewController: UICollectionViewDataSource, UICollectionViewDelegate {
+
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
-        collectionView === suggestionsStrip ? suggestions.count : featured.count
+        switch collectionView {
+        case photoStrip: photoTemplates.count
+        case videoStrip: videoShowcases.count
+        case carouselStrip: carouselTemplates.count
+        default: suggestions.count
+        }
     }
 
     func collectionView(
         _ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath
     ) -> UICollectionViewCell {
-        if collectionView === suggestionsStrip {
-            let cell = collectionView.dequeueReusableCell(
-                withReuseIdentifier: LayoutSchematicCell.reuseID, for: indexPath)
-            if let schematic = cell as? LayoutSchematicCell,
-               suggestions.indices.contains(indexPath.item) {
-                // Reuses the editor's own layout schematic, so a suggestion looks
-                // exactly like the chip the user will see once inside.
-                schematic.configure(with: suggestions[indexPath.item], isSelected: false)
-            }
-            return cell
+        switch collectionView {
+        case photoStrip: return photoCard(collectionView, at: indexPath)
+        case videoStrip: return videoCard(collectionView, at: indexPath)
+        case carouselStrip: return carouselCard(collectionView, at: indexPath)
+        default: return suggestionCard(collectionView, at: indexPath)
         }
+    }
 
+    private func photoCard(
+        _ collectionView: UICollectionView, at indexPath: IndexPath
+    ) -> UICollectionViewCell {
         let cell = collectionView.dequeueReusableCell(
-            withReuseIdentifier: FeaturedTemplateCell.reuseID, for: indexPath)
-        if let card = cell as? FeaturedTemplateCell, featured.indices.contains(indexPath.item) {
-            card.configure(with: featured[indexPath.item])
+            withReuseIdentifier: ShowcaseTemplateCell.reuseID, for: indexPath)
+        guard let card = cell as? ShowcaseTemplateCell,
+              photoTemplates.indices.contains(indexPath.item) else { return cell }
+        let template = photoTemplates[indexPath.item]
+        card.configure(
+            name: template.name,
+            identifier: "showcaseTemplate-\(template.id)",
+            locked: !TemplateService.shared.canOpen(template),
+            // The schematic is the fallback, not the plan: it only appears for a
+            // template the manifest does not dress, which today means only when
+            // the manifest itself failed to load.
+            preview: {
+                TemplateService.shared.showcasePreview(for: template)
+                    ?? TemplateService.shared.thumbnail(for: template)
+            })
+        return cell
+    }
+
+    private func videoCard(
+        _ collectionView: UICollectionView, at indexPath: IndexPath
+    ) -> UICollectionViewCell {
+        let cell = collectionView.dequeueReusableCell(
+            withReuseIdentifier: ShowcaseVideoCell.reuseID, for: indexPath)
+        guard let card = cell as? ShowcaseVideoCell,
+              videoShowcases.indices.contains(indexPath.item) else { return cell }
+        let showcase = videoShowcases[indexPath.item]
+        card.configure(
+            name: showcase.title,
+            identifier: "showcaseVideo-\(showcase.id)",
+            poster: sampleContent.image(named: showcase.poster),
+            loopURL: sampleContent.videoURL(named: showcase.loop))
+        return cell
+    }
+
+    private func carouselCard(
+        _ collectionView: UICollectionView, at indexPath: IndexPath
+    ) -> UICollectionViewCell {
+        let cell = collectionView.dequeueReusableCell(
+            withReuseIdentifier: ShowcaseTemplateCell.reuseID, for: indexPath)
+        guard let card = cell as? ShowcaseTemplateCell,
+              carouselTemplates.indices.contains(indexPath.item) else { return cell }
+        let template = carouselTemplates[indexPath.item]
+        card.configure(
+            name: template.name,
+            identifier: "showcaseCarousel-\(template.id)",
+            // How many pages the post has is the one fact the picture cannot
+            // state, and the one a user comparing carousels wants first.
+            badge: String(localized: "\(template.frameCount) frames"),
+            preview: { TemplateService.shared.showcasePreview(for: template) })
+        return cell
+    }
+
+    private func suggestionCard(
+        _ collectionView: UICollectionView, at indexPath: IndexPath
+    ) -> UICollectionViewCell {
+        let cell = collectionView.dequeueReusableCell(
+            withReuseIdentifier: LayoutSchematicCell.reuseID, for: indexPath)
+        if let schematic = cell as? LayoutSchematicCell,
+           suggestions.indices.contains(indexPath.item) {
+            // Reuses the editor's own layout schematic, so a suggestion looks
+            // exactly like the chip the user will see once inside.
+            schematic.configure(with: suggestions[indexPath.item], isSelected: false)
         }
         return cell
     }
@@ -370,82 +688,254 @@ extension HomeViewController: UICollectionViewDataSource, UICollectionViewDelega
         collectionView.deselectItem(at: indexPath, animated: true)
         Haptics.tap()
 
-        if collectionView === suggestionsStrip {
+        switch collectionView {
+        case photoStrip:
+            guard photoTemplates.indices.contains(indexPath.item) else { return }
+            onSelectTemplate?(photoTemplates[indexPath.item])
+        case videoStrip:
+            guard videoShowcases.indices.contains(indexPath.item) else { return }
+            onSelectVideoShowcase?(videoShowcases[indexPath.item])
+        case carouselStrip:
+            guard carouselTemplates.indices.contains(indexPath.item) else { return }
+            onSelectCarouselTemplate?(carouselTemplates[indexPath.item])
+        default:
             guard suggestions.indices.contains(indexPath.item) else { return }
             onSelectSuggestedLayout?(suggestions[indexPath.item])
-            return
         }
-        guard featured.indices.contains(indexPath.item) else { return }
-        onSelectTemplate?(featured[indexPath.item])
+    }
+
+    /// Only a card that is actually on screen — and only while Home is — gets to
+    /// hold a video pipeline.
+    func collectionView(
+        _ collectionView: UICollectionView, willDisplay cell: UICollectionViewCell,
+        forItemAt indexPath: IndexPath
+    ) {
+        guard isVisible, let card = cell as? ShowcaseVideoCell else { return }
+        card.play()
+    }
+
+    func collectionView(
+        _ collectionView: UICollectionView, didEndDisplaying cell: UICollectionViewCell,
+        forItemAt indexPath: IndexPath
+    ) {
+        (cell as? ShowcaseVideoCell)?.stop()
     }
 }
 
-// MARK: - Featured template cell
+// MARK: - Quick-start chip
 
-final class FeaturedTemplateCell: UICollectionViewCell {
-    static let reuseID = "FeaturedTemplateCell"
+/// One compact door into a format: glyph, word, pill.
+///
+/// The full-width `QuickStartTile` still exists and is still right where it is
+/// used — the "+" sheet, where the choice IS the screen. On a showcase Home the
+/// same four rows took half the page to say what four chips say in one line.
+@MainActor
+private final class QuickStartChip: UIControl {
 
-    private let imageView = UIImageView()
-    private let nameLabel = UILabel()
-    private var thumbnailTask: Task<Void, Never>?
+    private let action: () -> Void
 
-    override init(frame: CGRect) {
-        super.init(frame: frame)
+    init(title: String, symbol: String, identifier: String, action: @escaping () -> Void) {
+        self.action = action
+        super.init(frame: .zero)
 
-        // Fit, not fill. The strip's tile is a fixed 132×~170 box while templates
-        // are authored 1:1, 4:5 and 9:16, so filling cropped a square template's
-        // left and right edges away — which does not just hide a sliver, it moves
-        // every zone's centre outward from the tile's centre. A 2-up came out with
-        // its two "+" chips pushed apart and its divider no longer reading as the
-        // middle: the template looked lopsided when it is perfectly symmetrical.
-        // Fitting shows the whole authored shape, letterboxed onto the well.
-        imageView.contentMode = .scaleAspectFit
-        imageView.clipsToBounds = true
-        imageView.backgroundColor = Theme.Color.cellWell
-        imageView.layer.cornerRadius = Theme.Radius.md
-        imageView.layer.cornerCurve = .continuous
-        imageView.translatesAutoresizingMaskIntoConstraints = false
+        accessibilityIdentifier = identifier
+        accessibilityLabel = title
+        isAccessibilityElement = true
+        accessibilityTraits = .button
 
-        nameLabel.font = Theme.Typography.caption
-        nameLabel.textColor = Theme.Color.textSecondary
-        nameLabel.numberOfLines = 1
-        nameLabel.translatesAutoresizingMaskIntoConstraints = false
+        backgroundColor = Theme.Color.controlFill
+        layer.cornerRadius = Theme.Radius.md
+        layer.cornerCurve = .continuous
 
-        contentView.addSubview(imageView)
-        contentView.addSubview(nameLabel)
+        let icon = UIImageView(image: UIImage(
+            systemName: symbol,
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: 17, weight: .semibold)))
+        icon.tintColor = Theme.Color.accentStrong
+        icon.contentMode = .center
+
+        let label = UILabel()
+        label.text = title
+        label.font = Theme.Typography.caption
+        label.textColor = Theme.Color.textPrimary
+        label.textAlignment = .center
+        label.adjustsFontForContentSizeCategory = true
+        // A quarter of the width, four times over: "Carousel" is the longest word
+        // and the tightest fit, so it is allowed to shrink a little before it
+        // truncates.
+        label.adjustsFontSizeToFitWidth = true
+        label.minimumScaleFactor = 0.8
+
+        let stack = UIStackView(arrangedSubviews: [icon, label])
+        stack.axis = .vertical
+        stack.spacing = Theme.Spacing.xxs
+        stack.alignment = .center
+        // The chip owns the touch; nothing inside it may intercept one.
+        stack.isUserInteractionEnabled = false
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(stack)
+
         NSLayoutConstraint.activate([
-            imageView.topAnchor.constraint(equalTo: contentView.topAnchor),
-            imageView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
-            imageView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
-
-            nameLabel.topAnchor.constraint(equalTo: imageView.bottomAnchor, constant: 6),
-            nameLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 2),
-            nameLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -2),
-            nameLabel.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
+            stack.topAnchor.constraint(equalTo: topAnchor, constant: Theme.Spacing.sm),
+            stack.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -Theme.Spacing.sm),
+            stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: Theme.Spacing.xs),
+            stack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -Theme.Spacing.xs),
         ])
+
+        addTarget(self, action: #selector(fire), for: .touchUpInside)
     }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
 
-    override func prepareForReuse() {
-        super.prepareForReuse()
-        thumbnailTask?.cancel()
-        thumbnailTask = nil
-        imageView.image = nil
+    override var isHighlighted: Bool {
+        didSet {
+            guard isHighlighted != oldValue else { return }
+            UIView.animate(
+                withDuration: Theme.Motion.duration(Theme.Motion.quick),
+                delay: 0,
+                usingSpringWithDamping: Theme.Motion.effectiveSpringDamping,
+                initialSpringVelocity: Theme.Motion.effectiveSpringVelocity,
+                options: [.allowUserInteraction, .beginFromCurrentState]
+            ) {
+                self.transform = self.isHighlighted
+                    ? CGAffineTransform(scaleX: 0.94, y: 0.94) : .identity
+            }
+        }
     }
 
-    func configure(with template: CollageTemplate) {
-        nameLabel.text = template.name
-        accessibilityIdentifier = "featuredTemplate-\(template.id)"
-        // Thumbnails are rendered and disk-cached by TemplateService; hop off the
-        // first layout pass so a cold cache never stalls the Home screen.
-        thumbnailTask?.cancel()
-        thumbnailTask = Task { @MainActor [weak self] in
-            let rendered = TemplateService.shared.thumbnail(for: template)
-            guard !Task.isCancelled else { return }
-            self?.imageView.image = rendered.map { UIImage(cgImage: $0) }
+    @objc private func fire() { action() }
+}
+
+// MARK: - Video showcase card
+
+/// A showcase card whose picture moves.
+///
+/// A sibling of `ShowcaseTemplateCell` rather than a subclass of it (that cell is
+/// `final`, and deliberately: it renders a still through `CollageRenderer` and
+/// nothing else). The two share the parts that matter — `ShowcaseScrimView`, the
+/// caption treatment, the press spring — so the strips still read as one family.
+///
+/// A still frame cannot sell a video collage: the motion IS the product. The
+/// poster is up instantly and is the FINAL state whenever motion is not allowed
+/// (Reduce Motion, Low Power Mode), and no decoder exists until `play()`.
+@MainActor
+final class ShowcaseVideoCell: UICollectionViewCell {
+    static let reuseID = "ShowcaseVideoCell"
+
+    private static let scrimHeightRatio: CGFloat = 0.38
+    private static let badgeSide: CGFloat = 24
+
+    private let playerView = LoopingPreviewPlayerView()
+    private let scrim = ShowcaseScrimView()
+    private let nameLabel = UILabel()
+    private let motionBadge = UIImageView()
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+
+        contentView.backgroundColor = Theme.Color.cellWell
+        contentView.layer.cornerRadius = Theme.Radius.lg
+        contentView.layer.cornerCurve = .continuous
+        contentView.clipsToBounds = true
+
+        nameLabel.font = Theme.Typography.subheadline
+        // See `ShowcaseTemplateCell`: ink that floats over photography takes the
+        // toast token, because it has no app surface to borrow from.
+        nameLabel.textColor = Theme.Color.textOnToast
+        nameLabel.adjustsFontForContentSizeCategory = true
+        nameLabel.numberOfLines = 1
+        nameLabel.lineBreakMode = .byTruncatingTail
+        nameLabel.applyShowcaseCaptionShadow()
+
+        // Says "this one moves" even when it is not moving — which is exactly the
+        // case under Reduce Motion and Low Power Mode, where the card is a still.
+        motionBadge.contentMode = .center
+        motionBadge.tintColor = Theme.Color.textOnToast
+        motionBadge.backgroundColor = Theme.Color.toast.withAlphaComponent(0.55)
+        motionBadge.layer.cornerRadius = Self.badgeSide / 2
+        motionBadge.layer.cornerCurve = .continuous
+        motionBadge.clipsToBounds = true
+        motionBadge.image = UIImage(
+            systemName: "play.fill",
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: 11, weight: .semibold))
+
+        for subview in [playerView, scrim, nameLabel, motionBadge] as [UIView] {
+            subview.translatesAutoresizingMaskIntoConstraints = false
+            contentView.addSubview(subview)
         }
+
+        NSLayoutConstraint.activate([
+            playerView.topAnchor.constraint(equalTo: contentView.topAnchor),
+            playerView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            playerView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            playerView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
+
+            scrim.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            scrim.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            scrim.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
+            scrim.heightAnchor.constraint(
+                equalTo: contentView.heightAnchor, multiplier: Self.scrimHeightRatio),
+
+            nameLabel.leadingAnchor.constraint(
+                equalTo: contentView.leadingAnchor, constant: Theme.Spacing.sm),
+            nameLabel.trailingAnchor.constraint(
+                equalTo: contentView.trailingAnchor, constant: -Theme.Spacing.sm),
+            nameLabel.bottomAnchor.constraint(
+                equalTo: contentView.bottomAnchor, constant: -Theme.Spacing.sm),
+
+            motionBadge.topAnchor.constraint(
+                equalTo: contentView.topAnchor, constant: Theme.Spacing.xs),
+            motionBadge.trailingAnchor.constraint(
+                equalTo: contentView.trailingAnchor, constant: -Theme.Spacing.xs),
+            motionBadge.widthAnchor.constraint(equalToConstant: Self.badgeSide),
+            motionBadge.heightAnchor.constraint(equalToConstant: Self.badgeSide),
+        ])
+
+        isAccessibilityElement = true
+        accessibilityTraits = .button
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
+
+    /// The same press spring the gallery's cards and `ShowcaseTemplateCell` use —
+    /// one press feel across the app.
+    override var isHighlighted: Bool {
+        didSet {
+            guard isHighlighted != oldValue else { return }
+            UIView.animate(
+                withDuration: Theme.Motion.duration(Theme.Motion.quick),
+                delay: 0,
+                usingSpringWithDamping: Theme.Motion.effectiveSpringDamping,
+                initialSpringVelocity: Theme.Motion.effectiveSpringVelocity,
+                options: [.allowUserInteraction, .beginFromCurrentState]
+            ) {
+                self.transform = self.isHighlighted
+                    ? CGAffineTransform(scaleX: 0.96, y: 0.96) : .identity
+            }
+        }
+    }
+
+    func configure(name: String, identifier: String, poster: UIImage?, loopURL: URL?) {
+        nameLabel.text = name
+        accessibilityIdentifier = identifier
+        accessibilityLabel = name
+        // The play glyph is a fact stated only in pixels.
+        accessibilityValue = String(localized: "Video")
+        playerView.configure(loopURL: loopURL, poster: poster)
+    }
+
+    func play() { playerView.play() }
+    func stop() { playerView.stop() }
+
+    override func prepareForReuse() {
+        super.prepareForReuse()
+        // Releases the decoder AND the poster: whatever is in flight belongs to
+        // the showcase this cell used to be.
+        playerView.stop()
+        playerView.configure(loopURL: nil, poster: nil)
+        nameLabel.text = nil
+        accessibilityValue = nil
     }
 }
 

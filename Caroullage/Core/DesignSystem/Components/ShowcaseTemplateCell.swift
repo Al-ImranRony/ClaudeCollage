@@ -5,10 +5,11 @@
 //  Step 07 — one card in a Home showcase strip (Photo Collages, Video Collages,
 //  Carousels).
 //
-//  `FeaturedTemplateCell` deliberately shows a template's SCHEMATIC: an empty
-//  wireframe letterboxed onto the well, captioned underneath. That is honest
-//  about structure and reads as a dev tool. This cell is the other half of that
-//  trade: a full-bleed, photo-real render of the template already dressed in its
+//  Home's old featured cell showed a template's SCHEMATIC: an empty wireframe
+//  letterboxed onto the well, captioned underneath. That is honest about
+//  structure and reads as a dev tool — it was deleted with the featured strip
+//  once Home became a showcase. This cell is the other half of that trade: a
+//  full-bleed, photo-real render of the template already dressed in its
 //  bundled sample photography, with the name burned over the image instead of
 //  parked below it. Nothing here is generic enough to belong to one screen — the
 //  three strips and (next task) the hero card are all the same card at different
@@ -56,6 +57,26 @@ final class ShowcaseScrimView: UIView {
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
+}
+
+extension UILabel {
+
+    /// The soft drop shadow every caption that floats over showcase artwork wears.
+    ///
+    /// The scrim alone is not enough, and Step 07's real content is what proved
+    /// it: a good half of the catalog — the minimal templates, most carousel
+    /// pages — is authored on a WHITE background, and 55% black over white is a
+    /// light grey that white type disappears into. Darkening the scrim until it
+    /// worked would drag every photographic card toward looking like a dark
+    /// panel with a picture in it. A shadow is the surgical version: invisible
+    /// over a dark photo, and the only thing holding the caption up over a pale
+    /// one.
+    func applyShowcaseCaptionShadow() {
+        layer.shadowColor = UIColor.black.cgColor
+        layer.shadowOpacity = 0.55
+        layer.shadowRadius = 3
+        layer.shadowOffset = CGSize(width: 0, height: 1)
+    }
 }
 
 /// A full-bleed showcase card: photo-real preview, name over a bottom scrim, an
@@ -117,6 +138,7 @@ final class ShowcaseTemplateCell: UICollectionViewCell {
         nameLabel.adjustsFontForContentSizeCategory = true
         nameLabel.numberOfLines = 1
         nameLabel.lineBreakMode = .byTruncatingTail
+        nameLabel.applyShowcaseCaptionShadow()
         nameLabel.translatesAutoresizingMaskIntoConstraints = false
 
         // "4 frames", a play glyph — a fact about the card that the picture

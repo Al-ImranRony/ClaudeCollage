@@ -49,6 +49,20 @@ final class AppCoordinator {
         home.featuredTemplatesProvider = { TemplateService.shared.templates }
         home.onSelectTemplate = { [weak self] template in self?.openTemplate(template) }
         home.onBrowseTemplates = { [weak self] in self?.selectTemplatesTab() }
+        // The bundled carousel catalog, unfiltered: Home is the showcase, so Home
+        // is where the "only what the sample-content manifest dresses" rule lives —
+        // one rule, in one place, for all three strips.
+        home.carouselTemplatesProvider = { TemplateService.shared.carouselTemplates }
+        home.onSelectCarouselTemplate = { [weak self] template in
+            self?.openCarouselTemplate(template)
+        }
+        home.videoShowcasesProvider = { SampleContentCatalog.shared.videoShowcases }
+        home.onSelectVideoShowcase = { [weak self] showcase in
+            self?.openVideoShowcase(showcase)
+        }
+        // There is no carousel-template gallery yet, so "See All" on the Carousels
+        // strip opens the type picker — the same door the "+" sheet uses.
+        home.onBrowseCarousels = { [weak self] in self?.presentCarouselTypePicker() }
         home.onNewProject = { [weak self] in self?.startNewGridProject() }
         home.onNewPolygon = { [weak self] in self?.startNewPolygonProject() }
         home.onNewVideoCollage = { [weak self] in self?.startVideoCollage() }
@@ -96,9 +110,14 @@ final class AppCoordinator {
         ])
         tabBarController.onStartEditing = { [weak self] in self?.presentStartEditingSheet() }
 
-        // Bundled templates back the Home strip; the gallery loads them too, but
+        // Bundled templates back the Home strips; the gallery loads them too, but
         // Home is shown first so it cannot wait for that.
+        //
+        // The carousel catalog had never been loaded ANYWHERE — twenty bundled
+        // templates that no screen had ever surfaced. Home's Carousels strip is
+        // the first thing to ask for them.
         _ = TemplateService.shared.loadBundledTemplates()
+        _ = TemplateService.shared.loadBundledCarouselTemplates()
         home.reload()
 
         IntentRouter.shared.onRequest = { [weak self] request in self?.handle(request) }
@@ -538,6 +557,41 @@ final class AppCoordinator {
         attachAutosave(to: viewModel)
         store.save(viewModel)
         pushEditor(with: viewModel)
+    }
+
+    /// Opens a bundled carousel template from the Home showcase.
+    ///
+    /// The same deal `openTemplate` offers: the template's frames with the photo
+    /// zones EMPTY and its text prefilled, so the user rebuilds the preview they
+    /// tapped with their own photos. The sample photography sells the structure;
+    /// it never lands in the project.
+    private func openCarouselTemplate(_ template: CarouselTemplate) {
+        let frames = CarouselService().buildCarousel(from: template)
+        // A template that parses to no frames has nothing to open — bail rather
+        // than pushing an empty editor.
+        guard !frames.isEmpty else { return }
+        presentCarouselEditor(
+            frames: frames,
+            images: [:],
+            canvasSize: CanvasSize.size(forAspectRatio: template.canvasAspectRatio),
+            type: template.carouselType,
+            // Horizontal is the carousel editor's default reading axis; the user
+            // can flip it in the editor, and that choice then persists.
+            axis: .horizontal)
+    }
+
+    /// Opens the video editor preset to a Home showcase's layout, cells empty —
+    /// the moving equivalent of `openTemplate`.
+    private func openVideoShowcase(_ showcase: SampleContentManifest.VideoShowcase) {
+        // The manifest carries the layout as a `GridTemplate` raw value. An
+        // unknown one means the manifest and the enum have drifted; do nothing
+        // rather than open a layout the loop was not composed in.
+        guard let grid = GridTemplate(rawValue: showcase.layout) else { return }
+        let viewModel = VideoEditorViewModel(
+            canvasSize: CanvasSize.size(forAspectRatio: "4:5"), layout: .grid(grid))
+        attachVideoAutosave(to: viewModel)
+        store.saveVideo(viewModel)
+        pushVideoEditor(viewModel)
     }
 
     private func openProject(id: UUID) {
