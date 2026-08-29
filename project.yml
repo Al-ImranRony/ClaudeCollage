@@ -35,10 +35,20 @@ settings:
     MARKETING_VERSION: "1.0.0"
     GENERATE_INFOPLIST_FILE: NO
     ENABLE_MODULE_VERIFIER: YES
-    # Personal-team signing (Steps 01–05). XcodeGen writes this into the pbxproj on every
-    # `xcodegen generate`, so the team persists across regenerations instead of resetting to
-    # "no team selected". Team IDs are not secret. Replaced by Match codesigning in Step 06.
-    DEVELOPMENT_TEAM: G9AZVLUA7S
+    # Signing team. The .xcodeproj is gitignored and XcodeGen rewrites it wholesale on every
+    # `xcodegen generate`, so this line is the ONLY durable home for the team — a team picked
+    # by hand in Xcode's Signing pane is erased by the very next regeneration.
+    #
+    # CAUTION: this must be the TEAM ID, which is the signing certificate's OU — NOT the value
+    # in parentheses that `security find-identity -v -p codesigning` prints. For this cert:
+    #   CN=Apple Development: imranalrony@icloud.com (G9AZVLUA7S)  <- certificate ID, not a team
+    #   OU=VS9574SDLX                                              <- the Team ID; this is it
+    # Putting the certificate ID here makes Xcode report "No Account for Team ..." and demand a
+    # manual re-selection after every regeneration. Read the real value straight off the cert:
+    #   security find-certificate -c "Apple Development: <email> (<certID>)" -p \
+    #     | openssl x509 -noout -subject      # the OU= field is the Team ID
+    # Team IDs are not secret. Replaced by Match codesigning in Step 06.
+    DEVELOPMENT_TEAM: VS9574SDLX
 
 configs:
   Debug: debug
@@ -141,6 +151,11 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.devron.caroullage.tests
         GENERATE_INFOPLIST_FILE: YES
+        # Test bundles are never distributed, so drop the "Mac (Designed for iPad)"
+        # destination — that is what puts a macOS section in Signing & Capabilities and
+        # the "No signing certificate 'Mac Development' found" warning in it.
+        # NB SUPPORTS_MACCATALYST is already NO by default; this is the flag that matters.
+        SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: NO
 
   CaroullageUITests:
     type: bundle.ui-testing
@@ -154,6 +169,11 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.devron.caroullage.uitests
         GENERATE_INFOPLIST_FILE: YES
+        # Test bundles are never distributed, so drop the "Mac (Designed for iPad)"
+        # destination — that is what puts a macOS section in Signing & Capabilities and
+        # the "No signing certificate 'Mac Development' found" warning in it.
+        # NB SUPPORTS_MACCATALYST is already NO by default; this is the flag that matters.
+        SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: NO
 
 schemes:
   "Caroullage (Dev)":
