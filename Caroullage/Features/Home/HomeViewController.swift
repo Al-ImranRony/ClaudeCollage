@@ -76,7 +76,7 @@ final class HomeViewController: UIViewController {
     /// Derived from the fold, not chosen. On an iPhone 17 (402 x 874pt) the
     /// screen is spent like this:
     ///
-    ///   168  the large-title block (62pt status bar + 106pt nav)
+    ///   106  the title block (62pt status bar + 44pt standard nav)
     ///   + 8  `contentStack`'s top padding
     ///   + H  the hero, which is `width - 2 * Spacing.md` = 370pt across
     ///   + 24 `contentStack.spacing` (`Spacing.xl`)
@@ -84,12 +84,15 @@ final class HomeViewController: UIViewController {
     ///   + 12 the section's own spacing (`Spacing.sm`)
     ///   + S  the strip
     ///   ---
-    ///   = 733, where the floating "Start Editing" pill begins covering content.
+    ///   = 728, where the floating "Start Editing" pill begins covering content.
     ///
-    /// That leaves 495pt for H + S. At 0.84 the hero is 311pt and the strip's
-    /// cards are a complete 176 — the whole first pillar lands above the pill
-    /// with ~8pt to spare, and "Video Collages" then sits at 749pt, in the band
-    /// between the pill and the tab bar, where it peeks and invites the scroll.
+    /// At 0.84 the hero is 311pt and the strip's cards are a complete 176, so the
+    /// whole first pillar lands above the pill. "Video Collages" then sits at
+    /// 687pt — clear of the pill by 15pt — with its cards peeking behind it.
+    ///
+    /// This budget assumed the 168pt LARGE-title block until the compact title
+    /// freed 62pt (see `viewDidLoad`). The ratio did not have to move for it: the
+    /// space went straight to the second pillar, which is what was short.
     ///
     /// It was 1.15, which put the hero's bottom at 602pt and the first strip's
     /// cards half under the tab bar: a first screen that showed ONE template and
@@ -141,8 +144,22 @@ final class HomeViewController: UIViewController {
         // rewrites its tab bar label, so this screen would sit under a tab reading
         // "Caroullage" instead of "Home".
         navigationItem.title = "Caroullage"
+        // Compact, not large. The large title's block is 168pt on an iPhone 17 —
+        // a fifth of the screen spent telling a user who just opened the app what
+        // the app is called. It also pushed "Video Collages" to 749pt, dead centre
+        // of the floating "Start Editing" pill (728–774), so the second pillar
+        // announced itself with its title struck through by a button.
+        //
+        // Dropping to the standard bar returns 62pt to the content: the header
+        // clears the pill with 15pt to spare and its cards peek beneath, which is
+        // the invitation the peek was always meant to be. The hero and the strips
+        // keep the sizes they were tuned to — see `heroAspectRatio`.
+        //
+        // The bar still prefers large titles for anything pushed onto it; this
+        // screen opts out the way the three editors already do.
         view.backgroundColor = Theme.Color.background
         navigationController?.navigationBar.prefersLargeTitles = true
+        navigationItem.largeTitleDisplayMode = .never
         setupLayout()
 
         // Backgrounding is not a view transition, so `viewDidDisappear` never
