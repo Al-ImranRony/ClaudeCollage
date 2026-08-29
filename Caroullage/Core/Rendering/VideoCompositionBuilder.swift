@@ -151,13 +151,19 @@ extension VideoComposer {
             let assetDuration = try await cell.asset.load(.duration).seconds
             let trimmed = cell.trim.clamped(toAssetDuration: assetDuration)
             guard trimmed.duration > 0 else { continue }
-            let naturalSize = try await videoTrack.load(.naturalSize)
+            // The stored size is not the seen size: a portrait clip is recorded
+            // landscape with a quarter-turn in `preferredTransform`. Every piece
+            // of framing below is computed in DISPLAY space, so it is resolved
+            // here once — see `VideoCompositionMath.orientedSource`.
+            let oriented = VideoCompositionMath.orientedSource(
+                naturalSize: try await videoTrack.load(.naturalSize),
+                preferredTransform: try await videoTrack.load(.preferredTransform))
             let audioTrack = try await cell.asset.loadTracks(withMediaType: .audio).first
             let range = CMTimeRange(
                 start: CMTime(seconds: trimmed.start, preferredTimescale: ts),
                 duration: CMTime(seconds: trimmed.duration, preferredTimescale: ts))
             resolved.append(ResolvedVideoCell(cell: cell, videoTrack: videoTrack, audioTrack: audioTrack,
-                                              naturalSize: naturalSize, range: range))
+                                              oriented: oriented, range: range))
         }
 
         // 2) Composition duration = the longest trimmed cell.
@@ -183,6 +189,10 @@ extension VideoComposer {
             // resolution (identity when rendering at the canvas size).
             let mappedFrame = VideoCompositionMath.renderMappedRect(
                 item.cell.frame, canvas: canvasSize, render: output)
+            // Placement is worked out against the size the viewer sees, then the
+            // clip's own orientation is applied first, so a portrait clip lands
+            // upright instead of on its side scaled to whatever the slot allowed.
+            let oriented = item.oriented
             let transform: CGAffineTransform
             switch item.cell.contentMode {
             case .fill:
@@ -192,15 +202,23 @@ extension VideoComposer {
                 // exactly fills the cell — no overflow at any zoom. (Centred at
                 // zoom 1 / pan 0 ⇒ plain fill.)
                 let cellAspect = mappedFrame.height > 0 ? mappedFrame.width / mappedFrame.height : 1
+                // In display space, so pan/zoom keep meaning what the user did
+                // with their fingers rather than what the file happens to store.
                 let crop = VideoCompositionMath.framedCropRect(
-                    source: item.naturalSize, cellAspect: cellAspect,
+                    source: oriented.displaySize, cellAspect: cellAspect,
                     zoom: CGFloat(item.cell.transform.zoom),
                     panX: CGFloat(item.cell.transform.panX), panY: CGFloat(item.cell.transform.panY))
-                transform = VideoCompositionMath.cropFillTransform(crop: crop, in: mappedFrame)
-                layer.setCropRectangle(crop, at: .zero)
+                transform = oriented.orientation.concatenating(
+                    VideoCompositionMath.cropFillTransform(crop: crop, in: mappedFrame))
+                // The crop rectangle is read in the SOURCE's own coordinates and
+                // applied before the transform, so the display-space crop has to
+                // be carried back through the orientation to get there.
+                layer.setCropRectangle(
+                    crop.applying(oriented.orientation.inverted()), at: .zero)
             case .fit:
-                transform = VideoCompositionMath.aspectFitTransform(
-                    source: item.naturalSize, in: mappedFrame)
+                transform = oriented.orientation.concatenating(
+                    VideoCompositionMath.aspectFitTransform(
+                        source: oriented.displaySize, in: mappedFrame))
             }
             applyPlacement(transform, transition: item.cell.transition,
                            cellFrame: mappedFrame, clipDuration: item.range.duration,
@@ -557,7 +575,7 @@ extension VideoComposer {
         let cell: VideoCompositionCell
         let videoTrack: AVAssetTrack
         let audioTrack: AVAssetTrack?
-        let naturalSize: CGSize
+        let oriented: VideoCompositionMath.OrientedSource
         let range: CMTimeRange
     }
 

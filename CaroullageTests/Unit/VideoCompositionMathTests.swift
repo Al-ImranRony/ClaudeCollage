@@ -166,6 +166,110 @@ final class VideoCompositionMathTests: XCTestCase {
         XCTAssertEqual(CGPoint(x: crop.maxX, y: crop.maxY).applying(t), CGPoint(x: cell.maxX, y: cell.maxY))
     }
 
+    // MARK: - Source orientation (Step 07 — portrait/rotated clips)
+
+    /// iPhone portrait recordings are stored landscape with a quarter-turn in
+    /// `preferredTransform`. These fix the contract the composition builder
+    /// needs: a display size to do geometry in, and a transform that carries
+    /// natural coordinates into it.
+
+    private static let portraitQuarterTurn = CGAffineTransform(
+        a: 0, b: 1, c: -1, d: 0, tx: 1080, ty: 0)
+
+    func testUnrotatedClipIsLeftAlone() {
+        let oriented = VideoCompositionMath.orientedSource(
+            naturalSize: CGSize(width: 1920, height: 1080), preferredTransform: .identity)
+        XCTAssertEqual(oriented.displaySize, CGSize(width: 1920, height: 1080))
+        XCTAssertTrue(oriented.orientation.isIdentity)
+    }
+
+    func testQuarterTurnSwapsTheDisplayedDimensions() {
+        let oriented = VideoCompositionMath.orientedSource(
+            naturalSize: CGSize(width: 1920, height: 1080),
+            preferredTransform: Self.portraitQuarterTurn)
+        // The clip a user shot in portrait is 1080 wide and 1920 tall on screen,
+        // whatever the file says.
+        XCTAssertEqual(oriented.displaySize, CGSize(width: 1080, height: 1920))
+    }
+
+    /// Whatever the rotation, the displayed frame has to start at the origin —
+    /// a quarter turn about (0,0) otherwise leaves the content in negative space.
+    func testOrientationAnchorsTheDisplayedFrameAtTheOrigin() {
+        for transform in [Self.portraitQuarterTurn,
+                          CGAffineTransform(a: -1, b: 0, c: 0, d: -1, tx: 1920, ty: 1080),
+                          CGAffineTransform(a: 0, b: -1, c: 1, d: 0, tx: 0, ty: 1920),
+                          // A quarter turn with NO translation baked in: some
+                          // assets carry the rotation alone.
+                          CGAffineTransform(rotationAngle: .pi / 2)] {
+            let oriented = VideoCompositionMath.orientedSource(
+                naturalSize: CGSize(width: 1920, height: 1080), preferredTransform: transform)
+            let framed = CGRect(origin: .zero, size: CGSize(width: 1920, height: 1080))
+                .applying(oriented.orientation)
+            XCTAssertEqual(framed.minX, 0, accuracy: 1e-6)
+            XCTAssertEqual(framed.minY, 0, accuracy: 1e-6)
+            XCTAssertEqual(framed.width, oriented.displaySize.width, accuracy: 1e-6)
+            XCTAssertEqual(framed.height, oriented.displaySize.height, accuracy: 1e-6)
+        }
+    }
+
+    /// A mirrored front-camera clip keeps its displayed size; the reflection
+    /// rides along in the transform rather than being straightened away.
+    func testMirroredClipKeepsItsDisplayedSize() {
+        let mirrored = CGAffineTransform(a: -1, b: 0, c: 0, d: 1, tx: 1920, ty: 0)
+        let oriented = VideoCompositionMath.orientedSource(
+            naturalSize: CGSize(width: 1920, height: 1080), preferredTransform: mirrored)
+        XCTAssertEqual(oriented.displaySize, CGSize(width: 1920, height: 1080))
+        let framed = CGRect(origin: .zero, size: CGSize(width: 1920, height: 1080))
+            .applying(oriented.orientation)
+        XCTAssertEqual(framed.minX, 0, accuracy: 1e-6)
+        XCTAssertEqual(framed.minY, 0, accuracy: 1e-6)
+    }
+
+    /// The bug this was written for: a portrait clip dropped into a portrait
+    /// slot must arrive upright and fill it, not lie on its side scaled to
+    /// whatever the slot's aspect happened to allow.
+    func testPortraitClipArrivesUprightInAPortraitCell() {
+        let natural = CGSize(width: 1920, height: 1080)
+        let cell = CGRect(x: 0, y: 0, width: 540, height: 960)
+        let oriented = VideoCompositionMath.orientedSource(
+            naturalSize: natural, preferredTransform: Self.portraitQuarterTurn)
+
+        // Geometry is done in DISPLAY space — the 1080x1920 the viewer sees.
+        let placement = VideoCompositionMath.aspectFitTransform(
+            source: oriented.displaySize, in: cell)
+        let full = oriented.orientation.concatenating(placement)
+
+        // Same aspect (9:16), so the clip fills the slot corner to corner.
+        // The displayed top-left of a quarter-turned clip is the natural
+        // frame's bottom-left, and it must land on the cell's top-left.
+        XCTAssertEqual(CGPoint(x: 0, y: 1080).applying(full).x, cell.minX, accuracy: 1e-6)
+        XCTAssertEqual(CGPoint(x: 0, y: 1080).applying(full).y, cell.minY, accuracy: 1e-6)
+        XCTAssertEqual(CGPoint(x: 1920, y: 0).applying(full).x, cell.maxX, accuracy: 1e-6)
+        XCTAssertEqual(CGPoint(x: 1920, y: 0).applying(full).y, cell.maxY, accuracy: 1e-6)
+    }
+
+    /// Crop rectangles are in the source's own coordinates and are applied
+    /// before the transform, so a crop chosen in display space has to be
+    /// carried back. Round-tripping it must land on the same region.
+    func testDisplaySpaceCropMapsBackIntoSourceSpace() {
+        let natural = CGSize(width: 1920, height: 1080)
+        let oriented = VideoCompositionMath.orientedSource(
+            naturalSize: natural, preferredTransform: Self.portraitQuarterTurn)
+        let displayCrop = VideoCompositionMath.fillCropRect(
+            source: oriented.displaySize, cellAspect: 1)   // square slot
+        let sourceCrop = displayCrop.applying(oriented.orientation.inverted())
+
+        // A square region stays square, sits inside the source, and comes back
+        // to where it started.
+        XCTAssertTrue(CGRect(origin: .zero, size: natural).insetBy(dx: -0.5, dy: -0.5)
+            .contains(sourceCrop), "crop must stay inside the source frame")
+        let roundTripped = sourceCrop.applying(oriented.orientation)
+        XCTAssertEqual(roundTripped.minX, displayCrop.minX, accuracy: 1e-6)
+        XCTAssertEqual(roundTripped.minY, displayCrop.minY, accuracy: 1e-6)
+        XCTAssertEqual(roundTripped.width, displayCrop.width, accuracy: 1e-6)
+        XCTAssertEqual(roundTripped.height, displayCrop.height, accuracy: 1e-6)
+    }
+
     // MARK: - Render-size mapping (slice 6d / export resolution)
 
     func testRenderMapIsIdentityWhenSizesMatch() {

@@ -30,6 +30,52 @@ public enum VideoCompositionMath {
         return CGAffineTransform(a: scale, b: 0, c: 0, d: scale, tx: tx, ty: ty)
     }
 
+    // MARK: - Source orientation
+
+    /// A video track's displayed geometry, as opposed to its stored geometry.
+    public struct OrientedSource: Equatable, Sendable {
+        /// The size the clip is meant to be *seen* at. For a portrait iPhone
+        /// recording this is the swap of `naturalSize`.
+        public let displaySize: CGSize
+        /// Natural (stored) coordinates → displayed coordinates, anchored so the
+        /// displayed frame starts at the origin.
+        public let orientation: CGAffineTransform
+    }
+
+    /// Resolves what a track actually looks like on screen.
+    ///
+    /// A camera does not rotate its sensor; it records landscape and writes a
+    /// quarter-turn into the track's `preferredTransform`. So `naturalSize` for
+    /// a portrait clip is 1920x1080 — width and height swapped from what anyone
+    /// watching it sees — and the pixels need turning before they are shown.
+    ///
+    /// Playing an asset directly, or deriving a composition with
+    /// `videoComposition(withPropertiesOf:)`, applies that transform for you.
+    /// Building layer instructions by hand does not: AVFoundation ignores a
+    /// composition track's `preferredTransform` once explicit instructions are
+    /// supplied, so the rotation has to be carried in the layer transform, and
+    /// every piece of framing geometry has to be computed against `displaySize`
+    /// rather than the stored size.
+    ///
+    /// Rotating about the origin sends content into negative coordinates, so the
+    /// result is translated back — `orientation` maps the natural frame onto
+    /// exactly `0,0 … displaySize`. Video transforms are quarter turns with an
+    /// optional reflection, so the bounding box of the mapped rect *is* the
+    /// mapped rect and no accuracy is lost taking it.
+    public static func orientedSource(
+        naturalSize: CGSize, preferredTransform: CGAffineTransform
+    ) -> OrientedSource {
+        guard naturalSize.width > 0, naturalSize.height > 0 else {
+            return OrientedSource(displaySize: naturalSize, orientation: .identity)
+        }
+        let mapped = CGRect(origin: .zero, size: naturalSize).applying(preferredTransform)
+        let anchored = preferredTransform.concatenating(
+            CGAffineTransform(translationX: -mapped.minX, y: -mapped.minY))
+        return OrientedSource(
+            displaySize: CGSize(width: abs(mapped.width), height: abs(mapped.height)),
+            orientation: anchored)
+    }
+
     /// Aspect-FILL: scale a source to COVER the cell (max scale) and centre it.
     /// Pair with `fillCropRect` as the layer crop rectangle so the overflow doesn't
     /// spill into neighbouring cells. This is the default for a collage cell —
