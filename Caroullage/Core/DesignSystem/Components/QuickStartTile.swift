@@ -6,7 +6,7 @@
 //  large; these replaced nav-bar icons that were far too small to hit reliably.
 //
 //  Step 05b lifted it out of `HomeViewController` so the floating "+" sheet can
-//  use the same row. That is the point: "Start Something" on Home and the "+"
+//  use the same row. That is the point: "Create New" on Home and the "+"
 //  sheet offer overlapping choices, and when they were built from different
 //  parts they looked like two unrelated features.
 //

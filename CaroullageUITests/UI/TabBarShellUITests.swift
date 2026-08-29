@@ -214,7 +214,7 @@ final class TabBarShellUITests: XCTestCase {
 
     @MainActor
     func testHomeOffersCarouselLikeTheStartEditingSheetDoes() {
-        // Home's "Start Something" and the "+" sheet deliberately overlap — that is
+        // Home's "Create New" and the "+" sheet deliberately overlap — that is
         // why `QuickStartTile` was lifted into the component layer. Carousel joined
         // the sheet in Step 06 and Home was left a format short, so the app's
         // signature output was missing from one of its two front doors.

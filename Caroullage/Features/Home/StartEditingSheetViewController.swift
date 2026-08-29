@@ -9,7 +9,7 @@
 //  themed. It is the most-tapped control in the shell and it looked like a
 //  debug menu.
 //
-//  It now wears the same `QuickStartTile` rows as Home's "Start Something",
+//  It now wears the same `QuickStartTile` rows as Home's "Create New",
 //  which is the whole reason that row was lifted into the component layer — the
 //  two surfaces offer overlapping choices and should not look like unrelated
 //  features.
@@ -122,7 +122,9 @@ final class StartEditingSheetViewController: UIViewController {
         view.accessibilityIdentifier = "startEditingSheet"
 
         let title = UILabel()
-        title.text = "Start Something"
+        // The same words as Home's chip row: the two surfaces offer the same
+        // four doors and should not name them differently.
+        title.text = String(localized: "Create New")
         title.font = Theme.Typography.title2
         title.textColor = Theme.Color.textPrimary
         title.adjustsFontForContentSizeCategory = true
