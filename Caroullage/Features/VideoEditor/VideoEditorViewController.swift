@@ -394,7 +394,9 @@ final class VideoEditorViewController: UIViewController {
             })
         }
         sheet.addAction(UIAlertAction(title: "Cancel", style: .cancel))
-        sheet.popoverPresentationController?.barButtonItem = toolbarItems?.last
+        anchorPopover(sheet) { popover in
+            popover.barButtonItem = toolbarItems?.last
+        }
         present(sheet, animated: true)
     }
 
@@ -761,7 +763,9 @@ final class VideoEditorViewController: UIViewController {
 
     private func shareURL(_ url: URL) {
         let share = UIActivityViewController(activityItems: [url], applicationActivities: nil)
-        share.popoverPresentationController?.barButtonItem = navigationItem.rightBarButtonItems?.first
+        anchorPopover(share) { popover in
+            popover.barButtonItem = navigationItem.rightBarButtonItems?.first
+        }
         present(share, animated: true)
     }
 

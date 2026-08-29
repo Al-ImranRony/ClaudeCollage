@@ -599,8 +599,10 @@ final class GridEditorViewController: UIViewController {
         sheet.addAction(UIAlertAction(title: "Cancel", style: .cancel) { [weak self] _ in
             self?.canvasView.setSelectedCell(nil)
         })
-        sheet.popoverPresentationController?.sourceView = canvasView
-        sheet.popoverPresentationController?.sourceRect = cellRectOnScreen(index) ?? canvasView.bounds
+        anchorPopover(sheet) { popover in
+            popover.sourceView = canvasView
+            popover.sourceRect = cellRectOnScreen(index) ?? canvasView.bounds
+        }
         present(sheet, animated: true)
     }
 
@@ -1029,7 +1031,9 @@ final class GridEditorViewController: UIViewController {
             return
         }
         let share = UIActivityViewController(activityItems: [url], applicationActivities: nil)
-        share.popoverPresentationController?.barButtonItem = navigationItem.rightBarButtonItems?.first
+        anchorPopover(share) { popover in
+            popover.barButtonItem = navigationItem.rightBarButtonItems?.first
+        }
         present(share, animated: true)
     }
 
