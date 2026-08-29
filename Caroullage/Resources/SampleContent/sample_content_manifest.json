@@ -25,10 +25,10 @@
     { "id": "solo-motion", "loop": "sample_loop_solo", "poster": "sample_loop_solo_poster", "title": "Spotlight",   "layout": "oneCell" }
   ],
   "hero": [
-    { "kind": "template", "id": "story-caption-hero" },
+    { "kind": "template", "id": "grid-4cell-square" },
     { "kind": "video",    "id": "duo-motion" },
     { "kind": "carousel", "id": "carousel-matched-team" },
-    { "kind": "template", "id": "grid-4cell-square" },
+    { "kind": "template", "id": "story-caption-hero" },
     { "kind": "carousel", "id": "carousel-story-beforeafter" }
   ]
 }
