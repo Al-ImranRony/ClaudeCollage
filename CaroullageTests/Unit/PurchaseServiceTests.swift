@@ -99,7 +99,7 @@ final class PurchaseServiceTests: XCTestCase {
     }
 
     func testAnUnrelatedEntitlementDoesNotGrantPremium() async {
-        let gateway = StubPurchaseGateway(entitled: ["net.pixeltouch.somethingelse"])
+        let gateway = StubPurchaseGateway(entitled: ["com.devron.somethingelse"])
         let service = makeService(gateway: gateway)
 
         await service.start()

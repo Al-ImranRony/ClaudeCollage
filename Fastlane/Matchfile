@@ -1,8 +1,12 @@
-git_url("git@github.com:pixeltouch/ios-certs-private.git")
+# The PixelTouch certificate repo and account are no longer used. A brand-new Apple
+# Developer account is being created for Caroullage — fill in git_url and username
+# once it exists. See docs/step-06-account-gated.md.
+
+git_url("") # TODO: private git repo holding the new account's certificates
 storage_mode("git")
 
-app_identifier(["net.pixeltouch.caroullage", "net.pixeltouch.caroullage.widgets"])
-username("dev3@pixeltouch.net")
+app_identifier(["com.devron.caroullage", "com.devron.caroullage.widgets"])
+username("") # TODO: Apple ID of the new developer account
 
 type("development") # The default type, can be: appstore, adhoc, enterprise or development
 

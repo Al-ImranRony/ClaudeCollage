@@ -34,7 +34,7 @@ final class CameraSession: NSObject, @unchecked Sendable {
     private let session = AVCaptureSession()
     private let photoOutput = AVCapturePhotoOutput()
     private let videoOutput = AVCaptureVideoDataOutput()
-    private let queue = DispatchQueue(label: "net.pixeltouch.caroullage.camera")
+    private let queue = DispatchQueue(label: "com.devron.caroullage.camera")
     private let context = CIContext(options: [.useSoftwareRenderer: false])
 
     private let lock = NSLock()

@@ -19,14 +19,32 @@ Each entry says what is blocked, and what was done locally in its place.
 | **App Store Server Notifications V2** endpoint (server-side validation) | Not started. The app verifies transactions client-side via StoreKit 2's own signature checking (`.verified` only), which is the correct client behaviour regardless; the server endpoint is defence against a jailbroken client and can be added at any time. |
 | Real sandbox purchase testing (a sandbox Apple ID) | Local StoreKit testing covers purchase, cancel, pending, restore, renewal, and revocation. |
 
-**Product identifier note.** The brief in `Steps/Step_06_Deployment.md` writes the
-IDs as `com.devron.caroullage.premium.*`, while `StoreKit/Caroullage.storekit`
-uses `net.pixeltouch.caroullage.premium.*`. The app follows the `.storekit`
-file, since that is the artifact local testing actually runs against. The bundle
-ID is `com.devron.caroullage`. **Product IDs do not have to match the bundle ID,
-but they are permanent once created in App Store Connect** — pick the prefix
-deliberately before creating them, and update `PremiumProduct.idPrefix` plus the
-`.storekit` file together if the answer is `com.devron`.
+**Product identifier note — action required with the new account.** The StoreKit
+products still carry the `net.pixeltouch.*` prefix inherited from the PixelTouch
+account, which is no longer being used. A brand-new Apple Developer account and
+Team ID are being created for Caroullage (2026-08-29), so this prefix must be
+settled **before any product is registered — product IDs are permanent once
+created in App Store Connect.** The bundle ID is `com.devron.caroullage`; product
+IDs need not match it, but the prefix should be chosen deliberately.
+
+The IDs were deliberately left in place rather than guessed at, because they have
+to match App Store Connect exactly. Change these together:
+
+| File | What carries the prefix |
+|---|---|
+| `StoreKit/Caroullage.storekit` | all 8 product IDs (4 premium, 3 credits, 1 offer) |
+| `Caroullage/Core/Models/PremiumProduct.swift` | `idPrefix` |
+| `Caroullage/Core/Models/CreditProduct.swift` | `idPrefix` |
+
+A unit test asserts the app's product IDs match the `.storekit` file, so letting
+these drift apart fails the suite rather than shipping.
+
+**Fastlane account details were cleared** (2026-08-29). `Fastlane/Appfile` and
+`Fastlane/Matchfile` no longer reference the PixelTouch Apple ID, team, or
+certificate repo; `apple_id`, `team_id`, `itc_team_id`, `username` and `git_url`
+are blank TODOs awaiting the new account. Their `app_identifier` entries now
+match the real bundle IDs (`com.devron.caroullage[.widgets]`) instead of the
+`net.pixeltouch.*` ones, which never matched what the app actually builds.
 
 ---
 
