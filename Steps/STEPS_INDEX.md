@@ -342,8 +342,36 @@ The first cut recomposited the whole canvas on the CPU per gesture frame and hel
 | Step | File | Description | Est. Weeks | Status |
 |------|------|-------------|-----------|--------|
 | **06** | `Step_06_Deployment.md` | Monetization, paywall, onboarding, localization, accessibility, compliance, App Store assets, Featuring, submission, post-launch | 36–42 | ⬜ Not started |
+| **07** | `docs/superpowers/specs/2026-08-29-home-showcase-redesign-design.md` | Home showcase redesign (unplanned interstitial) — photo-real hero + three pillar strips (Photo Collage, Video Collage, Carousel) | — | 🟢 Core complete — bundled licensed sample photography + manifest/catalog, showcase previews rendered through the export renderer, auto-cycling hero, looping video cards, quick-start compressed to chips. See Step 07 notes below |
 
 **End of Part 2:** App is live on the App Store in 11 languages, monitored for 30 days, ready for v1.1 planning.
+
+
+### Step 07 — Home showcase redesign (2026-08-29)
+An unplanned interstitial, taken on after Step 06's shell work: Home was well organised but
+schematic — every template previewed as empty "+" chips, so the screen never showed what the app
+*makes*. Rebuilt as a showcase around the three pillars.
+
+- **Sample content is bundled, licensed, and credited.** ~24 Pexels photos + three baked video
+  loops with posters under `Resources/SampleContent/`, with `ATTRIBUTION.md`. Deliberately **no
+  celebrity or actress likenesses** — bundling a real person's image to market an app is a
+  right-of-publicity problem and an App Store rejection risk; model-released stock buys the same
+  aspirational look legally.
+- **Previews cannot lie.** `TemplateService.showcasePreview` composites the sample photos into the
+  template's real zones through the **same `CollageRenderer` the editor and export use**, disk-cached
+  and version-keyed. What the card shows is what the user can rebuild.
+- **Tap contract unchanged:** photo cards route through the existing `openTemplate`; new routes open
+  a bundled `CarouselTemplate` (finally surfacing `CarouselService.buildCarousel(from:)`, until now
+  unreachable from any screen) and a video showcase's preset layout. Photo zones always arrive empty.
+- **Motion where it sells, stills where it doesn't:** video cards loop muted via `AVPlayerLooper`,
+  decoding only while on screen; Reduce Motion and Low Power Mode make the poster the final state.
+  The hero's auto-advance lives in a timer-injectable `HeroRotationController` so it is unit-tested.
+- Quick-start tiles compressed to a chip row, **keeping their accessibility identifiers** so the
+  existing shell/critical-flow suites kept passing unmodified.
+- Spec: `docs/superpowers/specs/2026-08-29-home-showcase-redesign-design.md`.
+  Plan: `docs/superpowers/plans/2026-08-29-home-showcase-redesign.md`.
+- Device QA still owed: loop playback smoothness and thermals, hero cross-fade feel, showcase scroll
+  performance on hardware.
 
 ---
 
