@@ -70,3 +70,4 @@ coverage/
 
 # Logs
 *.log
+.gstack/
