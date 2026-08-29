@@ -35,18 +35,22 @@ final class HeroShowcaseView: UIView {
     struct Page {
         /// How the preview is fitted to the card.
         ///
-        /// A carousel's showcase preview is a wide three-page strip; filling a
-        /// portrait hero with it crops away everything except a vertical sliver
-        /// of the middle page, which destroys the one thing the strip exists to
-        /// say (that this is a multi-page post). Those pages are fitted whole
-        /// onto a blurred bed of themselves instead — the letterboxing then
-        /// reads as a deliberate presentation rather than as a layout accident.
-        enum Presentation { case fill, fitOnBlurredBed }
+        /// A carousel's showcase preview is a wide three-page strip; filling the
+        /// hero with it crops away everything except a sliver of the middle page,
+        /// which destroys the one thing the strip exists to say (that this is a
+        /// multi-page post). Those pages are fitted whole onto a blurred bed of
+        /// themselves instead — the letterboxing then reads as a deliberate
+        /// presentation rather than as a layout accident.
+        ///
+        /// The same argument turned out to apply to any artwork whose shape is
+        /// far from the card's, which is what `.automatic` — the default —
+        /// measures. See `HeroPageCell.fitting(for:artwork:card:)`.
+        enum Presentation { case fill, fitOnBlurredBed, automatic }
 
         let title: String
         let subtitle: String
         let identifier: String
-        var presentation: Presentation = .fill
+        var presentation: Presentation = .automatic
         /// A video page's still frame, shown instantly and kept as the permanent
         /// state whenever motion is not allowed.
         var poster: UIImage?
@@ -312,10 +316,63 @@ private final class HeroPageCell: UICollectionViewCell {
     /// strip card's because the hero carries two lines of type, not one.
     private static let scrimHeightRatio: CGFloat = 0.45
 
-    /// How much of the card a FITTED preview may occupy, measured from the top.
-    /// The remaining quarter is the caption's, so a fitted strip is composed
-    /// above the title rather than centred behind it.
-    private static let fittedRegionRatio: CGFloat = 0.74
+    /// How far a preview's proportions may stray from the card's before filling
+    /// stops showing a template and starts showing a crop.
+    ///
+    /// The hero card is about 1 : 0.84. Filling it with `story-caption-hero` —
+    /// a 9:16 template whose whole design is a photo above a caption band —
+    /// shows 47% of the artwork, which on this catalog's sample photography is
+    /// an extreme close-up of one face with the template's own composition
+    /// cropped away entirely. The hero then reads as a photo viewer, which is
+    /// the one thing it must not do. A 1:1 or 4:5 template loses only its
+    /// margins under the same crop and still reads whole.
+    ///
+    /// The line is drawn on the RATIO between the two aspect ratios rather than
+    /// on either one, so it keeps meaning the same thing if the card's
+    /// proportions change: fit when the artwork is more than 1.8x as elongated
+    /// as the card — equivalently, when filling would crop away more than 44%
+    /// of one axis. Against the shipped catalog that puts 1:1 (1.19), 4:5
+    /// (1.49) and 3:4 (1.59) on the fill side and 9:16 (2.12) and the
+    /// three-page carousel strip (2.02) on the fit side, with real air either
+    /// way rather than a boundary a new template could stumble across.
+    private static let fitDivergenceThreshold: CGFloat = 1.8
+
+    /// The shape a preview takes inside the card.
+    private enum Fitting {
+        /// Edge to edge, cropped to the card.
+        case fill
+        /// Whole, seated in the card's region ABOVE the caption, on a blurred
+        /// blow-up of itself.
+        ///
+        /// Above rather than behind, for both shapes of artwork. A wide strip
+        /// centred in the card would land exactly where the two lines of type
+        /// go; a tall template large enough to fill the card's height puts its
+        /// OWN authored caption band ("MOMENTS") under the hero's title, and two
+        /// captions in the same 40pt reads as a bug rather than as a poster.
+        case onBed
+    }
+
+    /// Resolves a page's declared presentation against what was actually
+    /// rendered. `artwork` is `.zero` before the render lands, which is why an
+    /// explicitly-fitted page still starts in the geometry it asked for.
+    private static func fitting(
+        for presentation: HeroShowcaseView.Page.Presentation,
+        artwork: CGSize, card: CGSize
+    ) -> Fitting {
+        switch presentation {
+        case .fill:
+            return .fill
+        case .fitOnBlurredBed:
+            return .onBed
+        case .automatic:
+            guard artwork.width > 0, artwork.height > 0, card.width > 0, card.height > 0
+            else { return .fill }
+            let artAspect = artwork.height / artwork.width
+            let cardAspect = card.height / card.width
+            let divergence = max(artAspect / cardAspect, cardAspect / artAspect)
+            return divergence > Self.fitDivergenceThreshold ? .onBed : .fill
+        }
+    }
 
     private let bedImageView = UIImageView()
     // Ultra-thin, not thick: the bed is meant to read as a soft, out-of-focus
@@ -327,10 +384,11 @@ private final class HeroPageCell: UICollectionViewCell {
     private let scrim = ShowcaseScrimView()
     private let titleLabel = UILabel()
     private let subtitleLabel = UILabel()
+    private let captionStack = UIStackView()
     private var previewTask: Task<Void, Never>?
-    /// The preview's two geometries, swapped by `configure(with:)`.
-    private var fillConstraints: [NSLayoutConstraint] = []
-    private var fitConstraints: [NSLayoutConstraint] = []
+    /// The preview's two geometries, swapped by `apply(_:isVideo:)`.
+    private var edgeConstraints: [NSLayoutConstraint] = []
+    private var aboveCaptionConstraints: [NSLayoutConstraint] = []
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -370,11 +428,14 @@ private final class HeroPageCell: UICollectionViewCell {
         subtitleLabel.lineBreakMode = .byTruncatingTail
         subtitleLabel.applyShowcaseCaptionShadow()
 
-        let labels = UIStackView(arrangedSubviews: [titleLabel, subtitleLabel])
-        labels.axis = .vertical
-        labels.spacing = Theme.Spacing.xxs / 2
+        // Stored rather than local now: the fitted geometry hangs off its top
+        // edge, so the image view has to be able to reach it.
+        captionStack.addArrangedSubview(titleLabel)
+        captionStack.addArrangedSubview(subtitleLabel)
+        captionStack.axis = .vertical
+        captionStack.spacing = Theme.Spacing.xxs / 2
 
-        for subview in [bedImageView, bedBlur, imageView, playerView, scrim, labels] {
+        for subview in [bedImageView, bedBlur, imageView, playerView, scrim, captionStack] {
             subview.translatesAutoresizingMaskIntoConstraints = false
             contentView.addSubview(subview)
         }
@@ -401,33 +462,35 @@ private final class HeroPageCell: UICollectionViewCell {
             scrim.heightAnchor.constraint(
                 equalTo: contentView.heightAnchor, multiplier: Self.scrimHeightRatio),
 
-            labels.leadingAnchor.constraint(
+            captionStack.leadingAnchor.constraint(
                 equalTo: contentView.leadingAnchor, constant: Theme.Spacing.md),
-            labels.bottomAnchor.constraint(
+            captionStack.bottomAnchor.constraint(
                 equalTo: contentView.bottomAnchor, constant: -Theme.Spacing.md),
             // Leaves the bottom-trailing corner to the page control, which lives
             // on the hero rather than in the cell and so cannot be constrained to
             // directly.
-            labels.widthAnchor.constraint(
+            captionStack.widthAnchor.constraint(
                 lessThanOrEqualTo: contentView.widthAnchor, multiplier: 0.68),
         ])
 
-        // Two geometries for one image view: edge to edge when the preview fills
-        // the card, and the card's top region when it is fitted whole.
-        fillConstraints = [
+        // Two geometries for one image view: edge to edge, and the band above the
+        // caption. The second is anchored to the caption rather than set as a
+        // share of the card's height so that it still clears the type at the
+        // accessibility text sizes, where the two lines are twice as tall.
+        edgeConstraints = [
             imageView.topAnchor.constraint(equalTo: contentView.topAnchor),
             imageView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
             imageView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
             imageView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
         ]
-        fitConstraints = [
+        aboveCaptionConstraints = [
             imageView.topAnchor.constraint(equalTo: contentView.topAnchor),
             imageView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
             imageView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
-            imageView.heightAnchor.constraint(
-                equalTo: contentView.heightAnchor, multiplier: Self.fittedRegionRatio),
+            imageView.bottomAnchor.constraint(
+                equalTo: captionStack.topAnchor, constant: -Theme.Spacing.sm),
         ]
-        NSLayoutConstraint.activate(fillConstraints)
+        NSLayoutConstraint.activate(edgeConstraints)
 
         isAccessibilityElement = true
         accessibilityTraits = .button
@@ -450,12 +513,11 @@ private final class HeroPageCell: UICollectionViewCell {
         // cell was holding for the video page it used to show.
         playerView.configure(loopURL: page.loopURL, poster: isVideo ? page.poster : nil)
 
-        let fits = page.presentation == .fitOnBlurredBed
-        imageView.contentMode = fits ? .scaleAspectFit : .scaleAspectFill
-        NSLayoutConstraint.deactivate(fits ? fillConstraints : fitConstraints)
-        NSLayoutConstraint.activate(fits ? fitConstraints : fillConstraints)
-        bedImageView.isHidden = !fits || isVideo
-        bedBlur.isHidden = bedImageView.isHidden
+        // Nothing has been rendered yet, so this is only what the page DECLARES.
+        // It is re-resolved below against the artwork that actually arrives.
+        apply(
+            Self.fitting(for: page.presentation, artwork: .zero, card: contentView.bounds.size),
+            isVideo: isVideo)
 
         previewTask?.cancel()
         guard !isVideo else { return }
@@ -464,18 +526,42 @@ private final class HeroPageCell: UICollectionViewCell {
             let rendered = page.preview()
             guard !Task.isCancelled, let self else { return }
             let image = rendered.map { UIImage(cgImage: $0) }
+            // Measured now rather than inside the animation block, so it reads a
+            // settled layout rather than one mid-transition.
+            let fitting = Self.fitting(
+                for: page.presentation, artwork: image?.size ?? .zero,
+                card: self.contentView.bounds.size)
             // A fade, not a pop: the well → photograph swap is very visible at
-            // hero size. Reduce Motion shortens it rather than removing it —
-            // a cross-dissolve is not motion.
+            // hero size, and the geometry can change with it (a tall template
+            // arriving on a card that had been laid out to fill). Reduce Motion
+            // shortens it rather than removing it — a cross-dissolve is not
+            // motion.
             UIView.transition(
                 with: self.contentView,
                 duration: Theme.Motion.duration(Theme.Motion.standard),
                 options: [.transitionCrossDissolve, .allowUserInteraction]
             ) {
+                self.apply(fitting, isVideo: isVideo)
                 self.imageView.image = image
-                if fits { self.bedImageView.image = image }
+                self.bedImageView.image = fitting == .fill ? nil : image
+                self.contentView.layoutIfNeeded()
             }
         }
+    }
+
+    /// Puts the image view into one of the two geometries and shows or hides the
+    /// blurred bed to match.
+    private func apply(_ fitting: Fitting, isVideo: Bool) {
+        let fits = fitting != .fill
+        imageView.contentMode = fits ? .scaleAspectFit : .scaleAspectFill
+
+        NSLayoutConstraint.deactivate(fits ? edgeConstraints : aboveCaptionConstraints)
+        NSLayoutConstraint.activate(fits ? aboveCaptionConstraints : edgeConstraints)
+
+        // A video page never grows a bed: it fills by construction, and there is
+        // no still to blow up behind it.
+        bedImageView.isHidden = fitting == .fill || isVideo
+        bedBlur.isHidden = bedImageView.isHidden
     }
 
     func play() { playerView.play() }

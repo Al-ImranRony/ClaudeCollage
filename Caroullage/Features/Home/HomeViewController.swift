@@ -61,16 +61,43 @@ final class HomeViewController: UIViewController {
 
     // MARK: - Showcase geometry
 
-    /// A showcase card is portrait-ish, which is what most of the catalog is.
-    private static let cardHeight: CGFloat = 200
-    private static let cardWidth: CGFloat = 160
+    /// A showcase card is portrait-ish (4:5), which is what most of the catalog
+    /// is. Sized against the fold budget below rather than picked: 176pt is what
+    /// is left for a complete card once the hero has taken its share.
+    private static let cardHeight: CGFloat = 176
+    private static let cardWidth: CGFloat = 140
     /// A carousel's preview is three pages laid side by side, so its card is
-    /// wider: at 160pt the centre crop shows one page and the strip stops saying
-    /// the only thing it exists to say.
-    private static let carouselCardWidth: CGFloat = 240
-    /// The hero's height as a share of its width. Portrait enough to sell a 4:5
-    /// or 9:16 piece without pushing the first strip off the screen.
-    private static let heroAspectRatio: CGFloat = 1.15
+    /// half again as wide: at photo-card width the centre crop shows one page and
+    /// the strip stops saying the only thing it exists to say.
+    private static let carouselCardWidth: CGFloat = 212
+
+    /// The hero's height as a share of its width.
+    ///
+    /// Derived from the fold, not chosen. On an iPhone 17 (402 x 874pt) the
+    /// screen is spent like this:
+    ///
+    ///   168  the large-title block (62pt status bar + 106pt nav)
+    ///   + 8  `contentStack`'s top padding
+    ///   + H  the hero, which is `width - 2 * Spacing.md` = 370pt across
+    ///   + 24 `contentStack.spacing` (`Spacing.xl`)
+    ///   + 26 the "Photo Collages" header
+    ///   + 12 the section's own spacing (`Spacing.sm`)
+    ///   + S  the strip
+    ///   ---
+    ///   = 733, where the floating "Start Editing" pill begins covering content.
+    ///
+    /// That leaves 495pt for H + S. At 0.84 the hero is 311pt and the strip's
+    /// cards are a complete 176 — the whole first pillar lands above the pill
+    /// with ~8pt to spare, and "Video Collages" then sits at 749pt, in the band
+    /// between the pill and the tab bar, where it peeks and invites the scroll.
+    ///
+    /// It was 1.15, which put the hero's bottom at 602pt and the first strip's
+    /// cards half under the tab bar: a first screen that showed ONE template and
+    /// no evidence the app also makes video or carousels.
+    ///
+    /// Still the focal point at 370 x 311: the hero is two and a half times the
+    /// width of a strip card and more than a third of the screen's height.
+    private static let heroAspectRatio: CGFloat = 0.84
 
     // MARK: - State
 
