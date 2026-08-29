@@ -19,52 +19,36 @@ import UIKit
 
 // MARK: - Brand mark
 
-/// The app's mark: the icon's glyph on the icon's gradient.
+/// The app's own icon, at header size.
 ///
-/// The gradient is the view's BACKING layer rather than a sublayer — the same
-/// reason `GradientLayerButton` exists. A sublayer would sit above the image
-/// view added after it and swallow the glyph.
+/// This was a gradient squircle with `square.stack.3d.up.fill` on it — an
+/// invented mark that merely resembled the icon. The icon is a real drawing
+/// (the white collage card over its fanned pair), so a lockup carrying an
+/// approximation of it was showing users a logo the app does not have.
+///
+/// `AppIcon` cannot be loaded with `UIImage(named:)`, so the artwork is also
+/// published as the `BrandMark` image set. The light rendition is used in both
+/// appearances deliberately: it carries its own orange ground, so it holds the
+/// same contrast on a dark screen as on a light one, and stays the mark people
+/// already recognise from their home screen.
 @MainActor
-final class BrandMarkView: UIView {
-
-    override class var layerClass: AnyClass { CAGradientLayer.self }
-
-    private let glyph = UIImageView()
+final class BrandMarkView: UIImageView {
 
     init(side: CGFloat = 30) {
         super.init(frame: .zero)
 
-        let gradient = layer as? CAGradientLayer
-        gradient?.startPoint = CGPoint(x: 0, y: 0)
-        gradient?.endPoint = CGPoint(x: 1, y: 1)
-        repaint()
-        // CGColors are resolved, not dynamic: without this the mark keeps its
-        // light-mode ramp after a switch to dark.
-        registerForTraitChanges([UITraitUserInterfaceStyle.self]) { (view: Self, _) in
-            view.repaint()
-        }
-
-        // A squircle, not a circle: it echoes the app icon's own shape.
+        image = UIImage(named: "BrandMark")
+        contentMode = .scaleAspectFill
+        clipsToBounds = true
+        // The icon art is square and full-bleed, so it takes the icon's own
+        // corner treatment rather than a circle.
         layer.cornerRadius = side * 0.28
         layer.cornerCurve = .continuous
-
-        glyph.image = UIImage(
-            systemName: "square.stack.3d.up.fill",
-            withConfiguration: UIImage.SymbolConfiguration(
-                pointSize: side * 0.5, weight: .semibold))
-        // The mark's ink is the same token every filled accent surface uses, so
-        // it stays legible when the gradient flips ends in dark mode.
-        glyph.tintColor = Theme.Color.textOnAccent
-        glyph.contentMode = .center
-        glyph.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(glyph)
 
         translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
             widthAnchor.constraint(equalToConstant: side),
             heightAnchor.constraint(equalToConstant: side),
-            glyph.centerXAnchor.constraint(equalTo: centerXAnchor),
-            glyph.centerYAnchor.constraint(equalTo: centerYAnchor),
         ])
 
         isAccessibilityElement = false
@@ -72,10 +56,6 @@ final class BrandMarkView: UIView {
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
-
-    private func repaint() {
-        (layer as? CAGradientLayer)?.colors = Theme.Color.brandGradient(for: traitCollection)
-    }
 }
 
 // MARK: - Brand lockup
@@ -138,19 +118,25 @@ final class ProBadgeButton: GradientLayerButton {
         self.action = action
         super.init(frame: .zero)
 
-        var config = UIButton.Configuration.filled()
+        // The glyph takes the button's tintColor, NOT `baseForegroundColor` — and
+        // a bar button's custom view inherits the navigation bar's tint, so
+        // without this the sparkle came out in the bar's dark ink while the word
+        // beside it was white. The floating "Start Editing" pill sets both for
+        // the same reason.
+        tintColor = Theme.Color.textOnAccent
+
+        // `.plain()`, not `.filled()`: the gradient IS the backing layer, so a
+        // filled configuration only adds a background that has to be cleared
+        // again.
+        var config = UIButton.Configuration.plain()
         config.title = title
-        config.image = UIImage(
-            systemName: "sparkles",
-            withConfiguration: UIImage.SymbolConfiguration(pointSize: 12, weight: .bold))
         config.imagePadding = 5
         config.attributedTitle = AttributedString(
-            title, attributes: AttributeContainer([.font: Theme.Typography.caption]))
+            title, attributes: AttributeContainer([
+                .font: Theme.Typography.rounded(13, .bold, .caption1),
+            ]))
         config.contentInsets = NSDirectionalEdgeInsets(
             top: 7, leading: 12, bottom: 7, trailing: 13)
-        // The gradient is the backing layer, so the button's own background must
-        // not paint over it.
-        config.background.backgroundColor = .clear
         config.baseForegroundColor = Theme.Color.textOnAccent
         // `.capsule` states the intent once and survives re-layout; a manual
         // cornerRadius on a configured button is overwritten by its own updates.
@@ -158,6 +144,12 @@ final class ProBadgeButton: GradientLayerButton {
         configuration = config
 
         useBrandGradient()
+        refreshGlyph()
+        // The glyph's colour is baked, so it has to be re-baked when the
+        // appearance flips — exactly why `useBrandGradient` registers too.
+        registerForTraitChanges([UITraitUserInterfaceStyle.self]) { (button: Self, _) in
+            button.refreshGlyph()
+        }
         layer.cornerCurve = .circular
 
         addAction(UIAction { [weak self] _ in
@@ -175,6 +167,26 @@ final class ProBadgeButton: GradientLayerButton {
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
+
+    /// The sparkle, with its colour baked in rather than tinted.
+    ///
+    /// A template symbol inside a bar button item comes out pure black: the
+    /// navigation bar renders bar-item content its own way and neither the
+    /// button's `tintColor` nor its `baseForegroundColor` reaches the image —
+    /// which is why the title was white beside a black sparkle, and why the
+    /// same configuration works on the floating "Start Editing" pill, which is
+    /// not in a bar. `.alwaysOriginal` carries the colour past all of that.
+    ///
+    /// Bigger and heavier than the label beside it: at 12pt the sparkle read as
+    /// punctuation. It is the part that says "premium".
+    private func refreshGlyph() {
+        configuration?.image = UIImage(
+            systemName: "sparkles",
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: 15, weight: .heavy)
+        )?.withTintColor(
+            Theme.Color.textOnAccent.resolvedColor(with: traitCollection),
+            renderingMode: .alwaysOriginal)
+    }
 
     override func layoutSubviews() {
         super.layoutSubviews()

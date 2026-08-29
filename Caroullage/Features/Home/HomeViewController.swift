@@ -588,7 +588,9 @@ final class HomeViewController: UIViewController {
     /// chips. They keep their accessibility identifiers and their closures: this
     /// is the same four doors, taking a tenth of the space they used to.
     private func makeQuickStartSection() -> UIStackView {
-        let header = sectionHeader("Start Something")
+        // "Create New" over "Start Something": the row is the four things this
+        // app makes, and a section that lists them should say so plainly.
+        let header = sectionHeader(String(localized: "Create New"))
 
         let chips = [
             QuickStartChip(

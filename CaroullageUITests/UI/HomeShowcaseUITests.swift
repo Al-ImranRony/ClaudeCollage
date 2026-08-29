@@ -72,6 +72,8 @@ final class HomeShowcaseUITests: XCTestCase {
         // sheet is the other front door and both must keep working.
         XCTAssertTrue(app.buttons["newProjectButton"].exists,
                       "Quick-start chips keep their entry points")
+        XCTAssertTrue(app.staticTexts["Create New"].exists,
+                      "The chip row is headed by what it makes")
     }
 
     /// The hero renders real pages, not an empty carousel.
