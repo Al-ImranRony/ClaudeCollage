@@ -179,6 +179,18 @@ public final class TemplateService {
     ) -> CGImage? {
         guard let photos = sampleContent.samplePhotos(forTemplateID: template.id) else { return nil }
 
+        // `SampleContentCatalog` only guarantees that every name IT lists resolves
+        // to a bundled image — it has no idea how many `.photo` zones the template
+        // actually has. A template that gains a zone (or a manifest entry authored
+        // short) would otherwise sail past this point and render with the extra
+        // zones left as bare empty wells: half-dressed, which is exactly what this
+        // method's contract says a showcase must never be. Checked before the cache
+        // lookup, not after — an on-disk thumbnail cached while the two were still
+        // out of sync must not be served back as if it were valid just because its
+        // key still matches.
+        let photoZoneCount = template.cells.filter { $0.zoneType == .photo }.count
+        guard photos.count == photoZoneCount else { return nil }
+
         // Same key shape as `thumbnail(for:)` — content fingerprint + renderer
         // revision — plus the sample-content version, because re-dressing a
         // template in the manifest changes the render without touching either.
@@ -291,6 +303,15 @@ public final class TemplateService {
         // applies; the two lists are index-aligned by construction.
         let photoCells = frame.cells.filter { $0.zoneType == .photo }
         guard photoCells.count == layout.cells.count else { return nil }
+
+        // Same defect as the standard-template overload, one level down: the
+        // manifest's per-frame photo array is only guaranteed internally
+        // consistent (every name it lists resolves), never checked against how
+        // many `.photo` zones THIS frame actually has. Without this, a short
+        // array would leave the trailing zones with `image: nil` below — empty
+        // wells baked into what is supposed to be a photo-real preview — instead
+        // of the whole frame (and so the whole carousel strip) degrading to nil.
+        guard photos.count == photoCells.count else { return nil }
 
         let cells: [RenderCell] = layout.cells.enumerated().map { index, layoutCell in
             let absolute = CGRect(
