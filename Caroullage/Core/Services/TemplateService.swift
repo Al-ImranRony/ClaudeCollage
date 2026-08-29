@@ -129,7 +129,11 @@ public final class TemplateService {
     ///
     /// 2 — Step 05b: the empty-cell well moved from the system greys to the
     /// deterministic `Theme.Color.cellWell` tokens.
-    private static let rendererRevision = 2
+    /// 3 — Step 06: empty zones gained an outline and a circular "+" chip
+    /// (`EmptyCellChrome`), so every cached thumbnail draws the old bare glyph.
+    /// 4 — Step 06: the well went from warm grey to the near-white the video
+    /// editor's slots use, and the outline down to a hairline.
+    private static let rendererRevision = 4
 
     /// A `maxDimension`-bounded thumbnail for the template, rendered once via the
     /// shared `CollageRenderer` and cached in memory + on disk. Photo zones show
@@ -154,6 +158,198 @@ public final class TemplateService {
         thumbnailCache[key] = image
         storeDiskThumbnail(image, key: key)
         return image
+    }
+
+    // MARK: - Showcase previews (Step 07)
+
+    /// A photo-real preview of the template, dressed in its bundled sample
+    /// photography. Rendered through the SAME `CollageRenderer` the editor and
+    /// the exporter use, into the template's real zones — so what Home shows is
+    /// literally what opening the template produces once your photos land in it.
+    /// A separate drawing path here would make that promise aspirational; this
+    /// makes it structural.
+    ///
+    /// Returns `nil` when the template has no manifest entry, so the caller falls
+    /// back to the schematic `thumbnail(for:)` rather than presenting a grid of
+    /// empty wells as if it were a showcase.
+    public func showcasePreview(
+        for template: CollageTemplate,
+        sampleContent: SampleContentCatalog = .shared,
+        maxDimension: CGFloat = 640
+    ) -> CGImage? {
+        guard let photos = sampleContent.samplePhotos(forTemplateID: template.id) else { return nil }
+
+        // Same key shape as `thumbnail(for:)` — content fingerprint + renderer
+        // revision — plus the sample-content version, because re-dressing a
+        // template in the manifest changes the render without touching either.
+        let key = "showcase-\(template.id)-\(Self.contentFingerprint(of: template))"
+            + "-s\(sampleContent.version)-r\(Self.rendererRevision)@\(Int(maxDimension))"
+        if let cached = thumbnailCache[key] { return cached }
+        if let disk = loadDiskThumbnail(key: key) {
+            thumbnailCache[key] = disk
+            return disk
+        }
+
+        let request = renderRequest(for: template, maxDimension: maxDimension)
+
+        // `renderRequest` emits a cell for both `.photo` AND `.art` zones, but the
+        // manifest's photo array is sized to `.photo` zones only. Walking the two
+        // lists in lockstep works today (no showcased template has an art zone)
+        // and would silently hand photo #2 to the art zone the moment one gained
+        // it — every photo after it shifting one cell to the left. So re-derive
+        // the same filtered source list and consume a sample photo only where the
+        // source zone really is a photo zone.
+        let sourceCells = template.cells.filter { $0.zoneType == .photo || $0.zoneType == .art }
+        guard sourceCells.count == request.cells.count else { return nil }
+
+        var remaining = photos[...]
+        var dressed: [RenderCell] = []
+        for (source, cell) in zip(sourceCells, request.cells) {
+            guard source.zoneType == .photo,
+                  let photo = remaining.popFirst(), let image = photo.cgImage else {
+                dressed.append(cell)
+                continue
+            }
+            dressed.append(RenderCell(frame: cell.frame, image: image, transform: cell.transform,
+                                      cornerRadius: cell.cornerRadius, clipShape: cell.clipShape))
+        }
+
+        // Everything else about the request survives untouched: background, the
+        // template's typography, its font scale and its seeded stickers.
+        let dressedRequest = RenderRequest(
+            canvasSize: request.canvasSize, background: request.background, cells: dressed,
+            textOverlays: request.textOverlays, textFontScale: request.textFontScale,
+            stickerOverlays: request.stickerOverlays, stickerImages: request.stickerImages
+        )
+        guard let image = renderer.render(dressedRequest, scale: 1) else { return nil }
+        thumbnailCache[key] = image
+        storeDiskThumbnail(image, key: key)
+        return image
+    }
+
+    /// A photo-real preview of a carousel: its first three frames rendered through
+    /// `CollageRenderer` and composited into one side-by-side strip, so Home can
+    /// show at a glance that this template is a multi-page post rather than a
+    /// single image.
+    ///
+    /// Returns `nil` without a manifest entry, and `nil` rather than a partial
+    /// strip if any frame fails — a strip missing its last page reads as broken.
+    public func showcasePreview(
+        for template: CarouselTemplate,
+        sampleContent: SampleContentCatalog = .shared,
+        frameMaxDimension: CGFloat = 480
+    ) -> CGImage? {
+        guard let framePhotos = sampleContent.sampleFramePhotos(forCarouselID: template.id)
+        else { return nil }
+
+        // No content fingerprint here: `CarouselTemplate` has no equivalent digest,
+        // and carousel JSON is bundled — it only changes with the app binary, which
+        // also clears the caches directory on install.
+        let key = "showcase-carousel-\(template.id)"
+            + "-s\(sampleContent.version)-r\(Self.rendererRevision)@\(Int(frameMaxDimension))"
+        if let cached = thumbnailCache[key] { return cached }
+        if let disk = loadDiskThumbnail(key: key) {
+            thumbnailCache[key] = disk
+            return disk
+        }
+
+        // The manifest authors its frame arrays in frame order, so sort by `index`
+        // rather than trusting the JSON's array order.
+        let frames = template.frames.sorted { $0.index < $1.index }.prefix(3)
+        var rendered: [CGImage] = []
+        for (offset, frame) in frames.enumerated() {
+            guard offset < framePhotos.count,
+                  let image = renderCarouselFrame(frame, photos: framePhotos[offset],
+                                                  of: template, maxDimension: frameMaxDimension)
+            else { return nil }
+            rendered.append(image)
+        }
+        guard let strip = Self.compositeStrip(rendered) else { return nil }
+        thumbnailCache[key] = strip
+        storeDiskThumbnail(strip, key: key)
+        return strip
+    }
+
+    /// One carousel frame, dressed and rendered through the shared renderer.
+    private func renderCarouselFrame(
+        _ frame: CarouselTemplateFrame, photos: [UIImage],
+        of template: CarouselTemplate, maxDimension: CGFloat
+    ) -> CGImage? {
+        let native = CanvasSize.size(forAspectRatio: template.canvasAspectRatio)
+        let longest = max(native.width, native.height, 1)
+        let scale = maxDimension / longest
+        let canvas = CGSize(width: (native.width * scale).rounded(),
+                            height: (native.height * scale).rounded())
+
+        // Geometry comes from the editor's own layout mapper, so a previewed frame
+        // has exactly the cells the carousel editor will open — no second copy of
+        // the frame → cells math to drift out of sync.
+        let layout = Self.editorLayout(templateID: template.id, name: template.name,
+                                       aspectRatio: template.canvasAspectRatio, cells: frame.cells)
+        // `TemplateLayoutCell` carries frame + clip but not the authored corner
+        // radius, so re-derive that from the same `.photo` filter `editorLayout`
+        // applies; the two lists are index-aligned by construction.
+        let photoCells = frame.cells.filter { $0.zoneType == .photo }
+        guard photoCells.count == layout.cells.count else { return nil }
+
+        let cells: [RenderCell] = layout.cells.enumerated().map { index, layoutCell in
+            let absolute = CGRect(
+                x: layoutCell.frame.origin.x * canvas.width,
+                y: layoutCell.frame.origin.y * canvas.height,
+                width: layoutCell.frame.size.width * canvas.width,
+                height: layoutCell.frame.size.height * canvas.height
+            )
+            return RenderCell(
+                frame: absolute,
+                image: index < photos.count ? photos[index].cgImage : nil,
+                transform: CellTransform(panX: 0, panY: 0, zoom: 1, rotationRadians: 0),
+                cornerRadius: CGFloat(photoCells[index].cornerRadius)
+                    * min(canvas.width, canvas.height),
+                clipShape: layoutCell.clip
+            )
+        }
+
+        // The frame's own captions and stickers ride along, so a previewed page
+        // looks like the page the editor opens, not a bare photo grid.
+        let request = RenderRequest(
+            canvasSize: canvas, background: template.background, cells: cells,
+            textOverlays: frame.cells.compactMap(\.textStyle), textFontScale: scale,
+            stickerOverlays: Self.stickerOverlays(for: frame.cells)
+        )
+        return renderer.render(request, scale: 1)
+    }
+
+    /// Lays rendered frames out left to right with a small gap, every frame after
+    /// the first slightly shorter and vertically centred. The stagger is what makes
+    /// the strip read as swipeable pages rather than one very wide photograph.
+    private static func compositeStrip(_ frames: [CGImage]) -> CGImage? {
+        guard let first = frames.first else { return nil }
+        let frameWidth = CGFloat(first.width)
+        let frameHeight = CGFloat(first.height)
+        guard frameWidth > 0, frameHeight > 0 else { return nil }
+
+        let gap = (frameWidth * 0.02).rounded()
+        let inset = (frameHeight * 0.04).rounded()
+        let total = CGSize(
+            width: frameWidth * CGFloat(frames.count) + gap * CGFloat(frames.count - 1),
+            height: frameHeight
+        )
+
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        // Not opaque: the gaps stay transparent so the strip sits on whatever
+        // surface Home puts behind it.
+        format.opaque = false
+        let output = UIGraphicsImageRenderer(size: total, format: format).image { _ in
+            for (index, frame) in frames.enumerated() {
+                let x = (frameWidth + gap) * CGFloat(index)
+                let rect = index == 0
+                    ? CGRect(x: x, y: 0, width: frameWidth, height: frameHeight)
+                    : CGRect(x: x, y: inset, width: frameWidth, height: frameHeight - inset * 2)
+                UIImage(cgImage: frame).draw(in: rect)
+            }
+        }
+        return output.cgImage
     }
 
     // MARK: - Template → render request
