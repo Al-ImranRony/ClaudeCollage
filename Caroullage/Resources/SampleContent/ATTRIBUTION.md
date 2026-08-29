@@ -1,6 +1,6 @@
 # Sample Content Attribution
 
-All photos in this directory are sourced from [Pexels](https://www.pexels.com) and are
+All photos and video clips in this directory are sourced from [Pexels](https://www.pexels.com) and are
 licensed under the [Pexels License](https://www.pexels.com/license/), which permits free
 use for commercial and non-commercial purposes without attribution being legally required.
 This file is provided as a courtesy record of provenance and photographer credit.
@@ -8,7 +8,7 @@ This file is provided as a courtesy record of provenance and photographer credit
 These images are used by Caroullage's Home tab to preview collage templates dressed in
 real, attractive lifestyle photography, so users can see the outcome before they tap.
 
-No photo in this bundle depicts a recognizable public figure, celebrity, or any other
+No photo or video clip in this bundle depicts a recognizable public figure, celebrity, or any other
 person whose likeness would require separate publicity/personality-rights clearance. All
 subjects appear in editorial/lifestyle stock photography contexts consistent with the
 Pexels License.
@@ -41,5 +41,21 @@ Pexels License.
 | sample_seasonal_03.jpg | Guillermo Berlin | https://www.pexels.com/photo/woman-holding-autumn-leaf-in-buenos-aires-park-39068042/ |
 | sample_family_01.jpg | Kenzhar Sharap | https://www.pexels.com/photo/happy-family-enjoying-picnic-in-autumn-meadow-38595104/ |
 | sample_family_02.jpg | Kampus Production | https://www.pexels.com/photo/a-family-having-a-picnic-7669127/ |
+
+## Video credits
+
+The three bundled loops (`sample_loop_duo.mp4`, `sample_loop_quad.mp4`,
+`sample_loop_solo.mp4`) are not original footage. Each is a baked composite of the
+Pexels stock clips below, cropped into a real Caroullage video-collage layout,
+trimmed to 2.5 seconds and re-encoded muted. The posters
+(`sample_loop_*_poster.jpg`) are the first frame of the matching loop.
+
+| Filename | Photographer | Source | Appears in |
+|---|---|---|---|
+| clip 1 — Woman with Afro Hair Laughing | Tima Miroshnichenko | https://www.pexels.com/video/woman-with-afro-hair-laughing-8724239/ | sample_loop_solo, sample_loop_duo (top pane) |
+| clip 2 — Man and Women Smiling and Looking at the Camera | RDNE Stock project | https://www.pexels.com/video/man-and-women-smiling-and-looking-at-the-camera-8456409/ | sample_loop_duo (bottom pane), sample_loop_quad (bottom-right pane) |
+| clip 3 — Casual Stroll on Bustling Urban Street | isgandar Ganbarov | https://www.pexels.com/video/casual-stroll-on-bustling-urban-street-33578345/ | sample_loop_quad (top-left pane) |
+| clip 4 — Pouring Fresh Coffee into Ceramic Mug | Çağrı KANMAZ | https://www.pexels.com/video/pouring-fresh-coffee-into-ceramic-mug-27938665/ | sample_loop_quad (top-right pane) |
+| clip 5 — Father And Daughter Dancing In The Living Room | Annushka Ahuja | https://www.pexels.com/video/father-and-daughter-dancing-in-the-living-room-8052007/ | sample_loop_quad (bottom-left pane) |
 
 All: Pexels License.

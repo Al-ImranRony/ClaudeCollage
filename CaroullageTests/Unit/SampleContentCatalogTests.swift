@@ -11,6 +11,7 @@
 //  premium (the showcase must be openable by a free user).
 //
 
+import AVFoundation
 import XCTest
 @testable import Caroullage
 
@@ -128,8 +129,6 @@ final class SampleContentCatalogTests: XCTestCase {
 
     func testVideoShowcasesResolve() throws {
         let catalog = makeCatalog()
-        try XCTSkipIf(catalog.videoURL(named: "sample_loop_duo") == nil,
-                      "video loops are bundled in Task 6")
 
         XCTAssertGreaterThanOrEqual(catalog.videoShowcases.count, 3)
         for showcase in catalog.videoShowcases {
@@ -144,6 +143,30 @@ final class SampleContentCatalogTests: XCTestCase {
             XCTAssertNotNil(
                 catalog.videoURL(named: showcase.loop),
                 "\(showcase.id): loop \(showcase.loop).mp4 is not bundled"
+            )
+        }
+    }
+
+    /// The app never configures an `AVAudioSession`, so it runs on the default
+    /// non-mixing `soloAmbient` category. A Home loop that carries even a silent
+    /// audio track can activate that session on autoplay and duck whatever the user
+    /// is listening to — for a muted decorative preview. The loops are baked with
+    /// `-an`, and this test is what keeps them that way.
+    func testVideoLoopsCarryNoAudioTrack() async throws {
+        let catalog = makeCatalog()
+        let showcases = catalog.videoShowcases
+        XCTAssertFalse(showcases.isEmpty, "there must be video showcases to check")
+
+        for showcase in showcases {
+            let url = try XCTUnwrap(
+                catalog.videoURL(named: showcase.loop),
+                "\(showcase.id): loop \(showcase.loop).mp4 is not bundled"
+            )
+            let asset = AVURLAsset(url: url)
+            let audioTracks = try await asset.loadTracks(withMediaType: .audio)
+            XCTAssertTrue(
+                audioTracks.isEmpty,
+                "\(showcase.id): \(showcase.loop).mp4 carries \(audioTracks.count) audio track(s) — a bundled loop must have none, or autoplay ducks the user's music"
             )
         }
     }
