@@ -85,6 +85,14 @@ final class HeroRotationControllerTests: XCTestCase {
         XCTAssertEqual(installCount(), 0, "a single page shouldn't install a scheduler at all")
     }
 
+    func testZeroPagesNeverAdvances() {
+        let (controller, tick, installCount, advanced) = makeController(count: 0)
+        controller.start()
+        tick()
+        XCTAssertEqual(advanced(), [], "zero pages: nothing to advance to")
+        XCTAssertEqual(installCount(), 0, "zero pages shouldn't install a scheduler at all")
+    }
+
     func testStopPreventsFurtherAdvances() {
         // stop() must cancel the scheduler so a tick fired after stop() (e.g. a
         // race with a real timer's last queued fire) is inert.
@@ -105,5 +113,38 @@ final class HeroRotationControllerTests: XCTestCase {
         XCTAssertEqual(installCount(), 1, "a second start() must not install a second scheduler")
         tick()
         XCTAssertEqual(advanced(), [1], "only one advance per tick even after a redundant start()")
+    }
+
+    func testStopStartCycleClearsAStalePause() {
+        // Failure sequence this guards against: start() -> pause() (a touch
+        // begins) -> stop() (the view disappears mid-touch, e.g. the user
+        // navigates away, so the matching resume() never arrives) -> start()
+        // (the view reappears). Without a reset, paused stays true forever
+        // and the reinstalled timer ticks into a silent no-op for the rest
+        // of the session.
+        let (controller, tick, _, advanced) = makeController(count: 3)
+        controller.start()
+        controller.pause()
+        controller.stop()
+        controller.start()
+        tick()
+        XCTAssertEqual(advanced(), [1], "a fresh start() must not inherit a stale paused state")
+    }
+
+    func testDeinitCancelsTheScheduler() {
+        // Timer.scheduledTimer/RunLoop retain the underlying timer
+        // independently of this controller, so if a caller drops its last
+        // reference without calling stop(), deinit must still tear it down
+        // or the timer leaks and fires for the rest of the app's lifetime.
+        var cancelled = false
+        var controller: HeroRotationController? = HeroRotationController(
+            pageCount: 3,
+            reduceMotion: { false },
+            scheduler: { _ in { cancelled = true } })
+        controller?.start()
+        XCTAssertFalse(cancelled, "the scheduler shouldn't be cancelled while the controller is alive")
+
+        controller = nil
+        XCTAssertTrue(cancelled, "deinit must cancel the scheduler")
     }
 }
