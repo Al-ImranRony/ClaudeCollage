@@ -160,6 +160,7 @@ final class HomeViewController: UIViewController {
         view.backgroundColor = Theme.Color.background
         navigationController?.navigationBar.prefersLargeTitles = true
         navigationItem.largeTitleDisplayMode = .never
+        setupNavigationBar()
         setupLayout()
 
         // Backgrounding is not a view transition, so `viewDidDisappear` never
@@ -183,6 +184,7 @@ final class HomeViewController: UIViewController {
         super.viewWillAppear(animated)
         isVisible = true
         reload()
+        refreshProButton()
         setShowcaseActive(true)
     }
 
@@ -304,6 +306,56 @@ final class HomeViewController: UIViewController {
                     },
                     onTap: { [weak self] in self?.onSelectCarouselTemplate?(template) })
             }
+        }
+    }
+
+    // MARK: - Navigation bar
+
+    private lazy var proButton = ProBadgeButton(
+        title: String(localized: "Pro")
+    ) { [weak self] in
+        self?.presentPaywallFromHeader()
+    }
+
+    /// Brand on the leading side, the paywall on the trailing side.
+    ///
+    /// `navigationItem.title` stays set even though nothing draws it: the bar's
+    /// accessibility identity comes from it, and every suite that waits for Home
+    /// waits on `navigationBars["Caroullage"]`. An empty `titleView` suppresses
+    /// the centred copy so the wordmark is not printed twice, once in the lockup
+    /// and once in the middle of the bar.
+    private func setupNavigationBar() {
+        navigationItem.titleView = UIView()
+        let brand = UIBarButtonItem(customView: BrandLockupView(title: "Caroullage"))
+        let pro = UIBarButtonItem(customView: proButton)
+        // iOS 26 gives every bar item its own glass capsule. That is the right
+        // default for a system control and the wrong one for both of these: it
+        // draws a pill around the Pro button's pill, and it makes the wordmark
+        // look like something to tap. Each already carries its own shape — the
+        // gradient capsule and the mark — so the shared background comes off.
+        if #available(iOS 26.0, *) {
+            brand.hidesSharedBackground = true
+            pro.hidesSharedBackground = true
+        }
+        navigationItem.leftBarButtonItem = brand
+        navigationItem.rightBarButtonItem = pro
+        refreshProButton()
+    }
+
+    /// Premium users do not get a button to buy premium.
+    ///
+    /// Re-read rather than observed: `EntitlementStore` broadcasts nothing, and
+    /// the two moments that can change the answer — coming back to Home, and
+    /// unlocking from this very button — are both already in hand.
+    private func refreshProButton() {
+        proButton.isHidden = EntitlementStore.shared.isPremiumUnlocked
+    }
+
+    private func presentPaywallFromHeader() {
+        presentPaywall { [weak self] in
+            // Bought from here, so the button that asked has to go without
+            // waiting for a trip through another tab.
+            self?.refreshProButton()
         }
     }
 
