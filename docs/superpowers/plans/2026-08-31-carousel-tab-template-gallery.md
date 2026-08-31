@@ -2133,7 +2133,7 @@ this tab stop being the type picker."
 - Modify: `Caroullage/Features/Home/ProjectsViewController.swift:33-71`
 - Modify: `Caroullage/Core/Services/GalleryFilter.swift:1-39`
 - Modify: `Caroullage/Features/CarouselEditor/CarouselStartViewController.swift:1-18`
-- Modify: `Caroullage/Core/DesignSystem/Components/HomeEmptyStateView.swift` (delete `.carousels`)
+- Modify: `Caroullage/Features/Home/HomeViewController.swift` (delete `HomeEmptyStateView.Content.carousels` — the view is declared inside this file, not in its own)
 
 - [ ] **Step 1: Swap the tab root**
 
@@ -2236,7 +2236,7 @@ and replace the file header (lines 1-12) with:
 
 - [ ] **Step 5: Delete `HomeEmptyStateView.Content.carousels`**
 
-In `Caroullage/Core/DesignSystem/Components/HomeEmptyStateView.swift`, delete the `static let carousels = Content(...)` block (the one with `buttonIdentifier: "carouselsEmptyStateCreateButton"`). Leave `.projects` untouched.
+In `Caroullage/Features/Home/HomeViewController.swift` (where `HomeEmptyStateView` is declared), delete the `static let carousels = Content(...)` block (the one with `buttonIdentifier: "carouselsEmptyStateCreateButton"`). Leave `.projects` untouched.
 
 - [ ] **Step 6: Refresh the picker's header**
 
