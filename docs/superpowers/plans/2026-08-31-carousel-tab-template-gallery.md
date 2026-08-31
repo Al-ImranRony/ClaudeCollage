@@ -78,7 +78,7 @@ If a UI test fails to launch the runner with "Application failed preflight check
 
 ### Task 1: `CarouselType` display metadata
 
-The gallery needs a human title and a glyph per type, for section headers and chips. `CarouselTypeSelectorView` hard-codes its own titles alongside subtitles and symbols; it is deliberately left alone (out of scope), so this is additive.
+The gallery needs a human title per type, for section headers and chips. `CarouselTypeSelectorView` hard-codes its own titles alongside subtitles and symbols; it is deliberately left alone (out of scope), so this is purely additive.
 
 **Files:**
 - Modify: `Caroullage/Core/Models/CollageEnums.swift:42-47`
