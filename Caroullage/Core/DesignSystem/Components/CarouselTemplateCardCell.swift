@@ -192,7 +192,13 @@ final class CarouselTemplateCardCell: UICollectionViewCell {
         // Interpuncts rather than icons: the reference design uses glyphs, but
         // three SF Symbols inline at caption size read as noise on a 170pt card
         // and cost a line of Dynamic Type headroom the ratio word needs.
-        metaLabel.text = "\(ratio) · \(photos) photos · \(pages) pages"
+        // `String(localized:)` even though it is an interpolation, so the String
+        // Catalog extracts it and the app's eleven languages get a say — this is
+        // the same shape Home's "\(frameCount) frames" badge uses. It also gives
+        // translators somewhere to author plural variants; English gets away
+        // without them only because no bundled carousel has fewer than two of
+        // either.
+        metaLabel.text = String(localized: "\(ratio) · \(photos) photos · \(pages) pages")
 
         lockBadge.isHidden = !locked
         setPageDots(pages)
@@ -200,9 +206,12 @@ final class CarouselTemplateCardCell: UICollectionViewCell {
         accessibilityIdentifier = identifier
         accessibilityLabel = template.name
         // The metadata is stated only in pixels; without this it reaches nobody
-        // using VoiceOver.
-        accessibilityValue = "\(ratio), \(photos) photos, \(pages) pages"
-            + (locked ? ", premium" : "")
+        // using VoiceOver. Spoken rather than read, so it takes commas where the
+        // label takes interpuncts, and it says "premium" — the lock badge is a
+        // picture and pictures do not reach a screen reader either.
+        accessibilityValue = locked
+            ? String(localized: "\(ratio), \(photos) photos, \(pages) pages, premium")
+            : String(localized: "\(ratio), \(photos) photos, \(pages) pages")
 
         previewTask?.cancel()
         previewTask = Task { @MainActor [weak self] in
@@ -253,6 +262,11 @@ final class CarouselTemplateCardCell: UICollectionViewCell {
         nameLabel.text = nil
         metaLabel.text = nil
         lockBadge.isHidden = true
+        // Hidden here as well as re-decided in `setPageDots`. `configure` always
+        // follows a dequeue today, so this is belt and braces — but a cell that
+        // cleared its caption and kept the previous template's page count would
+        // be a very quiet lie, and the sibling cell hides its badge here too.
+        dotsPill.isHidden = true
         accessibilityValue = nil
     }
 }
