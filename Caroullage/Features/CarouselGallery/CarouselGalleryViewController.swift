@@ -86,7 +86,14 @@ final class CarouselGalleryViewController: UIViewController {
         searchController.searchResultsUpdater = self
         searchController.obscuresBackgroundDuringPresentation = false
         searchController.searchBar.placeholder = String(localized: "Search carousels")
-        searchController.searchBar.accessibilityIdentifier = "carouselGallerySearchField"
+        // On the TEXT FIELD, not on the search bar. A search bar hosted by the
+        // navigation item is not itself an element in the accessibility tree —
+        // only the field inside it is, and it does not inherit its host's
+        // identifier. Setting this on `searchBar` compiles, reads correctly and
+        // silently identifies nothing, which is exactly how the UI test that
+        // types into this field failed to find it.
+        searchController.searchBar.searchTextField.accessibilityIdentifier
+            = "carouselGallerySearchField"
         navigationItem.searchController = searchController
         definesPresentationContext = true
 
