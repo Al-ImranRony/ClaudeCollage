@@ -104,3 +104,17 @@ public struct CarouselTemplateParser: Sendable {
         }
     }
 }
+
+// MARK: - Derived facts
+
+public extension CarouselTemplate {
+
+    /// Total `.photo` zones across every frame — "how many of your photos does
+    /// this post need", which is the number the gallery card states next to the
+    /// page count. Summed rather than per-frame: a grid-preview carousel opens
+    /// with a 4-up frame and then shows each cell alone, so its per-frame count
+    /// says nothing useful on its own.
+    var photoZoneCount: Int {
+        frames.reduce(0) { $0 + $1.cells.filter { $0.zoneType == .photo }.count }
+    }
+}

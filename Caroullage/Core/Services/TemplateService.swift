@@ -294,9 +294,85 @@ public final class TemplateService {
         return strip
     }
 
-    /// One carousel frame, dressed and rendered through the shared renderer.
+    /// The carousel's FIRST frame alone, dressed in its manifest sample photos
+    /// and rendered at the template's true canvas aspect ratio.
+    ///
+    /// Deliberately not `showcasePreview`, which composites three frames into a
+    /// wide strip. A strip is right for Home, whose carousel cards are wide by
+    /// construction. It is wrong for the Carousel gallery, which is a masonry
+    /// grid: masonry has nothing to stagger unless a 9:16 template comes back
+    /// tall and a 1:1 one comes back square. That property is what
+    /// `CarouselCoverPreviewTests` pins.
+    ///
+    /// Returns `nil` without a manifest entry, so the caller falls back to
+    /// `schematicCover`.
+    public func showcaseCover(
+        for template: CarouselTemplate,
+        sampleContent: SampleContentCatalog = .shared,
+        maxDimension: CGFloat = 480
+    ) -> CGImage? {
+        guard let framePhotos = sampleContent.sampleFramePhotos(forCarouselID: template.id),
+              let first = framePhotos.first,
+              let frame = template.frames.min(by: { $0.index < $1.index })
+        else { return nil }
+
+        let key = "cover-carousel-\(template.id)"
+            + "-s\(sampleContent.version)-r\(Self.rendererRevision)@\(Int(maxDimension))"
+        if let cached = thumbnailCache[key] { return cached }
+        if let disk = loadDiskThumbnail(key: key) {
+            thumbnailCache[key] = disk
+            return disk
+        }
+
+        guard let image = renderCarouselFrame(
+            frame, photos: first, of: template, maxDimension: maxDimension)
+        else { return nil }
+        thumbnailCache[key] = image
+        storeDiskThumbnail(image, key: key)
+        return image
+    }
+
+    /// The same first frame with its photo zones left as empty wells — the
+    /// wireframe a gallery card falls back to.
+    ///
+    /// Unlike `showcaseCover` this asks the manifest for nothing, so it survives
+    /// a missing or corrupt manifest. It is the reason a Carousel gallery card
+    /// can never render blank, which `showcasePreview`'s deliberate "no
+    /// fallback" rule leaves open for Home (Home FEATURES carousels; the gallery
+    /// LISTS them, and a list may not have holes).
+    public func schematicCover(
+        for template: CarouselTemplate,
+        maxDimension: CGFloat = 480
+    ) -> CGImage? {
+        guard let frame = template.frames.min(by: { $0.index < $1.index }) else { return nil }
+
+        // No sample-content version in the key: this render does not read the
+        // manifest, so re-dressing a template cannot change it.
+        let key = "schematic-carousel-\(template.id)"
+            + "-r\(Self.rendererRevision)@\(Int(maxDimension))"
+        if let cached = thumbnailCache[key] { return cached }
+        if let disk = loadDiskThumbnail(key: key) {
+            thumbnailCache[key] = disk
+            return disk
+        }
+
+        guard let image = renderCarouselFrame(
+            frame, photos: nil, of: template, maxDimension: maxDimension)
+        else { return nil }
+        thumbnailCache[key] = image
+        storeDiskThumbnail(image, key: key)
+        return image
+    }
+
+    /// One carousel frame, rendered through the shared renderer.
+    ///
+    /// `photos == nil` renders the frame SCHEMATICALLY — every photo zone left
+    /// as an empty well, exactly as `renderRequest(for: CollageTemplate)` does
+    /// for a standard template's thumbnail. That is the fallback a gallery card
+    /// falls back to, and routing it through this method rather than a second
+    /// drawing path is what keeps one answer to "where do a frame's cells go".
     private func renderCarouselFrame(
-        _ frame: CarouselTemplateFrame, photos: [UIImage],
+        _ frame: CarouselTemplateFrame, photos: [UIImage]?,
         of template: CarouselTemplate, maxDimension: CGFloat
     ) -> CGImage? {
         let native = CanvasSize.size(forAspectRatio: template.canvasAspectRatio)
@@ -316,14 +392,13 @@ public final class TemplateService {
         let photoCells = frame.cells.filter { $0.zoneType == .photo }
         guard photoCells.count == layout.cells.count else { return nil }
 
-        // Same defect as the standard-template overload, one level down: the
-        // manifest's per-frame photo array is only guaranteed internally
-        // consistent (every name it lists resolves), never checked against how
-        // many `.photo` zones THIS frame actually has. Without this, a short
-        // array would leave the trailing zones with `image: nil` below — empty
-        // wells baked into what is supposed to be a photo-real preview — instead
-        // of the whole frame (and so the whole carousel strip) degrading to nil.
-        guard photos.count == photoCells.count else { return nil }
+        // Only meaningful when photos were supplied. The manifest's per-frame
+        // array is guaranteed internally consistent (every name it lists
+        // resolves) but is never checked against how many `.photo` zones THIS
+        // frame actually has, so a short array would otherwise leave trailing
+        // zones as empty wells baked into a supposedly photo-real preview.
+        // Schematic renders have no array to be short.
+        if let photos { guard photos.count == photoCells.count else { return nil } }
 
         let cells: [RenderCell] = layout.cells.enumerated().map { index, layoutCell in
             let absolute = CGRect(
@@ -334,7 +409,7 @@ public final class TemplateService {
             )
             return RenderCell(
                 frame: absolute,
-                image: index < photos.count ? photos[index].cgImage : nil,
+                image: photos.flatMap { index < $0.count ? $0[index].cgImage : nil },
                 transform: CellTransform(panX: 0, panY: 0, zoom: 1, rotationRadians: 0),
                 cornerRadius: CGFloat(photoCells[index].cornerRadius)
                     * min(canvas.width, canvas.height),
