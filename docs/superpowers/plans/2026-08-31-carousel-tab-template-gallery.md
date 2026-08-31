@@ -1215,7 +1215,7 @@ enum CarouselGalleryFilter {
 xcodegen generate && xcodebuild test -project Caroullage.xcodeproj -scheme "Caroullage (Dev)" -destination "platform=iOS Simulator,name=iPhone 17" -only-testing:CaroullageTests/CarouselGalleryFilterTests
 ```
 
-Expected: **PASS**, 12 tests.
+Expected: **PASS**, 11 tests — the 3 pre-existing `displayName` tests plus the 8 new ones.
 
 - [ ] **Step 5: Commit**
 
