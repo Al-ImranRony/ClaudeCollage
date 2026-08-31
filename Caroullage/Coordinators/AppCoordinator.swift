@@ -224,9 +224,15 @@ final class AppCoordinator {
 
     // MARK: - Galleries
 
-    /// Projects and Carousels are the same screen with a different filter, so the
-    /// wiring lives here once. Only "new" differs: Projects starts a grid collage,
-    /// Carousels opens the type picker.
+    /// Builds the saved-project gallery.
+    ///
+    /// This ran twice until Step 07 — the Projects tab and a carousels-only
+    /// Carousel tab — which is why the configuration is a parameter rather than
+    /// baked in. That second caller is gone (the Carousel tab is the template
+    /// catalog now, and Projects' "By type" sort already groups carousels), so
+    /// today there is exactly one. The seam stays: `Configuration` is still the
+    /// honest way to describe a gallery, and collapsing it would only have to be
+    /// undone the next time a second one appears.
     private func makeGallery(
         configuration: ProjectsViewController.Configuration,
         onNew: @escaping () -> Void
@@ -258,8 +264,10 @@ final class AppCoordinator {
     /// The carousel type picker, as a sheet over whichever tab you are on.
     ///
     /// Two doors reach it — the "+" menu's Carousel row and the Carousel tab's
-    /// empty state. The `NewStoryCarousel` intent is a third entry to carousels
-    /// but skips the picker: it already knows the type and frame count.
+    /// "New" bar button. (Until Step 07 the second door was that tab's empty
+    /// state, which went with the saved-carousel gallery it belonged to.) The
+    /// `NewStoryCarousel` intent is a third entry to carousels but skips the
+    /// picker: it already knows the type and frame count.
     private func presentCarouselTypePicker() {
         let picker = CarouselStartViewController()
         picker.onCreate = { [weak self] config in self?.beginCarousel(config: config) }

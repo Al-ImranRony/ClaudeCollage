@@ -922,9 +922,12 @@ private final class QuickStartChip: UIControl {
 
 /// Shown by `ProjectsViewController` when nothing has been saved yet.
 ///
-/// Step 06: the gallery runs twice, so the panel's words come in rather than
-/// being baked in. On the Carousel tab "No collages yet" would be wrong twice
-/// over — you may well have collages, just no carousels.
+/// The words come in rather than being baked in because Step 06 ran this panel
+/// on two tabs, where "No collages yet" would have been wrong on the Carousel
+/// one — you may well have collages, just no carousels. Step 07 gave that tab
+/// to the carousel template catalog, which is bundled and so never empty, and
+/// only `.projects` remains. The seam is kept for the same reason the gallery's
+/// `Configuration` is.
 final class HomeEmptyStateView: UIView {
 
     struct Content {
