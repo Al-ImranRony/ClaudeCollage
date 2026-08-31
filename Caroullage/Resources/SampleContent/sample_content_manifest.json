@@ -19,6 +19,14 @@
     "carousel-story-beforeafter":  { "framePhotos": [["sample_seasonal_03"], ["sample_seasonal_02"]] },
     "carousel-gridpreview-family": { "framePhotos": [["sample_family_01", "sample_family_02", "sample_friends_03", "sample_couple_01"], ["sample_family_01"], ["sample_family_02"], ["sample_friends_03"], ["sample_couple_01"]] }
   },
+  "featuredCarousels": [
+    "carousel-matched-team",
+    "carousel-matched-menu",
+    "carousel-matched-tips",
+    "carousel-matched-steps",
+    "carousel-story-beforeafter",
+    "carousel-gridpreview-family"
+  ],
   "videoShowcases": [
     { "id": "duo-motion",  "loop": "sample_loop_duo",  "poster": "sample_loop_duo_poster",  "title": "Duo Motion",  "layout": "twoUpVertical" },
     { "id": "quad-motion", "loop": "sample_loop_quad", "poster": "sample_loop_quad_poster", "title": "Quad Motion", "layout": "fourSquare" },

@@ -33,6 +33,12 @@ public struct SampleContentManifest: Decodable, Sendable {
     public let carousels: [String: CarouselEntry]
     public let videoShowcases: [VideoShowcase]
     public let hero: [HeroRef]
+    /// Which carousels Home's strip leads with, in order.
+    ///
+    /// Optional so a manifest authored before this key still decodes — the whole
+    /// file degrades to nil if any required field is missing, which would take
+    /// the entire showcase down over a curation list.
+    public let featuredCarousels: [String]?
 }
 
 @MainActor
@@ -79,6 +85,19 @@ public final class SampleContentCatalog {
     }
 
     public var heroRefs: [SampleContentManifest.HeroRef] { manifest?.hero ?? [] }
+
+    /// The carousels Home features, in the manifest's order.
+    ///
+    /// Falls back to every dressed carousel when the key is absent, which is
+    /// exactly what Home did before the key existed — so an old or partial
+    /// manifest still produces a strip rather than none.
+    public var featuredCarouselIDs: [String] {
+        if let featured = manifest?.featuredCarousels, !featured.isEmpty { return featured }
+        guard let carousels = manifest?.carousels else { return [] }
+        // Sorted, not raw dictionary order: an unordered fallback would shuffle
+        // Home's strip between launches.
+        return carousels.keys.sorted()
+    }
 
     public func image(named name: String) -> UIImage? {
         if let cached = imageCache[name] { return cached }
