@@ -122,6 +122,18 @@ public final class TemplateService {
         !template.isPremium || entitlements.isPremiumUnlocked
     }
 
+    /// Whether the carousel template itself is marked premium in its JSON.
+    public func isPremium(_ template: CarouselTemplate) -> Bool { template.isPremium }
+
+    /// Whether the current user may open the carousel template.
+    ///
+    /// This overload did not exist until Step 07's gallery, and its absence was
+    /// not benign: Home's carousel cards had nothing to ask, so four premium
+    /// carousels opened free. Any surface that offers a carousel asks here.
+    public func canOpen(_ template: CarouselTemplate) -> Bool {
+        !template.isPremium || entitlements.isPremiumUnlocked
+    }
+
     // MARK: - Thumbnails
 
     /// Bumped whenever `CollageRenderer` changes how it draws chrome, so cached
