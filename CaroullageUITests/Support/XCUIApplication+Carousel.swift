@@ -8,7 +8,10 @@
 //  what put a full-width "Create" bar and the floating "+ Start Editing" pill in
 //  the same band, two filled brand CTAs with nothing to say which was the action.
 //  The picker moved into the "+" sheet and the tab became a gallery of the
-//  carousels you have made.
+//  carousels you have made — and then, in Step 07, the catalog of carousel
+//  TEMPLATES, because that gallery turned out to be the Projects grid with a
+//  filter. The route this helper drives is unchanged through both: the "+"
+//  sheet is still where a carousel starts from blank.
 //
 //  Five suites reached the picker through that tab, so the route lives here
 //  rather than being spelled out — and changed — five times.

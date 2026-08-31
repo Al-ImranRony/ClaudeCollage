@@ -102,6 +102,9 @@ final class CarouselGalleryViewController: UIViewController {
         emptyLabel.textAlignment = .center
         emptyLabel.numberOfLines = 0
         emptyLabel.accessibilityIdentifier = "carouselGalleryEmptyLabel"
+        // Constant — the catalog is bundled, so the only empty this screen has
+        // is "your filters match nothing", never "you have made nothing".
+        emptyLabel.text = String(localized: "No carousels match your filters.")
         emptyLabel.isHidden = true
 
         filterDivider.backgroundColor = Theme.Color.separator
@@ -151,6 +154,19 @@ final class CarouselGalleryViewController: UIViewController {
         applyFilters(animated: false)
     }
 
+    /// Re-asks the entitlement, so an unlock is reflected without a relaunch.
+    ///
+    /// The lock badge and the `.premium` identifier are decided in
+    /// `cellForItemAt` from `canOpen`, which means a card laid out while locked
+    /// stays locked-looking until it recycles. That matters here more than on the
+    /// Templates tab: the paywall's completion pushes the editor, so the user
+    /// comes back to this exact grid moments after buying, and would find the
+    /// thing they just paid for still wearing a padlock.
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        applyFilters(animated: false)
+    }
+
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         // Clears the pinned ratio chip and type chips above the grid.
@@ -168,9 +184,7 @@ final class CarouselGalleryViewController: UIViewController {
             service.carouselTemplates,
             type: selectedType, ratio: selectedRatio, search: searchText)
 
-        let isEmpty = sections.isEmpty
-        emptyLabel.text = String(localized: "No carousels match your filters.")
-        emptyLabel.isHidden = !isEmpty
+        emptyLabel.isHidden = !sections.isEmpty
 
         // The masonry section's height depends on the items in it, so the layout
         // has to be rebuilt rather than merely reloaded — `reloadData` re-runs
@@ -202,13 +216,7 @@ final class CarouselGalleryViewController: UIViewController {
         Haptics.selectionChanged()
         chipsView.reloadData()
         applyFilters()
-        // `adjustedContentInset`, not `contentInset`: the grid runs the full
-        // height of the view, so the safe area is half of what holds the first
-        // row clear of the pinned chips. Scrolling to `-contentInset.top` parks
-        // that row under them, where the top fade leaves it as a ghost — the
-        // same correction `ProjectsViewController` carries on its sort change.
-        gridView.setContentOffset(
-            CGPoint(x: 0, y: -gridView.adjustedContentInset.top), animated: false)
+        scrollGridToTop()
     }
 
     private func select(ratio: CanvasPreset?) {
@@ -218,6 +226,22 @@ final class CarouselGalleryViewController: UIViewController {
         ratioChip.menu = makeRatioMenu()
         Haptics.selectionChanged()
         applyFilters()
+        // The ratio narrows as hard as the type does — "Landscape" matches
+        // exactly one of the twenty — so it needs this just as much. Leaving it
+        // off `select(ratio:)` was how the same defect got back in on half the
+        // controls.
+        scrollGridToTop()
+    }
+
+    /// `adjustedContentInset`, not `contentInset`: the grid runs the full height
+    /// of the view, so the safe area is half of what holds the first row clear of
+    /// the pinned chips. Scrolling to `-contentInset.top` parks that row under
+    /// them, where the top fade leaves it as a ghost — and with a filter that
+    /// leaves one card there is nothing to bounce it back. The same correction
+    /// `ProjectsViewController` carries on its sort change.
+    private func scrollGridToTop() {
+        gridView.setContentOffset(
+            CGPoint(x: 0, y: -gridView.adjustedContentInset.top), animated: false)
     }
 
     @objc private func newCarouselTapped() {
@@ -394,6 +418,10 @@ extension CarouselGalleryViewController: UICollectionViewDataSource, UICollectio
         guard let card = cell as? CarouselTemplateCardCell,
               let template = template(at: indexPath) else { return cell }
 
+        // `canOpen`, not `isPremium` — deliberately unlike the Templates tab,
+        // which badges every premium card whether or not you own it. A crown on
+        // something you have already bought is noise; this says "you cannot open
+        // this", which is the only thing the badge is for.
         let locked = !service.canOpen(template)
         card.configure(
             template: template,
@@ -459,6 +487,11 @@ extension CarouselGalleryViewController: UICollectionViewDataSource, UICollectio
 extension CarouselGalleryViewController: UISearchResultsUpdating {
     func updateSearchResults(for searchController: UISearchController) {
         searchText = searchController.searchBar.text ?? ""
-        applyFilters()
+        // Not animated: a crossfade per keystroke re-runs a full-grid transition
+        // AND re-configures every visible cell, each spawning its own 0.2s
+        // cross-dissolve. `ProjectsViewController` does not animate its reload
+        // either. The chip and ratio paths keep the fade — those are one
+        // deliberate tap, not a stream of them.
+        applyFilters(animated: false)
     }
 }

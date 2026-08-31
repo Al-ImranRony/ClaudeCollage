@@ -13,8 +13,12 @@
 //  photography is not readable at a glance. So the artwork is full-bleed and the
 //  facts sit under it on the app surface.
 //
-//  The card's own frame carries the template's aspect ratio (see
-//  `MasonryLayout`), which is why the image view fills rather than fits.
+//  The card's own frame carries the template's aspect ratio, CLAMPED — see
+//  `MasonryLayout`, which bounds height to 0.68–1.55x width so a panorama does
+//  not become a sliver. Nine of the twenty bundled templates (the 9:16s at 1.78
+//  and the lone 16:9 at 0.5625) fall outside that band and are therefore cropped
+//  rather than shown at true proportion. That is why the image view fills rather
+//  than fits: it is filling a box that is deliberately not always its shape.
 //
 
 import UIKit
@@ -114,8 +118,20 @@ final class CarouselTemplateCardCell: UICollectionViewCell {
             imageView.topAnchor.constraint(equalTo: contentView.topAnchor),
             imageView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
             imageView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            // The caption block pins the bottom, and the artwork ends where the
+            // caption begins — NOT at a fixed inset from the bottom.
+            //
+            // `captionHeight` is what `MasonryLayout` RESERVES, which is only the
+            // right height at the default text size. Pinning the artwork to
+            // `contentView.bottom - 44` makes that reservation load-bearing: at
+            // the accessibility sizes the subheadline/caption pair needs closer
+            // to 100pt, and since this cell deliberately does not clip, the
+            // metadata would draw outside the card and over the card below it in
+            // the masonry column. Hanging the artwork off the caption instead
+            // lets growing type steal from the picture, which is the trade
+            // `ProjectCardCell` makes and documents.
             imageView.bottomAnchor.constraint(
-                equalTo: contentView.bottomAnchor, constant: -Self.captionHeight),
+                equalTo: nameLabel.topAnchor, constant: -Theme.Spacing.xxs),
 
             dotsPill.centerXAnchor.constraint(equalTo: imageView.centerXAnchor),
             dotsPill.bottomAnchor.constraint(
@@ -133,14 +149,17 @@ final class CarouselTemplateCardCell: UICollectionViewCell {
             lockBadge.widthAnchor.constraint(equalToConstant: Self.lockBadgeSide),
             lockBadge.heightAnchor.constraint(equalToConstant: Self.lockBadgeSide),
 
-            nameLabel.topAnchor.constraint(
-                equalTo: imageView.bottomAnchor, constant: Theme.Spacing.xxs),
             nameLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
             nameLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
 
             metaLabel.topAnchor.constraint(equalTo: nameLabel.bottomAnchor, constant: 2),
             metaLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
             metaLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            // Equality, not `lessThanOrEqualTo` — the same call `ProjectCardCell`
+            // makes and for the same reason: with only an inequality the whole
+            // chain is satisfiable by collapsing the artwork to zero height and
+            // parking the labels at the top.
+            metaLabel.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
         ])
 
         isAccessibilityElement = true

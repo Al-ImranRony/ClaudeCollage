@@ -44,6 +44,15 @@ final class CarouselSectionHeaderView: UICollectionReusableView {
         addSubview(titleLabel)
         addSubview(button)
 
+        // What actually makes the whole row the target. The button alone settles
+        // at 44pt hugging the trailing edge, so without this the title is inert
+        // and the row IS the bare chevron the doc above says it is not.
+        //
+        // A recognizer on the view rather than making the whole header a
+        // `UIControl`: the button has to stay a button, because it is what
+        // carries the accessibility identifier the UI tests navigate by.
+        addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(tapped)))
+
         NSLayoutConstraint.activate([
             titleLabel.leadingAnchor.constraint(equalTo: leadingAnchor),
             titleLabel.centerYAnchor.constraint(equalTo: centerYAnchor),
@@ -75,5 +84,11 @@ final class CarouselSectionHeaderView: UICollectionReusableView {
         super.prepareForReuse()
         titleLabel.text = nil
         onTap = nil
+        // The identifier too. A header dequeued but never configured would
+        // otherwise keep the recycled button's `carouselSectionHeader-<type>`,
+        // putting a duplicate in the accessibility tree and making the UI tests
+        // that query it ambiguous.
+        button.accessibilityIdentifier = nil
+        button.accessibilityLabel = nil
     }
 }

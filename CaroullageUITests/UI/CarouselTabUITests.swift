@@ -162,19 +162,34 @@ final class CarouselTabUITests: XCTestCase {
         let app = launch()
         openCarouselTab(app)
 
-        // Premium cards sort last within a section, so find one rather than
-        // assuming a position. `firstMatch` is enough — any premium card proves
-        // the gate.
-        let locked = app.collectionViews["carouselTemplateGrid"]
-            .cells.matching(identifier: "carouselTemplateCard.premium").firstMatch
-        guard locked.waitForExistence(timeout: 8) else {
-            XCTFail("no premium carousel card is on screen to exercise the gate")
+        let grid = app.collectionViews["carouselTemplateGrid"]
+        XCTAssertTrue(grid.waitForExistence(timeout: 8))
+
+        // Only visible cells exist in the accessibility tree, and free templates
+        // sort first WITHIN each section — the first premium card is the fifth
+        // Panoramic one — so scroll until a locked card comes into view rather
+        // than hoping one is on the first screenful. The same loop, and the same
+        // reason, as `PaywallUITests.launchAndOpenPaywall`.
+        let locked = app.cells.matching(identifier: "carouselTemplateCard.premium").firstMatch
+        var scrolls = 0
+        while !locked.exists, scrolls < 8 {
+            grid.swipeUp()
+            scrolls += 1
+        }
+        guard locked.waitForExistence(timeout: 3) else {
+            XCTFail("no locked carousel card after \(scrolls) scrolls")
             return
         }
         locked.tap()
 
-        XCTAssertFalse(app.collectionViews["carouselFrameStrip"].waitForExistence(timeout: 3),
-                       "A premium template must not open the editor on the free tier")
+        // Assert the paywall APPEARED, not merely that the editor did not. The
+        // negative form passes just as well when the tap is wired to nothing at
+        // all, which is the one outcome this test exists to rule out.
+        XCTAssertTrue(
+            app.staticTexts["Unlock Caroullage Premium"].waitForExistence(timeout: 5),
+            "tapping a premium carousel must open the paywall")
+        XCTAssertFalse(app.collectionViews["carouselFrameStrip"].exists,
+                       "…and must not open the editor on the free tier")
     }
 
     // MARK: - Starting from blank
