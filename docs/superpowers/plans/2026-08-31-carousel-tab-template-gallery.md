@@ -1822,8 +1822,13 @@ final class CarouselGalleryViewController: UIViewController {
         Haptics.selectionChanged()
         chipsView.reloadData()
         applyFilters()
+        // `adjustedContentInset`, not `contentInset`: the grid runs the full
+        // height of the view, so the safe area is half of what holds the first
+        // row clear of the pinned chips. Scrolling to `-contentInset.top` parks
+        // that row under them, where the top fade leaves it as a ghost — the
+        // same correction `ProjectsViewController` carries on its sort change.
         gridView.setContentOffset(
-            CGPoint(x: 0, y: -gridView.contentInset.top), animated: false)
+            CGPoint(x: 0, y: -gridView.adjustedContentInset.top), animated: false)
     }
 
     private func select(ratio: CanvasPreset?) {
