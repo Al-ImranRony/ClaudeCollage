@@ -25,13 +25,15 @@ final class ProjectsViewController: UIViewController {
     var onDuplicateProject: ((UUID) -> Void)?
     var onExportProject: ((UUID) -> Void)?
 
-    /// Everything that differs between the two galleries this class now runs:
-    /// the Projects tab, which shows every saved project, and the Carousel tab,
-    /// which shows carousels only.
+    /// Everything that differs between gallery configurations.
     ///
-    /// Configuring one class rather than forking a second is the same call the
-    /// codebase made for `QuickStartTile` — two surfaces built from different
-    /// parts stop looking like one feature.
+    /// Only `allProjects` remains. Step 06 ran this class twice — the Projects
+    /// tab and a carousels-only Carousel tab — but the second was the first with
+    /// a filter, showing cards that were already one tab over, and Step 07 gave
+    /// that tab to the carousel template catalog instead. The struct stays
+    /// because `modeFilter` is still the honest way to describe a gallery, and
+    /// because collapsing it back into hard-coded strings would have to be
+    /// undone the next time a second gallery appears.
     struct Configuration {
         /// Which kind this gallery shows. `nil` shows every kind.
         let modeFilter: CollageMode?
@@ -57,19 +59,6 @@ final class ProjectsViewController: UIViewController {
             emptyState: .projects,
             itemSingular: "Collage",
             itemPlural: "Collages")
-
-        static let carousels = Configuration(
-            modeFilter: .carousel,
-            navigationTitle: "Carousels",
-            searchPlaceholder: "Search your carousels",
-            gridIdentifier: "carouselsGrid",
-            searchIdentifier: "carouselsSearchField",
-            sortIdentifier: "carouselsSortControl",
-            // Nothing to group when every card is the same type.
-            sortOrders: GallerySortOrder.withoutModeGrouping,
-            emptyState: .carousels,
-            itemSingular: "Carousel",
-            itemPlural: "Carousels")
     }
 
     private let configuration: Configuration

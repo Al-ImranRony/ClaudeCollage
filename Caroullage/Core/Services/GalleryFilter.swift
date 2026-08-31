@@ -2,13 +2,14 @@
 //  GalleryFilter.swift
 //  Caroullage
 //
-//  Step 06 — the gallery runs twice: the Projects tab shows every saved project,
-//  the Carousel tab shows carousels only.
+//  Step 06 — the saved-project gallery's narrowing: mode, then search, then
+//  sort.
 //
-//  The narrowing lives here rather than inside `ProjectsViewController` so both
-//  configurations can be pinned by unit tests instead of only through the
-//  simulator, and so the two never drift into two slightly different ideas of
-//  what "empty" means.
+//  It used to run twice, because the Carousel tab was this gallery filtered to
+//  carousels. Step 07 gave that tab to the carousel template catalog, so today
+//  only the Projects tab calls it, with `mode: nil`. The mode parameter stays:
+//  it is what "By type" grouping is built on, and it is the pin these unit tests
+//  hold in place.
 //
 
 import Foundation
@@ -33,10 +34,6 @@ enum GallerySortOrder: Int, CaseIterable {
         case .byMode: return "square.grid.2x2"
         }
     }
-
-    /// What a gallery narrowed to a single mode offers. Grouping by type cannot
-    /// group anything when every card is the same type.
-    static var withoutModeGrouping: [GallerySortOrder] { [.recent, .oldest] }
 }
 
 /// Turns the saved-project list into what a gallery actually shows.

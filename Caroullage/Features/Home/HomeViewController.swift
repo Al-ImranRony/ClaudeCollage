@@ -940,15 +940,6 @@ final class HomeEmptyStateView: UIView {
             subtitle: "Create your first grid collage to get started.",
             buttonTitle: "New Collage",
             buttonIdentifier: "emptyStateCreateButton")
-
-        static let carousels = Content(
-            // The same glyph the gallery badges a carousel card with, so the
-            // empty state and the thing it promises are visibly the same idea.
-            symbol: CollageMode.carousel.badgeSymbolName,
-            title: "No carousels yet",
-            subtitle: "Build a multi-frame post for the feed.",
-            buttonTitle: "New Carousel",
-            buttonIdentifier: "carouselsEmptyStateCreateButton")
     }
 
     var onCreate: (() -> Void)?

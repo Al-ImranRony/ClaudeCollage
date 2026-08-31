@@ -4,17 +4,18 @@
 //
 //  The host for the carousel type picker.
 //
-//  Step 04.5 batch C made this the Carousel tab's root: the selector WAS the tab.
-//  Step 06 undid that. It left Carousel as the only tab whose root was a form
-//  rather than a place, so the selector's full-width "Create" bar and the shell's
-//  floating "+ Start Editing" pill sat in the same band as two filled brand CTAs
-//  with nothing to say which was the action — and the tab gave finished carousels
-//  nowhere to live.
+//  The Carousel tab has been three things, and this file has outlived two of
+//  them. Step 04.5 made this selector the tab root: the wizard WAS the tab, so
+//  its full-width "Create" bar and the shell's floating "+ Start Editing" pill
+//  sat in the same band as two filled brand CTAs with nothing to say which was
+//  the action. Step 06 made the tab a gallery of the carousels you had made and
+//  this a sheet. Step 07 made the tab the carousel TEMPLATE catalog, because the
+//  Step 06 gallery was the Projects grid with a filter.
 //
-//  The picker is now a sheet, reached from the "+" menu or from the Carousel
-//  tab's empty state, and the tab itself is a gallery of the carousels you have
-//  made. `CarouselTypeSelectorView` already drew a Cancel header whenever
-//  `onCancel` was non-nil; until now nothing passed one.
+//  Through all three the picker's job never changed: start a carousel from
+//  blank. It is reached from the "+" menu's Carousel row and from the Carousel
+//  tab's "New" bar button. The `NewStoryCarousel` intent is a third entry but
+//  skips the picker — it already knows the type and frame count.
 //
 
 import UIKit

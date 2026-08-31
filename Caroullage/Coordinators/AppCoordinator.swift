@@ -60,9 +60,8 @@ final class AppCoordinator {
         home.onSelectVideoShowcase = { [weak self] showcase in
             self?.openVideoShowcase(showcase)
         }
-        // There is no carousel-template gallery yet, so "See All" on the Carousels
-        // strip opens the type picker — the same door the "+" sheet uses.
-        home.onBrowseCarousels = { [weak self] in self?.presentCarouselTypePicker() }
+        // "See All" finally means see all: the Carousel tab is the gallery now.
+        home.onBrowseCarousels = { [weak self] in self?.selectCarouselTab() }
         home.onNewProject = { [weak self] in self?.startNewGridProject() }
         home.onNewPolygon = { [weak self] in self?.startNewPolygonProject() }
         home.onNewVideoCollage = { [weak self] in self?.startVideoCollage() }
@@ -89,12 +88,17 @@ final class AppCoordinator {
         let projects = makeGallery(configuration: .allProjects) { [weak self] in
             self?.startNewGridProject()
         }
-        // The Carousel tab used to be the type picker itself. It is now a place
-        // like every other tab — the carousels you have made — and the picker is
-        // a sheet reached from "+" or from this tab's empty state.
-        let carousels = makeGallery(configuration: .carousels) { [weak self] in
-            self?.presentCarouselTypePicker()
+        // The Carousel tab has been three things. It was the type picker (a
+        // wizard as a tab root). Step 06 made it the carousels you had MADE,
+        // which turned out to be the Projects grid with a filter — every card
+        // already one tab over, and Projects' "By type" sort already groups
+        // them. It is now the twenty bundled carousel TEMPLATES, which is the
+        // one thing no other surface was showing.
+        let carousels = CarouselGalleryViewController(service: .shared)
+        carousels.onSelectTemplate = { [weak self] template in
+            self?.openCarouselTemplate(template)
         }
+        carousels.onNewCarousel = { [weak self] in self?.presentCarouselTypePicker() }
 
         tabBarController.setTabs([
             // Home is the one tab a user returns to rather than visits, so it
@@ -272,6 +276,10 @@ final class AppCoordinator {
 
     private func selectTemplatesTab() {
         tabBarController.selectTab { $0 is TemplateGalleryViewController }
+    }
+
+    private func selectCarouselTab() {
+        tabBarController.selectTab { $0 is CarouselGalleryViewController }
     }
 
     // MARK: - "Start Editing" (+)
