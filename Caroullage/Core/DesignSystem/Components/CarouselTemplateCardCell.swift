@@ -1,0 +1,258 @@
+//
+//  CarouselTemplateCardCell.swift
+//  Caroullage
+//
+//  Step 07 — one card in the Carousel tab's masonry grid.
+//
+//  Deliberately not `ShowcaseTemplateCell`, which is its sibling rather than its
+//  base class. That cell burns the template name OVER the artwork on a scrim and
+//  carries no metadata row, because Home's strips sell a picture. A browse grid
+//  has a different job: you are comparing twenty things, so the facts that let
+//  you compare them — the canvas ratio, how many of your photos it wants, how
+//  many pages it makes — have to be readable at a glance, and type over
+//  photography is not readable at a glance. So the artwork is full-bleed and the
+//  facts sit under it on the app surface.
+//
+//  The card's own frame carries the template's aspect ratio (see
+//  `MasonryLayout`), which is why the image view fills rather than fits.
+//
+
+import UIKit
+
+@MainActor
+final class CarouselTemplateCardCell: UICollectionViewCell {
+    static let reuseID = "CarouselTemplateCardCell"
+
+    /// Room under the artwork for the name and the metadata row. Fixed, and
+    /// passed to `MasonryLayout` as `captionHeight`, so captions line up across
+    /// a row even though the thumbnails above them do not.
+    static let captionHeight: CGFloat = 44
+
+    /// More dots than this and they stop being countable, so the row truncates.
+    /// 7 is the longest bundled carousel (Grid Reveal 6), so nothing truncates
+    /// today — this is the guard for a template authored longer later.
+    private static let maxPageDots = 7
+
+    private static let lockBadgeSide: CGFloat = 24
+    private static let dotSize: CGFloat = 5
+
+    private let imageView = UIImageView()
+    private let dotsPill = UIView()
+    private let dotsRow = UIStackView()
+    private let lockBadge = UIImageView()
+    private let nameLabel = UILabel()
+    private let metaLabel = UILabel()
+
+    private var previewTask: Task<Void, Never>?
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+
+        // The artwork clips; the cell does not, so the caption below it is not
+        // trimmed by the artwork's corner radius.
+        imageView.contentMode = .scaleAspectFill
+        imageView.clipsToBounds = true
+        imageView.layer.cornerRadius = Theme.Radius.lg
+        imageView.layer.cornerCurve = .continuous
+        // The same well the canvas and the exporter paint, so a card whose
+        // preview has not landed yet still looks intentional rather than blank.
+        imageView.backgroundColor = Theme.Color.cellWell
+        imageView.translatesAutoresizingMaskIntoConstraints = false
+
+        // Smoked glass rather than a UI chip, so the dots belong to the picture.
+        // `toast` is the right family — fixed dark ground, white ink, floats over
+        // anything — re-alpha'd because a badge over photography wants to let the
+        // image through where a toast does not.
+        dotsPill.backgroundColor = Theme.Color.toast.withAlphaComponent(0.55)
+        dotsPill.layer.cornerCurve = .continuous
+        dotsPill.clipsToBounds = true
+        dotsPill.isUserInteractionEnabled = false
+        dotsPill.translatesAutoresizingMaskIntoConstraints = false
+
+        dotsRow.axis = .horizontal
+        dotsRow.spacing = 4
+        dotsRow.alignment = .center
+        dotsRow.translatesAutoresizingMaskIntoConstraints = false
+
+        lockBadge.contentMode = .center
+        lockBadge.tintColor = Theme.Color.textOnAccent
+        lockBadge.backgroundColor = Theme.Color.accentStrong
+        lockBadge.layer.cornerRadius = Self.lockBadgeSide / 2
+        lockBadge.layer.cornerCurve = .continuous
+        lockBadge.clipsToBounds = true
+        lockBadge.isHidden = true
+        lockBadge.image = UIImage(
+            systemName: "lock.fill",
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: 11, weight: .semibold))
+        lockBadge.translatesAutoresizingMaskIntoConstraints = false
+
+        // Below the artwork, on the app surface — so these take the surface
+        // tokens, unlike `ShowcaseTemplateCell`'s caption which floats over
+        // photography and cannot.
+        nameLabel.font = Theme.Typography.subheadline
+        nameLabel.textColor = Theme.Color.textPrimary
+        nameLabel.adjustsFontForContentSizeCategory = true
+        nameLabel.numberOfLines = 1
+        nameLabel.lineBreakMode = .byTruncatingTail
+        nameLabel.translatesAutoresizingMaskIntoConstraints = false
+
+        metaLabel.font = Theme.Typography.caption
+        metaLabel.textColor = Theme.Color.textSecondary
+        metaLabel.adjustsFontForContentSizeCategory = true
+        metaLabel.numberOfLines = 1
+        metaLabel.lineBreakMode = .byTruncatingTail
+        metaLabel.translatesAutoresizingMaskIntoConstraints = false
+
+        dotsPill.addSubview(dotsRow)
+        contentView.addSubview(imageView)
+        contentView.addSubview(dotsPill)
+        contentView.addSubview(lockBadge)
+        contentView.addSubview(nameLabel)
+        contentView.addSubview(metaLabel)
+
+        NSLayoutConstraint.activate([
+            imageView.topAnchor.constraint(equalTo: contentView.topAnchor),
+            imageView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            imageView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            imageView.bottomAnchor.constraint(
+                equalTo: contentView.bottomAnchor, constant: -Self.captionHeight),
+
+            dotsPill.centerXAnchor.constraint(equalTo: imageView.centerXAnchor),
+            dotsPill.bottomAnchor.constraint(
+                equalTo: imageView.bottomAnchor, constant: -Theme.Spacing.xs),
+
+            dotsRow.topAnchor.constraint(equalTo: dotsPill.topAnchor, constant: 5),
+            dotsRow.bottomAnchor.constraint(equalTo: dotsPill.bottomAnchor, constant: -5),
+            dotsRow.leadingAnchor.constraint(equalTo: dotsPill.leadingAnchor, constant: 7),
+            dotsRow.trailingAnchor.constraint(equalTo: dotsPill.trailingAnchor, constant: -7),
+
+            lockBadge.topAnchor.constraint(
+                equalTo: imageView.topAnchor, constant: Theme.Spacing.xs),
+            lockBadge.trailingAnchor.constraint(
+                equalTo: imageView.trailingAnchor, constant: -Theme.Spacing.xs),
+            lockBadge.widthAnchor.constraint(equalToConstant: Self.lockBadgeSide),
+            lockBadge.heightAnchor.constraint(equalToConstant: Self.lockBadgeSide),
+
+            nameLabel.topAnchor.constraint(
+                equalTo: imageView.bottomAnchor, constant: Theme.Spacing.xxs),
+            nameLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            nameLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+
+            metaLabel.topAnchor.constraint(equalTo: nameLabel.bottomAnchor, constant: 2),
+            metaLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            metaLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+        ])
+
+        isAccessibilityElement = true
+        accessibilityTraits = .button
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        dotsPill.layer.cornerRadius = dotsPill.bounds.height / 2
+    }
+
+    /// The same press feel as every other card in the app.
+    override var isHighlighted: Bool {
+        didSet {
+            guard isHighlighted != oldValue else { return }
+            UIView.animate(
+                withDuration: Theme.Motion.duration(Theme.Motion.quick),
+                delay: 0,
+                usingSpringWithDamping: Theme.Motion.effectiveSpringDamping,
+                initialSpringVelocity: Theme.Motion.effectiveSpringVelocity,
+                options: [.allowUserInteraction, .beginFromCurrentState]
+            ) {
+                self.transform = self.isHighlighted
+                    ? CGAffineTransform(scaleX: 0.96, y: 0.96) : .identity
+            }
+        }
+    }
+
+    /// - Parameters:
+    ///   - preview: invoked off the first layout pass. A closure rather than an
+    ///     image so a cold render — which composites real photographs through
+    ///     `CollageRenderer` — is never paid for by a cell that has already been
+    ///     recycled before it runs.
+    func configure(
+        template: CarouselTemplate,
+        identifier: String,
+        locked: Bool,
+        preview: @escaping () -> CGImage?
+    ) {
+        nameLabel.text = template.name
+
+        let ratio = CanvasPreset(aspectRatio: template.canvasAspectRatio)?.displayName
+            ?? template.canvasAspectRatio
+        let photos = template.photoZoneCount
+        let pages = template.frameCount
+        // Interpuncts rather than icons: the reference design uses glyphs, but
+        // three SF Symbols inline at caption size read as noise on a 170pt card
+        // and cost a line of Dynamic Type headroom the ratio word needs.
+        metaLabel.text = "\(ratio) · \(photos) photos · \(pages) pages"
+
+        lockBadge.isHidden = !locked
+        setPageDots(pages)
+
+        accessibilityIdentifier = identifier
+        accessibilityLabel = template.name
+        // The metadata is stated only in pixels; without this it reaches nobody
+        // using VoiceOver.
+        accessibilityValue = "\(ratio), \(photos) photos, \(pages) pages"
+            + (locked ? ", premium" : "")
+
+        previewTask?.cancel()
+        previewTask = Task { @MainActor [weak self] in
+            guard !Task.isCancelled else { return }
+            let rendered = preview()
+            guard !Task.isCancelled, let self else { return }
+            UIView.transition(
+                with: self.imageView,
+                duration: Theme.Motion.duration(Theme.Motion.quick),
+                options: [.transitionCrossDissolve, .allowUserInteraction]
+            ) {
+                self.imageView.image = rendered.map { UIImage(cgImage: $0) }
+            }
+        }
+    }
+
+    private func setPageDots(_ count: Int) {
+        dotsRow.arrangedSubviews.forEach {
+            dotsRow.removeArrangedSubview($0)
+            $0.removeFromSuperview()
+        }
+        let shown = min(max(count, 0), Self.maxPageDots)
+        // One page is not a carousel, so there is nothing for dots to say.
+        dotsPill.isHidden = shown < 2
+        guard shown >= 2 else { return }
+
+        for index in 0..<shown {
+            let dot = UIView()
+            dot.translatesAutoresizingMaskIntoConstraints = false
+            dot.backgroundColor = Theme.Color.textOnToast
+                .withAlphaComponent(index == 0 ? 1 : 0.45)
+            dot.layer.cornerRadius = Self.dotSize / 2
+            NSLayoutConstraint.activate([
+                dot.widthAnchor.constraint(equalToConstant: Self.dotSize),
+                dot.heightAnchor.constraint(equalToConstant: Self.dotSize),
+            ])
+            dotsRow.addArrangedSubview(dot)
+        }
+    }
+
+    override func prepareForReuse() {
+        super.prepareForReuse()
+        // A render in flight belongs to the template this cell USED to show;
+        // letting it land would paint the wrong photograph on the new one.
+        previewTask?.cancel()
+        previewTask = nil
+        imageView.image = nil
+        nameLabel.text = nil
+        metaLabel.text = nil
+        lockBadge.isHidden = true
+        accessibilityValue = nil
+    }
+}
