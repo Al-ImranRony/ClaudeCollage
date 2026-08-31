@@ -566,6 +566,17 @@ final class AppCoordinator {
     /// tapped with their own photos. The sample photography sells the structure;
     /// it never lands in the project.
     private func openCarouselTemplate(_ template: CarouselTemplate) {
+        // The lock badge on the card is cosmetic; this is the gate. Routed here
+        // rather than in each caller so Home, the Carousel gallery and any
+        // future door give the same answer.
+        guard TemplateService.shared.canOpen(template) else {
+            Haptics.boundary()
+            tabBarController.presentPaywall { [weak self] in
+                self?.openCarouselTemplate(template)
+            }
+            return
+        }
+
         let frames = CarouselService().buildCarousel(from: template)
         // A template that parses to no frames has nothing to open — bail rather
         // than pushing an empty editor.

@@ -251,13 +251,24 @@ final class HomeViewController: UIViewController {
         return all.filter { showcased.contains($0.id) }
     }
 
-    /// Carousel templates the manifest dresses. No fallback here, deliberately:
-    /// unlike a standard template, a carousel has no schematic thumbnail to
-    /// degrade to, so an undressed one would render as a card full of empty wells.
+    /// The carousels Home features, in the manifest's authored order.
+    ///
+    /// Not "every carousel the manifest dresses" any more. That rule made Home's
+    /// curation a side effect of which templates happened to have sample photos,
+    /// and Step 07's Carousel gallery dresses all twenty — which would have
+    /// turned this strip into the whole catalog without anyone deciding to.
+    ///
+    /// Still no schematic fallback, deliberately: unlike a standard template, a
+    /// FEATURED carousel with no photography would render as a card full of
+    /// empty wells. The gallery is the surface that must never have holes, and
+    /// it has `schematicCover` for exactly that.
     private func showcasedCarouselTemplates() -> [CarouselTemplate] {
         let all = carouselTemplatesProvider?() ?? []
-        let showcased = Set(sampleContent.manifest?.carousels.keys.map { $0 } ?? [])
-        return all.filter { showcased.contains($0.id) }
+        let dressed = Set(sampleContent.manifest?.carousels.keys.map { $0 } ?? [])
+        return sampleContent.featuredCarouselIDs.compactMap { id in
+            guard dressed.contains(id) else { return nil }
+            return all.first { $0.id == id }
+        }
     }
 
     /// The hero's pages, resolved from the manifest's ordered hero list against
@@ -764,6 +775,9 @@ extension HomeViewController: UICollectionViewDataSource, UICollectionViewDelega
             // How many pages the post has is the one fact the picture cannot
             // state, and the one a user comparing carousels wants first.
             badge: String(localized: "\(template.frameCount) frames"),
+            // Until Step 07 there was no `canOpen` overload to ask, so four
+            // premium carousels wore no lock and opened free.
+            locked: !TemplateService.shared.canOpen(template),
             preview: { TemplateService.shared.showcasePreview(for: template) })
         return cell
     }
