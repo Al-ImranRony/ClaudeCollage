@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "templates": {
     "grid-4cell-square":    { "photos": ["sample_portrait_01", "sample_travel_01", "sample_couple_01", "sample_food_01"] },
     "grid-filmstrip":       { "photos": ["sample_friends_02", "sample_portrait_02", "sample_travel_02"] },
@@ -17,7 +17,21 @@
     "carousel-matched-tips":       { "framePhotos": [["sample_portrait_04"], ["sample_friends_01"], ["sample_portrait_02"], ["sample_seasonal_01"], ["sample_portrait_06"]] },
     "carousel-matched-steps":      { "framePhotos": [["sample_food_02"], ["sample_food_01"], ["sample_food_03"], ["sample_friends_01"], ["sample_family_02"]] },
     "carousel-story-beforeafter":  { "framePhotos": [["sample_seasonal_03"], ["sample_seasonal_02"]] },
-    "carousel-gridpreview-family": { "framePhotos": [["sample_family_01", "sample_family_02", "sample_friends_03", "sample_couple_01"], ["sample_family_01"], ["sample_family_02"], ["sample_friends_03"], ["sample_couple_01"]] }
+    "carousel-gridpreview-family": { "framePhotos": [["sample_family_01", "sample_family_02", "sample_friends_03", "sample_couple_01"], ["sample_family_01"], ["sample_family_02"], ["sample_friends_03"], ["sample_couple_01"]] },
+    "carousel-gridpreview-4cell":  { "framePhotos": [["sample_friends_01", "sample_friends_02", "sample_friends_03", "sample_couple_02"], ["sample_friends_01"], ["sample_friends_02"], ["sample_friends_03"], ["sample_couple_02"]] },
+    "carousel-gridpreview-6cell":  { "framePhotos": [["sample_portrait_01", "sample_portrait_02", "sample_portrait_03", "sample_portrait_04", "sample_portrait_05", "sample_portrait_06"], ["sample_portrait_01"], ["sample_portrait_02"], ["sample_portrait_03"], ["sample_portrait_04"], ["sample_portrait_05"], ["sample_portrait_06"]] },
+    "carousel-gridpreview-travel": { "framePhotos": [["sample_travel_01", "sample_travel_02", "sample_travel_03", "sample_travel_04"], ["sample_travel_01"], ["sample_travel_02"], ["sample_travel_03"], ["sample_travel_04"]] },
+    "carousel-matched-product":    { "framePhotos": [["sample_food_03"], ["sample_food_02"], ["sample_food_01"], ["sample_seasonal_02"]] },
+    "carousel-matched-quotes":     { "framePhotos": [["sample_seasonal_01"], ["sample_travel_03"], ["sample_seasonal_03"]] },
+    "carousel-panoramic-beach":    { "framePhotos": [["sample_travel_01"], ["sample_travel_02"], ["sample_travel_03"], ["sample_travel_04"]] },
+    "carousel-panoramic-city":     { "framePhotos": [["sample_travel_04"], ["sample_travel_03"], ["sample_travel_01"]] },
+    "carousel-panoramic-skyline":  { "framePhotos": [["sample_travel_03"], ["sample_travel_04"], ["sample_travel_02"]] },
+    "carousel-panoramic-sunset":   { "framePhotos": [["sample_seasonal_01"], ["sample_seasonal_02"], ["sample_seasonal_03"], ["sample_travel_03"], ["sample_travel_04"]] },
+    "carousel-panoramic-travel":   { "framePhotos": [["sample_travel_02"], ["sample_travel_01"], ["sample_travel_04"]] },
+    "carousel-story-lessons":      { "framePhotos": [["sample_portrait_02"], ["sample_portrait_05"], ["sample_portrait_03"], ["sample_friends_02"], ["sample_portrait_01"]] },
+    "carousel-story-recipe":       { "framePhotos": [["sample_food_01"], ["sample_food_02"], ["sample_food_03"], ["sample_family_02"]] },
+    "carousel-story-travel":       { "framePhotos": [["sample_travel_01"], ["sample_travel_02"], ["sample_travel_03"], ["sample_travel_04"]] },
+    "carousel-story-tutorial":     { "framePhotos": [["sample_portrait_04"], ["sample_portrait_06"], ["sample_friends_01"], ["sample_friends_03"], ["sample_couple_03"]] }
   },
   "featuredCarousels": [
     "carousel-matched-team",

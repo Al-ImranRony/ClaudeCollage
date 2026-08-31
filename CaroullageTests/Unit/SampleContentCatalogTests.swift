@@ -114,13 +114,42 @@ final class SampleContentCatalogTests: XCTestCase {
                     "\(id) frame \(frames[offset].index): \(names.count) photos for \(photoZones) photo zones"
                 )
             }
-            XCTAssertFalse(
-                template.isPremium,
-                "\(id): a showcased carousel must be free"
-            )
             XCTAssertNotNil(
                 catalog.sampleFramePhotos(forCarouselID: id),
                 "\(id): every named photo must resolve"
+            )
+        }
+    }
+
+    /// Being dressed no longer implies being shown on Home, so the "must be
+    /// free" rule moved here rather than being dropped.
+    ///
+    /// It used to sit in `testCarouselEntriesMatchCatalog`, asserting that no
+    /// DRESSED carousel was premium. That was a workaround for a missing gate:
+    /// Home showed every dressed carousel, `canOpen` had no `CarouselTemplate`
+    /// overload to ask, and so a premium carousel on the strip would have opened
+    /// free. Step 07 fixed the cause — Home reads `featuredCarousels`, its cards
+    /// wear the lock, and `openCarouselTemplate` gates on the entitlement.
+    ///
+    /// So the Carousel gallery now dresses all twenty deliberately, premium
+    /// included, and asserting on the dressed set would fail by design. What is
+    /// still worth pinning is the original intent: the strip Home LEADS with
+    /// should not be things you cannot use.
+    func testFeaturedCarouselsAreFree() throws {
+        let catalog = makeCatalog()
+        let service = makeTemplateService()
+
+        let featured = catalog.featuredCarouselIDs
+        XCTAssertFalse(featured.isEmpty, "Home's strip is built from this list")
+
+        for id in featured {
+            let template = try XCTUnwrap(
+                service.carouselTemplates.first { $0.id == id },
+                "\(id): featured carousel is not in the bundled catalog"
+            )
+            XCTAssertFalse(
+                template.isPremium,
+                "\(id): Home should not lead its showcase with a locked carousel"
             )
         }
     }
