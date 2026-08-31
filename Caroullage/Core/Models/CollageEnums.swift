@@ -44,6 +44,18 @@ public enum CarouselType: String, Codable, Sendable, CaseIterable {
     case matched
     case scrollThrough
     case gridPreview
+
+    /// The section header and chip label. `scrollThrough` and `gridPreview` are
+    /// camel-cased raw values that must never reach a user, which is the whole
+    /// reason this is not `rawValue.capitalized`.
+    public var displayName: String {
+        switch self {
+        case .panoramic: return String(localized: "Panoramic")
+        case .matched: return String(localized: "Matched")
+        case .scrollThrough: return String(localized: "Scroll-Through")
+        case .gridPreview: return String(localized: "Grid Preview")
+        }
+    }
 }
 
 public enum CellShape: String, Codable, Sendable, CaseIterable {
