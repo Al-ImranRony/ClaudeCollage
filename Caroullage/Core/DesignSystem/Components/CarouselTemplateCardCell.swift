@@ -208,16 +208,20 @@ final class CarouselTemplateCardCell: UICollectionViewCell {
             ?? template.canvasAspectRatio
         let photos = template.photoZoneCount
         let pages = template.frameCount
-        // Interpuncts rather than icons: the reference design uses glyphs, but
-        // three SF Symbols inline at caption size read as noise on a 170pt card
-        // and cost a line of Dynamic Type headroom the ratio word needs.
-        // `String(localized:)` even though it is an interpolation, so the String
-        // Catalog extracts it and the app's eleven languages get a say — this is
-        // the same shape Home's "\(frameCount) frames" badge uses. It also gives
-        // translators somewhere to author plural variants; English gets away
-        // without them only because no bundled carousel has fewer than two of
-        // either.
-        metaLabel.text = String(localized: "\(ratio) · \(photos) photos · \(pages) pages")
+        // Glyphs for the two counts, the way the reference design does it.
+        //
+        // This started as words — "Landscape · 3 photos · 3 pages" — on the
+        // argument that three inline symbols at caption size read as noise. On
+        // the device that turned out to be the wrong trade: at a 170pt column
+        // width the words fit for "Story" and "Portrait" and truncated for
+        // "Landscape", so the longest ratio name lost its page count to an
+        // ellipsis. Glyphs buy back the room, and they buy it back in every
+        // language rather than only in English.
+        //
+        // The ratio stays a word. It is the one part a symbol cannot say, and
+        // the card's shape does not say it either — `MasonryLayout` clamps, so
+        // nine of the twenty are cropped rather than true to their ratio.
+        metaLabel.attributedText = Self.metadata(ratio: ratio, photos: photos, pages: pages)
 
         lockBadge.isHidden = !locked
         setPageDots(pages)
@@ -245,6 +249,48 @@ final class CarouselTemplateCardCell: UICollectionViewCell {
                 self.imageView.image = rendered.map { UIImage(cgImage: $0) }
             }
         }
+    }
+
+    /// "Portrait  ⧉5  ▤3" — ratio as a word, counts behind their glyphs.
+    ///
+    /// Built as an attributed string rather than assembled from `String(localized:)`
+    /// because the symbols are text attachments, and a translator must be free to
+    /// reorder the ratio against the counts without having to carry the images.
+    private static func metadata(ratio: String, photos: Int, pages: Int) -> NSAttributedString {
+        let font = Theme.Typography.caption
+        let out = NSMutableAttributedString(
+            string: ratio,
+            attributes: [.font: font, .foregroundColor: Theme.Color.textSecondary])
+
+        func append(symbol: String, count: Int) {
+            let config = UIImage.SymbolConfiguration(font: font)
+            guard let image = UIImage(systemName: symbol, withConfiguration: config)?
+                .withTintColor(Theme.Color.textSecondary, renderingMode: .alwaysTemplate)
+            else {
+                // No such symbol on this OS — fall back to the word, which is
+                // long but honest. Truncation beats a blank.
+                out.append(NSAttributedString(
+                    string: "  \(count)",
+                    attributes: [.font: font, .foregroundColor: Theme.Color.textSecondary]))
+                return
+            }
+            let attachment = NSTextAttachment()
+            attachment.image = image
+            // Sits the glyph on the text baseline instead of hanging it below.
+            attachment.bounds = CGRect(
+                x: 0, y: font.descender * 0.5,
+                width: image.size.width, height: image.size.height)
+
+            out.append(NSAttributedString(string: "  "))
+            out.append(NSAttributedString(attachment: attachment))
+            out.append(NSAttributedString(
+                string: " \(count)",
+                attributes: [.font: font, .foregroundColor: Theme.Color.textSecondary]))
+        }
+
+        append(symbol: "photo", count: photos)
+        append(symbol: "square.stack", count: pages)
+        return out
     }
 
     private func setPageDots(_ count: Int) {
@@ -279,7 +325,7 @@ final class CarouselTemplateCardCell: UICollectionViewCell {
         previewTask = nil
         imageView.image = nil
         nameLabel.text = nil
-        metaLabel.text = nil
+        metaLabel.attributedText = nil
         lockBadge.isHidden = true
         // Hidden here as well as re-decided in `setPageDots`. `configure` always
         // follows a dequeue today, so this is belt and braces — but a cell that
