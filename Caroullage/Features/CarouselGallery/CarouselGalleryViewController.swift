@@ -320,8 +320,8 @@ final class CarouselGalleryViewController: UIViewController {
         view.delegate = self
         view.accessibilityIdentifier = "carouselTemplateGrid"
         view.register(
-            CarouselTemplateCardCell.self,
-            forCellWithReuseIdentifier: CarouselTemplateCardCell.reuseID)
+            BrowseTemplateCell.self,
+            forCellWithReuseIdentifier: BrowseTemplateCell.reuseID)
         view.register(
             CarouselSectionHeaderView.self,
             forSupplementaryViewOfKind: UICollectionView.elementKindSectionHeader,
@@ -349,7 +349,7 @@ final class CarouselGalleryViewController: UIViewController {
             columns: 2,
             containerWidth: width,
             spacing: Self.cardSpacing,
-            captionHeight: CarouselTemplateCardCell.captionHeight)
+            captionHeight: BrowseTemplateCell.captionHeight)
 
         // A custom group is clipped to its declared size, so the height must be
         // the measured total rather than an estimate. `max(1,…)` keeps an empty
@@ -411,21 +411,27 @@ extension CarouselGalleryViewController: UICollectionViewDataSource, UICollectio
         }
 
         let cell = collectionView.dequeueReusableCell(
-            withReuseIdentifier: CarouselTemplateCardCell.reuseID, for: indexPath)
-        guard let card = cell as? CarouselTemplateCardCell,
+            withReuseIdentifier: BrowseTemplateCell.reuseID, for: indexPath)
+        guard let card = cell as? BrowseTemplateCell,
               let template = template(at: indexPath) else { return cell }
 
-        // `canOpen`, not `isPremium` — deliberately unlike the Templates tab,
-        // which badges every premium card whether or not you own it. A crown on
-        // something you have already bought is noise; this says "you cannot open
-        // this", which is the only thing the badge is for.
+        // `canOpen`, not `isPremium`. A crown on something you have already
+        // bought is noise; this says "you cannot open this", which is the only
+        // thing the badge is for. The Templates tab agrees, since Step 07 —
+        // before that it badged every premium card whether or not you owned it.
         let locked = !service.canOpen(template)
         card.configure(
-            template: template,
-            // Locked and unlocked cards are told apart in UI tests by identifier
-            // rather than by reading the lock badge out of a screenshot.
-            identifier: locked ? "carouselTemplateCard.premium" : "carouselTemplateCard.free",
-            locked: locked,
+            BrowseTemplateCell.Content(
+                name: template.name,
+                // Shown here, unlike the Templates tab: this screen defaults to
+                // "Any Ratio", so the cards genuinely differ and the word earns
+                // its place.
+                ratio: CanvasPreset(aspectRatio: template.canvasAspectRatio)?.displayName
+                    ?? template.canvasAspectRatio,
+                photos: template.photoZoneCount,
+                pages: template.frameCount,
+                locked: locked,
+                identifier: locked ? "carouselTemplateCard.premium" : "carouselTemplateCard.free"),
             preview: { [service] in
                 // Photo-real first; the wireframe is what stops a card in a LIST
                 // ever coming back blank.

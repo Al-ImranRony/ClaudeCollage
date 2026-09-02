@@ -251,7 +251,7 @@ final class TemplateGalleryViewController: UIViewController {
             let containerWidth = environment.container.effectiveContentSize.width
             let columnWidth = max(1, (containerWidth - inset * 2 - spacing) / 2)
             let aspect = preset.size.height / max(preset.size.width, 1)
-            let cardHeight = columnWidth * aspect + TemplateCardCell.labelStripHeight
+            let cardHeight = columnWidth * aspect + BrowseTemplateCell.captionHeight
 
             let item = NSCollectionLayoutItem(
                 layoutSize: NSCollectionLayoutSize(
@@ -279,18 +279,31 @@ final class TemplateGalleryViewController: UIViewController {
     }
 
     private func makeDataSource() -> UICollectionViewDiffableDataSource<Int, String> {
-        let registration = UICollectionView.CellRegistration<TemplateCardCell, String> {
+        let registration = UICollectionView.CellRegistration<BrowseTemplateCell, String> {
             [weak self] cell, _, templateID in
             guard let self, let template = self.templatesByID[templateID] else { return }
+            // Keyed off `isPremium`, NOT `canOpen`, unlike the badge itself.
+            // These identifiers are how the paywall UI tests find a locked card,
+            // and a test that unlocked premium would otherwise find none.
             let isPremium = self.service.isPremium(template)
             cell.configure(
-                name: template.name,
-                thumbnail: self.service.thumbnail(for: template),
-                isPremium: isPremium
-            )
-            // Locked and unlocked cards are told apart in UI tests by identifier
-            // rather than by reading the crown badge out of a screenshot.
-            cell.accessibilityIdentifier = isPremium ? "templateCard.premium" : "templateCard.free"
+                BrowseTemplateCell.Content(
+                    name: template.name,
+                    // Omitted: this screen's ratio filter is a hard one, so every
+                    // visible card shares a ratio and the word would be the same
+                    // on all of them.
+                    ratio: nil,
+                    photos: template.cells.filter { $0.zoneType == .photo }.count,
+                    // A collage is one canvas. No pages, so no dots.
+                    pages: nil,
+                    locked: !self.service.canOpen(template),
+                    identifier: isPremium ? "templateCard.premium" : "templateCard.free"),
+                preview: { [service = self.service] in
+                    // Photo-real first, schematic second — the same fallback the
+                    // Carousel tab uses, and the reason a card in a browse LIST
+                    // can never come back blank.
+                    service.showcasePreview(for: template) ?? service.thumbnail(for: template)
+                })
         }
         return UICollectionViewDiffableDataSource<Int, String>(collectionView: gridView) {
             collectionView, indexPath, templateID in

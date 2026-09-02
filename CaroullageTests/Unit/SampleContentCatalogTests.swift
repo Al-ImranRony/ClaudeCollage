@@ -7,8 +7,13 @@
 //  whose photo array is the wrong length renders a half-empty preview that looks
 //  broken rather than aspirational. These tests hold the manifest to the real
 //  catalog: every id resolves, every array length matches the template's actual
-//  photo-zone count, every asset it names is bundled, and nothing showcased is
-//  premium (the showcase must be openable by a free user).
+//  photo-zone count, and every asset it names is bundled.
+//
+//  "Nothing showcased is premium" used to live here too. It does not any more —
+//  both browse tabs are photo-real now, so the whole catalog is dressed on
+//  purpose and the locked ones are badged rather than hidden. The rule survives
+//  as `testFeaturedTemplatesAreFree` / `testFeaturedCarouselsAreFree`, applied
+//  to what Home LEADS with, which is what it was really protecting.
 //
 
 import AVFoundation
@@ -75,13 +80,42 @@ final class SampleContentCatalogTests: XCTestCase {
                 entry.photos.count, photoZones,
                 "\(id): manifest lists \(entry.photos.count) photos for \(photoZones) photo zones"
             )
-            XCTAssertFalse(
-                template.isPremium,
-                "\(id): a showcased template must be free — the showcase is the free user's first impression"
-            )
             XCTAssertNotNil(
                 catalog.samplePhotos(forTemplateID: id),
                 "\(id): every named photo must resolve, or the preview draws half-dressed"
+            )
+        }
+    }
+
+    /// The same move `testFeaturedCarouselsAreFree` made, for the same reason.
+    ///
+    /// This used to assert that no DRESSED template was premium, on the grounds
+    /// that the showcase is the free user's first impression. That held while
+    /// "dressed" and "on Home" were the same set. They no longer are: the
+    /// Templates tab is photo-real now, so all thirty-three are dressed on
+    /// purpose, premium included, and the tab badges the locked ones.
+    ///
+    /// What still deserves pinning is the original intent, one layer up — Home's
+    /// strip should not lead with things a free user cannot open.
+    func testFeaturedTemplatesAreFree() throws {
+        let catalog = makeCatalog()
+        let service = makeTemplateService()
+
+        let featured = catalog.featuredTemplateIDs
+        XCTAssertFalse(featured.isEmpty, "Home's Photo Collages strip is drawn from this list")
+
+        for id in featured {
+            let template = try XCTUnwrap(
+                service.templates.first { $0.id == id },
+                "\(id): featured template is not in the bundled catalog"
+            )
+            XCTAssertFalse(
+                template.isPremium,
+                "\(id): Home should not lead its showcase with a locked template"
+            )
+            XCTAssertNotNil(
+                catalog.samplePhotos(forTemplateID: id),
+                "\(id): a featured template with no photography renders empty wells"
             )
         }
     }

@@ -1,17 +1,26 @@
 //
-//  CarouselTemplateCardCell.swift
+//  BrowseTemplateCell.swift
 //  Caroullage
 //
-//  Step 07 — one card in the Carousel tab's masonry grid.
+//  Step 07 — one card in a browse grid. Both browse tabs use it: the Carousel
+//  tab's masonry sections and the Templates tab's uniform grid.
+//
+//  It started as the Carousel tab's alone. When the Templates tab went
+//  photo-real it needed the same card — same artwork treatment, same lock, same
+//  caption block — differing only in that a collage has no pages to dot. Two
+//  copies of this file would have been two chances for the app's two browse
+//  tabs to stop looking like one app, which is the whole thing a shared card is
+//  for. So the differences became `Content`: a `nil` ratio for a screen whose
+//  filter already fixes it, a `nil` page count for a single-canvas template.
 //
 //  Deliberately not `ShowcaseTemplateCell`, which is its sibling rather than its
 //  base class. That cell burns the template name OVER the artwork on a scrim and
 //  carries no metadata row, because Home's strips sell a picture. A browse grid
-//  has a different job: you are comparing twenty things, so the facts that let
-//  you compare them — the canvas ratio, how many of your photos it wants, how
-//  many pages it makes — have to be readable at a glance, and type over
-//  photography is not readable at a glance. So the artwork is full-bleed and the
-//  facts sit under it on the app surface.
+//  has a different job: you are comparing a whole catalog, so the facts that let
+//  you compare — how many of your photos it wants, how many pages it makes —
+//  have to be readable at a glance, and type over photography is not readable at
+//  a glance. So the artwork is full-bleed and the facts sit under it on the app
+//  surface.
 //
 //  The card's own frame carries the template's aspect ratio, CLAMPED — see
 //  `MasonryLayout`, which bounds height to 0.68–1.55x width so a panorama does
@@ -24,8 +33,27 @@
 import UIKit
 
 @MainActor
-final class CarouselTemplateCardCell: UICollectionViewCell {
-    static let reuseID = "CarouselTemplateCardCell"
+final class BrowseTemplateCell: UICollectionViewCell {
+    static let reuseID = "BrowseTemplateCell"
+
+    /// What a card states. The two browse tabs differ only in this.
+    struct Content {
+        let name: String
+        /// The canvas ratio as a word. `nil` omits it — the Templates tab's own
+        /// ratio filter is a hard one, so every card there would repeat the same
+        /// word, and thirty-three copies of "Square" is noise, not information.
+        let ratio: String?
+        let photos: Int
+        /// `nil` for a single-canvas template: no page dots, no page count. A
+        /// collage is one image, and a "1 page" badge on it would be answering a
+        /// question nobody asked.
+        let pages: Int?
+        let locked: Bool
+        /// The cell's `accessibilityIdentifier`. Locked and unlocked cards are
+        /// told apart in UI tests by this rather than by reading a badge out of
+        /// a screenshot, so the caller names them.
+        let identifier: String
+    }
 
     /// Room under the artwork for the name and the metadata row. Fixed, and
     /// passed to `MasonryLayout` as `captionHeight`, so captions line up across
@@ -61,6 +89,15 @@ final class CarouselTemplateCardCell: UICollectionViewCell {
         // The same well the canvas and the exporter paint, so a card whose
         // preview has not landed yet still looks intentional rather than blank.
         imageView.backgroundColor = Theme.Color.cellWell
+        // A hairline, because a good part of the catalog is authored on a WHITE
+        // background — the minimal templates especially — and a white render on
+        // the app's near-white ground is a card with no edge at all. On the
+        // Carousel tab, where every cover happened to be an edge-to-edge
+        // photograph, this was invisible and its absence went unnoticed; the
+        // Templates tab is where it shows. Cheaper and quieter than a shadow,
+        // which is what the old schematic card reached for.
+        imageView.layer.borderWidth = 1
+        imageView.layer.borderColor = Theme.Color.separator.cgColor
         imageView.translatesAutoresizingMaskIntoConstraints = false
 
         // Smoked glass rather than a UI chip, so the dots belong to the picture.
@@ -164,6 +201,13 @@ final class CarouselTemplateCardCell: UICollectionViewCell {
 
         isAccessibilityElement = true
         accessibilityTraits = .button
+
+        // `CGColor` is a snapshot, not a dynamic colour, so the hairline keeps
+        // whatever shade it was born in unless it is re-resolved when light/dark
+        // flips. Same registration every other component in this directory uses.
+        registerForTraitChanges([UITraitUserInterfaceStyle.self]) { (cell: Self, _) in
+            cell.imageView.layer.borderColor = Theme.Color.separator.cgColor
+        }
     }
 
     @available(*, unavailable)
@@ -173,6 +217,8 @@ final class CarouselTemplateCardCell: UICollectionViewCell {
         super.layoutSubviews()
         dotsPill.layer.cornerRadius = dotsPill.bounds.height / 2
     }
+
+
 
     /// The same press feel as every other card in the app.
     override var isHighlighted: Bool {
@@ -196,18 +242,13 @@ final class CarouselTemplateCardCell: UICollectionViewCell {
     ///     image so a cold render — which composites real photographs through
     ///     `CollageRenderer` — is never paid for by a cell that has already been
     ///     recycled before it runs.
-    func configure(
-        template: CarouselTemplate,
-        identifier: String,
-        locked: Bool,
-        preview: @escaping () -> CGImage?
-    ) {
-        nameLabel.text = template.name
+    func configure(_ content: Content, preview: @escaping () -> CGImage?) {
+        nameLabel.text = content.name
 
-        let ratio = CanvasPreset(aspectRatio: template.canvasAspectRatio)?.displayName
-            ?? template.canvasAspectRatio
-        let photos = template.photoZoneCount
-        let pages = template.frameCount
+        let ratio = content.ratio
+        let photos = content.photos
+        let pages = content.pages
+        let locked = content.locked
         // Glyphs for the two counts, the way the reference design does it.
         //
         // This started as words — "Landscape · 3 photos · 3 pages" — on the
@@ -226,15 +267,18 @@ final class CarouselTemplateCardCell: UICollectionViewCell {
         lockBadge.isHidden = !locked
         setPageDots(pages)
 
-        accessibilityIdentifier = identifier
-        accessibilityLabel = template.name
+        accessibilityIdentifier = content.identifier
+        accessibilityLabel = content.name
         // The metadata is stated only in pixels; without this it reaches nobody
         // using VoiceOver. Spoken rather than read, so it takes commas where the
         // label takes interpuncts, and it says "premium" — the lock badge is a
         // picture and pictures do not reach a screen reader either.
-        accessibilityValue = locked
-            ? String(localized: "\(ratio), \(photos) photos, \(pages) pages, premium")
-            : String(localized: "\(ratio), \(photos) photos, \(pages) pages")
+        var spoken: [String] = []
+        if let ratio { spoken.append(ratio) }
+        spoken.append(String(localized: "\(photos) photos"))
+        if let pages { spoken.append(String(localized: "\(pages) pages")) }
+        if locked { spoken.append(String(localized: "premium")) }
+        accessibilityValue = spoken.joined(separator: ", ")
 
         previewTask?.cancel()
         previewTask = Task { @MainActor [weak self] in
@@ -256,10 +300,10 @@ final class CarouselTemplateCardCell: UICollectionViewCell {
     /// Built as an attributed string rather than assembled from `String(localized:)`
     /// because the symbols are text attachments, and a translator must be free to
     /// reorder the ratio against the counts without having to carry the images.
-    private static func metadata(ratio: String, photos: Int, pages: Int) -> NSAttributedString {
+    private static func metadata(ratio: String?, photos: Int, pages: Int?) -> NSAttributedString {
         let font = Theme.Typography.caption
         let out = NSMutableAttributedString(
-            string: ratio,
+            string: ratio ?? "",
             attributes: [.font: font, .foregroundColor: Theme.Color.textSecondary])
 
         func append(symbol: String, count: Int) {
@@ -270,7 +314,7 @@ final class CarouselTemplateCardCell: UICollectionViewCell {
                 // No such symbol on this OS — fall back to the word, which is
                 // long but honest. Truncation beats a blank.
                 out.append(NSAttributedString(
-                    string: "  \(count)",
+                    string: out.length > 0 ? "  \(count)" : "\(count)",
                     attributes: [.font: font, .foregroundColor: Theme.Color.textSecondary]))
                 return
             }
@@ -281,7 +325,9 @@ final class CarouselTemplateCardCell: UICollectionViewCell {
                 x: 0, y: font.descender * 0.5,
                 width: image.size.width, height: image.size.height)
 
-            out.append(NSAttributedString(string: "  "))
+            // No leading gap when the glyph is the first thing on the line,
+            // which it is on a screen that omits the ratio.
+            if out.length > 0 { out.append(NSAttributedString(string: "  ")) }
             out.append(NSAttributedString(attachment: attachment))
             out.append(NSAttributedString(
                 string: " \(count)",
@@ -289,17 +335,18 @@ final class CarouselTemplateCardCell: UICollectionViewCell {
         }
 
         append(symbol: "photo", count: photos)
-        append(symbol: "square.stack", count: pages)
+        if let pages { append(symbol: "square.stack", count: pages) }
         return out
     }
 
-    private func setPageDots(_ count: Int) {
+    private func setPageDots(_ count: Int?) {
         dotsRow.arrangedSubviews.forEach {
             dotsRow.removeArrangedSubview($0)
             $0.removeFromSuperview()
         }
-        let shown = min(max(count, 0), Self.maxPageDots)
-        // One page is not a carousel, so there is nothing for dots to say.
+        let shown = min(max(count ?? 0, 0), Self.maxPageDots)
+        // One page is not a carousel, and `nil` is not a carousel at all, so in
+        // both cases there is nothing for dots to say.
         dotsPill.isHidden = shown < 2
         guard shown >= 2 else { return }
 

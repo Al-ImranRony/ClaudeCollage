@@ -33,6 +33,13 @@ public struct SampleContentManifest: Decodable, Sendable {
     public let carousels: [String: CarouselEntry]
     public let videoShowcases: [VideoShowcase]
     public let hero: [HeroRef]
+    /// Which templates Home's Photo Collages strip is drawn from.
+    ///
+    /// A SET rather than an order, unlike `featuredCarousels`: Home renders
+    /// photo templates in whatever order its provider hands back, because
+    /// onboarding reorders that provider to lead with the category the user
+    /// said they make. Authoring an order here would silently override that.
+    public let featuredTemplates: [String]?
     /// Which carousels Home's strip leads with, in order.
     ///
     /// Optional so a manifest authored before this key still decodes — the whole
@@ -85,6 +92,18 @@ public final class SampleContentCatalog {
     }
 
     public var heroRefs: [SampleContentManifest.HeroRef] { manifest?.hero ?? [] }
+
+    /// The templates Home may feature.
+    ///
+    /// Falls back to every dressed template when the key is absent — which is
+    /// what Home did before the key existed, so an older manifest still fills
+    /// the strip rather than emptying it.
+    public var featuredTemplateIDs: Set<String> {
+        if let featured = manifest?.featuredTemplates, !featured.isEmpty {
+            return Set(featured)
+        }
+        return Set(manifest?.templates.keys ?? [:].keys)
+    }
 
     /// The carousels Home features, in the manifest's order.
     ///

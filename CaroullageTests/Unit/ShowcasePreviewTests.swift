@@ -61,13 +61,29 @@ final class ShowcasePreviewTests: XCTestCase {
     func testShowcasePreviewNilWithoutManifestEntry() throws {
         let catalog = makeCatalog()
         let service = makeTemplateService()
-        let showcased = Set(catalog.manifest?.templates.keys ?? [:].keys)
 
-        let undressed = try XCTUnwrap(
-            service.templates.first { !showcased.contains($0.id) },
-            "expected at least one bundled template outside the manifest"
-        )
-        try XCTSkipIf(undressed.id.isEmpty, "no un-showcased template to exercise the fallback")
+        // Parsed from JSON with an id the manifest cannot know, rather than
+        // hunting the catalog for a template nobody dressed.
+        //
+        // It used to do the hunting, and that made the test quietly dependent on
+        // the catalog being incompletely dressed — so it broke the moment the
+        // Templates tab went photo-real and all thirty-three gained photography.
+        // The behaviour under test was never "some template is undressed"; it is
+        // "no manifest entry means nil", and an id the manifest has never heard
+        // of states that directly and permanently.
+        let json = """
+        {
+          "id": "not-in-any-manifest", "name": "Unknown", "category": "test",
+          "isPremium": false, "canvasAspectRatio": "1:1",
+          "cells": [
+            { "type": "photo", "shape": "rectangle",
+              "frame": { "x": 0, "y": 0, "width": 1, "height": 1 } }
+          ]
+        }
+        """
+        let undressed = try TemplateParser().parse(data: Data(json.utf8))
+        XCTAssertNil(catalog.samplePhotos(forTemplateID: undressed.id),
+                     "the fixture must genuinely be absent from the manifest")
 
         XCTAssertNil(
             service.showcasePreview(for: undressed, sampleContent: catalog),

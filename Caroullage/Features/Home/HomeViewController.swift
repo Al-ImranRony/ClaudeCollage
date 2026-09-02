@@ -237,18 +237,28 @@ final class HomeViewController: UIViewController {
 
     // MARK: - Showcase data
 
-    /// The templates the manifest dresses in sample photography, in the order the
-    /// provider supplied them (premium last, then alphabetical — or onboarding's
-    /// preferred category first).
+    /// The templates Home features, in the order the provider supplied them
+    /// (premium last, then alphabetical — or onboarding's preferred category
+    /// first).
+    ///
+    /// Narrowed by an authored list rather than by "everything the manifest
+    /// dresses". That older rule made Home's curation a side effect of which
+    /// templates happened to have sample photography, and once the Templates tab
+    /// went photo-real ALL thirty-three are dressed — which would have turned
+    /// this strip into the whole catalog without anyone deciding to.
+    ///
+    /// The list narrows but does not order: the provider's order is the one that
+    /// matters here, because onboarding rewrites it to lead with the category
+    /// the user said they make.
     ///
     /// Falls back to the full catalog if the manifest is missing or empty: those
     /// cards then render the schematic `thumbnail(for:)`, which is the old Home's
     /// look but still a working screen — much better than an empty one.
     private func showcasedPhotoTemplates() -> [CollageTemplate] {
         let all = featuredTemplatesProvider?() ?? []
-        let showcased = Set(sampleContent.manifest?.templates.keys.map { $0 } ?? [])
-        guard !showcased.isEmpty else { return all }
-        return all.filter { showcased.contains($0.id) }
+        let featured = sampleContent.featuredTemplateIDs
+        guard !featured.isEmpty else { return all }
+        return all.filter { featured.contains($0.id) }
     }
 
     /// The carousels Home features, in the manifest's authored order.
