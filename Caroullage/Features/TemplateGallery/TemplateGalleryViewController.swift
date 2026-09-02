@@ -72,9 +72,13 @@ final class TemplateGalleryViewController: UIViewController {
         // exactly why the trap survives unnoticed until someone renames one.
         navigationItem.title = "Templates"
         view.backgroundColor = Theme.Color.background
-        // Large, like Home and Projects. A browse screen that dropped to an
-        // inline title read as a pushed detail rather than a tab root.
-        navigationController?.navigationBar.prefersLargeTitles = true
+        // Inline, not large. This used to argue the opposite — that a browse
+        // screen with an inline title read as a pushed detail rather than a tab
+        // root — but that was reasoning about the title in isolation. In place,
+        // above a search bar and a ratio/category filter row, the large title is
+        // a third band of chrome before the first template, and the tab bar
+        // already says "Templates".
+        navigationController?.navigationBar.prefersLargeTitles = false
 
         searchController.searchResultsUpdater = self
         searchController.obscuresBackgroundDuringPresentation = false

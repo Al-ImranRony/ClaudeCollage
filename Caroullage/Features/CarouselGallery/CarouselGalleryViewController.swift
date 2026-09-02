@@ -28,8 +28,6 @@ final class CarouselGalleryViewController: UIViewController {
     /// Wired by AppCoordinator. Called for any template — the premium gate lives
     /// in the coordinator, so every door to a carousel gives one answer.
     var onSelectTemplate: ((CarouselTemplate) -> Void)?
-    /// The "New" bar button: the carousel type picker, for starting from blank.
-    var onNewCarousel: (() -> Void)?
 
     private let service: TemplateService
 
@@ -70,18 +68,22 @@ final class CarouselGalleryViewController: UIViewController {
         // is called "Carousel".
         navigationItem.title = String(localized: "Carousels")
         view.backgroundColor = Theme.Color.background
-        navigationController?.navigationBar.prefersLargeTitles = true
+        // Inline, not large. A large title costs about a third of the first
+        // screen on a tab whose whole job is to show you twenty pictures, and it
+        // has to earn that against a search bar and a filter row already stacked
+        // beneath it. The tab bar underneath already says "Carousel", so the
+        // title is a label rather than a headline.
+        navigationController?.navigationBar.prefersLargeTitles = false
 
-        // A bar button, deliberately not a filled CTA. The defect that made this
-        // tab stop being the type picker was two competing filled brand-orange
-        // buttons — the picker's "Create" bar and the shell's floating
-        // "+ Start Editing" pill — in the same band with nothing to say which
-        // was the action. A bar button does not re-open that.
-        let newButton = UIBarButtonItem(
-            title: String(localized: "New"), style: .plain,
-            target: self, action: #selector(newCarouselTapped))
-        newButton.accessibilityIdentifier = "carouselGalleryNewButton"
-        navigationItem.rightBarButtonItem = newButton
+        // No "New" button here, deliberately.
+        //
+        // There was one, on the reasoning that the tab needed to keep the door
+        // to a blank carousel that the old empty state provided. It does keep
+        // it — the shell's floating "+ Start Editing" pill has a Carousel row
+        // and is present on every tab — so the bar button was a second door to
+        // the same sheet, sitting directly above the pill that opens it. That is
+        // a milder version of the two-CTAs-in-one-band defect that made this tab
+        // stop being the picker in the first place.
 
         searchController.searchResultsUpdater = self
         searchController.obscuresBackgroundDuringPresentation = false
@@ -242,11 +244,6 @@ final class CarouselGalleryViewController: UIViewController {
     private func scrollGridToTop() {
         gridView.setContentOffset(
             CGPoint(x: 0, y: -gridView.adjustedContentInset.top), animated: false)
-    }
-
-    @objc private func newCarouselTapped() {
-        Haptics.tap()
-        onNewCarousel?()
     }
 
     // MARK: - Subview factories

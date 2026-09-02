@@ -98,7 +98,6 @@ final class AppCoordinator {
         carousels.onSelectTemplate = { [weak self] template in
             self?.openCarouselTemplate(template)
         }
-        carousels.onNewCarousel = { [weak self] in self?.presentCarouselTypePicker() }
 
         tabBarController.setTabs([
             // Home is the one tab a user returns to rather than visits, so it

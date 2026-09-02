@@ -195,12 +195,29 @@ final class CarouselTabUITests: XCTestCase {
     // MARK: - Starting from blank
 
     @MainActor
-    func testNewButtonOpensTheTypePicker() {
+    func testTheTabDoesNotRepeatTheStartEditingDoor() {
+        // The tab had a "New" bar button, added so the catalog would keep the
+        // route to a blank carousel that the old empty state provided. It was
+        // redundant: the floating pill is on every tab and its Carousel row
+        // opens the same sheet, so "New" was a second door sitting directly
+        // above the one that already worked.
         let app = launch()
         openCarouselTab(app)
 
-        app.buttons["carouselGalleryNewButton"].tap()
+        XCTAssertFalse(app.buttons["carouselGalleryNewButton"].exists,
+                       "the catalog does not repeat a door the shell already provides")
+    }
+
+    @MainActor
+    func testTheBlankCarouselRouteStillWorksFromTheTab() {
+        // The other half of the test above: dropping the button must not have
+        // taken the route with it. This is the door a user actually uses, driven
+        // from the Carousel tab because that is where they would reach for it.
+        let app = launch()
+        openCarouselTab(app)
+
+        app.openCarouselTypePicker()
         XCTAssertTrue(app.otherElements["carouselTypeSelector"].waitForExistence(timeout: 8),
-                      "The path to a blank carousel survives the tab's new job")
+                      "the path to a blank carousel survives without a bar button")
     }
 }
