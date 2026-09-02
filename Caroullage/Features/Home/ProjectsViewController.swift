@@ -100,7 +100,13 @@ final class ProjectsViewController: UIViewController {
         searchController.searchResultsUpdater = self
         searchController.obscuresBackgroundDuringPresentation = false
         searchController.searchBar.placeholder = configuration.searchPlaceholder
-        searchController.searchBar.accessibilityIdentifier = configuration.searchIdentifier
+        // On the TEXT FIELD, not on the search bar — the same defect this had in
+        // CarouselGalleryViewController. A search bar hosted by the navigation item
+        // is not itself an element in the accessibility tree; only the field inside
+        // it is, and it does not inherit its host's identifier. Setting this on
+        // `searchBar` compiles, reads correctly and silently identifies nothing.
+        searchController.searchBar.searchTextField.accessibilityIdentifier
+            = configuration.searchIdentifier
         navigationItem.searchController = searchController
         definesPresentationContext = true
 
