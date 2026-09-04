@@ -14,12 +14,22 @@
 //  that structure with the photo zones EMPTY, so the picture on Home is a promise
 //  the editor can keep rather than marketing art.
 //
-//  Section order is the argument the screen makes, top to bottom: here is what
-//  this app makes (hero) → the three things it makes (Photo Collages, Video
-//  Collages, Carousels) → something made from YOUR photos (Suggested For You) →
-//  and if you already know what you want, start here (the quick-start chips).
-//  The chips are the four Step 04.5 tiles compressed into one scrolling row: they
-//  are shortcuts, and shortcuts do not deserve half the screen.
+//  Section order is the argument the screen makes, top to bottom: start here (the
+//  quick-start chips) → here is what this app makes (hero) → here is one made from
+//  YOUR photos (Suggested For You) → and here is the catalog, if you want to browse
+//  (Photo Collages, Video Collages, Carousels).
+//
+//  The chips lead because this is an editor, not a feed — the App Store's editors
+//  open on create actions and put inspiration below, and Home was doing the
+//  reverse. The chips used to CLOSE the screen, roughly 1,400pt down, behind three
+//  strips that duplicate the Collage and Carousel tabs: the one section only Home
+//  offers was the one section nobody reached. They keep their section header —
+//  every other block here is a headed section, and four unlabelled icon pills
+//  under the nav bar is the closest this screen gets to the schematic tile grid
+//  Step 07 removed.
+//
+//  The strips lost nothing by moving down. Their "See All" actions exist precisely
+//  to hand a browsing user to the tab built for browsing.
 //
 //  "Custom Size" is deliberately absent — it lives in the floating "+" sheet
 //  alongside Image and Video, so all creation-with-a-choice starts in one place.
@@ -78,21 +88,29 @@ final class HomeViewController: UIViewController {
     ///
     ///   106  the title block (62pt status bar + 44pt standard nav)
     ///   + 8  `contentStack`'s top padding
-    ///   + H  the hero, which is `width - 2 * Spacing.md` = 370pt across
-    ///   + 24 `contentStack.spacing` (`Spacing.xl`)
-    ///   + 26 the "Photo Collages" header
+    ///   + 26 the "Create New" header (`title2`, 22pt)
     ///   + 12 the section's own spacing (`Spacing.sm`)
-    ///   + S  the strip
+    ///   + 65 the chip row (`sm` + 17pt glyph + `xxs` + `caption` + `sm`)
+    ///   + 24 `contentStack.spacing` (`Spacing.xl`)
+    ///   + H  the hero, which is `width - 2 * Spacing.md` = 370pt across
     ///   ---
-    ///   = 728, where the floating "Start Editing" pill begins covering content.
+    ///   = 552 at 0.84, where H is 311.
     ///
-    /// At 0.84 the hero is 311pt and the strip's cards are a complete 176, so the
-    /// whole first pillar lands above the pill. "Video Collages" then sits at
-    /// 687pt — clear of the pill by 15pt — with its cards peeking behind it.
+    /// A further 24 spacing + 26 "Suggested For You" header + 12 + a 96pt strip
+    /// runs the suggestions 614 → 710, against a floating "Start Editing" pill
+    /// whose top edge is around 702. The strip's last 8pt tuck under it, showing
+    /// 88 of 96 — deliberate, and the same cue this budget has always used:
+    /// content that peeks invites a scroll, content fully hidden does not.
     ///
-    /// This budget assumed the 168pt LARGE-title block until the compact title
-    /// freed 62pt (see `viewDidLoad`). The ratio did not have to move for it: the
-    /// space went straight to the second pillar, which is what was short.
+    /// The ratio did NOT have to move when the chips took the top. The 103pt they
+    /// cost came out of the catalog strips, which are below the fold now by
+    /// design; everything the first screen has to prove — you can start here,
+    /// this is what it makes, here is one from your own photos — still lands
+    /// above the pill.
+    ///
+    /// This budget also assumed the 168pt LARGE-title block until the compact
+    /// title freed 62pt (see `viewDidLoad`), and the ratio did not move for that
+    /// either.
     ///
     /// It was 1.15, which put the hero's bottom at 602pt and the first strip's
     /// cards half under the tab bar: a first screen that showed ONE template and
@@ -513,9 +531,19 @@ final class HomeViewController: UIViewController {
         scrollView.showsVerticalScrollIndicator = false
         scrollView.alwaysBounceVertical = true
 
+        // First, deliberately. This is an editor, not a feed: the four doors into
+        // a format lead, and the showcase argues its case immediately below them.
+        contentStack.addArrangedSubview(makeQuickStartSection())
+
         let heroSection = makeHeroSection()
         self.heroSection = heroSection
         contentStack.addArrangedSubview(heroSection)
+
+        // Personalized before generic. The three strips below are a catalog, and
+        // a catalog has two tabs of its own; this is the one thing only Home has.
+        let suggestionsSection = makeSuggestionsSection()
+        self.suggestionsSection = suggestionsSection
+        contentStack.addArrangedSubview(suggestionsSection)
 
         let photoSection = makeStripSection(
             title: String(localized: "Photo Collages"), strip: photoStrip,
@@ -544,12 +572,6 @@ final class HomeViewController: UIViewController {
         }
         self.carouselSection = carouselSection
         contentStack.addArrangedSubview(carouselSection)
-
-        let suggestionsSection = makeSuggestionsSection()
-        self.suggestionsSection = suggestionsSection
-        contentStack.addArrangedSubview(suggestionsSection)
-
-        contentStack.addArrangedSubview(makeQuickStartSection())
 
         scrollView.addSubview(contentStack)
         view.addSubview(scrollView)

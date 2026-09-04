@@ -76,6 +76,51 @@ final class HomeShowcaseUITests: XCTestCase {
                       "The chip row is headed by what it makes")
     }
 
+    /// Create New leads the screen. It used to close it, roughly 1,400pt down.
+    ///
+    /// Asserted by FRAME, not by existence: every section of Home exists in the
+    /// hierarchy at launch whether or not it is on screen, so `exists` cannot
+    /// tell the two orders apart. `isHittable` and `frame` can.
+    @MainActor
+    func testCreateNewLeadsTheScreenAboveTheHero() {
+        let app = launch()
+
+        let hero = app.collectionViews["heroShowcase"]
+        XCTAssertTrue(hero.waitForExistence(timeout: 10), "Hero showcase is on Home")
+
+        let createNew = app.staticTexts["Create New"]
+        XCTAssertTrue(createNew.exists, "The Create New header is on Home")
+        XCTAssertTrue(createNew.isHittable, "…and is on the first screen, unscrolled")
+        XCTAssertTrue(app.buttons["newProjectButton"].isHittable,
+                      "The create chips are reachable without a scroll")
+        XCTAssertLessThanOrEqual(createNew.frame.maxY, hero.frame.minY,
+                                 "Create New sits above the hero")
+    }
+
+    /// Personalized before generic: the suggestions follow the hero and precede
+    /// the three catalog strips, which the Collage and Carousel tabs duplicate.
+    @MainActor
+    func testSuggestedForYouFollowsTheHeroAndPrecedesTheStrips() throws {
+        let app = launch()
+
+        let hero = app.collectionViews["heroShowcase"]
+        XCTAssertTrue(hero.waitForExistence(timeout: 10), "Hero showcase is on Home")
+
+        // The section hides itself entirely when photo access is denied, and a
+        // simulator can be in that state — that is a skip, not a failure.
+        let suggested = app.staticTexts["Suggested For You"]
+        try XCTSkipUnless(suggested.exists,
+                          "Photo access is denied on this simulator, so the section is hidden")
+
+        XCTAssertGreaterThanOrEqual(suggested.frame.minY, hero.frame.maxY,
+                                    "Suggested For You follows the hero")
+
+        let photoCollages = app.staticTexts["Photo Collages"]
+        XCTAssertTrue(photoCollages.exists, "The Photo Collages header is on Home")
+        XCTAssertLessThanOrEqual(suggested.frame.maxY, photoCollages.frame.minY,
+                                 "…and precedes the catalog strips")
+    }
+
     /// The hero renders real pages, not an empty carousel.
     @MainActor
     func testHeroShowsAPage() {
