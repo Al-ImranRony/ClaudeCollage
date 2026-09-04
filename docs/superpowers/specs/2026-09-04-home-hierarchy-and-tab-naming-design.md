@@ -52,7 +52,13 @@ things only Home offers.
 
 ### Fold budget after the change
 
-iPhone 17, 402 × 874pt. The floating "Start Editing" pill's top edge sits at ≈ 702pt.
+iPhone 17, 402 × 874pt. The floating "Start Editing" pill's top edge sits at **733pt**.
+
+> **Corrected 2026-09-04, after the work shipped.** This section originally said 702pt, a
+> figure never derived from anything — the comment it replaced said 728. `AppTabBarController`
+> computes `plusY = tabBar.frame.minY - barGap(12) - plusHeight(46)` = `791 - 58 = 733`, and a
+> screenshot confirms it. Everything below is the corrected budget; see the implementation
+> note at the end of this section for what the wrong figure cost.
 
 | block | height | running total |
 |---|---|---|
@@ -63,15 +69,32 @@ iPhone 17, 402 × 874pt. The floating "Start Editing" pill's top edge sits at �
 | chip row (`sm` + 17pt glyph + `xxs` + `caption`  + `sm`) | 65 | 217 |
 | `contentStack.spacing` (`Spacing.xl`) | 24 | 241 |
 | hero (370 wide × 0.84) | 311 | **552** |
-| `contentStack.spacing` | 24 | 576 |
-| "Suggested For You" header | 26 | 602 |
-| section spacing | 12 | 614 |
-| suggestions strip (fixed `heightAnchor`) | 96 | **710** |
+| `foldSeamSpacing` | 8 | 560 |
+| "Suggested For You" header | 26 | 586 |
+| section spacing | 12 | 598 |
+| the suggestions section's content | *varies — see below* | |
 
-Create New and the hero are fully above the fold. The suggestions strip runs 614 → 710, so
-its last 8pt tuck under the pill — it shows 88 of 96pt. That partial reveal is deliberate
-and matches the cue the existing fold comment already relies on for "Video Collages": content
-that peeks invites a scroll, content that is fully hidden does not.
+Create New and the hero are fully above the fold, and the suggestions section clears the
+pill outright rather than peeking under it. The table stops at the suggestions content
+deliberately: that content is ~82pt as the enable card and a fixed 96pt as the populated
+strip, so anything below it is not a single number.
+
+The original text here claimed the strip's "last 8pt tuck under the pill — it shows 88 of
+96pt", framed as a deliberate scroll cue. That was an artefact of the wrong 702: at 733 no
+state of this screen produces that peek.
+
+What the pill actually overlapped was the section *below* the suggestions. At the stack's
+uniform 24pt spacing the "Photo Collages" header landed at 730 → 757 against the pill's 733,
+so the pill cut the header mid-word — the first screen read `Photo Coll ( + Start Editing )`
+with "See All" stranded beside it. The fix narrows both seams around the suggestions section
+to 8pt (`foldSeamSpacing`), lifting the header to 701 → 721, about 17pt clear, and leaving
+the pill to overlap that strip's *cards* — which is the peek cue the budget wanted all along.
+
+One state remains unmeasured: the suggestions section is ~82pt as the enable card but a
+fixed 96pt as the populated strip, so the fold depends on a runtime permission. The 96pt
+state leaves only a few points of margin and could not be reproduced on a simulator to
+verify. The durable fix is to give both states the same height; that is a design change to
+the suggestions section and is out of scope here.
 
 `heroAspectRatio` stays at **0.84**. The value still holds under the new stack; only the
 derivation written above it is now wrong.

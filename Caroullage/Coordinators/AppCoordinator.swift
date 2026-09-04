@@ -112,10 +112,12 @@ final class AppCoordinator {
             // its place. A raw literal like its three siblings; localizing one
             // of four would add an inconsistency rather than remove one.
             // Weakest axis, acknowledged rather than dodged: the app also makes
-            // VIDEO collages, and they live in neither middle tab — only a Home
-            // strip and the "Video" create chip — so "Collage" over-promises
-            // exactly where "Templates" under-promised. Accepted deliberately;
-            // see the design spec's "Known trade-off, accepted" section.
+            // VIDEO collages, and they live in neither middle tab — a Home
+            // strip, the "Video" create chip, the floating "+" sheet's Video
+            // row (`onVideo` in `presentStartEditingSheet`, and that sheet is on
+            // every tab), and Projects once one is saved — so "Collage"
+            // over-promises exactly where "Templates" under-promised. Accepted deliberately; see the
+            // design spec's "Known trade-off, accepted" section.
             // The identifier stays `templatesButton`, not `collageButton`: it
             // is not user-visible, and renaming it (plus the matching
             // `seeAllTemplatesButton` in HomeViewController.swift:563) would

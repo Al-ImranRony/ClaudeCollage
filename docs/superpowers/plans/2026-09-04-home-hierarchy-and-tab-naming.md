@@ -245,6 +245,11 @@ including the declaration `private static let heroAspectRatio: CGFloat = 0.84` w
     /// runs the suggestions 614 → 710, against a floating "Start Editing" pill
     /// whose top edge is around 702. The strip's last 8pt tuck under it, showing
     /// 88 of 96 — deliberate, and the same cue this budget has always used:
+    ///
+    /// [SUPERSEDED — the pill's top edge is 733, not 702, and no state produces
+    /// this peek. The shipped comment in HomeViewController.swift is correct;
+    /// this block is left as written so the plan still reflects what was
+    /// specified at the time. See the spec's corrected fold budget.]
     /// content that peeks invites a scroll, content fully hidden does not.
     ///
     /// The ratio did NOT have to move when the chips took the top. The 103pt they

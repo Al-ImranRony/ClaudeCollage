@@ -69,7 +69,7 @@ final class TemplateGalleryViewController: UIViewController {
         super.viewDidLoad()
         // `navigationItem.title`, NOT `title`: the latter also rewrites this
         // tab's bar label. The two no longer say the same thing — the tab is
-        // "Collage", this screen is "Collage Templates". This is that rename.
+        // "Collage", this screen is "Collage Templates".
         navigationItem.title = String(localized: "Collage Templates")
         view.backgroundColor = Theme.Color.background
         // Inline, not large. This used to argue the opposite — that a browse
