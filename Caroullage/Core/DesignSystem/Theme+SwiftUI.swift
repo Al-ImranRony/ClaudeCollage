@@ -31,6 +31,7 @@ public extension Color {
     static var themeAccent: Color { Color(Theme.Color.accent) }
     static var themeAccentStrong: Color { Color(Theme.Color.accentStrong) }
     static var themeAccentSecondary: Color { Color(Theme.Color.accentSecondary) }
+    static var themeAccentFar: Color { Color(Theme.Color.accentFar) }
     static var themeAccentSoft: Color { Color(Theme.Color.accentSoft) }
     static var themeBackground: Color { Color(Theme.Color.background) }
     static var themeSurface: Color { Color(Theme.Color.surface) }
@@ -69,6 +70,28 @@ public extension LinearGradient {
     ) -> LinearGradient {
         LinearGradient(
             colors: [.themeAccentStrong, .themeAccentSecondary],
+            startPoint: startPoint,
+            endPoint: endPoint
+        )
+    }
+
+    /// The chromatic ramp — `accent` → `accentFar`, the same pair the app icon
+    /// paints its collage cells with.
+    ///
+    /// A deliberate exception to "ink is chrome", and the only one: onboarding
+    /// is the app before there is any content in it, so there is nothing for
+    /// ink to be restrained *against* and a monochrome first run reads austere
+    /// rather than assured. Everywhere past onboarding, `themeBrand` is the
+    /// gradient — the ink takes over exactly when the photographs arrive.
+    ///
+    /// Both stops carry `textOnAccent`; see `Theme.Color.accentFar` for why the
+    /// ramp reverses direction between appearances.
+    static func themeSpark(
+        startPoint: UnitPoint = .topLeading,
+        endPoint: UnitPoint = .bottomTrailing
+    ) -> LinearGradient {
+        LinearGradient(
+            colors: [.themeAccent, .themeAccentFar],
             startPoint: startPoint,
             endPoint: endPoint
         )

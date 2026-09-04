@@ -106,7 +106,7 @@ struct OnboardingView: View {
             Spacer(minLength: 0)
             ZStack {
                 Circle()
-                    .fill(LinearGradient.themeBrand())
+                    .fill(LinearGradient.themeSpark())
                     .frame(width: 168, height: 168)
                 Image(systemName: symbol)
                     .font(.system(size: 68, weight: .semibold))
@@ -254,7 +254,7 @@ struct OnboardingView: View {
                     .frame(maxWidth: .infinity)
                     .frame(height: 54)
                     .background(
-                        LinearGradient.themeBrand(startPoint: .leading, endPoint: .trailing),
+                        LinearGradient.themeSpark(startPoint: .leading, endPoint: .trailing),
                         in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous)
                     )
             }

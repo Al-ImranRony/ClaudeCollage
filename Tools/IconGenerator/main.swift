@@ -27,9 +27,11 @@ import UniformTypeIdentifiers
 
 /// The icon palette is the app's own ramp, not a separate set of colours: the
 /// ground is `Theme.Color.accentStrong` (#18181B) opening to near-black, the
-/// card is white, and the collage cells are `Theme.Color.accent` (#5B54E8).
-/// Keeping the icon inside the ramp is what makes the home screen and the app
-/// read as one product.
+/// card is white, and the collage cells run `Theme.Color.accent` (#5B54E8) to
+/// `Theme.Color.accentFar` (#4338CA) — the same two stops SwiftUI paints as
+/// `LinearGradient.themeSpark`, which is what onboarding uses. Keeping the icon
+/// inside the ramp is what makes the home screen and the app read as one
+/// product.
 ///
 /// It is also the app's design rule stated in a single image: an ink field, a
 /// white sheet, and one chromatic note doing all the work. An orange icon was
@@ -39,9 +41,9 @@ import UniformTypeIdentifiers
 enum Brand {
     static let ink = rgb(0x27_272A)
     static let inkDeep = rgb(0x09_090B)
-    static let spark = rgb(0x6D_66F0)
-    static let sparkDeep = rgb(0x43_38CA)
-    static let sparkLift = rgb(0x8B_85F5)
+    static let spark = rgb(0x5B_54E8)
+    static let sparkDeep = rgb(0x43_38CA)  // Theme.Color.accentFar, light
+    static let sparkLift = rgb(0x8B_85F5)  // Theme.Color.accent, dark
     static let white = CGColor(gray: 1, alpha: 1)
     static let paper = rgb(0xFA_FAFA)
 

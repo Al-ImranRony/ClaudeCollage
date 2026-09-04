@@ -51,6 +51,25 @@ public enum Theme {
             dynamic(light: 0x5B54E8, dark: 0x8B85F5)
         }
 
+        /// The far end of the spark ramp — `accent` → `accentFar`.
+        ///
+        /// The app's chrome is ink, but the screens a user meets *before* the
+        /// app — onboarding — carry the colour instead. A first run with no hue
+        /// in it reads austere rather than confident, and there is no content
+        /// on those screens for ink chrome to be restrained against; the
+        /// restraint only means something once photographs are on screen.
+        ///
+        /// It reverses direction between appearances, which looks like a
+        /// mistake and is not. `textOnAccent` inverts — white in light, near-
+        /// black in dark — and *both* stops have to carry it, so the ramp has
+        /// to move away from the ink in whichever direction the ink is. Going
+        /// deeper in both would put near-black on #6D66F0 at 4.06:1. Light runs
+        /// 5.41:1 → 7.90:1 under white; dark runs 5.71:1 → 7.89:1 under
+        /// near-black.
+        public static var accentFar: UIColor {
+            dynamic(light: 0x4338CA, dark: 0xA9A4F8)
+        }
+
         /// Primary Pressed — the pressed state of the ink chrome.
         ///
         /// Lighter than `accentStrong` in light mode, not darker: at #18181B

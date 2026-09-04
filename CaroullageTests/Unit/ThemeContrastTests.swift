@@ -79,6 +79,32 @@ final class ThemeContrastTests: XCTestCase {
         }
     }
 
+    /// Both gradients carry `textOnAccent` at both ends, and neither end was
+    /// covered before.
+    ///
+    /// `brandGradient` runs `accentStrong → accentSecondary`; the spark ramp
+    /// `accent → accentFar`. A gradient is the easiest place for a token change
+    /// to go unnoticed, because only one of its two stops is usually the one
+    /// anybody looked at.
+    func testTextOnAccentClearsAAAcrossTheBrandGradient() {
+        for style in [UIUserInterfaceStyle.light, .dark] {
+            assertContrast(Theme.Color.textOnAccent, on: Theme.Color.accentStrong, atLeast: body, style: style)
+            assertContrast(Theme.Color.textOnAccent, on: Theme.Color.accentSecondary, atLeast: body, style: style)
+        }
+    }
+
+    /// The spark ramp reverses direction between appearances, which reads as a
+    /// mistake and is not: `textOnAccent` is white in light and near-black in
+    /// dark, so the far stop has to move *away* from the ink in whichever
+    /// direction the ink is. A far stop that went deeper in both appearances
+    /// would strand the dark one at 4.06:1 — this is the test that says so.
+    func testTextOnAccentClearsAAAcrossTheSparkRamp() {
+        for style in [UIUserInterfaceStyle.light, .dark] {
+            assertContrast(Theme.Color.textOnAccent, on: Theme.Color.accent, atLeast: body, style: style)
+            assertContrast(Theme.Color.textOnAccent, on: Theme.Color.accentFar, atLeast: body, style: style)
+        }
+    }
+
     // MARK: - Contrast maths
 
     private func assertContrast(
