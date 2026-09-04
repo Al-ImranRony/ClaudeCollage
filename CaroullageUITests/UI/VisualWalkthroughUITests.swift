@@ -47,15 +47,23 @@ final class VisualWalkthroughUITests: XCTestCase {
         XCTAssertTrue(tabBar.waitForExistence(timeout: 10), "Tab shell")
         capture("01-home", of: app)
 
-        for (tab, name) in [("Collage", "02-collage"), ("Projects", "03-projects"),
-                            ("Carousel", "04-carousel")] {
-            let button = tabBar.buttons[tab]
-            XCTAssertTrue(button.waitForExistence(timeout: 5), "\(tab) tab")
+        // Tabs are reached by accessibility identifier, never by label. The
+        // labels are user-visible copy — renaming Templates to Collage broke
+        // this walkthrough, which has no stake in what the tabs are called —
+        // and they are already covered where they belong, by
+        // `TabBarShellUITests.testTabsAreInTheIntendedOrder`. `templatesButton`
+        // is deliberately still the identifier of the tab labelled "Collage";
+        // see the note in AppCoordinator's `setTabs` call.
+        for (identifier, name) in [("templatesButton", "02-collage"),
+                                   ("projectsTab", "03-projects"),
+                                   ("carouselButton", "04-carousel")] {
+            let button = tabBar.buttons[identifier]
+            XCTAssertTrue(button.waitForExistence(timeout: 5), "\(identifier) tab")
             button.tap()
             capture(name, of: app)
         }
 
-        tabBar.buttons["Home"].tap()
+        tabBar.buttons["homeTab"].tap()
         let grid = app.buttons["newProjectButton"]
         XCTAssertTrue(grid.waitForExistence(timeout: 5), "Grid quick-start tile")
         grid.tap()
