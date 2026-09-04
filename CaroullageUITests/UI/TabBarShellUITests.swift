@@ -35,7 +35,7 @@ final class TabBarShellUITests: XCTestCase {
         let tabBar = app.tabBars["mainTabBar"]
         XCTAssertTrue(tabBar.waitForExistence(timeout: 5))
         let labels = (0..<4).map { tabBar.buttons.element(boundBy: $0).label }
-        XCTAssertEqual(labels, ["Home", "Templates", "Carousel", "Projects"])
+        XCTAssertEqual(labels, ["Home", "Collage", "Carousel", "Projects"])
     }
 
     @MainActor
@@ -61,7 +61,7 @@ final class TabBarShellUITests: XCTestCase {
             app.buttons[identifier].tap()
         }
         let tabBar = app.tabBars["mainTabBar"]
-        for label in ["Home", "Templates", "Projects", "Carousel"] {
+        for label in ["Home", "Collage", "Projects", "Carousel"] {
             XCTAssertTrue(tabBar.buttons[label].exists,
                           "Tab labelled \(label) after every tab has loaded")
         }
@@ -238,6 +238,6 @@ final class TabBarShellUITests: XCTestCase {
         }
         seeAll.tap()
         XCTAssertTrue(app.collectionViews["templateGalleryGrid"].waitForExistence(timeout: 8),
-                      "See All lands on the Templates tab")
+                      "See All lands on the Collage tab")
     }
 }

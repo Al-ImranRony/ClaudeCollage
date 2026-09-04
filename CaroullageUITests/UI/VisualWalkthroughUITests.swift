@@ -47,7 +47,7 @@ final class VisualWalkthroughUITests: XCTestCase {
         XCTAssertTrue(tabBar.waitForExistence(timeout: 10), "Tab shell")
         capture("01-home", of: app)
 
-        for (tab, name) in [("Templates", "02-templates"), ("Projects", "03-projects"),
+        for (tab, name) in [("Collage", "02-collage"), ("Projects", "03-projects"),
                             ("Carousel", "04-carousel")] {
             let button = tabBar.buttons[tab]
             XCTAssertTrue(button.waitForExistence(timeout: 5), "\(tab) tab")

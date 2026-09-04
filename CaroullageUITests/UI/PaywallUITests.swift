@@ -36,7 +36,7 @@ final class PaywallUITests: XCTestCase {
         app.launch()
 
         let templates = app.buttons["templatesButton"]
-        XCTAssertTrue(templates.waitForExistence(timeout: 10), "the Templates tab never appeared")
+        XCTAssertTrue(templates.waitForExistence(timeout: 10), "the Collage tab never appeared")
         templates.tap()
 
         let grid = app.collectionViews["templateGalleryGrid"]

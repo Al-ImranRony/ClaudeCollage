@@ -9,7 +9,7 @@
 //  above it:
 //
 //               ( +  Start Editing )
-//      ( Home | Templates | Projects | Carousel )
+//      ( Home | Collage | Carousel | Projects )
 //
 //  The bar is the system `UITabBar`, and that is the whole point. On iOS 26 the
 //  platform already draws it as a floating pill with Liquid Glass and a capsule

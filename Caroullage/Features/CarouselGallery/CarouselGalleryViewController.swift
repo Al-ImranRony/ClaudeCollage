@@ -64,9 +64,11 @@ final class CarouselGalleryViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         // `navigationItem.title`, NOT `title`: the latter also rewrites this
-        // tab's bar label, and this screen is called "Carousels" while the tab
-        // is called "Carousel".
-        navigationItem.title = String(localized: "Carousels")
+        // tab's bar label, and this screen is called "Carousel Templates" while
+        // the tab is called "Carousel". It is titled to match the Collage tab's
+        // gallery — the parallel only pays off if both screens introduce
+        // themselves the same way.
+        navigationItem.title = String(localized: "Carousel Templates")
         view.backgroundColor = Theme.Color.background
         // Inline, not large. A large title costs about a third of the first
         // screen on a tab whose whole job is to show you twenty pictures, and it
@@ -161,7 +163,7 @@ final class CarouselGalleryViewController: UIViewController {
     /// The lock badge and the `.premium` identifier are decided in
     /// `cellForItemAt` from `canOpen`, which means a card laid out while locked
     /// stays locked-looking until it recycles. That matters here more than on the
-    /// Templates tab: the paywall's completion pushes the editor, so the user
+    /// Collage tab: the paywall's completion pushes the editor, so the user
     /// comes back to this exact grid moments after buying, and would find the
     /// thing they just paid for still wearing a padlock.
     override func viewWillAppear(_ animated: Bool) {
@@ -261,7 +263,7 @@ final class CarouselGalleryViewController: UIViewController {
 
     /// Rebuilt on every change so the checkmark follows the selection.
     private func makeRatioMenu() -> UIMenu {
-        // "Any Ratio" first and selected by default. The Templates tab has no
+        // "Any Ratio" first and selected by default. The Collage tab has no
         // such entry because its catalog is large enough per preset; this one
         // has exactly one landscape template.
         let any = UIAction(
@@ -417,13 +419,13 @@ extension CarouselGalleryViewController: UICollectionViewDataSource, UICollectio
 
         // `canOpen`, not `isPremium`. A crown on something you have already
         // bought is noise; this says "you cannot open this", which is the only
-        // thing the badge is for. The Templates tab agrees, since Step 07 —
+        // thing the badge is for. The Collage tab agrees, since Step 07 —
         // before that it badged every premium card whether or not you owned it.
         let locked = !service.canOpen(template)
         card.configure(
             BrowseTemplateCell.Content(
                 name: template.name,
-                // Shown here, unlike the Templates tab: this screen defaults to
+                // Shown here, unlike the Collage tab: this screen defaults to
                 // "Any Ratio", so the cards genuinely differ and the word earns
                 // its place.
                 ratio: CanvasPreset(aspectRatio: template.canvasAspectRatio)?.displayName

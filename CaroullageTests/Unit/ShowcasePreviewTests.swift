@@ -67,7 +67,7 @@ final class ShowcasePreviewTests: XCTestCase {
         //
         // It used to do the hunting, and that made the test quietly dependent on
         // the catalog being incompletely dressed — so it broke the moment the
-        // Templates tab went photo-real and all thirty-three gained photography.
+        // Collage tab went photo-real and all thirty-three gained photography.
         // The behaviour under test was never "some template is undressed"; it is
         // "no manifest entry means nil", and an id the manifest has never heard
         // of states that directly and permanently.

@@ -68,16 +68,18 @@ final class TemplateGalleryViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         // `navigationItem.title`, NOT `title`: the latter also rewrites this
-        // tab's bar label. It happens to say the same thing today, which is
-        // exactly why the trap survives unnoticed until someone renames one.
-        navigationItem.title = "Templates"
+        // tab's bar label. The two no longer say the same thing — the tab is
+        // "Collage", this screen is "Collage Templates". This comment used to
+        // warn that the trap would survive unnoticed until someone renamed one;
+        // this is that rename, and using the safe form is why it cost nothing.
+        navigationItem.title = String(localized: "Collage Templates")
         view.backgroundColor = Theme.Color.background
         // Inline, not large. This used to argue the opposite — that a browse
         // screen with an inline title read as a pushed detail rather than a tab
         // root — but that was reasoning about the title in isolation. In place,
         // above a search bar and a ratio/category filter row, the large title is
         // a third band of chrome before the first template, and the tab bar
-        // already says "Templates".
+        // already says "Collage".
         navigationController?.navigationBar.prefersLargeTitles = false
 
         searchController.searchResultsUpdater = self

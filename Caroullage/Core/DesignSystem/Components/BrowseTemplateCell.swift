@@ -3,9 +3,9 @@
 //  Caroullage
 //
 //  Step 07 — one card in a browse grid. Both browse tabs use it: the Carousel
-//  tab's masonry sections and the Templates tab's uniform grid.
+//  tab's masonry sections and the Collage tab's uniform grid.
 //
-//  It started as the Carousel tab's alone. When the Templates tab went
+//  It started as the Carousel tab's alone. When the Collage tab went
 //  photo-real it needed the same card — same artwork treatment, same lock, same
 //  caption block — differing only in that a collage has no pages to dot. Two
 //  copies of this file would have been two chances for the app's two browse
@@ -39,7 +39,7 @@ final class BrowseTemplateCell: UICollectionViewCell {
     /// What a card states. The two browse tabs differ only in this.
     struct Content {
         let name: String
-        /// The canvas ratio as a word. `nil` omits it — the Templates tab's own
+        /// The canvas ratio as a word. `nil` omits it — the Collage tab's own
         /// ratio filter is a hard one, so every card there would repeat the same
         /// word, and thirty-three copies of "Square" is noise, not information.
         let ratio: String?
@@ -94,7 +94,7 @@ final class BrowseTemplateCell: UICollectionViewCell {
         // the app's near-white ground is a card with no edge at all. On the
         // Carousel tab, where every cover happened to be an edge-to-edge
         // photograph, this was invisible and its absence went unnoticed; the
-        // Templates tab is where it shows. Cheaper and quieter than a shadow,
+        // Collage tab is where it shows. Cheaper and quieter than a shadow,
         // which is what the old schematic card reached for.
         imageView.layer.borderWidth = 1
         imageView.layer.borderColor = Theme.Color.separator.cgColor

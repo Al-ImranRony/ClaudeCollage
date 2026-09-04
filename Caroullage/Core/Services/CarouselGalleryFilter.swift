@@ -30,7 +30,7 @@ enum CarouselGalleryFilter {
     ///
     /// - Parameters:
     ///   - ratio: `nil` means "Any Ratio", which is the default. Unlike the
-    ///     Templates tab — whose catalog is large enough that defaulting to
+    ///     Collage tab — whose catalog is large enough that defaulting to
     ///     Square is reasonable — this catalog has 6 square and exactly 1
     ///     landscape template, so a preset default would hide most of it. It
     ///     would also make every visible card the same shape, which flattens the

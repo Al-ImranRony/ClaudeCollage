@@ -31,8 +31,8 @@ final class CarouselTabUITests: XCTestCase {
     @MainActor
     private func openCarouselTab(_ app: XCUIApplication) {
         app.buttons["carouselButton"].tap()
-        XCTAssertTrue(app.navigationBars["Carousels"].waitForExistence(timeout: 8),
-                      "The Carousel tab is titled Carousels")
+        XCTAssertTrue(app.navigationBars["Carousel Templates"].waitForExistence(timeout: 8),
+                      "The Carousel tab is titled Carousel Templates")
     }
 
     // MARK: - The Step 06 regression, still pinned
@@ -121,7 +121,7 @@ final class CarouselTabUITests: XCTestCase {
 
         header.tap()
 
-        XCTAssertTrue(app.navigationBars["Carousels"].exists,
+        XCTAssertTrue(app.navigationBars["Carousel Templates"].exists,
                       "The chevron must not push a second screen")
         XCTAssertFalse(header.waitForExistence(timeout: 2),
                        "It selects the chip, which collapses the sections")

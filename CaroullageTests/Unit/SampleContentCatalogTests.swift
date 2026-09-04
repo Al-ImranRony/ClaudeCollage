@@ -92,7 +92,7 @@ final class SampleContentCatalogTests: XCTestCase {
     /// This used to assert that no DRESSED template was premium, on the grounds
     /// that the showcase is the free user's first impression. That held while
     /// "dressed" and "on Home" were the same set. They no longer are: the
-    /// Templates tab is photo-real now, so all thirty-three are dressed on
+    /// Collage tab is photo-real now, so all thirty-three are dressed on
     /// purpose, premium included, and the tab badges the locked ones.
     ///
     /// What still deserves pinning is the original intent, one layer up — Home's

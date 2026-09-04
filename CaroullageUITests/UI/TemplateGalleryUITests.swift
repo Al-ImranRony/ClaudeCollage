@@ -24,7 +24,7 @@ final class TemplateGalleryUITests: XCTestCase {
         let app = XCUIApplication.underTest()
         app.launch()
         app.buttons["templatesButton"].tap()
-        XCTAssertTrue(app.navigationBars["Templates"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.navigationBars["Collage Templates"].waitForExistence(timeout: 8))
 
         XCTAssertFalse(app.segmentedControls["canvasPresetControl"].exists,
                        "The stacked ratio segmented control is gone")
@@ -68,9 +68,10 @@ final class TemplateGalleryUITests: XCTestCase {
 
         // Enter the gallery from Home.
         let templatesButton = app.buttons["templatesButton"]
-        XCTAssertTrue(templatesButton.waitForExistence(timeout: 8), "Home shows the Templates button")
+        XCTAssertTrue(templatesButton.waitForExistence(timeout: 8), "Home shows the Collage tab")
         templatesButton.tap()
-        XCTAssertTrue(app.navigationBars["Templates"].waitForExistence(timeout: 5), "Gallery pushes")
+        XCTAssertTrue(app.navigationBars["Collage Templates"].waitForExistence(timeout: 5),
+                      "Gallery pushes")
 
         // Square (default) shows the bundled 1:1 grid templates.
         let grid = app.collectionViews["templateGalleryGrid"]
@@ -107,7 +108,8 @@ final class TemplateGalleryUITests: XCTestCase {
         app.launch()
 
         app.buttons["templatesButton"].tap()
-        XCTAssertTrue(app.navigationBars["Templates"].waitForExistence(timeout: 5), "Gallery pushes")
+        XCTAssertTrue(app.navigationBars["Collage Templates"].waitForExistence(timeout: 5),
+                      "Gallery pushes")
 
         // The Minimal chip isolates the offset-duo design, which doesn't match
         // any stock grid — it must open through the `.template` layout path.

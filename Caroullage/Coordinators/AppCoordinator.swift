@@ -104,7 +104,14 @@ final class AppCoordinator {
             // gets the outline-to-filled treatment: a plain house that fills in
             // when you are there. The rest stay filled — one moving part, not four.
             (home, tabItem("Home", "house", selected: "house.fill", "homeTab")),
-            (templates, tabItem("Templates", "rectangle.3.group.fill", "templatesButton")),
+            // "Collage", not "Templates". The tab beside it is named for a
+            // FORMAT while both of these are template galleries — named on two
+            // different axes they cannot be read as a set, and nothing told a
+            // user that "Templates" excluded carousel templates. The word
+            // Templates moves into both galleries' nav titles, where it earns
+            // its place. A raw literal like its three siblings; localizing one
+            // of four would add an inconsistency rather than remove one.
+            (templates, tabItem("Collage", "rectangle.3.group.fill", "templatesButton")),
             // Carousel sits mid-bar, where the thumb lands, because it is the
             // app's signature format. Projects is the archive you visit least, so
             // it takes the edge.
