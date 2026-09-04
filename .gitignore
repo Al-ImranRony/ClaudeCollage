@@ -71,3 +71,6 @@ coverage/
 # Logs
 *.log
 .gstack/
+
+# Superpowers brainstorming session artifacts
+.superpowers/
