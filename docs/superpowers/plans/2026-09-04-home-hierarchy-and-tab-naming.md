@@ -18,6 +18,7 @@
 |---|---|---|
 | `Caroullage/Features/Home/HomeViewController.swift` | Home screen: builds and owns the section stack | reorder `setupLayout()`; rewrite two doc comments |
 | `Caroullage/Coordinators/AppCoordinator.swift` | builds the tab set | one tab title |
+| `Caroullage/Features/Home/AppTabBarController.swift` | the tab shell | one line of an ASCII diagram (added after Task 1's review) |
 | `Caroullage/Features/TemplateGallery/TemplateGalleryViewController.swift` | collage template gallery | nav title + two comments |
 | `Caroullage/Features/CarouselGallery/CarouselGalleryViewController.swift` | carousel template gallery | nav title + one comment |
 | `CaroullageUITests/UI/HomeShowcaseUITests.swift` | Home structure tests | **two new order tests** |
@@ -557,6 +558,28 @@ with:
 The `prefersLargeTitles` comment below it already says the tab bar "already says
 'Carousel'", which is still true. Leave it.
 
+- [ ] **Step 5b: Fix the tab bar diagram in the shell**
+
+Found by Task 1's quality review; this file is not otherwise part of the rename, and would
+have been missed. `Caroullage/Features/Home/AppTabBarController.swift:12` draws the bar as
+an ASCII diagram that this rename makes wrong — and it is **already** wrong about the
+order, which is `Home, Templates, Carousel, Projects` per `AppCoordinator.swift:106-112`.
+
+Replace:
+
+```swift
+//      ( Home | Templates | Projects | Carousel )
+```
+
+with:
+
+```swift
+//      ( Home | Collage | Carousel | Projects )
+```
+
+Fix only that line. The surrounding paragraphs about Liquid Glass and the floating pill are
+still accurate and must not be touched.
+
 - [ ] **Step 6: Run the tests to verify they pass**
 
 ```bash
@@ -570,7 +593,7 @@ visits every tab and then re-checks all four labels, which is exactly the `title
 - [ ] **Step 7: Commit**
 
 ```bash
-git add Caroullage/Coordinators/AppCoordinator.swift Caroullage/Features/TemplateGallery/TemplateGalleryViewController.swift Caroullage/Features/CarouselGallery/CarouselGalleryViewController.swift CaroullageUITests/UI/TabBarShellUITests.swift CaroullageUITests/UI/TemplateGalleryUITests.swift CaroullageUITests/UI/CarouselTabUITests.swift CaroullageUITests/UI/VisualWalkthroughUITests.swift CaroullageUITests/UI/PaywallUITests.swift
+git add Caroullage/Coordinators/AppCoordinator.swift Caroullage/Features/Home/AppTabBarController.swift Caroullage/Features/TemplateGallery/TemplateGalleryViewController.swift Caroullage/Features/CarouselGallery/CarouselGalleryViewController.swift CaroullageUITests/UI/TabBarShellUITests.swift CaroullageUITests/UI/TemplateGalleryUITests.swift CaroullageUITests/UI/CarouselTabUITests.swift CaroullageUITests/UI/VisualWalkthroughUITests.swift CaroullageUITests/UI/PaywallUITests.swift
 git commit -m "$(cat <<'EOF'
 feat(step07): the Templates tab becomes Collage
 
