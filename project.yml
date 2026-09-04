@@ -35,6 +35,28 @@ settings:
     MARKETING_VERSION: "1.0.0"
     GENERATE_INFOPLIST_FILE: NO
     ENABLE_MODULE_VERIFIER: YES
+    # Localization extraction. Without this, swiftc emits no .stringsdata, so the
+    # String Catalog never learns about keys added after it was last hand-edited —
+    # they fall back to their literal, and an otherwise-translated ja/de/ar build
+    # shows English. Nothing fails in en, which is why this drifted unnoticed until
+    # 55 of the app's keys were missing.
+    #
+    # CAUTION: this setting alone does NOT update Localizable.xcstrings. It only
+    # makes the compiler EMIT .stringsdata; the write-back into the catalog is done
+    # by Xcode.app, and `xcodebuild` never does it. A command-line or CI build will
+    # therefore keep drifting silently. After adding or changing a localized string,
+    # build once and then merge the extracted keys in by hand:
+    #
+    #   xcrun xcstringstool sync Caroullage/Resources/Localizable.xcstrings \
+    #     $(find "$(xcodebuild -project Caroullage.xcodeproj -scheme Caroullage \
+    #       -showBuildSettings 2>/dev/null | awk '/ OBJROOT =/{print $3}')" \
+    #       -name '*.stringsdata' | sed 's/^/--stringsdata /')
+    #
+    # Omitting --skip-marking-strings-stale lets sync flag keys no longer present in
+    # source; check what it marks before deleting, since a key can go stale merely
+    # because its format specifier changed (%@ -> %lld) and its translations then
+    # need moving to the new key rather than dropping.
+    SWIFT_EMIT_LOC_STRINGS: YES
     # Signing team. The .xcodeproj is gitignored and XcodeGen rewrites it wholesale on every
     # `xcodegen generate`, so this line is the ONLY durable home for the team — a team picked
     # by hand in Xcode's Signing pane is erased by the very next regeneration.
