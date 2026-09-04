@@ -123,8 +123,14 @@ and the word *Templates* moves to the nav titles, where it tells a user what the
 looking at once inside. The carousel side is included because the parallelism only pays off
 if both screens introduce themselves the same way.
 
-Use `String(localized:)` for all three, matching the house style. The collage tab title and
-nav title are currently raw literals.
+Localization follows each string's own neighbours rather than one blanket rule:
+
+- Both **nav titles** become `String(localized:)`. The carousel gallery already uses that
+  form; the collage gallery's raw `"Templates"` is the odd one out.
+- The **tab title** stays a raw literal. `"Home"`, `"Carousel"` and `"Projects"` are all raw
+  literals passed to `tabItem(_:_:selected:_:)`, and localizing one of four would introduce
+  an inconsistency rather than remove one. Localizing all four tab titles is a reasonable
+  follow-up, but it is not this change.
 
 ### Accessibility identifiers stay unchanged
 
