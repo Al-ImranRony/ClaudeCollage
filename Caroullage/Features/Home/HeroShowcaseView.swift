@@ -2,12 +2,12 @@
 //  HeroShowcaseView.swift
 //  Caroullage
 //
-//  Step 07 — the thing you see first.
+//  Step 07 — the app's case, made in one card.
 //
 //  Home used to open on a row of empty layout schematics, which told a new user
 //  what the app is BUILT of rather than what it MAKES. This card does the
 //  opposite: one finished, photo-real piece of work at a time, cycling slowly, so
-//  the first screen is a portfolio rather than a parts bin. Every page is a real
+//  Home argues with a portfolio rather than a parts bin. Every page is a real
 //  template rendered through the real renderer, and tapping one opens exactly
 //  that structure with the photo zones empty — the promise is structural, not
 //  aspirational.

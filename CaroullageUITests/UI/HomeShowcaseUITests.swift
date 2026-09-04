@@ -31,12 +31,12 @@ final class HomeShowcaseUITests: XCTestCase {
 
     /// Scrolls Home until the WHOLE of `element` is on screen.
     ///
-    /// `isHittable` is not enough here, and the difference is not academic: the
-    /// Video pillar lands with its top edge just above the fold, so it reports
-    /// itself hittable while its centre — the point `tap()` synthesises — sits
-    /// below the tab bar. The tap then lands on nothing and the test fails
-    /// blaming the route. Requiring the full frame, with the tab bar's height
-    /// kept clear at the bottom, is what makes a tap mean what it says.
+    /// `isHittable` is not enough here, and the difference is not academic: a
+    /// strip can land with its top edge just clear of the tab bar while its
+    /// centre — the point `tap()` synthesises — still sits underneath it. The
+    /// tap then lands on nothing and the test fails blaming the route.
+    /// Requiring the full frame, with the tab bar's height kept clear at the
+    /// bottom, is what makes a tap mean what it says.
     @MainActor
     private func reveal(_ element: XCUIElement, in app: XCUIApplication, swipes: Int = 6) {
         let tabBarInset: CGFloat = 96
@@ -106,17 +106,27 @@ final class HomeShowcaseUITests: XCTestCase {
         let hero = app.collectionViews["heroShowcase"]
         XCTAssertTrue(hero.waitForExistence(timeout: 10), "Hero showcase is on Home")
 
-        // The section hides itself entirely when photo access is denied, and a
-        // simulator can be in that state — that is a skip, not a failure.
+        // Auth-independent, and deliberately above the skip below: the catalog
+        // follows the hero whether or not there is anything to suggest, and
+        // without this the whole second half of the reorder rests on a test that
+        // a denied simulator never runs.
+        let photoCollages = app.staticTexts["Photo Collages"]
+        XCTAssertTrue(photoCollages.exists, "The Photo Collages header is on Home")
+        XCTAssertLessThanOrEqual(hero.frame.maxY, photoCollages.frame.minY,
+                                 "The catalog strips follow the hero")
+
+        // `waitForExistence`, not `exists`: on `.authorized` the section is
+        // unhidden from inside `loadSuggestions()`'s async Task, so reading it in
+        // the same runloop turn the hero appeared in races the continuation and
+        // skips a test that should have run. The message stays vague on purpose —
+        // three different states hide this section, and the test cannot tell
+        // which one it is looking at.
         let suggested = app.staticTexts["Suggested For You"]
-        try XCTSkipUnless(suggested.exists,
-                          "Photo access is denied on this simulator, so the section is hidden")
+        try XCTSkipUnless(suggested.waitForExistence(timeout: 5),
+                          "Suggestions are hidden here — photo access is off, or nothing was analysable")
 
         XCTAssertGreaterThanOrEqual(suggested.frame.minY, hero.frame.maxY,
                                     "Suggested For You follows the hero")
-
-        let photoCollages = app.staticTexts["Photo Collages"]
-        XCTAssertTrue(photoCollages.exists, "The Photo Collages header is on Home")
         XCTAssertLessThanOrEqual(suggested.frame.maxY, photoCollages.frame.minY,
                                  "…and precedes the catalog strips")
     }

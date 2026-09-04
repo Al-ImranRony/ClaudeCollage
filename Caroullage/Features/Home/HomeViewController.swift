@@ -7,12 +7,12 @@
 //  The screen it replaced previewed templates as empty layout SCHEMATICS and led
 //  with four icon tiles. That is an honest picture of the app's structure and a
 //  terrible picture of its output: it reads as a dev tool, and it asks a first-run
-//  user to imagine the result instead of showing it. So Home now opens on finished
-//  work — a rotating hero card and three strips of photo-real collages dressed in
-//  bundled sample photography — and every one of them is rendered through the SAME
-//  `CollageRenderer` the editor and the exporter use. Tapping one opens exactly
-//  that structure with the photo zones EMPTY, so the picture on Home is a promise
-//  the editor can keep rather than marketing art.
+//  user to imagine the result instead of showing it. Home now shows finished
+//  work instead — a rotating hero card and three strips of photo-real collages
+//  dressed in bundled sample photography — and every one of them is rendered
+//  through the SAME `CollageRenderer` the editor and the exporter use. Tapping
+//  one opens exactly that structure with the photo zones EMPTY, so the picture
+//  on Home is a promise the editor can keep rather than marketing art.
 //
 //  Section order is the argument the screen makes, top to bottom: start here (the
 //  quick-start chips) → here is what this app makes (hero) → here is one made from
@@ -72,8 +72,12 @@ final class HomeViewController: UIViewController {
     // MARK: - Showcase geometry
 
     /// A showcase card is portrait-ish (4:5), which is what most of the catalog
-    /// is. Sized against the fold budget below rather than picked: 176pt is what
-    /// is left for a complete card once the hero has taken its share.
+    /// is. 176pt is inherited from the pre-reorder fold budget, not derived from
+    /// the one in `heroAspectRatio` below — it was sized as what was left for a
+    /// complete card once the hero had taken its share, back when the first
+    /// strip still lived above the fold. The strips moved below the fold in the
+    /// reorder; this number did not need to move with them, so the catalog kept
+    /// the size it was tuned to before.
     private static let cardHeight: CGFloat = 176
     private static let cardWidth: CGFloat = 140
     /// A carousel's preview is three pages laid side by side, so its card is
@@ -100,21 +104,29 @@ final class HomeViewController: UIViewController {
     /// runs the suggestions 614 → 710, against a floating "Start Editing" pill
     /// whose top edge is around 702. The strip's last 8pt tuck under it, showing
     /// 88 of 96 — deliberate, and the same cue this budget has always used:
-    /// content that peeks invites a scroll, content fully hidden does not.
+    /// content that peeks invites a scroll, content fully hidden does not. (96pt
+    /// is the section's taller state; `.notDetermined` hides `suggestionsStrip`
+    /// and shows the ~60pt `enableSuggestionsButton` instead, so a first-run
+    /// device clears the pill with room to spare, never less than this budget
+    /// assumes.)
     ///
-    /// The ratio did NOT have to move when the chips took the top. The 103pt they
-    /// cost came out of the catalog strips, which are below the fold now by
-    /// design; everything the first screen has to prove — you can start here,
-    /// this is what it makes, here is one from your own photos — still lands
-    /// above the pill.
+    /// The ratio did NOT have to move when the chips took the top. What moved
+    /// down came out of the catalog strips, which are below the fold now by
+    /// design: 127pt, not merely the chip section's own 103 (26 + 12 + 65) — the
+    /// chips also added a 24pt `contentStack.spacing` above the hero that the old
+    /// stack spent between the hero and the first strip's header instead. Either
+    /// way, everything the first screen has to prove — you can start here, this
+    /// is what it makes, here is one from your own photos — still lands above
+    /// the pill.
     ///
     /// This budget also assumed the 168pt LARGE-title block until the compact
     /// title freed 62pt (see `viewDidLoad`), and the ratio did not move for that
     /// either.
     ///
-    /// It was 1.15, which put the hero's bottom at 602pt and the first strip's
-    /// cards half under the tab bar: a first screen that showed ONE template and
-    /// no evidence the app also makes video or carousels.
+    /// It was 1.15 before the chips moved up, which put the hero's bottom at
+    /// 602pt and the first strip's cards half under the tab bar: a first screen
+    /// that showed ONE template and no evidence the app also makes video or
+    /// carousels.
     ///
     /// Still the focal point at 370 x 311: the hero is two and a half times the
     /// width of a strip card and more than a third of the screen's height.
@@ -164,14 +176,12 @@ final class HomeViewController: UIViewController {
         navigationItem.title = "Caroullage"
         // Compact, not large. The large title's block is 168pt on an iPhone 17 —
         // a fifth of the screen spent telling a user who just opened the app what
-        // the app is called. It also pushed "Video Collages" to 749pt, dead centre
-        // of the floating "Start Editing" pill (728–774), so the second pillar
-        // announced itself with its title struck through by a button.
+        // the app is called, before a single section of content shows.
         //
-        // Dropping to the standard bar returns 62pt to the content: the header
-        // clears the pill with 15pt to spare and its cards peek beneath, which is
-        // the invitation the peek was always meant to be. The hero and the strips
-        // keep the sizes they were tuned to — see `heroAspectRatio`.
+        // Dropping to the standard bar returns 62pt to the content. The fold
+        // budget in `heroAspectRatio` is built on top of that 62pt already being
+        // back; choosing large titles again would push its whole budget down by
+        // that much, not just the hero.
         //
         // The bar still prefers large titles for anything pushed onto it; this
         // screen opts out the way the three editors already do.
@@ -533,6 +543,8 @@ final class HomeViewController: UIViewController {
 
         // First, deliberately. This is an editor, not a feed: the four doors into
         // a format lead, and the showcase argues its case immediately below them.
+        // The order is enforced, not just described here — see
+        // `testCreateNewLeadsTheScreenAboveTheHero`.
         contentStack.addArrangedSubview(makeQuickStartSection())
 
         let heroSection = makeHeroSection()
@@ -627,9 +639,10 @@ final class HomeViewController: UIViewController {
         return section
     }
 
-    /// The four Step 04.5 quick-start tiles, compressed into one scrolling row of
-    /// chips. They keep their accessibility identifiers and their closures: this
-    /// is the same four doors, taking a tenth of the space they used to.
+    /// The four Step 04.5 quick-start tiles, compressed into one row of chips —
+    /// NOT a scrolling one; see the comment on `row` below for why. They keep
+    /// their accessibility identifiers and their closures: this is the same four
+    /// doors, taking a tenth of the space they used to.
     private func makeQuickStartSection() -> UIStackView {
         // "Create New" over "Start Something": the row is the four things this
         // app makes, and a section that lists them should say so plainly.
