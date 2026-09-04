@@ -272,7 +272,7 @@ final class HomeViewController: UIViewController {
     ///
     /// Narrowed by an authored list rather than by "everything the manifest
     /// dresses". That older rule made Home's curation a side effect of which
-    /// templates happened to have sample photography, and once the Templates tab
+    /// templates happened to have sample photography, and once the Collage tab
     /// went photo-real ALL thirty-three are dressed — which would have turned
     /// this strip into the whole catalog without anyone deciding to.
     ///
