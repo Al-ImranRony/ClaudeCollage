@@ -78,11 +78,16 @@ public extension LinearGradient {
     /// The chromatic ramp — `accent` → `accentFar`, the same pair the app icon
     /// paints its collage cells with.
     ///
-    /// A deliberate exception to "ink is chrome", and the only one: onboarding
-    /// is the app before there is any content in it, so there is nothing for
-    /// ink to be restrained *against* and a monochrome first run reads austere
-    /// rather than assured. Everywhere past onboarding, `themeBrand` is the
-    /// gradient — the ink takes over exactly when the photographs arrive.
+    /// The deliberate exception to "ink is chrome", and the only one. It is
+    /// drawn around what a screen is *for*, not where it sits in the flow: the
+    /// marketing surfaces — onboarding and the paywall — are the app talking
+    /// about itself, with no content of their own, so there is nothing for ink
+    /// to be restrained against and monochrome reads austere rather than
+    /// assured. The paywall is on this side of the line even though the Pro
+    /// badge can open it mid-session, because it is selling either way.
+    ///
+    /// Every surface where the user is actually working on something takes
+    /// `themeBrand` — the ink starts exactly where the photographs do.
     ///
     /// Both stops carry `textOnAccent`; see `Theme.Color.accentFar` for why the
     /// ramp reverses direction between appearances.

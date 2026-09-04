@@ -53,11 +53,11 @@ public enum Theme {
 
         /// The far end of the spark ramp — `accent` → `accentFar`.
         ///
-        /// The app's chrome is ink, but the screens a user meets *before* the
-        /// app — onboarding — carry the colour instead. A first run with no hue
-        /// in it reads austere rather than confident, and there is no content
-        /// on those screens for ink chrome to be restrained against; the
-        /// restraint only means something once photographs are on screen.
+        /// The app's chrome is ink, but the screens that *sell* the app —
+        /// onboarding and the paywall — carry the colour instead. Ink chrome is
+        /// restraint against content, and neither screen has any: the restraint
+        /// only means something once photographs are on screen, and without
+        /// them it reads austere rather than confident.
         ///
         /// It reverses direction between appearances, which looks like a
         /// mistake and is not. `textOnAccent` inverts — white in light, near-

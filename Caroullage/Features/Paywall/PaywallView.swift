@@ -83,7 +83,7 @@ struct PaywallView: View {
             ForEach(Array(Self.heroCards.enumerated()), id: \.offset) { index, card in
                 ZStack {
                     RoundedRectangle(cornerRadius: Theme.Radius.xl, style: .continuous)
-                        .fill(LinearGradient.themeBrand())
+                        .fill(LinearGradient.themeSpark())
                     VStack(spacing: Theme.Spacing.xs) {
                         Image(systemName: card.symbol)
                             .font(.system(size: 46, weight: .semibold))
@@ -257,7 +257,7 @@ struct PaywallView: View {
                     }
                 }) {
                     ZStack {
-                        LinearGradient.themeBrand(startPoint: .leading, endPoint: .trailing)
+                        LinearGradient.themeSpark(startPoint: .leading, endPoint: .trailing)
                         if model.isPurchasing {
                             ProgressView().tint(Color.themeTextOnAccent)
                         } else {
