@@ -80,6 +80,25 @@ final class HomeViewController: UIViewController {
     /// the size it was tuned to before.
     private static let cardHeight: CGFloat = 176
     private static let cardWidth: CGFloat = 140
+
+    /// The gap at the two seams around the suggestions section, overriding
+    /// `contentStack`'s uniform `Spacing.xl` (24pt) for those two only — see the
+    /// `setCustomSpacing` calls in `setupLayout`.
+    ///
+    /// At the stack's default 24pt the "Photo Collages" header landed ON the
+    /// floating "Start Editing" pill rather than behind it: measured on an
+    /// iPhone 17, the header ran 730.3 → 756.7pt against a pill whose top edge
+    /// is 733.0. The pill cut the header mid-word — the first screen read
+    /// "Photo Coll ( + Start Editing )" with "See All" stranded to its right. A
+    /// CARD peeking under the pill reads as "scroll for more"; a word cut in
+    /// half just reads as broken.
+    ///
+    /// The header has to come up about 32pt to clear, and one 24pt seam cannot
+    /// give that much — the first attempt at this used a NEGATIVE spacing on the
+    /// single seam below the suggestions, which bought the pixels by overlapping
+    /// the header onto the card above it. Splitting the cost across BOTH seams
+    /// keeps every value positive and nothing overlapping.
+    private static let foldSeamSpacing: CGFloat = 8
     /// A carousel's preview is three pages laid side by side, so its card is
     /// half again as wide: at photo-card width the centre crop shows one page and
     /// the strip stops saying the only thing it exists to say.
@@ -100,15 +119,41 @@ final class HomeViewController: UIViewController {
     ///   ---
     ///   = 552 at 0.84, where H is 311.
     ///
-    /// A further 24 spacing + 26 "Suggested For You" header + 12 + a 96pt strip
-    /// runs the suggestions 614 → 710, against a floating "Start Editing" pill
-    /// whose top edge is around 702. The strip's last 8pt tuck under it, showing
-    /// 88 of 96 — deliberate, and the same cue this budget has always used:
-    /// content that peeks invites a scroll, content fully hidden does not. (96pt
-    /// is the section's taller state; `.notDetermined` hides `suggestionsStrip`
-    /// and shows the shorter `enableSuggestionsButton` state instead, so a
-    /// first-run device clears the pill with room to spare, never less than
-    /// this budget assumes.)
+    /// Below the hero the stack narrows to `foldSeamSpacing` (8pt) at both
+    /// seams around the suggestions — see that constant for why.
+    ///
+    /// The floating "Start Editing" pill's top edge is **733**, derived from the
+    /// code rather than guessed: `AppTabBarController` computes
+    /// `plusY = tabBar.frame.minY - barGap(12) - plusHeight(46)`, which on an
+    /// 874pt screen with a stock 83pt bar is `791 - 58 = 733`.
+    ///
+    /// Screenshotted on an iPhone 17 in the `.notDetermined` state, the first
+    /// screen ends with the "Photo Collages" header and its "See All" a little
+    /// under 20pt clear of that edge, and the pill overlapping the strip's CARDS
+    /// below them — the "peeks below the fold" cue this budget relies on
+    /// everywhere else. Deliberately no per-row breakdown here: the suggestions
+    /// section's height is not a constant (see below), so a table would be
+    /// inventing precision the screen does not have.
+    ///
+    /// This block previously claimed the pill sat at 702 and that the
+    /// suggestions strip tucked its last 8pt under it, "showing 88 of 96". Both
+    /// were wrong. 702 was never derived from anything — the comment this text
+    /// replaced said 728 — and no state of this screen produces that peek: the
+    /// suggestions clear the pill outright in every state. What the pill DID
+    /// overlap, at the stack's uniform 24pt spacing, was the "Photo Collages"
+    /// header, which it cut mid-word.
+    ///
+    /// ONE STATE HERE IS UNVERIFIED. The suggestions section has two heights:
+    /// the `enableSuggestionsButton` card, and a fixed 96pt `suggestionsStrip`
+    /// once access is granted AND something is analysable (`.denied` hides the
+    /// section outright, which moves the header far clear). The strip is the
+    /// taller of the two, so it eats into that clearance — and
+    /// `simctl privacy grant photos` does not reach what `photoAccessProvider`
+    /// reads, so that state could not be put on screen to measure. Treat it as
+    /// unmeasured rather than fine. The durable cure is to give both states the
+    /// same height so the fold stops depending on a runtime permission; that is
+    /// a design change to the suggestions section and is deliberately not made
+    /// here.
     ///
     /// The ratio did NOT have to move when the chips took the top. The hero
     /// itself starts 127pt lower than it used to — not merely the chip
@@ -551,12 +596,14 @@ final class HomeViewController: UIViewController {
         let heroSection = makeHeroSection()
         self.heroSection = heroSection
         contentStack.addArrangedSubview(heroSection)
+        contentStack.setCustomSpacing(Self.foldSeamSpacing, after: heroSection)
 
         // Personalized before generic. The three strips below are a catalog, and
         // a catalog has two tabs of its own; this is the one thing only Home has.
         let suggestionsSection = makeSuggestionsSection()
         self.suggestionsSection = suggestionsSection
         contentStack.addArrangedSubview(suggestionsSection)
+        contentStack.setCustomSpacing(Self.foldSeamSpacing, after: suggestionsSection)
 
         let photoSection = makeStripSection(
             title: String(localized: "Photo Collages"), strip: photoStrip,
