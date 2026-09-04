@@ -106,18 +106,19 @@ final class HomeViewController: UIViewController {
     /// 88 of 96 — deliberate, and the same cue this budget has always used:
     /// content that peeks invites a scroll, content fully hidden does not. (96pt
     /// is the section's taller state; `.notDetermined` hides `suggestionsStrip`
-    /// and shows the ~60pt `enableSuggestionsButton` instead, so a first-run
-    /// device clears the pill with room to spare, never less than this budget
-    /// assumes.)
+    /// and shows the shorter `enableSuggestionsButton` state instead, so a
+    /// first-run device clears the pill with room to spare, never less than
+    /// this budget assumes.)
     ///
-    /// The ratio did NOT have to move when the chips took the top. What moved
-    /// down came out of the catalog strips, which are below the fold now by
-    /// design: 127pt, not merely the chip section's own 103 (26 + 12 + 65) — the
-    /// chips also added a 24pt `contentStack.spacing` above the hero that the old
-    /// stack spent between the hero and the first strip's header instead. Either
-    /// way, everything the first screen has to prove — you can start here, this
-    /// is what it makes, here is one from your own photos — still lands above
-    /// the pill.
+    /// The ratio did NOT have to move when the chips took the top. The hero
+    /// itself starts 127pt lower than it used to — not merely the chip
+    /// section's own 103 (26 + 12 + 65), but that plus a 24pt
+    /// `contentStack.spacing` above the hero that the old stack spent between
+    /// the hero and the first strip's header instead. The catalog strips moved
+    /// further still, past Suggested For You as well, but that shift is below
+    /// the fold by design and costs the first screen nothing it has to prove:
+    /// you can start here, this is what it makes, here is one from your own
+    /// photos — all of it still lands above the pill.
     ///
     /// This budget also assumed the 168pt LARGE-title block until the compact
     /// title freed 62pt (see `viewDidLoad`), and the ratio did not move for that

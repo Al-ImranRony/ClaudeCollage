@@ -4,11 +4,12 @@
 //
 //  Step 07 — Home's header.
 //
-//  Losing the large title bought 62pt back for the content below it — see
-//  `heroAspectRatio` in HomeViewController for where that space goes — but it
-//  left the top of the app reading as a system screen label: a small centred
-//  word over a transparent bar. This is the front door of a creative app, and
-//  it should say whose app it is and what the app sells.
+//  Losing the large title bought 62pt back for the content below it — see the
+//  comment on `navigationItem.largeTitleDisplayMode` in HomeViewController's
+//  `viewDidLoad` for where that space goes — but it left the top of the app
+//  reading as a system screen label: a small centred word over a transparent
+//  bar. This is the front door of a creative app, and it should say whose app
+//  it is and what the app sells.
 //
 //  Two pieces, both leaning on what the design system already has: the brand
 //  lockup (the icon's own mark and glyph, so the icon, the onboarding splash

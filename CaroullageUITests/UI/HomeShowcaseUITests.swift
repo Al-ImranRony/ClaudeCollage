@@ -119,8 +119,8 @@ final class HomeShowcaseUITests: XCTestCase {
         // unhidden from inside `loadSuggestions()`'s async Task, so reading it in
         // the same runloop turn the hero appeared in races the continuation and
         // skips a test that should have run. The message stays vague on purpose —
-        // three different states hide this section, and the test cannot tell
-        // which one it is looking at.
+        // two states hide this section, denied access and an empty result, and
+        // from out here they are indistinguishable.
         let suggested = app.staticTexts["Suggested For You"]
         try XCTSkipUnless(suggested.waitForExistence(timeout: 5),
                           "Suggestions are hidden here — photo access is off, or nothing was analysable")
