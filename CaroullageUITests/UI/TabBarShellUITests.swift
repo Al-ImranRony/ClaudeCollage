@@ -199,11 +199,16 @@ final class TabBarShellUITests: XCTestCase {
     }
 
     @MainActor
-    func testHomeQuickStartTilesReplaceTheOldNavBarButtons() {
+    func testHomeQuickStartChipsReplaceTheOldNavBarButtons() {
+        // Step 04.5 moved these off the nav bar, where the icons were too small
+        // to hit reliably. Step 07 shrank them from full-width `QuickStartTile`
+        // rows to the private `QuickStartChip` and kept every identifier and
+        // every closure, which is why this test came through that rewrite
+        // without an edit — identity is the contract here, not the shape.
         let app = launch()
-        XCTAssertTrue(app.buttons["newProjectButton"].waitForExistence(timeout: 5), "Grid tile")
-        XCTAssertTrue(app.buttons["polygonQuickStartButton"].exists, "Shapes tile")
-        XCTAssertTrue(app.buttons["videoCollageButton"].exists, "Video tile")
+        XCTAssertTrue(app.buttons["newProjectButton"].waitForExistence(timeout: 5), "Grid chip")
+        XCTAssertTrue(app.buttons["polygonQuickStartButton"].exists, "Shapes chip")
+        XCTAssertTrue(app.buttons["videoCollageButton"].exists, "Video chip")
 
         app.buttons["polygonQuickStartButton"].tap()
         XCTAssertTrue(app.navigationBars["Grid Collage"].waitForExistence(timeout: 8),
@@ -215,9 +220,14 @@ final class TabBarShellUITests: XCTestCase {
     @MainActor
     func testHomeOffersCarouselLikeTheStartEditingSheetDoes() {
         // Home's "Create New" and the "+" sheet deliberately overlap — that is
-        // why `QuickStartTile` was lifted into the component layer. Carousel joined
-        // the sheet in Step 06 and Home was left a format short, so the app's
-        // signature output was missing from one of its two front doors.
+        // why `QuickStartTile` was lifted into the component layer in Step 05b.
+        // Step 07 took Home off that shared row (it draws `QuickStartChip` now),
+        // so the two front doors are no longer the same code and this test is
+        // what holds them together. It exists because the drift already
+        // happened once: Carousel joined the sheet in Step 06 and Home was left
+        // a format short, so the app's signature output was missing from one of
+        // its two entrances until both were fixed in the same commit as this
+        // assertion.
         let app = launch()
         let carousel = app.buttons["carouselQuickStartButton"]
         XCTAssertTrue(carousel.waitForExistence(timeout: 5),

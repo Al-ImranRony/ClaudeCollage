@@ -9,10 +9,13 @@
 //  themed. It is the most-tapped control in the shell and it looked like a
 //  debug menu.
 //
-//  It now wears the same `QuickStartTile` rows as Home's "Create New",
-//  which is the whole reason that row was lifted into the component layer — the
+//  It now wears `QuickStartTile` rows. Those were lifted into the component
+//  layer so this sheet and Home's "Create New" could be cut from one part — the
 //  two surfaces offer overlapping choices and should not look like unrelated
-//  features.
+//  features. Step 07 rebuilt Home as a showcase and shrank its copy to the
+//  private `QuickStartChip`, so this sheet is the tile's only caller now and
+//  the overlap survives as a convention between two screens rather than as
+//  shared code.
 //
 //  The accessibility identifiers are unchanged from the action-sheet version, so
 //  the existing shell tests keep working; only their `app.sheets` qualifier had

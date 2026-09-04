@@ -65,7 +65,7 @@ final class VisualWalkthroughUITests: XCTestCase {
 
         tabBar.buttons["homeTab"].tap()
         let grid = app.buttons["newProjectButton"]
-        XCTAssertTrue(grid.waitForExistence(timeout: 5), "Grid quick-start tile")
+        XCTAssertTrue(grid.waitForExistence(timeout: 5), "Grid quick-start chip")
         grid.tap()
         XCTAssertTrue(app.navigationBars["Grid Collage"].waitForExistence(timeout: 8), "Grid editor")
         capture("05-grid-editor", of: app)
