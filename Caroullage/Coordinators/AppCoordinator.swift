@@ -111,6 +111,15 @@ final class AppCoordinator {
             // Templates moves into both galleries' nav titles, where it earns
             // its place. A raw literal like its three siblings; localizing one
             // of four would add an inconsistency rather than remove one.
+            // Weakest axis, acknowledged rather than dodged: the app also makes
+            // VIDEO collages, and they live in neither middle tab — only a Home
+            // strip and the "Video" create chip — so "Collage" over-promises
+            // exactly where "Templates" under-promised. Accepted deliberately;
+            // see the design spec's "Known trade-off, accepted" section.
+            // The identifier stays `templatesButton`, not `collageButton`: it
+            // is not user-visible, and renaming it (plus the matching
+            // `seeAllTemplatesButton` in HomeViewController.swift:563) would
+            // touch roughly eight test files for no behavioural gain.
             (templates, tabItem("Collage", "rectangle.3.group.fill", "templatesButton")),
             // Carousel sits mid-bar, where the thumb lands, because it is the
             // app's signature format. Projects is the archive you visit least, so

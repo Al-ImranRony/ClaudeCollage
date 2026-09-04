@@ -69,9 +69,7 @@ final class TemplateGalleryViewController: UIViewController {
         super.viewDidLoad()
         // `navigationItem.title`, NOT `title`: the latter also rewrites this
         // tab's bar label. The two no longer say the same thing — the tab is
-        // "Collage", this screen is "Collage Templates". This comment used to
-        // warn that the trap would survive unnoticed until someone renamed one;
-        // this is that rename, and using the safe form is why it cost nothing.
+        // "Collage", this screen is "Collage Templates". This is that rename.
         navigationItem.title = String(localized: "Collage Templates")
         view.backgroundColor = Theme.Color.background
         // Inline, not large. This used to argue the opposite — that a browse
@@ -84,7 +82,11 @@ final class TemplateGalleryViewController: UIViewController {
 
         searchController.searchResultsUpdater = self
         searchController.obscuresBackgroundDuringPresentation = false
-        searchController.searchBar.placeholder = "Search templates"
+        // Echoes the nav title on purpose. This gallery and Carousel's are a
+        // set — "Search templates" under a bar that already reads "Collage
+        // Templates" would just reintroduce, one control down, the exact
+        // ambiguity the rename was for.
+        searchController.searchBar.placeholder = String(localized: "Search collage templates")
         navigationItem.searchController = searchController
         definesPresentationContext = true
 
@@ -173,8 +175,8 @@ final class TemplateGalleryViewController: UIViewController {
 
         if ids.isEmpty {
             emptyLabel.text = forCanvas.isEmpty
-                ? "No \(selectedPreset.displayName) templates yet.\nMore are on the way!"
-                : "No templates match your filters."
+                ? String(localized: "No \(selectedPreset.displayName) collage templates yet.\nMore are on the way!")
+                : String(localized: "No collage templates match your filters.")
         }
         emptyLabel.isHidden = !ids.isEmpty
     }
@@ -196,7 +198,7 @@ final class TemplateGalleryViewController: UIViewController {
         let chip = FilterMenuChip(
             symbolName: "aspectratio",
             identifier: "canvasRatioChip",
-            accessibilityLabel: "Canvas ratio")
+            accessibilityLabel: String(localized: "Canvas ratio"))
         chip.setValue(selectedPreset.displayName)
         chip.menu = makeRatioMenu()
         chip.setContentCompressionResistancePriority(.required, for: .horizontal)

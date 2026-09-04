@@ -229,7 +229,7 @@ final class TabBarShellUITests: XCTestCase {
     }
 
     @MainActor
-    func testSeeAllSwitchesToTheTemplatesTab() {
+    func testSeeAllSwitchesToTheCollageTab() {
         let app = launch()
         let seeAll = app.buttons["seeAllTemplatesButton"]
         guard seeAll.waitForExistence(timeout: 5) else {

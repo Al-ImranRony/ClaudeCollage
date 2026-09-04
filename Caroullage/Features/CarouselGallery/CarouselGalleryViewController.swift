@@ -89,7 +89,7 @@ final class CarouselGalleryViewController: UIViewController {
 
         searchController.searchResultsUpdater = self
         searchController.obscuresBackgroundDuringPresentation = false
-        searchController.searchBar.placeholder = String(localized: "Search carousels")
+        searchController.searchBar.placeholder = String(localized: "Search carousel templates")
         // On the TEXT FIELD, not on the search bar. A search bar hosted by the
         // navigation item is not itself an element in the accessibility tree —
         // only the field inside it is, and it does not inherit its host's
@@ -108,7 +108,7 @@ final class CarouselGalleryViewController: UIViewController {
         emptyLabel.accessibilityIdentifier = "carouselGalleryEmptyLabel"
         // Constant — the catalog is bundled, so the only empty this screen has
         // is "your filters match nothing", never "you have made nothing".
-        emptyLabel.text = String(localized: "No carousels match your filters.")
+        emptyLabel.text = String(localized: "No carousel templates match your filters.")
         emptyLabel.isHidden = true
 
         filterDivider.backgroundColor = Theme.Color.separator
