@@ -536,7 +536,7 @@ final class HomeViewController: UIViewController {
         config.imagePadding = 8
         config.cornerStyle = .large
         config.baseBackgroundColor = Theme.Color.accent
-        // The wash stays the identity orange; the label on it cannot — see
+        // The wash stays the indigo; the label on it is the ink — see
         // `Theme.Color.accentStrong`.
         config.baseForegroundColor = Theme.Color.accentStrong
         config.titleAlignment = .leading

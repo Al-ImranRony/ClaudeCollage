@@ -165,8 +165,9 @@ struct CarouselTypeSelectorView: View {
                 .font(.themeHeadline)
                 .frame(maxWidth: .infinity)
                 .padding()
-                // `accentStrong`, not `accent`: this label is body-sized, and
-                // white on the identity orange is 3.1:1.
+                // `accentStrong`, not `accent`: a filled call to action is
+                // chrome, and `textOnAccent` on `accentStrong` is the pair
+                // `ThemeContrastTests` pins.
                 .background(Color.themeAccentStrong)
                 .foregroundStyle(Color.themeTextOnAccent)
                 .clipShape(RoundedRectangle(cornerRadius: 14))

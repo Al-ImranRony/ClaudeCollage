@@ -14,6 +14,8 @@
 //        writes the chosen candidate's light/dark/tinted PNGs + Contents.json
 //    swift Tools/IconGenerator/main.swift master <candidate> <out.pdf>
 //        writes the scalable vector master
+//    swift Tools/IconGenerator/main.swift brandmark <candidate> <imagesetDir>
+//        writes the nav-bar lockup's mark at 1x/2x/3x
 //
 
 import CoreGraphics
@@ -23,16 +25,25 @@ import UniformTypeIdentifiers
 
 // MARK: - Brand
 
-/// The icon palette is the app's own accent ramp, not a separate set of oranges:
-/// `Theme.Color.accentSecondary` (#F29B3C) → `Theme.Color.accentPressed`
-/// (#CC5716), which brackets `accent` (#E56828). Keeping the icon inside the ramp
-/// is what makes the home screen and the app read as one product.
+/// The icon palette is the app's own ramp, not a separate set of colours: the
+/// ground is `Theme.Color.accentStrong` (#18181B) opening to near-black, the
+/// card is white, and the collage cells are `Theme.Color.accent` (#5B54E8).
+/// Keeping the icon inside the ramp is what makes the home screen and the app
+/// read as one product.
+///
+/// It is also the app's design rule stated in a single image: an ink field, a
+/// white sheet, and one chromatic note doing all the work. An orange icon was
+/// the right mark in the wrong colours — it competed with the photographs the
+/// app exists to arrange, and on a home screen it sat in the same warm band as
+/// every other free photo utility.
 enum Brand {
-    static let warm = rgb(0xF2_9B3C)
-    static let mid = rgb(0xE5_6828)
-    static let deep = rgb(0xCC_5716)
+    static let ink = rgb(0x27_272A)
+    static let inkDeep = rgb(0x09_090B)
+    static let spark = rgb(0x6D_66F0)
+    static let sparkDeep = rgb(0x43_38CA)
+    static let sparkLift = rgb(0x8B_85F5)
     static let white = CGColor(gray: 1, alpha: 1)
-    static let paper = rgb(0xFF_FBF7)
+    static let paper = rgb(0xFA_FAFA)
 
     static func rgb(_ value: UInt32, alpha: CGFloat = 1) -> CGColor {
         CGColor(
@@ -131,13 +142,14 @@ extension CGContext {
 // MARK: - The candidates
 
 /// The three motifs put to the owner. All three say "collage + carousel"; they
-/// differ in which half of the orange-and-white identity leads.
+/// differ in which half of the ink-and-white identity leads.
 enum Candidate: Int, CaseIterable {
-    /// Orange-led. A fan of photo cards; the front card's face is a collage grid.
+    /// Ink-led. A fan of photo cards; the front card's face is a collage grid.
+    /// This is the installed mark.
     case fan = 1
-    /// Orange-led. A white asymmetric collage grid over a carousel dot row.
+    /// Ink-led. A white asymmetric collage grid over a carousel dot row.
     case gridDots = 2
-    /// White-led. An orange collage grid with the next page peeking in from the edge.
+    /// Paper-led. An indigo collage grid with the next page peeking in from the edge.
     case paperGrid = 3
 
     var name: String {
@@ -151,23 +163,30 @@ enum Candidate: Int, CaseIterable {
     func palette(_ variant: Variant) -> Palette {
         switch (self, variant) {
         case (.paperGrid, .light):
-            Palette(ground: [Brand.paper, Brand.rgb(0xFF_F0E4)], card: Brand.white,
-                    cell: [Brand.warm, Brand.deep], ghostAlpha: 0.42, shadows: true)
+            Palette(ground: [Brand.paper, Brand.rgb(0xEF_EFF2)], card: Brand.white,
+                    cell: [Brand.spark, Brand.sparkDeep], ghostAlpha: 0.42, shadows: true)
         case (_, .light):
-            // The fanned siblings sit white-on-orange, so their alpha is what
-            // decides whether the fan survives the 40pt icon. Below ~0.5 the
-            // deck collapses into a single card at that size.
-            Palette(ground: [Brand.warm, Brand.deep], card: Brand.white,
-                    cell: [Brand.warm, Brand.deep], ghostAlpha: 0.55, shadows: true)
+            // The fanned siblings sit white-on-ink, so their alpha is what
+            // decides whether the fan survives the 40pt icon. It is far lower
+            // than the 0.55 the orange ground needed: there the ghost had to
+            // separate from a mid-luminance field AND from a white front card,
+            // and it only had the top half of the range to do it in. Against
+            // near-black the whole range is available, so a third of white is
+            // already an unmistakable wing — and keeping it dark is what stops
+            // the deck reading as three equal cards instead of one card in front.
+            Palette(ground: [Brand.ink, Brand.inkDeep], card: Brand.white,
+                    cell: [Brand.spark, Brand.sparkDeep], ghostAlpha: 0.32, shadows: true)
 
         // Dark: no ground of our own. The white cards carry the shape and the
-        // orange cells carry the brand, so the mark still reads as itself.
+        // indigo cells carry the brand, so the mark still reads as itself.
+        // The cells run one step brighter here — iOS composites this over its
+        // own dark backdrop, and #4338CA against that is nearly unreadable.
         case (.gridDots, .dark), (.paperGrid, .dark):
             Palette(ground: nil, card: Brand.white,
-                    cell: [Brand.warm, Brand.mid], ghostAlpha: 0.40, shadows: false)
+                    cell: [Brand.sparkLift, Brand.spark], ghostAlpha: 0.40, shadows: false)
         case (.fan, .dark):
             Palette(ground: nil, card: Brand.white,
-                    cell: [Brand.warm, Brand.deep], ghostAlpha: 0.35, shadows: false)
+                    cell: [Brand.sparkLift, Brand.spark], ghostAlpha: 0.35, shadows: false)
 
         // Tinted: greyscale on transparent; iOS applies the user's hue to the
         // luminance, so the only job here is a clean light/dark separation.
@@ -378,6 +397,26 @@ func contentsJSON(prefix: String) -> String {
     """
 }
 
+/// The `BrandMark` image set: the same artwork at the size the navigation-bar
+/// lockup draws it.
+///
+/// It exists because `AppIcon` cannot be loaded with `UIImage(named:)`, and it
+/// is generated rather than exported by hand for the reason every other size
+/// here is — a hand-made copy drifts. This one did: the lockup stayed orange
+/// through a rebrand because nothing tied it to the icon.
+func brandMarkContentsJSON() -> String {
+    """
+    {
+      "images" : [
+        { "filename" : "brand-mark.png", "idiom" : "universal", "scale" : "1x" },
+        { "filename" : "brand-mark@2x.png", "idiom" : "universal", "scale" : "2x" },
+        { "filename" : "brand-mark@3x.png", "idiom" : "universal", "scale" : "3x" }
+      ],
+      "info" : { "author" : "xcode", "version" : 1 }
+    }
+    """
+}
+
 // MARK: - Entry point
 
 let args = CommandLine.arguments
@@ -435,6 +474,23 @@ case "master":
     ctx.endPDFPage()
     ctx.closePDF()
     print("wrote vector master to \(url.path)")
+
+case "brandmark":
+    guard let raw = Int(args[2]), let candidate = Candidate(rawValue: raw) else {
+        die("unknown candidate \(args[2])")
+    }
+    let dir = URL(fileURLWithPath: args[3])
+    try fm.createDirectory(at: dir, withIntermediateDirectories: true)
+    // 30pt, the lockup's side, at each screen scale.
+    for scale in [1, 2, 3] {
+        let image = render(candidate, .light, size: 30 * scale)
+        let suffix = scale == 1 ? "" : "@\(scale)x"
+        try writePNG(image, to: dir.appendingPathComponent("brand-mark\(suffix).png"))
+    }
+    try brandMarkContentsJSON().write(
+        to: dir.appendingPathComponent("Contents.json"), atomically: true, encoding: .utf8
+    )
+    print("installed brand mark \(candidate.name) into \(dir.path)")
 
 default:
     die("unknown command \(args[1])")

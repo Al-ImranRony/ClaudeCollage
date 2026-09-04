@@ -167,9 +167,9 @@ struct UniversalExportSheetView: View {
             }
             .foregroundStyle(selected ? Color.themeTextOnAccent : Color.themeTextPrimary)
             .frame(width: 74, height: 74)
-            // The tile carries a caption under its glyph, so the selected fill
-            // is `accentStrong` — the identity orange would leave that label at
-            // 3.1:1.
+            // The selected fill is `accentStrong` rather than the indigo: a
+            // filled pill is the segmented control's pattern, and the caption
+            // under the glyph needs `textOnAccent` on the ink to stay legible.
             .background(selected ? Color.themeAccentStrong : Color.themeSurface)
             .clipShape(RoundedRectangle(cornerRadius: 14))
         }

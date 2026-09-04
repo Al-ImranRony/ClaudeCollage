@@ -17,9 +17,9 @@ public enum ThemeSegmentedControl {
 
     /// Applies the app's segmented-control styling in place.
     ///
-    /// The selected segment carries `accentStrong`, not `accent`: its label is
-    /// body-sized, and white on the identity orange is 3.2:1 — legible as a
-    /// glyph, not as text.
+    /// The selected segment carries `accentStrong` — the ink — and its label
+    /// `textOnAccent`. That is the pair `ThemeContrastTests` pins, and a filled
+    /// segment is chrome rather than state, so the indigo stays out of it.
     public static func apply(to control: UISegmentedControl) {
         control.selectedSegmentTintColor = Theme.Color.accentStrong
         control.backgroundColor = Theme.Color.controlFill

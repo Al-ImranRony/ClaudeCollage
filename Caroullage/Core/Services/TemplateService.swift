@@ -145,7 +145,9 @@ public final class TemplateService {
     /// (`EmptyCellChrome`), so every cached thumbnail draws the old bare glyph.
     /// 4 — Step 06: the well went from warm grey to the near-white the video
     /// editor's slots use, and the outline down to a hairline.
-    private static let rendererRevision = 4
+    /// 5 — The obsidian rebrand: `cellWellChip` went from a warm grey to a
+    /// neutral one, which every cached thumbnail draws in the old warm tone.
+    private static let rendererRevision = 5
 
     /// A `maxDimension`-bounded thumbnail for the template, rendered once via the
     /// shared `CollageRenderer` and cached in memory + on disk. Photo zones show

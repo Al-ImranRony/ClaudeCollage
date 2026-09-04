@@ -29,10 +29,15 @@ import UIKit
 /// approximation of it was showing users a logo the app does not have.
 ///
 /// `AppIcon` cannot be loaded with `UIImage(named:)`, so the artwork is also
-/// published as the `BrandMark` image set. The light rendition is used in both
-/// appearances deliberately: it carries its own orange ground, so it holds the
-/// same contrast on a dark screen as on a light one, and stays the mark people
-/// already recognise from their home screen.
+/// published as the `BrandMark` image set — rendered from the same generator as
+/// the icon (`main.swift brandmark 1 <imageset>`) rather than copied by hand.
+/// It was copied by hand once, and it is why the lockup was still orange for a
+/// while after the app was not.
+///
+/// The light rendition is used in both appearances deliberately: it carries its
+/// own near-black ground, so it holds the same contrast on a dark screen as on
+/// a light one, and stays the mark people already recognise from their home
+/// screen.
 @MainActor
 final class BrandMarkView: UIImageView {
 

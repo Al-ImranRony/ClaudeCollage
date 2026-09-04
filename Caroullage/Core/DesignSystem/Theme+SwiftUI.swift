@@ -30,6 +30,7 @@ public extension Font {
 public extension Color {
     static var themeAccent: Color { Color(Theme.Color.accent) }
     static var themeAccentStrong: Color { Color(Theme.Color.accentStrong) }
+    static var themeAccentSecondary: Color { Color(Theme.Color.accentSecondary) }
     static var themeAccentSoft: Color { Color(Theme.Color.accentSoft) }
     static var themeBackground: Color { Color(Theme.Color.background) }
     static var themeSurface: Color { Color(Theme.Color.surface) }
@@ -42,4 +43,34 @@ public extension Color {
     static var themeCritical: Color { Color(Theme.Color.critical) }
     static var themeSuccess: Color { Color(Theme.Color.success) }
     static var themeWarning: Color { Color(Theme.Color.warning) }
+}
+
+public extension LinearGradient {
+
+    /// The brand gradient — the same two tokens `Theme.Color.brandGradient(for:)`
+    /// paints in UIKit.
+    ///
+    /// It exists because the SwiftUI side had no brand gradient at all, so the
+    /// surfaces that wanted one invented it. Onboarding's hero and CTA ran
+    /// `accent → accentStrong`, which was a quiet same-family darkening while
+    /// the brand was orange and became a jump from the chromatic spark to the
+    /// ink the moment it was not. One definition, in `Theme`, is the whole
+    /// point of this file.
+    ///
+    /// No trait collection, unlike the UIKit twin: a SwiftUI `Color` wrapping a
+    /// dynamic `UIColor` resolves itself, so there is nothing to hand it.
+    ///
+    /// The direction defaults to the UIKit gradient's top-leading →
+    /// bottom-trailing; a wide, short surface reads better with the horizontal
+    /// pair, which is why it is a parameter and not a constant.
+    static func themeBrand(
+        startPoint: UnitPoint = .topLeading,
+        endPoint: UnitPoint = .bottomTrailing
+    ) -> LinearGradient {
+        LinearGradient(
+            colors: [.themeAccentStrong, .themeAccentSecondary],
+            startPoint: startPoint,
+            endPoint: endPoint
+        )
+    }
 }

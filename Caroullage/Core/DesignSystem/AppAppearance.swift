@@ -15,8 +15,22 @@ public enum AppAppearance {
 
     /// Applies the app-wide tint and navigation-bar appearance. Call once, on the
     /// key window, during scene connection.
+    ///
+    /// The global tint is the ink, not the indigo.
+    ///
+    /// This is the rule the whole palette turns on: **ink is chrome, indigo is
+    /// state.** Anything that is simply *there* and tappable — a bar button, a
+    /// filled action, a segmented control's selected pill — takes
+    /// `accentStrong`. The indigo marks which thing is currently chosen: a
+    /// selected cell's stroke, the selected tab, a swatch halo, the wash under
+    /// a `.tinted()` button.
+    ///
+    /// Splitting them the other way is what left the nav bar and the tab bar
+    /// disagreeing, and it is also what makes the indigo mean something: a
+    /// colour used on every bar item is decoration, and the eye stops reading
+    /// it as "this one".
     public static func apply(to window: UIWindow) {
-        window.tintColor = Theme.Color.accent
+        window.tintColor = Theme.Color.accentStrong
         configureNavigationBar()
         // SwiftUI's `.pickerStyle(.segmented)` is a UISegmentedControl under the
         // hood, so theming the appearance proxy is the only way to reach the
@@ -48,6 +62,6 @@ public enum AppAppearance {
         proxy.standardAppearance = appearance
         proxy.scrollEdgeAppearance = appearance
         proxy.compactAppearance = appearance
-        proxy.tintColor = Theme.Color.accent
+        proxy.tintColor = Theme.Color.accentStrong
     }
 }

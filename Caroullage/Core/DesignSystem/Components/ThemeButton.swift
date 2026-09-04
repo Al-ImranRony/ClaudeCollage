@@ -11,9 +11,9 @@
 //
 //  The styles are a hierarchy, not a palette: exactly one primary per screen,
 //  secondary for the neutral alternative, tertiary for the low-stakes one, hero
-//  for the single "make something" call to action. Two orange buttons on a
+//  for the single "make something" call to action. Two filled buttons on a
 //  screen compete and neither wins, which is why `secondary` is deliberately
-//  neutral rather than a lighter orange.
+//  quiet rather than a lighter version of `primary`.
 //
 
 import UIKit
@@ -78,8 +78,9 @@ public final class ThemeButton: GradientLayerButton {
             config.baseForegroundColor = Theme.Color.accentStrong
             config.background.backgroundColor = .clear
         case .tinted:
-            // The ink is `accentStrong`, not `accent`: on a 15% wash the
-            // identity orange is 3.6:1, a legible glyph but not legible text.
+            // The ink is `accentStrong`, not `accent`: the wash is already
+            // the indigo at 15%, and indigo ink on an indigo wash is a tint on
+            // a tint. The ink reads, the wash carries the colour.
             config.baseForegroundColor = Theme.Color.accentStrong
             config.background.backgroundColor = Theme.Color.accentSoft
         case .hero:

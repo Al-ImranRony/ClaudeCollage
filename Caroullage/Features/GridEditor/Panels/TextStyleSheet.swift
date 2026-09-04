@@ -31,9 +31,13 @@ struct TextStyleSheet: View {
         ("Chalkboard", "ChalkboardSE-Regular"),
     ]
 
-    /// Preset colour swatches — neutrals, brand orange, and a few social-friendly hues.
+    /// Preset colour swatches — neutrals, the brand indigo, and a few
+    /// social-friendly hues. These colour the user's own text, not the app's
+    /// chrome, so the range matters more than the brand does; the brand is here
+    /// because people reach for it, and it replaced a second orange that was a
+    /// half-step from the amber beside it.
     private static let swatches: [String] = [
-        "#000000", "#FFFFFF", "#E86A2A", "#F29B3C", "#F5C542",
+        "#000000", "#FFFFFF", "#5B54E8", "#F29B3C", "#F5C542",
         "#2E7D5B", "#2F6FB0", "#7A4FB0", "#C0405B", "#8A8A8E",
     ]
 

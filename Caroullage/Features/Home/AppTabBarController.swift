@@ -187,9 +187,17 @@ final class AppTabBarController: UITabBarController {
         // is how a themed app loses the platform's glass without noticing.
         appearance.configureWithDefaultBackground()
 
-        // Tab labels are ~11pt, which is body text as far as contrast is
-        // concerned, so the selected state uses `accentStrong` rather than the
-        // identity orange — the latter is 3.1:1 on white.
+        // The selected tab takes `accent`, not `accentStrong`, and it is the
+        // clearest case of the palette's rule: ink is chrome, indigo is state.
+        // A selected tab is state.
+        //
+        // It is also the legible choice rather than the decorative one. Both
+        // tokens are light in dark mode, so an ink selected label beside a grey
+        // unselected one separates by luminance alone, and the bar is Liquid
+        // Glass — when bright content scrolls under it the glass brightens, and
+        // near-white on that is about 1.1:1. Indigo holds ~5:1 on white and
+        // stays itself over a photograph, which is the whole reason this token
+        // is chromatic.
         let item = UITabBarItemAppearance()
         item.normal.titleTextAttributes = [
             .font: Theme.Typography.caption,
@@ -198,16 +206,16 @@ final class AppTabBarController: UITabBarController {
         item.normal.iconColor = Theme.Color.textSecondary
         item.selected.titleTextAttributes = [
             .font: Theme.Typography.caption,
-            .foregroundColor: Theme.Color.accentStrong,
+            .foregroundColor: Theme.Color.accent,
         ]
-        item.selected.iconColor = Theme.Color.accentStrong
+        item.selected.iconColor = Theme.Color.accent
         appearance.stackedLayoutAppearance = item
         appearance.inlineLayoutAppearance = item
         appearance.compactInlineLayoutAppearance = item
 
         tabBar.standardAppearance = appearance
         tabBar.scrollEdgeAppearance = appearance
-        tabBar.tintColor = Theme.Color.accentStrong
+        tabBar.tintColor = Theme.Color.accent
         tabBar.unselectedItemTintColor = Theme.Color.textSecondary
         tabBar.accessibilityIdentifier = "mainTabBar"
     }

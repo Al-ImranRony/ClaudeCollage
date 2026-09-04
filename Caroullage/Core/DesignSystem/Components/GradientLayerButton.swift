@@ -12,7 +12,7 @@
 //  that is a sublayer at the time. A UIButton's image is not: it arrives later
 //  and, depending on how the button is configured, ends up under the gradient
 //  and simply vanishes. That is exactly what happened to the floating "+", which
-//  rendered as a plain orange disc with no glyph on it.
+//  rendered as a plain brand-coloured disc with no glyph on it.
 //
 //  Making the gradient the backing layer removes the ordering question: every
 //  subview a button ever creates draws above its own layer. A CAGradientLayer

@@ -25,57 +25,63 @@ public enum Theme {
     /// whole app themes correctly without per-call-site `traitCollection` checks.
     public enum Color {
 
-        // Brand — Claude orange. The single most important token: this is the
-        // app's identity, used brilliantly wherever an accent fits.
+        // Brand — obsidian. The single most important decision here: this
+        // app's identity is carried by ink and restraint, not by a hue.
+
+        /// The one chromatic note in the system: selection, and little else.
         ///
-/// Primary, from the owner's palette (2026-08-26).
+        /// This is a collage app, so the warm end of the spectrum belongs to
+        /// the photographs — skin, golden hour, food, wood — and chrome painted
+        /// in that family competes with the canvas it is meant to frame. The
+        /// chrome is therefore ink (`accentStrong`), and the colour that used
+        /// to be spread across every button is concentrated here instead:
+        /// selection strokes, selected-cell borders, the wash under a `.tinted()`
+        /// button, a progress tint.
         ///
-        /// The palette says #E67E22; the light value here is #E0761C, which is
-        /// the same orange about two percent darker. #E67E22 lands at 2.85:1
-        /// against the palette's white background — under the 3:1 that a fill's
-        /// own edge and any large text on it must clear — and the palette moved
-        /// the background from off-white to pure white, which is what pushed it
-        /// under. The nudge is imperceptible side by side and it keeps the
-        /// token honest about the job it does. `ThemeContrastTests` is what
-        /// caught it, the same way it caught the previous orange.
+        /// It has to stay chromatic precisely because `accentStrong` is not.
+        /// A selection stroke drawn in ink disappears into the dark regions of
+        /// a photograph, which is the one place a collage app cannot afford to
+        /// lose it. Indigo reads over any exposure, and it is clear of
+        /// `critical`, `success` and `warning`, which have already claimed the
+        /// red, green and amber families.
         ///
-        /// The dark value lifts it so it reads as the same colour on a dark
-        /// ground instead of sinking into it.
+        /// Because it now covers a few percent of the screen rather than most
+        /// of the chrome, it can be fully saturated without shouting.
         public static var accent: UIColor {
-            dynamic(light: 0xE0761C, dark: 0xF0913F)
+            dynamic(light: 0x5B54E8, dark: 0x8B85F5)
         }
 
-        /// Primary Pressed, per the palette: #C96A16.
+        /// Primary Pressed — the pressed state of the ink chrome.
+        ///
+        /// Lighter than `accentStrong` in light mode, not darker: at #18181B
+        /// there is no darker left to go, so the press reads by stepping toward
+        /// the surface. Dark mode mirrors it.
         public static var accentPressed: UIColor {
-            dynamic(light: 0xC96A16, dark: 0xD97B22)
+            dynamic(light: 0x3F3F46, dark: 0xD4D4D8)
         }
 
-        /// The accent corrected for contrast, and the only accent that may
-        /// carry or be carried by body-sized text.
+        /// The chrome: filled buttons, the tab bar tint, badges, the selected
+        /// segment, and any label or glyph marking an active state.
         ///
-        /// The identity orange is too light to be legible as ink: white on
-        /// `accent` is 3.2:1 and `accent` on `background` is 3.0:1 — both fine
-        /// for large text and for non-text UI, both short of the 4.5:1 that
-        /// body text needs. So `accent` stays the identity (fills, gradients,
-        /// selection, display type) and this token does the reading work:
-        /// accent-coloured labels and glyphs on app surfaces, and the fill
-        /// under `textOnAccent`.
+        /// Obsidian cannot compete with a photograph because it is not a
+        /// colour; it reads as chrome at every exposure, over every image, in
+        /// both appearances. It also retires a workaround — the previous orange
+        /// needed a separate, darkened token here because no single orange is
+        /// both a legible fill and legible ink against near-white. That orange
+        /// cleared its gates at 1.03× the requirement; this clears them at 17:1.
         ///
-        /// It darkens in light mode and lightens in dark mode, which is why one
-        /// token can serve both roles — see `ThemeContrastTests`.
-        /// Not in the owner's palette because a palette lists identity, not
-        /// legibility: white on Primary is 2.9:1 and Primary on white is 3.1:1,
-        /// so Primary cannot carry body text either way. #B45309 is the same
-        /// family, two steps darker, and clears 4.5:1 in both directions.
+        /// It inverts in dark mode rather than lifting: ink chrome's job is to
+        /// be the furthest thing from the ground it sits on.
         public static var accentStrong: UIColor {
-            dynamic(light: 0xB45309, dark: 0xF0913F)
+            dynamic(light: 0x18181B, dark: 0xFAFAFA)
         }
 
-        /// The far end of the brand gradient (accent → accentSecondary) used on
-        /// hero surfaces, the primary CTA and selection glows. A warm amber keeps
-        /// the gradient inside the orange family — minimal, no clashing hue.
+        /// The far end of the brand gradient (accentStrong → accentSecondary),
+        /// used on hero surfaces and the primary CTA. A charcoal one step off
+        /// the ink: enough for the gradient to read as a gradient, not enough
+        /// to turn the chrome back into a colour.
         public static var accentSecondary: UIColor {
-            dynamic(light: 0xF59E0B, dark: 0xFBBF24)
+            dynamic(light: 0x3F3F46, dark: 0xD4D4D8)
         }
 
         // Backgrounds, from the owner's palette: Background #FFFFFF and Card
@@ -83,35 +89,57 @@ public enum Theme {
         // from the border and the card shadow rather than from a fill
         // difference, which is what keeps a white-canvas app looking clean
         // instead of grey.
+        //
+        // Every neutral in this file sits on ONE axis: true grey, no hue. Two
+        // reasons, and the first is specific to this app. A tinted neutral
+        // shifts the apparent colour of whatever sits next to it, and what sits
+        // next to these surfaces is always a photograph — a blue-grey chrome
+        // makes a warm photo read warmer, which is the one thing a tool for
+        // judging pictures must not do. Colour-critical tools are neutral-grey
+        // for exactly this reason. The second is coherence: with an ink brand
+        // the accent IS a neutral, so a blue-tinted text ramp beside a pure-grey
+        // accent reads as two greys that don't match. These values used to be
+        // Tailwind slate and GitHub dark-blue, chosen when the brand was orange
+        // and a cool chrome was its complement.
         public static var background: UIColor {
-            dynamic(light: 0xFFFFFF, dark: 0x0D1117)
+            dynamic(light: 0xFFFFFF, dark: 0x0E0E10)
         }
 
         public static var surface: UIColor {
-            dynamic(light: 0xFCFCFC, dark: 0x161B22)
+            dynamic(light: 0xFCFCFC, dark: 0x17171A)
         }
 
         public static var surfaceRaised: UIColor {
-            dynamic(light: 0xFFFFFF, dark: 0x1C222B)
+            dynamic(light: 0xFFFFFF, dark: 0x1D1D21)
         }
 
         // Text.
+        /// Body ink.
+        ///
+        /// The same value as `accentStrong`, which is correct rather than a
+        /// collision: in an ink system the brand and the body ink are the same
+        /// black, and an "accent-coloured" label is distinguished from a plain
+        /// one by weight and by what sits next to it, not by hue. Its old value
+        /// was blue-tinted slate — see the note on the neutral axis above.
         public static var textPrimary: UIColor {
-            dynamic(light: 0x111827, dark: 0xF3F5F8)
+            dynamic(light: 0x18181B, dark: 0xFAFAFA)
         }
 
+        /// Supporting ink. Two steps up the same grey, and a little darker than
+        /// the slate it replaces, which was scraping 4.83:1 on white.
         public static var textSecondary: UIColor {
-            dynamic(light: 0x6B7280, dark: 0x9CA3AF)
+            dynamic(light: 0x6E6E77, dark: 0xA1A1AA)
         }
 
         /// Ink for anything sitting on `accentStrong`.
         ///
-        /// Not simply white. In dark mode `accentStrong` is the *bright*
-        /// orange, and white on it is 2.5:1 — worse than the problem it was
-        /// meant to solve. A warm near-black gets 7.4:1 there, and reads as a
-        /// deliberate choice rather than a compromise.
+        /// Not simply white, because `accentStrong` inverts: it is near-black
+        /// in light mode and near-white in dark, so its ink has to invert with
+        /// it. Neutral rather than the warm near-black this token used to
+        /// carry — that value was chosen to sit under an orange fill and reads
+        /// as a stain under a neutral one.
         public static var textOnAccent: UIColor {
-            dynamic(light: 0xFFFFFF, dark: 0x17110C)
+            dynamic(light: 0xFFFFFF, dark: 0x18181B)
         }
 
         /// A toast's ground and ink.
@@ -141,29 +169,37 @@ public enum Theme {
         /// sits at its centre. Fixed for the same reason as `cellWell`: they are
         /// composited into exported files and template thumbnails.
         ///
-        /// The outline is `separator`'s family, one shade down from its #E5E7EB:
+        /// The outline is `separator`'s family, one shade down from its #E4E4E7:
         /// a template thumbnail is rendered at 300px and then shown at 132pt, and
-        /// at that reduction a true #E5E7EB hairline resolves away to nothing —
+        /// at that reduction a true #E4E4E7 hairline resolves away to nothing —
         /// which is precisely where the zones most need to be legible.
         ///
-        /// The chip is the counterweight — a warm near-black disc with white ink,
-        /// so the tap target is the one thing in an empty zone carrying real
-        /// contrast (12:1 on the well).
+        /// The chip is the counterweight — a neutral near-black disc with
+        /// white ink, so the tap target is the one thing in an empty zone
+        /// carrying real contrast (9.8:1 on the well). Neutral rather than the
+        /// warm grey it used to be: that value was picked to partner an orange
+        /// brand, and it reads as a colour cast beside an ink one.
         public static var cellWellOutline: UIColor { rgb(0xE0E2E7) }
-        public static var cellWellChip: UIColor { rgb(0x4D4842).withAlphaComponent(0.92) }
+        public static var cellWellChip: UIColor { rgb(0x3F3F46).withAlphaComponent(0.92) }
         public static var cellWellChipInk: UIColor { UIColor.white }
 
         // Lines & fills.
-        /// Border, per the palette: #E5E7EB. Load-bearing now that the canvas
-        /// and cards are both near-white.
+        /// Border. Load-bearing now that the canvas and cards are both
+        /// near-white — this hairline is what separates them, not a fill step.
+        /// The palette's #E5E7EB moved onto the neutral axis as #E4E4E7; the
+        /// two are indistinguishable side by side.
         public static var separator: UIColor {
-            dynamic(light: 0xE5E7EB, dark: 0x2A2F37)
+            dynamic(light: 0xE4E4E7, dark: 0x2B2B31)
         }
 
         /// Secondary Background from the palette, #F7F7F8, doing the job it is
         /// best at: the track under a segmented control, a chip, a field.
+        ///
+        /// The light value is untouched — it was already a true grey, and
+        /// `cellWell` is defined as this exact tone. Only the dark value moved
+        /// onto the neutral axis.
         public static var controlFill: UIColor {
-            dynamic(light: 0xF7F7F8, dark: 0x22272E)
+            dynamic(light: 0xF7F7F8, dark: 0x232327)
         }
 
         /// Error, per the palette: #EF4444. A purchase that did not go through,
@@ -192,14 +228,24 @@ public enum Theme {
             dynamic(light: 0x22C55E, dark: 0x22C55E)
         }
 
-        /// Warning, per the palette: #F59E0B — a canvas that does not match the
-        /// preset, an export that will be scaled. Darkened in light mode for the
-        /// same reason as `success`.
+        /// Warning — a canvas that does not match the preset, an export that
+        /// will be scaled. Darkened in light mode for the same reason as
+        /// `success`: the palette's #F59E0B is a fill, not an ink.
+        ///
+        /// The light value is amber rather than the burnt orange it used to be.
+        /// #B45309 was picked to sit beside an orange brand and had to be
+        /// *pushed* toward red to stay distinct from it — which is also how it
+        /// ended up identical to the old `accentStrong`. With the brand out of
+        /// the warm end entirely, warning is free to look like a warning.
         public static var warning: UIColor {
-            dynamic(light: 0xB45309, dark: 0xFBBF24)
+            dynamic(light: 0xA16207, dark: 0xFBBF24)
         }
 
         /// The accent as a low-opacity tint, e.g. selected-swatch halo.
+        ///
+        /// Built from `accent` rather than `accentStrong` for the reason
+        /// `accent` stays chromatic at all: fifteen percent of an ink chrome is
+        /// a grey smudge, which is exactly what a halo must not be.
         public static var accentSoft: UIColor {
             accent.withAlphaComponent(0.15)
         }
@@ -210,16 +256,14 @@ public enum Theme {
         /// a gradient layer keeps whatever colours it was given until something
         /// repaints it, so the caller has to say which appearance it wants.
         ///
-        /// The stops differ by appearance for contrast, not for taste. In light
-        /// the gradient runs `accentStrong → accent` under white; carrying it up
-        /// to `accentSecondary` would put white on a 2.2:1 amber. In dark the
-        /// ink flips to near-black, so the gradient can run the bright half of
-        /// the ramp instead.
+        /// The stops are the same two tokens in both appearances now. The old
+        /// gradient picked different stops per appearance to dodge orange's
+        /// contrast cliff — carrying it up to the bright amber would have put
+        /// white on a 2.2:1 fill. `accentStrong` and `accentSecondary` both
+        /// invert on their own, so the appearance branch has nothing left to
+        /// decide.
         public static func brandGradient(for traits: UITraitCollection) -> [CGColor] {
-            let stops = traits.userInterfaceStyle == .dark
-                ? [accent, accentSecondary]
-                : [accentStrong, accent]
-            return stops.map { $0.resolvedColor(with: traits).cgColor }
+            [accentStrong, accentSecondary].map { $0.resolvedColor(with: traits).cgColor }
         }
 
         // MARK: helpers
