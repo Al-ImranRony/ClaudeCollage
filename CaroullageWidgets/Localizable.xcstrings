@@ -1,9 +1,6 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    "Caroullage" : {
-      "shouldTranslate" : false
-    },
     "Make one to see it here" : {
       "localizations" : {
         "ar" : {
@@ -214,9 +211,6 @@
           }
         }
       }
-    },
-    "Widget arrives in Step 05." : {
-      "shouldTranslate" : false
     },
     "Your latest collages, one tap away." : {
       "extractionState" : "manual",
