@@ -99,6 +99,27 @@ final class HomeViewController: UIViewController {
     /// the header onto the card above it. Splitting the cost across BOTH seams
     /// keeps every value positive and nothing overlapping.
     private static let foldSeamSpacing: CGFloat = 8
+
+    /// The height of whatever the suggestions section is showing — the
+    /// `suggestionsStrip`'s cells and its own height anchor both.
+    ///
+    /// 83 because that is what `enableSuggestionsButton` measures on an iPhone 17
+    /// at default type (title plus a subtitle that wraps to two lines), and the
+    /// section has to be the SAME height in both of its visible states or the
+    /// fold moves with a runtime permission. It used to be 96 here and ~83 there,
+    /// and the 13pt difference was not cosmetic — measured frames, with the pill
+    /// fixed at 733:
+    ///
+    ///   content 83 → "Photo Collages" header 698.3 → 724.7, clears by 8.3
+    ///   content 96 → "Photo Collages" header 711.3 → 737.7, OVERLAPS by 4.7
+    ///
+    /// So the strip came down to the card rather than the card going up to the
+    /// strip: 96 is not a height this section can afford. The card is left
+    /// intrinsic — pinning it too would clip its subtitle at larger type, which
+    /// is worse than a moved fold — so the two can still drift apart if that
+    /// copy changes. `testTheCatalogHeaderClearsTheStartEditingPill` is what
+    /// catches it if they do.
+    private static let suggestionsContentHeight: CGFloat = 83
     /// A carousel's preview is three pages laid side by side, so its card is
     /// half again as wide: at photo-card width the centre crop shows one page and
     /// the strip stops saying the only thing it exists to say.
@@ -122,38 +143,40 @@ final class HomeViewController: UIViewController {
     /// Below the hero the stack narrows to `foldSeamSpacing` (8pt) at both
     /// seams around the suggestions — see that constant for why.
     ///
-    /// The floating "Start Editing" pill's top edge is **733**, derived from the
-    /// code rather than guessed: `AppTabBarController` computes
-    /// `plusY = tabBar.frame.minY - barGap(12) - plusHeight(46)`, which on an
-    /// 874pt screen with a stock 83pt bar is `791 - 58 = 733`.
+    /// Every figure here is a frame read off a running iPhone 17 through the
+    /// accessibility tree, not arithmetic. `.notDetermined`:
     ///
-    /// Screenshotted on an iPhone 17 in the `.notDetermined` state, the first
-    /// screen ends with the "Photo Collages" header and its "See All" a little
-    /// under 20pt clear of that edge, and the pill overlapping the strip's CARDS
-    /// below them — the "peeks below the fold" cue this budget relies on
-    /// everywhere else. Deliberately no per-row breakdown here: the suggestions
-    /// section's height is not a constant (see below), so a table would be
-    /// inventing precision the screen does not have.
+    ///   hero                 250.3 → 561.0
+    ///   "Suggested For You"  569.0 → 595.3
+    ///   suggestions content  607.3 → 690.3   (`suggestionsContentHeight`, 83)
+    ///   "Photo Collages"     698.3 → 724.7
+    ///   the pill             733.0 → 779.0
+    ///
+    /// So the catalog's header clears the pill by 8.3pt, and what the pill
+    /// overlaps is that strip's CARDS — the "peeks below the fold" cue this
+    /// budget relies on everywhere else. The pill's 733 is not measured alone:
+    /// `AppTabBarController` computes
+    /// `plusY = tabBar.frame.minY - barGap(12) - plusHeight(46)`, which on an
+    /// 874pt screen with a stock 83pt bar is `791 - 58 = 733`. Derivation and
+    /// measurement agree exactly.
+    ///
+    /// The other two states move only this section's content, and both are
+    /// accounted for. `.denied` (and `.authorized` with nothing analysable)
+    /// hides the section outright, which `UIStackView` collapses along with one
+    /// seam — measured, the header rises to 569.0, far clear. `.authorized`
+    /// with results swaps the enable card for `suggestionsStrip`, which is now
+    /// pinned to the same `suggestionsContentHeight`, so the frames above hold
+    /// unchanged. That equality is the point: this section used to be 96pt in
+    /// one state and 83 in the other, which put the header at 737.7 against a
+    /// pill at 733 — a 4.7pt overlap that no test caught and no screenshot
+    /// showed, because that state is genuinely hard to stage on a simulator
+    /// (`HomeShowcaseUITests` records how, and why the obvious routes fail).
     ///
     /// This block previously claimed the pill sat at 702 and that the
     /// suggestions strip tucked its last 8pt under it, "showing 88 of 96". Both
-    /// were wrong. 702 was never derived from anything — the comment this text
-    /// replaced said 728 — and no state of this screen produces that peek: the
-    /// suggestions clear the pill outright in every state. What the pill DID
-    /// overlap, at the stack's uniform 24pt spacing, was the "Photo Collages"
-    /// header, which it cut mid-word.
-    ///
-    /// ONE STATE HERE IS UNVERIFIED. The suggestions section has two heights:
-    /// the `enableSuggestionsButton` card, and a fixed 96pt `suggestionsStrip`
-    /// once access is granted AND something is analysable (`.denied` hides the
-    /// section outright, which moves the header far clear). The strip is the
-    /// taller of the two, so it eats into that clearance — and
-    /// `simctl privacy grant photos` does not reach what `photoAccessProvider`
-    /// reads, so that state could not be put on screen to measure. Treat it as
-    /// unmeasured rather than fine. The durable cure is to give both states the
-    /// same height so the fold stops depending on a runtime permission; that is
-    /// a design change to the suggestions section and is deliberately not made
-    /// here.
+    /// were invented. 702 was never derived from anything — the comment this
+    /// text replaced said 728 — and no state has ever produced that peek. The
+    /// numbers above are the first in this block to have been observed.
     ///
     /// The ratio did NOT have to move when the chips took the top. The hero
     /// itself starts 127pt lower than it used to — not merely the chip
@@ -498,7 +521,10 @@ final class HomeViewController: UIViewController {
         section.axis = .vertical
         section.spacing = Theme.Spacing.sm
         section.isHidden = true
-        suggestionsStrip.heightAnchor.constraint(equalToConstant: 96).isActive = true
+        // Matches `enableSuggestionsButton`'s intrinsic height, so this section
+        // contributes the same height whichever of the two it is showing.
+        suggestionsStrip.heightAnchor.constraint(
+            equalToConstant: Self.suggestionsContentHeight).isActive = true
         return section
     }
 
@@ -558,7 +584,8 @@ final class HomeViewController: UIViewController {
             widthDimension: .fractionalWidth(1), heightDimension: .fractionalHeight(1)))
         let group = NSCollectionLayoutGroup.horizontal(
             layoutSize: NSCollectionLayoutSize(
-                widthDimension: .absolute(96), heightDimension: .absolute(96)),
+                widthDimension: .absolute(Self.suggestionsContentHeight),
+                heightDimension: .absolute(Self.suggestionsContentHeight)),
             subitems: [item])
         let section = NSCollectionLayoutSection(group: group)
         section.orthogonalScrollingBehavior = .continuous

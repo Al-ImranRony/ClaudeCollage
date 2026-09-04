@@ -115,6 +115,28 @@ final class HomeShowcaseUITests: XCTestCase {
         XCTAssertLessThanOrEqual(hero.frame.maxY, photoCollages.frame.minY,
                                  "The catalog strips follow the hero")
 
+        // HOW TO STAGE THE THIRD STATE, if you need to see the populated strip
+        // rather than the enable card. It is harder than it looks, and two dead
+        // ends cost an afternoon:
+        //
+        //   1. `xcrun simctl privacy <dev> grant photos <bundle>` writes
+        //      kTCCServicePhotos=2 and does NOT reach
+        //      `PHPhotoLibrary.authorizationStatus` for an already-installed
+        //      app. The app still reports `.notDetermined`. Verified against
+        //      the simulator's own TCC.db.
+        //   2. Tapping through the in-app prompt can land on LIMITED access
+        //      with nothing selected. `RecentPhotoProvider.map` folds `.limited`
+        //      into `.authorized`, so access reads authorized while
+        //      `PHAsset.fetchAssets` returns 0 — and `suggestedLayoutsProvider`
+        //      requires 3+ photos, so the section hides itself and looks for all
+        //      the world like `.denied`.
+        //
+        // What is needed is media in the library AND full access:
+        //
+        //   xcrun simctl addmedia <dev> Caroullage/Resources/SampleContent/sample_*.jpg
+        //   # then tap the enable card and choose "Allow Full Access" — NOT
+        //   # "Limit Access", which selects nothing and looks like a hidden section
+        //
         // `waitForExistence`, not `exists`: on `.authorized` the section is
         // unhidden from inside `loadSuggestions()`'s async Task, so reading it in
         // the same runloop turn the hero appeared in races the continuation and
@@ -129,6 +151,33 @@ final class HomeShowcaseUITests: XCTestCase {
                                     "Suggested For You follows the hero")
         XCTAssertLessThanOrEqual(suggested.frame.maxY, photoCollages.frame.minY,
                                  "…and precedes the catalog strips")
+    }
+
+    /// The floating "Start Editing" pill must not land on the "Photo Collages"
+    /// header. It did once: the header ran 730.3 → 756.7 against a pill fixed at
+    /// 733.0, so the first screen read "Photo Coll ( + Start Editing )" with
+    /// "See All" stranded beside it.
+    ///
+    /// Unconditional on purpose. The suggestions section above has three states
+    /// and each puts this header somewhere different — hidden (header at 569),
+    /// the enable card, or the populated strip — so this is the one assertion
+    /// that has to hold no matter which state the simulator happens to be in.
+    /// That is also what makes it the guard on `suggestionsContentHeight`: if
+    /// the strip and the card ever drift apart again, one of the three states
+    /// fails here.
+    @MainActor
+    func testTheCatalogHeaderClearsTheStartEditingPill() {
+        let app = launch()
+
+        let pill = app.buttons["startEditingButton"]
+        XCTAssertTrue(pill.waitForExistence(timeout: 10), "The Start Editing pill is on Home")
+
+        let photoCollages = app.staticTexts["Photo Collages"]
+        XCTAssertTrue(photoCollages.exists, "The Photo Collages header is on Home")
+
+        XCTAssertLessThanOrEqual(
+            photoCollages.frame.maxY, pill.frame.minY,
+            "The pill overlaps the Photo Collages header — it should overlap the cards below it")
     }
 
     /// The hero renders real pages, not an empty carousel.
