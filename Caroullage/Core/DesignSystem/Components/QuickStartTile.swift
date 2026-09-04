@@ -5,10 +5,23 @@
 //  Step 04.5 — a full-width row: icon, title, subtitle, chevron. Deliberately
 //  large; these replaced nav-bar icons that were far too small to hit reliably.
 //
-//  Step 05b lifted it out of `HomeViewController` so the floating "+" sheet can
-//  use the same row. That is the point: "Create New" on Home and the "+"
-//  sheet offer overlapping choices, and when they were built from different
-//  parts they looked like two unrelated features.
+//  Step 05b lifted it out of `HomeViewController` so the floating "+" sheet
+//  could use the same row: "Create New" on Home and the "+" sheet offer
+//  overlapping choices, and built from different parts they looked like two
+//  unrelated features.
+//
+//  Step 07 ended that in one direction only. Home became a showcase — hero
+//  card, three strips of finished work — where four full-width rows took half
+//  the page to say what four pills say in one line, so Home's copy became the
+//  private `QuickStartChip` in `HomeViewController`. The "+" sheet is now this
+//  type's only caller, and it is still the right one: there the choice IS the
+//  screen, and a row that size can afford a subtitle.
+//
+//  So the overlap Step 05b enforced with a shared type is a convention now —
+//  same four doors, same accessibility identifiers, same closures, two shapes.
+//  Adding a format to one front door still means adding it to the other, but
+//  nothing in the compiler will remind you any more; the shell tests are what
+//  is left holding the two together.
 //
 
 import UIKit
