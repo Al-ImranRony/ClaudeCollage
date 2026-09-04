@@ -119,7 +119,7 @@ final class CarouselGalleryViewController: UIViewController {
         }
         // The grid runs under the pinned controls, so it belongs behind them,
         // with the fade between the two — the same treatment Projects and the
-        // Templates gallery use.
+        // Collage gallery use.
         view.sendSubviewToBack(gridView)
         TopFadeView.install(in: self, above: gridView)
 
