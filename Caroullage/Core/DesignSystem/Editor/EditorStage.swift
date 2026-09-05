@@ -3,9 +3,9 @@
 //  Caroullage
 //
 //  Hosts an editor's canvas and owns its geometry. The canvas takes the DOCUMENT's
-//  aspect ratio through a stored, replaceable multiplier constraint — the grid
-//  editor previously pinned it square, which letterboxed every 9:16 story collage
-//  into 44% dead space.
+//  aspect ratio: `layoutSubviews` sizes it via `EditorStageGeometry.canvasRect` on
+//  every layout pass — the grid editor previously pinned it square, which
+//  letterboxed every 9:16 story collage into 44% dead space.
 //
 //  The stage fills whatever space is left between the navigation bar and the panel
 //  or rail beneath it, so opening a panel shrinks the canvas smoothly instead of
@@ -18,7 +18,10 @@ import UIKit
 public final class EditorStage: UIView {
 
     /// Minimum breathing room around the canvas.
-    public var contentInsets = UIEdgeInsets(top: 8, left: 16, bottom: 8, right: 16) {
+    public var contentInsets = UIEdgeInsets(
+        top: Theme.Spacing.xs, left: Theme.Spacing.md,
+        bottom: Theme.Spacing.xs, right: Theme.Spacing.md
+    ) {
         didSet { setNeedsLayout() }
     }
 

@@ -135,7 +135,7 @@ final class EditorChromeTests: XCTestCase {
         stage.layoutIfNeeded()
 
         XCTAssertEqual(content.bounds.width / content.bounds.height, 1080.0 / 1920.0,
-                       accuracy: 0.01, "The aspect constraint must be replaced, not stacked")
+                       accuracy: 0.01, "Changing the aspect must re-lay-out the content")
     }
 
     func testReplacingContentRemovesThePreviousView() {
@@ -146,5 +146,41 @@ final class EditorChromeTests: XCTestCase {
 
         XCTAssertNil(first.superview)
         XCTAssertEqual(second.superview, stage)
+    }
+
+    func testChangingContentInsetsRelaysOutTheContent() {
+        let (stage, content) = layOutStage(canvasSize: CGSize(width: 1080, height: 1080))
+        let before = content.bounds
+
+        stage.contentInsets = UIEdgeInsets(top: 40, left: 60, bottom: 40, right: 60)
+        stage.layoutIfNeeded()
+
+        XCTAssertLessThan(content.bounds.width, before.width,
+                          "Larger insets must shrink the content rect")
+        XCTAssertLessThan(content.bounds.height, before.height,
+                          "Larger insets must shrink the content rect")
+    }
+
+    func testANonIdentityTransformSurvivesLayout() {
+        // Matches testAStoryDocumentGrowsTallInsteadOfBeingSquashedIntoASquare's
+        // expected rect for this same canvas/stage size: 370 x 657.78.
+        let (stage, content) = layOutStage(canvasSize: CGSize(width: 1080, height: 1920))
+        let transform = CGAffineTransform(scaleX: 1.5, y: 1.5)
+        content.transform = transform
+
+        stage.setNeedsLayout()
+        stage.layoutIfNeeded()
+
+        XCTAssertEqual(content.transform, transform,
+                       "The transform guard must restore the content's own transform")
+        // A uniform scale divides both dimensions equally, so checking only the
+        // aspect ratio would still pass even if the guard were deleted and the
+        // frame were assigned under the live 1.5x transform. Assert the absolute
+        // size to actually catch that: without the guard this comes out scaled
+        // down to ~246.7 x ~438.5 instead.
+        XCTAssertEqual(content.bounds.width, 370, accuracy: 0.5,
+                       "Bounds must be the untransformed aspect-fit width")
+        XCTAssertEqual(content.bounds.height, 657.78, accuracy: 0.5,
+                       "Bounds must be the untransformed aspect-fit height")
     }
 }
