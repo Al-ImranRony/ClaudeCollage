@@ -1918,7 +1918,11 @@ handler if it is not already assigned), add:
         viewModel.onGeometryChange = { [weak self] in
             guard let self else { return }
             self.stage.setCanvasAspect(self.viewModel.canvasSize)
-            self.reconfigureCanvas()
+            // updateGeometry, NOT reconfigureCanvas: this fires on every tick of a Border/Corners
+            // drag, and the full configure path re-wraps every CGImage and rebuilds every sticker
+            // view. CanvasView.updateGeometry's doc comment records that doing this at slider
+            // frequency is what made the canvas stutter. Only ADD the aspect resync line; keep
+            // whatever light-path call the handler already made.
         }
 ```
 
