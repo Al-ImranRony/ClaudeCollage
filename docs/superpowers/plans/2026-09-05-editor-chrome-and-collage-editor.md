@@ -401,7 +401,7 @@ Append inside `EditorChromeTests`:
         stage.layoutIfNeeded()
 
         XCTAssertEqual(content.bounds.width / content.bounds.height, 1080.0 / 1920.0,
-                       accuracy: 0.01, "The aspect constraint must be replaced, not stacked")
+                       accuracy: 0.01, "Changing the aspect must re-lay-out the content")
     }
 
     func testReplacingContentRemovesThePreviousView() {
@@ -435,7 +435,7 @@ Create `Caroullage/Core/DesignSystem/Editor/EditorStage.swift`:
 //  Caroullage
 //
 //  Hosts an editor's canvas and owns its geometry. The canvas takes the DOCUMENT's
-//  aspect ratio through a stored, replaceable multiplier constraint — the grid
+//  aspect ratio, sized by `EditorStageGeometry` in `layoutSubviews` — the grid
 //  editor previously pinned it square, which letterboxed every 9:16 story collage
 //  into 44% dead space.
 //
