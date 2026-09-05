@@ -415,6 +415,22 @@ Append to `TextTimingTests`:
         XCTAssertNotEqual(UIImage(cgImage: early!).pngData(),
                           UIImage(cgImage: late!).pngData(),
                           "Different captions must produce different pixels")
+
+        // Inequality alone is too weak: it still passes if the WRONG caption shows at
+        // each time (swapped windows, or an off-by-one in isVisible) because the two
+        // renders merely differ. Pin WHICH caption by comparing against a render of
+        // that overlay alone. Verified: with the visibility filter inverted, the
+        // inequality assertion above still passes and only these two fail.
+        let firstAlone = VideoOverlayRenderer.overlayImage(
+            textOverlays: [overlays[0]], stickerOverlays: [], canvasPx: size, at: nil)
+        let secondAlone = VideoOverlayRenderer.overlayImage(
+            textOverlays: [overlays[1]], stickerOverlays: [], canvasPx: size, at: nil)
+        XCTAssertEqual(UIImage(cgImage: early!).pngData(),
+                       UIImage(cgImage: firstAlone!).pngData(),
+                       "At t=1 only the FIRST caption may be drawn")
+        XCTAssertEqual(UIImage(cgImage: late!).pngData(),
+                       UIImage(cgImage: secondAlone!).pngData(),
+                       "At t=3 only the SECOND caption may be drawn")
     }
 
     func testUntimedOverlaysStillRenderAtEveryTime() {
@@ -475,7 +491,17 @@ In `VideoCompositionBuilder`, the export currently renders **one** `overlayImage
 
 Change the bundle to carry what is needed to render per frame rather than a single baked image: the overlays, the canvas size and the font scale. Then in `runExport`'s frame loop, render (or look up) the overlay for the frame's presentation time and pass that to `drawOverlay`.
 
-**Rendering a full-canvas image per frame is too slow.** Cache by *visible set*: text visibility only changes at in/out points, so consecutive frames almost always share an image. Key a small cache on the sorted ids of the visible overlays and reuse the rendered image until that set changes.
+**Rendering a full-canvas image per frame is too slow.** Text visibility only changes at in/out
+points, so consecutive frames almost always share an image.
+
+**Use a SINGLE-SLOT cache** — remember the last visible-id-set and its rendered image, re-rendering
+only when the set changes. Frames arrive in monotonic PTS order, so a long contiguous run between
+two boundaries costs one render. Do **not** use an unbounded dictionary: each entry is a full-canvas
+image (~8 MB at 1080x1920), and a project with dozens of overlapping captions would hold hundreds of
+MB alongside the reader/writer buffers already live during export.
+
+Keep "nothing visible" distinguishable from "not cached", or the renderer is re-invoked on every
+frame of a caption gap.
 
 Keep `overlayImage` on the bundle for the untimed case so nothing else that reads it breaks; when no overlay carries timing, the existing single-image path is still correct and should be used unchanged.
 
