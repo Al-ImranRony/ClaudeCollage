@@ -272,8 +272,8 @@ Assign them after `self.style = style`:
 
 ```swift
         self.style = style
-        self.startTime = startTime
-        self.endTime = endTime
+        self.startTime = startTime.map { max(0, $0) }
+        self.endTime = endTime.map { max(0, $0) }
 ```
 
 Add both to `CodingKeys`:
@@ -287,8 +287,10 @@ Decode them defensively in `init(from:)`, after the `style` line:
 
 ```swift
         self.style = try c.decodeIfPresent(TextStyle.self, forKey: .style) ?? fallback.style
-        self.startTime = try c.decodeIfPresent(Double.self, forKey: .startTime)
-        self.endTime = try c.decodeIfPresent(Double.self, forKey: .endTime)
+        // Clamped like VideoTrim / CellTransition. `nil` stays `nil` — turning an
+        // absent value into 0 would convert "always visible" into a real window.
+        self.startTime = try c.decodeIfPresent(Double.self, forKey: .startTime).map { max(0, $0) }
+        self.endTime = try c.decodeIfPresent(Double.self, forKey: .endTime).map { max(0, $0) }
 ```
 
 Then add the predicate at the end of the type:
@@ -307,6 +309,11 @@ Then add the predicate at the end of the type:
         case let (start?, nil):
             return time >= start
         case let (nil, end?):
+            // A non-positive out-point with no in-point describes a window no valid
+            // (non-negative) time can fall inside. Fail OPEN, exactly as an inverted
+            // window does below. Clamping alone does NOT fix this: clamping -3 to 0
+            // still leaves `time < 0` false for every valid time.
+            guard end > 0 else { return true }
             return time < end
         case let (start?, end?):
             guard end > start else { return true }
