@@ -22,9 +22,10 @@ public struct TextStyle: Codable, Sendable, Equatable {
         case shadow
         /// Outline around the glyphs.
         case stroke
-        /// Solid rounded rectangle behind the whole text block.
+        /// Solid rounded rectangle hugging the measured text.
         case pill
-        /// Solid rectangle hugging the text, marker-pen style.
+        /// Per-line marker-pen highlight behind the glyphs (an attributed-string
+        /// background colour, so it always hugs the actual text on every line).
         case highlight
         /// Coloured outer glow.
         case glow
@@ -33,7 +34,9 @@ public struct TextStyle: Codable, Sendable, Equatable {
     public var kind: Kind
     /// Shadow, stroke, pill, highlight or glow colour. Ignored by `.plain`.
     public var colorHex: String
-    /// Stroke width, glow radius, shadow blur radius and offset, highlight inset, or pill corner inset — reference-canvas points.
+    /// Stroke width, glow radius, shadow blur radius and offset, or pill outward
+    /// inset / corner radius — reference-canvas points. Ignored by `.highlight`
+    /// (its background hugs the glyphs with no adjustable inset) and by `.plain`.
     /// Expected to stay non-negative; any setter (e.g. a future slider) should clamp with `max(0, ...)`.
     public var width: Double
 

@@ -91,6 +91,7 @@ final class TextStyleTests: XCTestCase {
         let attrs = attributes(for: TextStyle(kind: .plain))
         XCTAssertNil(attrs[.strokeWidth])
         XCTAssertNil(attrs[.shadow])
+        XCTAssertNil(attrs[.backgroundColor])
     }
 
     func testStrokeUsesANegativeWidthSoTheFillIsKept() {
@@ -124,29 +125,82 @@ final class TextStyleTests: XCTestCase {
         XCTAssertEqual(abs(half ?? 0), abs(full ?? 0) / 2, accuracy: 0.01)
     }
 
-    func testDrawingAPillStyleProducesDifferentPixelsThanPlain() {
-        // The pill background is painted in `draw`, not in the attributes, so this
-        // is the only way to prove it lands.
-        func render(_ style: TextStyle) -> Data? {
-            var overlay = TextOverlay(text: "Hello",
-                                      colorHex: "#000000",
-                                      frame: CGRect(x: 0, y: 0, width: 1, height: 1))
-            overlay.style = style
-            let size = CGSize(width: 200, height: 100)
-            let renderer = UIGraphicsImageRenderer(size: size)
-            return renderer.pngData { ctx in
-                TextRendering.draw(overlay,
-                                   in: CGRect(origin: .zero, size: size),
-                                   fontScale: 0.2,
-                                   context: ctx.cgContext)
-            }
-        }
+    /// Reads back the RGB of one pixel from a rendered `CGImage` (established
+    /// pattern in this suite — see `EmptyCellChromeTests`/`RendererChromeTests`).
+    private func pixel(_ image: CGImage, x: Int, y: Int) -> (r: Int, g: Int, b: Int) {
+        var pixels = [UInt8](repeating: 0, count: image.width * image.height * 4)
+        let context = CGContext(
+            data: &pixels, width: image.width, height: image.height,
+            bitsPerComponent: 8, bytesPerRow: image.width * 4,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        )!
+        context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+        let offset = (y * image.width + x) * 4
+        return (Int(pixels[offset]), Int(pixels[offset + 1]), Int(pixels[offset + 2]))
+    }
 
-        let plain = render(TextStyle(kind: .plain))
-        let pill = render(TextStyle(kind: .pill, colorHex: "#FFCC00", width: 6))
+    /// `#FFCC00`, the pill colour used below, within anti-aliasing/colour-space tolerance.
+    private func isPillGold(_ p: (r: Int, g: Int, b: Int)) -> Bool {
+        abs(p.r - 255) <= 2 && abs(p.g - 204) <= 2 && abs(p.b - 0) <= 2
+    }
 
-        XCTAssertNotNil(plain)
-        XCTAssertNotNil(pill)
-        XCTAssertNotEqual(plain, pill, "A pill background must actually be painted")
+    func testPillBackgroundHugsTheMeasuredTextInsteadOfSpanningTheWholeBox() throws {
+        // Short text in a WIDE box: a pill sized from the frame (the bug) paints
+        // almost the entire box, while a pill sized from the measured text (the
+        // fix) hugs just the glyphs. The two sample points below distinguish them
+        // without depending on exact font metrics.
+        var overlay = TextOverlay(text: "Hi", fontSize: 32,
+                                  colorHex: "#000000",
+                                  frame: CGRect(x: 0, y: 0, width: 1, height: 1))
+        overlay.style = TextStyle(kind: .pill, colorHex: "#FFCC00", width: 16)
+        let canvasSize = CGSize(width: 300, height: 120)
+        let absoluteFrame = CGRect(origin: .zero, size: canvasSize)
+        let fontScale: CGFloat = 1
+
+        // Ground truth for where the glyphs actually land, measured the same way
+        // `draw` measures height — used here for width too, so the test doesn't
+        // hardcode font metrics.
+        let attributed = TextRendering.attributedString(for: overlay, fontScale: fontScale)
+        let measured = attributed.boundingRect(
+            with: CGSize(width: absoluteFrame.width, height: .greatestFiniteMagnitude),
+            options: [.usesLineFragmentOrigin, .usesFontLeading],
+            context: nil
+        )
+        let textOriginX = (absoluteFrame.width - measured.width) / 2   // centered alignment
+        let textMidY = Int((absoluteFrame.height - measured.height) / 2 + measured.height / 2)
+
+        // Scale must be pinned to 1 (as `VideoOverlayRenderer` does) so the CGImage's
+        // pixel grid matches the point-space geometry below 1:1 — otherwise the
+        // simulator's device scale silently multiplies every coordinate.
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        let renderer = UIGraphicsImageRenderer(size: canvasSize, format: format)
+        let image = renderer.image { ctx in
+            TextRendering.draw(overlay, in: absoluteFrame, fontScale: fontScale, context: ctx.cgContext)
+        }.cgImage
+        let cgImage = try XCTUnwrap(image)
+
+        // A few points inside the tight pill's left padding — left of the glyphs
+        // themselves (so ink-free), but only inside the PILL once its width comes
+        // from the measured text rather than the whole frame.
+        let insideTightPill = pixel(cgImage, x: Int(textOriginX - 4), y: textMidY)
+        // Deep inside the box but far from the short "Hi" — covered by a
+        // full-width pill, but well outside a tight one.
+        let farFromText = pixel(cgImage, x: 6, y: textMidY)
+
+        XCTAssertTrue(isPillGold(insideTightPill), "the pill must still reach just past the measured text")
+        XCTAssertFalse(isPillGold(farFromText), "a pill must not span the whole text-box width — this is the full-width-span bug")
+    }
+
+    func testHighlightSetsTheBackgroundColorAttributeInsteadOfPaintingInDraw() {
+        // `.backgroundColor` is an NSAttributedString attribute, so it renders
+        // identically wherever `attributedString(for:fontScale:)` is consumed —
+        // the live canvas's UILabel AND both export paths. This is what guarantees
+        // canvas/export parity for `.highlight` (unlike `.pill`, which paints
+        // separately in `draw` and must be reproduced on the canvas by hand).
+        let attrs = attributes(for: TextStyle(kind: .highlight, colorHex: "#FFFF00", width: 6))
+        let background = attrs[.backgroundColor] as? UIColor
+        XCTAssertEqual(background?.hexStringRGB, "#FFFF00")
     }
 }

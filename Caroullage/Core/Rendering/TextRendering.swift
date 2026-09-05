@@ -85,15 +85,15 @@ public enum TextRendering {
         /// Pill: generous horizontal inset, tighter vertical, near-capsule corners.
         static let pillVerticalInset: CGFloat = 0.6
         static let pillCornerInset: CGFloat = 2
-        /// Highlight: hugs the text, marker-pen corners.
-        static let highlightHorizontalInset: CGFloat = 0.5
-        static let highlightVerticalInset: CGFloat = 0.25
-        static let highlightCorner: CGFloat = 0.3
     }
 
-    /// Applies the presentation treatment. Kept separate from typesetting so the
-    /// pill / highlight kinds — which paint behind the text rather than changing it
-    /// — can be no-ops here and handled in `draw`.
+    /// Applies the presentation treatment. Kept separate from typesetting so `.pill`
+    /// — which paints a background sized from the MEASURED text, not just the
+    /// typeset attributes — can be a no-op here and handled by `draw` /
+    /// `backgroundRect` instead. `.highlight` is different: `.backgroundColor` is a
+    /// per-line NSAttributedString attribute, so applying it here is exactly what
+    /// makes it render identically on the live canvas (a UILabel) and in both
+    /// export paths, with no separate painting step needed anywhere.
     private static func applyStyle(
         _ style: TextStyle,
         fontScale: CGFloat,
@@ -103,8 +103,11 @@ public enum TextRendering {
         let width = CGFloat(style.width) * fontScale
 
         switch style.kind {
-        case .plain, .pill, .highlight:
+        case .plain, .pill:
             break
+
+        case .highlight:
+            attributes[.backgroundColor] = colour
 
         case .stroke:
             // NEGATIVE means stroke AND fill. A positive value hollows the glyph out.
@@ -149,11 +152,12 @@ public enum TextRendering {
 
         cg.saveGState()
         cg.clip(to: absoluteFrame)
-        drawBackground(for: overlay.style,
-                       textRect: CGRect(x: absoluteFrame.minX, y: originY,
-                                        width: absoluteFrame.width, height: drawnHeight),
-                       fontScale: fontScale,
-                       context: cg)
+        if let background = backgroundRect(for: overlay, in: absoluteFrame, fontScale: fontScale) {
+            cg.saveGState()
+            cg.setFillColor(UIColor(hex: overlay.style.colorHex).cgColor)
+            UIBezierPath(roundedRect: background.rect, cornerRadius: background.cornerRadius).fill()
+            cg.restoreGState()
+        }
         attributed.draw(with: CGRect(x: absoluteFrame.minX, y: originY,
                                      width: absoluteFrame.width, height: drawnHeight),
                         options: [.usesLineFragmentOrigin, .usesFontLeading],
@@ -161,35 +165,51 @@ public enum TextRendering {
         cg.restoreGState()
     }
 
-    /// Paints the solid backgrounds that sit BEHIND the glyphs. `.pill` is a rounded
-    /// rectangle around the whole block; `.highlight` hugs the text with square-ish
-    /// corners, marker-pen style.
-    private static func drawBackground(
-        for style: TextStyle,
-        textRect: CGRect,
-        fontScale: CGFloat,
-        context cg: CGContext
-    ) {
-        let inset = CGFloat(style.width) * fontScale
-        let rect: CGRect
-        let radius: CGFloat
+    /// The pill background rect for an overlay, in the same coordinate space as
+    /// `absoluteFrame`, or nil when the style paints no background (every kind but
+    /// `.pill` — `.highlight` is an attributed-string attribute now, see
+    /// `applyStyle`). Sized from the MEASURED text, not the whole `absoluteFrame`,
+    /// and positioned to match the overlay's alignment within it, so the pill hugs
+    /// short text instead of spanning the entire text box. Shared by the Core
+    /// Graphics export/thumbnail path (`draw`) and the live canvas's
+    /// `TextOverlayView`, so the two can't disagree.
+    public static func backgroundRect(
+        for overlay: TextOverlay,
+        in absoluteFrame: CGRect,
+        fontScale: CGFloat
+    ) -> (rect: CGRect, cornerRadius: CGFloat)? {
+        guard overlay.style.kind == .pill, !overlay.text.isEmpty,
+              absoluteFrame.width > 0, absoluteFrame.height > 0 else { return nil }
 
-        switch style.kind {
-        case .pill:
-            rect = textRect.insetBy(dx: -inset, dy: -inset * StyleRatio.pillVerticalInset)
-            radius = min(rect.height / 2, inset * StyleRatio.pillCornerInset)
-        case .highlight:
-            rect = textRect.insetBy(dx: -inset * StyleRatio.highlightHorizontalInset, dy: -inset * StyleRatio.highlightVerticalInset)
-            radius = inset * StyleRatio.highlightCorner
-        case .plain, .shadow, .stroke, .glow:
-            return
+        let attributed = attributedString(for: overlay, fontScale: fontScale)
+        let measured = attributed.boundingRect(
+            with: CGSize(width: absoluteFrame.width, height: .greatestFiniteMagnitude),
+            options: [.usesLineFragmentOrigin, .usesFontLeading],
+            context: nil
+        )
+        let textWidth = min(ceil(measured.width), absoluteFrame.width)
+        let textHeight = min(ceil(measured.height), absoluteFrame.height)
+        let originY = absoluteFrame.minY + (absoluteFrame.height - textHeight) / 2
+        let originX: CGFloat
+        switch overlay.alignment {
+        case .leading, .justified:
+            originX = absoluteFrame.minX
+        case .center:
+            originX = absoluteFrame.minX + (absoluteFrame.width - textWidth) / 2
+        case .trailing:
+            originX = absoluteFrame.maxX - textWidth
         }
+        let textRect = CGRect(x: originX, y: originY, width: textWidth, height: textHeight)
 
-        guard rect.width > 0, rect.height > 0 else { return }
-        cg.saveGState()
-        cg.setFillColor(UIColor(hex: style.colorHex).cgColor)
-        UIBezierPath(roundedRect: rect, cornerRadius: max(0, radius)).fill()
-        cg.restoreGState()
+        let inset = CGFloat(overlay.style.width) * fontScale
+        let outset = textRect.insetBy(dx: -inset, dy: -inset * StyleRatio.pillVerticalInset)
+        // The outward inset can overflow `absoluteFrame` (a large style width, or a
+        // text box with little room to spare); clamp rather than let the caller's
+        // rectangular clip crop the rounded corners into a flat notch.
+        let rect = outset.intersection(absoluteFrame)
+        guard rect.width > 0, rect.height > 0 else { return nil }
+        let radius = min(rect.height / 2, inset * StyleRatio.pillCornerInset)
+        return (rect, max(0, radius))
     }
 
     // MARK: - Helpers

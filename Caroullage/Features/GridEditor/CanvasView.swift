@@ -695,11 +695,18 @@ final class CellContentView: UIView {
 final class TextOverlayView: UIView {
 
     private let label = UILabel()
+    /// `.pill`'s background, painted BEHIND the label. `.highlight` needs no such
+    /// layer — it rides `.backgroundColor` inside the label's attributed string
+    /// (see `TextRendering.applyStyle`), so it already matches the export.
+    private let backgroundLayer = CALayer()
     private let selectionLayer = CAShapeLayer()
 
     /// The overlay this view currently renders — set on `configure` and mutated as
     /// the view drags itself, so its emitted geometry always carries the right id.
     private var overlay: TextOverlay?
+    /// Stashed from the last `configure` so a bounds-only change (rotation, layout
+    /// pass) can still re-derive the background rect without a fresh `configure`.
+    private var fontScale: CGFloat = 1
 
     /// The finger's true (unsnapped) centre during a drag; snapping is layered on
     /// top of this as a display magnet so the zone never feels "stuck" to a guide.
@@ -721,6 +728,10 @@ final class TextOverlayView: UIView {
         isUserInteractionEnabled = true
         backgroundColor = .clear
         clipsToBounds = true
+
+        backgroundLayer.isHidden = true
+        layer.addSublayer(backgroundLayer)
+
         label.numberOfLines = 0
         label.lineBreakMode = .byWordWrapping
         addSubview(label)
@@ -740,7 +751,9 @@ final class TextOverlayView: UIView {
 
     func configure(with overlay: TextOverlay, fontScale: CGFloat) {
         self.overlay = overlay
+        self.fontScale = fontScale
         label.attributedText = TextRendering.attributedString(for: overlay, fontScale: fontScale)
+        refreshBackground()
     }
 
     override func layoutSubviews() {
@@ -750,6 +763,27 @@ final class TextOverlayView: UIView {
         selectionLayer.path = UIBezierPath(
             roundedRect: bounds.insetBy(dx: 1, dy: 1), cornerRadius: 6
         ).cgPath
+        refreshBackground()
+    }
+
+    /// Keeps the `.pill` background layer in lockstep with `TextRendering`'s shared
+    /// helper — the same geometry the export draws, computed in `bounds`' own
+    /// coordinate space (origin zero, matching how `label.frame = bounds` already
+    /// works), so the canvas and the export agree by construction.
+    private func refreshBackground() {
+        guard let overlay,
+              let background = TextRendering.backgroundRect(for: overlay, in: bounds, fontScale: fontScale)
+        else {
+            backgroundLayer.isHidden = true
+            return
+        }
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        backgroundLayer.isHidden = false
+        backgroundLayer.frame = background.rect
+        backgroundLayer.cornerRadius = background.cornerRadius
+        backgroundLayer.backgroundColor = UIColor(hex: overlay.style.colorHex).cgColor
+        CATransaction.commit()
     }
 
     // MARK: - Gestures
