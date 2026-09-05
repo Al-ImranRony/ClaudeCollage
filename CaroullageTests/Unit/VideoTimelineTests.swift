@@ -58,4 +58,88 @@ final class VideoTimelineTests: XCTestCase {
         XCTAssertEqual(rect.minX, 60, accuracy: 0.01)
         XCTAssertEqual(rect.width, 90, accuracy: 0.01)
     }
+
+    // MARK: - laneRect clipping (Task 7 feeds this live, uncommitted drag values)
+
+    func testALaneStartingBeforeZeroClipsToTheVisiblePortion() {
+        // A live drag can push a clip's start negative before it settles. The
+        // rect must describe only the visible portion, clamped to the leading edge.
+        let rect = VideoTimelineGeometry.laneRect(
+            start: -2, duration: 3, compositionDuration: 10,
+            in: CGRect(x: 0, y: 0, width: width, height: 20))
+
+        XCTAssertEqual(rect.minX, 0, accuracy: 0.01)
+        XCTAssertEqual(rect.width, 30, accuracy: 0.01)
+    }
+
+    func testALaneExtendingPastTheCompositionEndClipsToTheVisiblePortion() {
+        let rect = VideoTimelineGeometry.laneRect(
+            start: 8, duration: 5, compositionDuration: 10,
+            in: CGRect(x: 0, y: 0, width: width, height: 20))
+
+        XCTAssertEqual(rect.minX, 240, accuracy: 0.01)
+        XCTAssertEqual(rect.width, 60, accuracy: 0.01)
+    }
+
+    func testALaneWhollyOutsideCollapsesToZeroWidthAtTheNearerEdge() {
+        let rect = VideoTimelineGeometry.laneRect(
+            start: 15, duration: 2, compositionDuration: 10,
+            in: CGRect(x: 0, y: 0, width: width, height: 20))
+
+        XCTAssertEqual(rect.minX, 300, accuracy: 0.01)
+        XCTAssertEqual(rect.width, 0, accuracy: 0.01)
+    }
+
+    // MARK: - Degenerate sizes (a view has zero width before its first layout pass)
+
+    func testTimeForXIsSafeForZeroDuration() {
+        let time = VideoTimelineGeometry.time(forX: 150, duration: 0, width: width)
+        XCTAssertFalse(time.isNaN)
+        XCTAssertFalse(time.isInfinite)
+        XCTAssertEqual(time, 0, accuracy: 0.001)
+    }
+
+    func testTimeForXIsSafeForZeroWidth() {
+        let time = VideoTimelineGeometry.time(forX: 150, duration: 10, width: 0)
+        XCTAssertFalse(time.isNaN)
+        XCTAssertFalse(time.isInfinite)
+        XCTAssertEqual(time, 0, accuracy: 0.001)
+    }
+
+    func testLaneRectIsSafeForZeroCompositionDuration() {
+        // An empty composition has no duration yet.
+        let rect = VideoTimelineGeometry.laneRect(
+            start: 2, duration: 3, compositionDuration: 0,
+            in: CGRect(x: 0, y: 0, width: width, height: 20))
+
+        XCTAssertFalse(rect.minX.isNaN)
+        XCTAssertFalse(rect.width.isNaN)
+        XCTAssertFalse(rect.minX.isInfinite)
+        XCTAssertFalse(rect.width.isInfinite)
+        XCTAssertEqual(rect.width, 0, accuracy: 0.01)
+    }
+
+    func testLaneRectIsSafeForZeroWidthBounds() {
+        let rect = VideoTimelineGeometry.laneRect(
+            start: 2, duration: 3, compositionDuration: 10,
+            in: CGRect(x: 0, y: 0, width: 0, height: 20))
+
+        XCTAssertFalse(rect.minX.isNaN)
+        XCTAssertFalse(rect.width.isNaN)
+        XCTAssertFalse(rect.minX.isInfinite)
+        XCTAssertFalse(rect.width.isInfinite)
+        XCTAssertEqual(rect.width, 0, accuracy: 0.01)
+    }
+
+    // MARK: - Non-zero-origin bounds
+
+    func testLaneRectHonorsANonZeroOriginBounds() {
+        let rect = VideoTimelineGeometry.laneRect(
+            start: 2, duration: 3, compositionDuration: 10,
+            in: CGRect(x: 40, y: 5, width: width, height: 20))
+
+        XCTAssertEqual(rect.minX, 100, accuracy: 0.01)
+        XCTAssertEqual(rect.minY, 5, accuracy: 0.01)
+        XCTAssertEqual(rect.width, 90, accuracy: 0.01)
+    }
 }

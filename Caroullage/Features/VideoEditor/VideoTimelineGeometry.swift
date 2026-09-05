@@ -27,6 +27,17 @@ public enum VideoTimelineGeometry {
     }
 
     /// The rect a clip occupies in a lane, given its start and duration.
+    ///
+    /// The result is clipped to the visible `0...compositionDuration` window. A
+    /// clip that straddles either end is trimmed to its visible portion; a clip
+    /// wholly outside the window collapses to a zero-width rect pinned to the
+    /// nearer edge (the leading edge if it ends before 0, the trailing edge if
+    /// it starts at or past `compositionDuration`). This is deliberate: the
+    /// returned rect describes what to draw, not the clip's underlying document
+    /// values, which the caller already holds. It never produces NaN or a
+    /// negative width, so it is safe to feed directly to a live drag, which can
+    /// pass `start < 0` or `start + duration > compositionDuration` before the
+    /// gesture is committed.
     public static func laneRect(
         start: Double,
         duration: Double,
