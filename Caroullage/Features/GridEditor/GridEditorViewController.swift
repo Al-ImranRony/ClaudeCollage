@@ -24,17 +24,20 @@ final class GridEditorViewController: UIViewController {
     private let toolRail = EditorToolRail()
     private let toolPanel = EditorPanel()
     /// Collapses the panel while it has no content, so Auto Layout cannot hand the
-    /// stage's height to an empty hidden view. Task 9 MUST either deactivate this when
-    /// showing a panel, or install its own height constraint at a priority strictly
-    /// greater than `.defaultHigh` — an equal priority ties silently, with no console
-    /// warning, because neither constraint is required.
+    /// stage's height to an empty hidden view. `openPanel` deactivates this the
+    /// moment a panel gets content — a shown panel's own default 750-priority
+    /// intrinsic sizing is the SAME priority as this constraint, so leaving both
+    /// active would tie silently, with no console warning, rather than reliably
+    /// picking the content's real size. `closePanel` reactivates it only once the
+    /// outgoing content is actually gone; see that method's comment for why the
+    /// ordering there matters too.
     private var collapsedPanelHeight: NSLayoutConstraint?
+    /// The currently-shown Layout panel, if any — kept so `layoutModeChanged()`
+    /// can toggle its picker without the panel being re-created.
+    private weak var layoutPanel: LayoutPanelView?
     private lazy var layoutModeControl = UISegmentedControl(items: ["Grid", "Shapes"])
     private lazy var layoutPicker = LayoutPickerView(selected: viewModel.state.layout.gridTemplate)
     private lazy var shapePicker = ShapePickerView(selected: viewModel.state.layout.polygonTemplate)
-    // Orphaned pending Task 9 — never read (see "Orphaned pending Task 9: Custom
-    // shape (premium)" further down); the whole chain is dead on purpose until the
-    // rail gains an entry point for it.
     private lazy var customShapeButton = makeCustomShapeButton()
     private lazy var backgroundPicker = BackgroundPickerView(selected: viewModel.state.background)
     private let borderSlider = UISlider()
@@ -97,6 +100,7 @@ final class GridEditorViewController: UIViewController {
         view.backgroundColor = Theme.Color.background
         setupNavigationBar()
         setupLayout()
+        setupRail()
         setupGestures()
         setupDropInteraction()
         bindViewModel()
@@ -239,6 +243,155 @@ final class GridEditorViewController: UIViewController {
         ])
     }
 
+    // MARK: - Tool rail
+
+    private var openToolID: EditorTool.ID?
+
+    private func setupRail() {
+        // These three controls predate the rail (Step 01) and lost their
+        // target/action wiring when the controls tray that used to host them was
+        // removed. Restoring it here is what makes `layoutModeChanged()`,
+        // `borderChanged()`, `cornerChanged()` and `sliderReleased()` live again.
+        layoutModeControl.addTarget(self, action: #selector(layoutModeChanged), for: .valueChanged)
+        borderSlider.addTarget(self, action: #selector(borderChanged), for: .valueChanged)
+        borderSlider.addTarget(self, action: #selector(sliderReleased),
+                               for: [.touchUpInside, .touchUpOutside, .touchCancel])
+        cornerSlider.addTarget(self, action: #selector(cornerChanged), for: .valueChanged)
+        cornerSlider.addTarget(self, action: #selector(sliderReleased),
+                               for: [.touchUpInside, .touchUpOutside, .touchCancel])
+
+        var tools: [EditorTool] = []
+        // A template defines its own geometry — offering a layout picker would claim
+        // a selection the document does not have.
+        if viewModel.state.layout.offersLayoutAlternatives {
+            tools.append(EditorTool(id: "layout", title: "Layout",
+                                    systemImage: "square.grid.2x2",
+                                    accessibilityIdentifier: "layoutTool"))
+        }
+        tools.append(contentsOf: [
+            EditorTool(id: "frame", title: "Frame",
+                       systemImage: "square.dashed", accessibilityIdentifier: "frameTool"),
+            EditorTool(id: "background", title: "Background",
+                       systemImage: "circle.lefthalf.filled",
+                       accessibilityIdentifier: "backgroundTool"),
+            // Identifiers preserved from the old pill buttons so existing UI tests
+            // keep matching.
+            EditorTool(id: "text", title: "Text",
+                       systemImage: "textformat", accessibilityIdentifier: "addTextButton"),
+            EditorTool(id: "sticker", title: "Sticker",
+                       systemImage: "face.smiling", accessibilityIdentifier: "addStickerButton"),
+        ])
+        toolRail.setBaseTools(tools)
+
+        toolRail.onSelect = { [weak self] in self?.toolTapped($0) }
+        toolPanel.onClose = { [weak self] in self?.closePanel() }
+    }
+
+    private func toolTapped(_ id: EditorTool.ID) {
+        // Tapping the open tool again closes it and gives the canvas its height back.
+        guard id != openToolID else { return closePanel() }
+
+        switch id {
+        case "layout":      openPanel(makeLayoutPanel(), title: "Layout", id: id)
+        case "frame":       openPanel(makeFramePanel(), title: "Frame", id: id)
+        case "background":  openPanel(makeBackgroundPanel(), title: "Background", id: id)
+        case "text":        addTextTapped()
+        case "sticker":     addStickerTapped()
+        default:            break
+        }
+    }
+
+    private func openPanel(_ content: UIView, title: String, id: EditorTool.ID) {
+        openToolID = id
+        toolRail.setActiveTool(id)
+        // Must run BEFORE `show`: see `collapsedPanelHeight`'s doc comment for why
+        // leaving it active here would tie against the content we're about to
+        // add instead of cleanly losing to it.
+        collapsedPanelHeight?.isActive = false
+        toolPanel.show(content, title: title, animated: true)
+        animateStageResize()
+    }
+
+    private func closePanel() {
+        openToolID = nil
+        toolRail.setActiveTool(nil)
+        // `EditorPanel.hide(animated:)` keeps its outgoing content attached (with
+        // the same 750-priority sizing `openPanel` above worries about) until ITS
+        // OWN fade finishes, so reactivating `collapsedPanelHeight` at the same
+        // moment would tie against that still-attached content instead of
+        // cleanly winning. Hiding un-animated removes the content synchronously,
+        // so by the time the constraint goes back up nothing contests it — the
+        // stage's resize just below is still animated, so the canvas growing
+        // back to fill the freed space reads as one continuous motion even
+        // though the panel itself disappears a beat faster.
+        toolPanel.hide(animated: false)
+        collapsedPanelHeight?.isActive = true
+        animateStageResize()
+    }
+
+    /// The stage and the panel share one animation block so the canvas grows and
+    /// shrinks smoothly instead of jumping a frame after the panel moves.
+    private func animateStageResize() {
+        guard !Theme.Motion.isReduced else { return view.layoutIfNeeded() }
+        UIView.animate(
+            withDuration: Theme.Motion.standard,
+            delay: 0,
+            usingSpringWithDamping: Theme.Motion.effectiveSpringDamping,
+            initialSpringVelocity: Theme.Motion.effectiveSpringVelocity,
+            options: [.allowUserInteraction]
+        ) {
+            self.view.layoutIfNeeded()
+        }
+    }
+
+    // MARK: - Panel factories
+
+    private func makeLayoutPanel() -> UIView {
+        layoutModeControl.selectedSegmentIndex = viewModel.state.layout.isPolygon ? 1 : 0
+        let panel = LayoutPanelView(
+            modeControl: layoutModeControl,
+            layoutPicker: layoutPicker,
+            shapePicker: shapePicker,
+            customButton: customShapeButton)
+        panel.showPolygonControls(viewModel.state.layout.isPolygon)
+        layoutPanel = panel
+        return panel
+    }
+
+    private func makeFramePanel() -> UIView {
+        borderSlider.value = Float(normalizedBorder)
+        cornerSlider.value = Float(normalizedCorner)
+        return FramePanelView(borderSlider: borderSlider, cornerSlider: cornerSlider)
+    }
+
+    private func makeBackgroundPanel() -> UIView {
+        BackgroundPanelView(picker: backgroundPicker,
+                            generativeButton: makeGenerativeBackgroundButton())
+    }
+
+    /// The AI generative-background entry, as the trailing chip of the Background
+    /// panel rather than a row of its own.
+    ///
+    /// Returns `nil` where Image Playground cannot run — the old row hid itself for
+    /// the same reason, and `MagicEraserUITests` asserts the button is ABSENT, not
+    /// merely disabled. Do not simplify this to always return a button.
+    private func makeGenerativeBackgroundButton() -> UIButton? {
+        guard aiService.generativeBackgroundsAvailable else { return nil }
+
+        var config = UIButton.Configuration.tinted()
+        config.image = UIImage(systemName: "sparkles")
+        config.cornerStyle = .capsule   // never set layer.cornerRadius on a configured button
+        config.baseBackgroundColor = Theme.Color.accent
+        config.baseForegroundColor = Theme.Color.accent
+        let button = UIButton(configuration: config, primaryAction: UIAction { [weak self] _ in
+            Haptics.tap()
+            self?.presentGenerativeBackground()
+        })
+        button.accessibilityIdentifier = "generateBackgroundButton"
+        button.accessibilityLabel = "Generate background"
+        return button
+    }
+
     private func setupGestures() {
         canvasView.isUserInteractionEnabled = true
 
@@ -370,8 +523,13 @@ final class GridEditorViewController: UIViewController {
         cornerSlider.value = Float(normalizedCorner)
         let layout = viewModel.state.layout
         layoutModeControl.selectedSegmentIndex = layout.isPolygon ? 1 : 0
-        layoutPicker.isHidden = layout.isPolygon
-        shapePicker.isHidden = !layout.isPolygon
+        // Routed through the panel (a no-op when it isn't currently shown, rather
+        // than setting `layoutPicker`/`shapePicker.isHidden` directly) so
+        // `customShapeButton`'s visibility stays in lockstep with the two
+        // pickers'. An undo/redo that flips grid⇄polygon while the Layout panel
+        // happens to be open must not leave the Custom Shape button showing (or
+        // hidden) for the wrong mode.
+        layoutPanel?.showPolygonControls(layout.isPolygon)
         // Passed straight through (not `if let`) so the highlight clears when the
         // document has no grid layout, rather than sticking on a stale template.
         layoutPicker.setSelected(layout.gridTemplate)
@@ -381,16 +539,11 @@ final class GridEditorViewController: UIViewController {
 
     /// Toggles the Grid/Shapes picker and applies that mode's default layout so
     /// the canvas immediately reflects the switch.
-    ///
-    /// Orphaned pending Task 9: `layoutModeControl` has no target/action wiring
-    /// (Task 8 removed the controls tray that owned it), so this is never called.
-    /// Dead on purpose — Task 9 re-homes it into the rail/panel. Do not delete.
     @objc private func layoutModeChanged() {
         let showShapes = layoutModeControl.selectedSegmentIndex == 1
         Haptics.selectionChanged()
         UIView.animate(withDuration: Theme.Motion.quick) {
-            self.layoutPicker.isHidden = showShapes
-            self.shapePicker.isHidden = !showShapes
+            self.layoutPanel?.showPolygonControls(showShapes)
         }
         if showShapes {
             let polygon = viewModel.state.layout.polygonTemplate ?? .diagonalLeft
@@ -418,12 +571,7 @@ final class GridEditorViewController: UIViewController {
         return max > 0 ? min(1, viewModel.state.cornerRadius / max) : 0
     }
 
-    // MARK: - Orphaned pending Task 9 (border / corner slider actions)
-    //
-    // Dead on purpose: `borderSlider`/`cornerSlider` have no `addTarget` wiring —
-    // Task 8 removed the controls tray that owned them — so none of the three
-    // methods below ever fire. Task 9 re-homes the sliders into the panel and
-    // re-wires these. Do not delete.
+    // MARK: - Frame slider actions
 
     @objc private func borderChanged() {
         viewModel.previewBorderWidth(Double(borderSlider.value) * viewModel.maxBorderWidth)
@@ -442,13 +590,7 @@ final class GridEditorViewController: UIViewController {
         refreshToolbar()
     }
 
-    // MARK: - Orphaned pending Task 9: Custom shape (premium)
-    //
-    // Dead on purpose: `customShapeButton` (declared near the top of the class) is
-    // never read, so nothing in this section — `makeCustomShapeButton()`,
-    // `customShapeTapped()`, `presentBezierEditor()` — is reachable. This chain
-    // backs the Custom Shape premium feature, which is temporarily unreachable in
-    // the UI as a result. Task 9 re-homes it into the rail/panel. Do not delete.
+    // MARK: - Custom shape (premium)
 
     private func makeCustomShapeButton() -> UIButton {
         var config = UIButton.Configuration.tinted()
@@ -626,44 +768,7 @@ final class GridEditorViewController: UIViewController {
         present(host, animated: true)
     }
 
-    // MARK: - Orphaned pending Task 9: Add overlays (text / stickers)
-    //
-    // Dead on purpose: `makeAddOverlayBar()` is never called — Task 8 removed the
-    // controls tray it was built into — so `makeAddButton()` and, transitively,
-    // `addTextTapped()` further down are unreachable too. Task 9 re-homes this bar
-    // into the rail/panel. Do not delete.
-
-    private func makeAddOverlayBar() -> UIView {
-        let textButton = makeAddButton(
-            title: "Text", systemImage: "textformat", identifier: "addTextButton",
-            action: { [weak self] in self?.addTextTapped() })
-        let stickerButton = makeAddButton(
-            title: "Sticker", systemImage: "face.smiling", identifier: "addStickerButton",
-            action: { [weak self] in self?.addStickerTapped() })
-        let row = UIStackView(arrangedSubviews: [textButton, stickerButton])
-        row.axis = .horizontal
-        row.distribution = .fillEqually
-        row.spacing = 12
-        row.translatesAutoresizingMaskIntoConstraints = false
-        return row
-    }
-
-    /// One definition of the editors' add-overlay pill, in the component layer:
-    /// the grid and video editors each carried an identical private copy, and
-    /// they had already drifted apart on contrast.
-    private func makeAddButton(
-        title: String, systemImage: String, identifier: String,
-        action: @escaping () -> Void
-    ) -> UIButton {
-        let button = ThemeButton(
-            style: .tinted,
-            title: title,
-            image: UIImage(systemName: systemImage),
-            action: UIAction { _ in action() }
-        )
-        button.accessibilityIdentifier = identifier
-        return button
-    }
+    // MARK: - Add overlays (text / stickers)
 
     /// Adds a fresh text zone at the canvas centre and opens the styling sheet so
     /// the user can type immediately.
@@ -779,42 +884,7 @@ final class GridEditorViewController: UIViewController {
         present(alert, animated: true)
     }
 
-    // MARK: - Orphaned pending Task 9 (generative background row)
-    //
-    // Dead on purpose: nothing calls `makeGenerativeBackgroundRow()` — Task 8
-    // removed the controls tray it was built for — so `presentGenerativeBackground()`
-    // below is unreachable too. Task 9 re-homes this row into the panel. Do not delete.
-
-    /// The Image Playground entry point, present ONLY on hardware that can run it.
-    ///
-    /// Hidden rather than disabled, deliberately: this is a premium feature, and
-    /// showing a locked control on a device that could never run it even after
-    /// paying would be false advertising. On the simulator and on pre-Apple
-    /// Intelligence devices the row simply does not exist.
-    private func makeGenerativeBackgroundRow() -> UIView {
-        let row = UIStackView()
-        row.isLayoutMarginsRelativeArrangement = true
-        row.layoutMargins = UIEdgeInsets(top: 0, left: 16, bottom: 2, right: 16)
-        guard aiService.generativeBackgroundsAvailable else {
-            row.isHidden = true
-            return row
-        }
-
-        var config = UIButton.Configuration.tinted()
-        config.title = "Generate Background"
-        config.image = UIImage(systemName: "sparkles")
-        config.imagePadding = 6
-        config.cornerStyle = .large
-        config.baseBackgroundColor = Theme.Color.accent
-        config.baseForegroundColor = Theme.Color.accent
-        let button = UIButton(configuration: config, primaryAction: UIAction { [weak self] _ in
-            Haptics.tap()
-            self?.presentGenerativeBackground()
-        })
-        button.accessibilityIdentifier = "generateBackgroundButton"
-        row.addArrangedSubview(button)
-        return row
-    }
+    // MARK: - Generative background
 
     private func presentGenerativeBackground() {
         guard EntitlementStore.shared.isPremiumUnlocked else {
@@ -874,16 +944,7 @@ final class GridEditorViewController: UIViewController {
         return alert
     }
 
-    // MARK: - Orphaned pending Task 9 (sticker picker + text-color helper)
-    //
-    // Dead on purpose: `addStickerTapped()` is only referenced from the dead
-    // `makeAddOverlayBar()` above — Task 8 removed the controls tray that called it
-    // — so `addPersonalSticker(_:)` and `addSticker(from:)` below are unreachable
-    // too. That pair wasn't called out in Task 8's brief, but the call graph
-    // confirms it. `onLightBackground`, at the end of this run, is likewise dead,
-    // reachable only from the equally-orphaned `addTextTapped()` above. Task 9
-    // re-homes the sticker picker (and its "add text" sibling) into the rail/panel.
-    // Do not delete.
+    // MARK: - Sticker picker + text-color helper
 
     /// Opens the sticker picker; the chosen sticker becomes a selected canvas overlay.
     @objc private func addStickerTapped() {
@@ -1087,44 +1148,6 @@ final class GridEditorViewController: UIViewController {
         let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "OK", style: .default))
         present(alert, animated: true)
-    }
-
-    // MARK: - Orphaned pending Task 9 (panel layout helpers)
-    //
-    // Dead on purpose: nothing calls `sectionLabel(_:)` or `labelledSlider(...)` —
-    // Task 8 removed the controls tray that used them to lay out its rows. Task 9
-    // re-homes both into the new panel content. Do not delete.
-
-    private func sectionLabel(_ text: String) -> UIView {
-        let label = UILabel()
-        label.text = text
-        label.font = Theme.Typography.headline
-        label.textColor = Theme.Color.textPrimary
-
-        let row = UIStackView(arrangedSubviews: [label])
-        row.isLayoutMarginsRelativeArrangement = true
-        row.layoutMargins = UIEdgeInsets(top: 6, left: 16, bottom: 0, right: 16)
-        return row
-    }
-
-    private func labelledSlider(_ title: String, slider: UISlider, systemImage: String) -> UIView {
-        let icon = UIImageView(image: UIImage(systemName: systemImage))
-        icon.tintColor = Theme.Color.textSecondary
-        icon.setContentHuggingPriority(.required, for: .horizontal)
-        let label = UILabel()
-        label.text = title
-        label.font = Theme.Typography.subheadline
-        label.textColor = Theme.Color.textSecondary
-        label.setContentHuggingPriority(.required, for: .horizontal)
-        label.widthAnchor.constraint(equalToConstant: 72).isActive = true
-
-        let row = UIStackView(arrangedSubviews: [icon, label, slider])
-        row.axis = .horizontal
-        row.spacing = 8
-        row.alignment = .center
-        row.isLayoutMarginsRelativeArrangement = true
-        row.layoutMargins = UIEdgeInsets(top: 0, left: 16, bottom: 0, right: 16)
-        return row
     }
 }
 
