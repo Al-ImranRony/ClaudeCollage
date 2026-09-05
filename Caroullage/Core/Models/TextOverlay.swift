@@ -37,6 +37,8 @@ public struct TextOverlay: Codable, Sendable, Equatable, Identifiable {
     public var isBold: Bool
     public var isItalic: Bool
     public var isUnderlined: Bool
+    /// How the text is presented over its background. See `TextStyle`.
+    public var style: TextStyle
     public var frameX: Double
     public var frameY: Double
     public var frameWidth: Double
@@ -55,6 +57,7 @@ public struct TextOverlay: Codable, Sendable, Equatable, Identifiable {
         isBold: Bool = false,
         isItalic: Bool = false,
         isUnderlined: Bool = false,
+        style: TextStyle = TextStyle(),
         frame: CGRect = .zero
     ) {
         self.id = id
@@ -69,6 +72,7 @@ public struct TextOverlay: Codable, Sendable, Equatable, Identifiable {
         self.isBold = isBold
         self.isItalic = isItalic
         self.isUnderlined = isUnderlined
+        self.style = style
         self.frameX = Double(frame.origin.x)
         self.frameY = Double(frame.origin.y)
         self.frameWidth = Double(frame.size.width)
@@ -99,6 +103,7 @@ public struct TextOverlay: Codable, Sendable, Equatable, Identifiable {
     private enum CodingKeys: String, CodingKey {
         case id, text, fontName, fontSize, colorHex, alignmentRaw
         case letterSpacing, lineHeight, opacity, isBold, isItalic, isUnderlined
+        case style
         case frameX, frameY, frameWidth, frameHeight
     }
 
@@ -117,6 +122,7 @@ public struct TextOverlay: Codable, Sendable, Equatable, Identifiable {
         self.isBold = try c.decodeIfPresent(Bool.self, forKey: .isBold) ?? fallback.isBold
         self.isItalic = try c.decodeIfPresent(Bool.self, forKey: .isItalic) ?? fallback.isItalic
         self.isUnderlined = try c.decodeIfPresent(Bool.self, forKey: .isUnderlined) ?? fallback.isUnderlined
+        self.style = try c.decodeIfPresent(TextStyle.self, forKey: .style) ?? fallback.style
         self.frameX = try c.decodeIfPresent(Double.self, forKey: .frameX) ?? fallback.frameX
         self.frameY = try c.decodeIfPresent(Double.self, forKey: .frameY) ?? fallback.frameY
         self.frameWidth = try c.decodeIfPresent(Double.self, forKey: .frameWidth) ?? fallback.frameWidth
