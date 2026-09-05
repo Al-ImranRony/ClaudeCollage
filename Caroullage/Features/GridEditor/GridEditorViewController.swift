@@ -513,11 +513,11 @@ final class GridEditorViewController: UIViewController {
 
     /// Re-sync the sliders/pickers after undo/redo changes state underneath them.
     ///
-    /// Pending Task 9: `layoutModeControl`, `layoutPicker`, `shapePicker`,
-    /// `backgroundPicker`, `borderSlider` and `cornerSlider` are not currently in any
-    /// view hierarchy — Task 8 removed the controls tray that hosted them. This
-    /// method still runs on every undo/redo and keeps them correctly configured
-    /// underneath; that's harmless today, and Task 9 restores them to the panel.
+    /// The pickers live inside their panels, which may be closed when this runs, so it
+    /// keeps them configured whether or not they are on screen. Polygon visibility goes
+    /// through `LayoutPanelView.showPolygonControls` rather than setting each picker's
+    /// `isHidden` directly: the direct route skips `customShapeButton`, which left the
+    /// Custom Shape button stale after an undo that flipped grid to polygon.
     private func syncControls() {
         borderSlider.value = Float(normalizedBorder)
         cornerSlider.value = Float(normalizedCorner)
