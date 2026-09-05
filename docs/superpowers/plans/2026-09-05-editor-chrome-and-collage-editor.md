@@ -1571,6 +1571,26 @@ block and before `return`, insert:
         return NSAttributedString(string: overlay.text, attributes: attributes)
     }
 
+    // `TextStyle` carries ONE `width` for every treatment, so the treatments that
+    // need a second dimension derive it here by a fixed ratio. Naming them makes the
+    // coupling legible: a `.shadow` cannot be art-directed as "soft blur, short
+    // offset" versus "sharp blur, long offset" — every shadow rides one curve. If a
+    // designer ever needs those independently, the fix is a second field on
+    // `TextStyle`, not a new literal in this file.
+    private enum StyleRatio {
+        /// Shadow offset as a fraction of `width`; the blur uses `width` directly.
+        static let shadowOffset: CGFloat = 0.35
+        /// A glow is a blur with no offset, softer than a drop shadow of the same width.
+        static let glowBlur: CGFloat = 1.6
+        /// Pill: generous horizontal inset, tighter vertical, near-capsule corners.
+        static let pillVerticalInset: CGFloat = 0.6
+        static let pillCornerInset: CGFloat = 2
+        /// Highlight: hugs the text, marker-pen corners.
+        static let highlightHorizontalInset: CGFloat = 0.5
+        static let highlightVerticalInset: CGFloat = 0.25
+        static let highlightCorner: CGFloat = 0.3
+    }
+
     /// Applies the presentation treatment. Kept separate from typesetting so the
     /// pill / highlight kinds — which paint behind the text rather than changing it
     /// — can be no-ops here and handled in `draw`.
@@ -1595,13 +1615,13 @@ block and before `return`, insert:
             let shadow = NSShadow()
             shadow.shadowColor = colour.withAlphaComponent(0.55)
             shadow.shadowBlurRadius = max(1, width)
-            shadow.shadowOffset = CGSize(width: 0, height: max(1, width * 0.35))
+            shadow.shadowOffset = CGSize(width: 0, height: max(1, width * StyleRatio.shadowOffset))
             attributes[.shadow] = shadow
 
         case .glow:
             let shadow = NSShadow()
             shadow.shadowColor = colour
-            shadow.shadowBlurRadius = max(1, width * 1.6)
+            shadow.shadowBlurRadius = max(1, width * StyleRatio.glowBlur)
             shadow.shadowOffset = .zero
             attributes[.shadow] = shadow
         }
@@ -1649,11 +1669,11 @@ Then add the helper below `draw`:
 
         switch style.kind {
         case .pill:
-            rect = textRect.insetBy(dx: -inset, dy: -inset * 0.6)
-            radius = min(rect.height / 2, inset * 2)
+            rect = textRect.insetBy(dx: -inset, dy: -inset * StyleRatio.pillVerticalInset)
+            radius = min(rect.height / 2, inset * StyleRatio.pillCornerInset)
         case .highlight:
-            rect = textRect.insetBy(dx: -inset * 0.5, dy: -inset * 0.25)
-            radius = inset * 0.3
+            rect = textRect.insetBy(dx: -inset * StyleRatio.highlightHorizontalInset, dy: -inset * StyleRatio.highlightVerticalInset)
+            radius = inset * StyleRatio.highlightCorner
         case .plain, .shadow, .stroke, .glow:
             return
         }
