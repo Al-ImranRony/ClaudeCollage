@@ -39,6 +39,11 @@ public struct TextOverlay: Codable, Sendable, Equatable, Identifiable {
     public var isUnderlined: Bool
     /// How the text is presented over its background. See `TextStyle`.
     public var style: TextStyle
+    /// In-point in seconds. `nil` means "from the beginning" — the still-image
+    /// paths ignore timing entirely, so this costs the photo editor nothing.
+    public var startTime: Double?
+    /// Out-point in seconds, exclusive. `nil` means "to the end".
+    public var endTime: Double?
     public var frameX: Double
     public var frameY: Double
     public var frameWidth: Double
@@ -58,6 +63,8 @@ public struct TextOverlay: Codable, Sendable, Equatable, Identifiable {
         isItalic: Bool = false,
         isUnderlined: Bool = false,
         style: TextStyle = TextStyle(),
+        startTime: Double? = nil,
+        endTime: Double? = nil,
         frame: CGRect = .zero
     ) {
         self.id = id
@@ -73,6 +80,8 @@ public struct TextOverlay: Codable, Sendable, Equatable, Identifiable {
         self.isItalic = isItalic
         self.isUnderlined = isUnderlined
         self.style = style
+        self.startTime = startTime
+        self.endTime = endTime
         self.frameX = Double(frame.origin.x)
         self.frameY = Double(frame.origin.y)
         self.frameWidth = Double(frame.size.width)
@@ -104,6 +113,7 @@ public struct TextOverlay: Codable, Sendable, Equatable, Identifiable {
         case id, text, fontName, fontSize, colorHex, alignmentRaw
         case letterSpacing, lineHeight, opacity, isBold, isItalic, isUnderlined
         case style
+        case startTime, endTime
         case frameX, frameY, frameWidth, frameHeight
     }
 
@@ -123,9 +133,31 @@ public struct TextOverlay: Codable, Sendable, Equatable, Identifiable {
         self.isItalic = try c.decodeIfPresent(Bool.self, forKey: .isItalic) ?? fallback.isItalic
         self.isUnderlined = try c.decodeIfPresent(Bool.self, forKey: .isUnderlined) ?? fallback.isUnderlined
         self.style = try c.decodeIfPresent(TextStyle.self, forKey: .style) ?? fallback.style
+        self.startTime = try c.decodeIfPresent(Double.self, forKey: .startTime)
+        self.endTime = try c.decodeIfPresent(Double.self, forKey: .endTime)
         self.frameX = try c.decodeIfPresent(Double.self, forKey: .frameX) ?? fallback.frameX
         self.frameY = try c.decodeIfPresent(Double.self, forKey: .frameY) ?? fallback.frameY
         self.frameWidth = try c.decodeIfPresent(Double.self, forKey: .frameWidth) ?? fallback.frameWidth
         self.frameHeight = try c.decodeIfPresent(Double.self, forKey: .frameHeight) ?? fallback.frameHeight
+    }
+
+    /// Whether this overlay is on screen at `time` (seconds into the composition).
+    ///
+    /// An inverted window (`end <= start`) is treated as ALWAYS VISIBLE rather than
+    /// never visible. A corrupt or hand-edited project should not be able to make a
+    /// caption permanently invisible with nothing on screen to explain why — failing
+    /// loud beats failing silent.
+    public func isVisible(at time: Double) -> Bool {
+        switch (startTime, endTime) {
+        case (nil, nil):
+            return true
+        case let (start?, nil):
+            return time >= start
+        case let (nil, end?):
+            return time < end
+        case let (start?, end?):
+            guard end > start else { return true }
+            return time >= start && time < end
+        }
     }
 }
