@@ -392,4 +392,33 @@ final class EditorChromeTests: XCTestCase {
         XCTAssertTrue(hit?.isDescendant(of: button) ?? false,
                      "Hit-testing the close button's visual centre must reach the button itself")
     }
+
+    func testAnInterruptedHideAnimationDoesNotTearDownTheNextPanel() {
+        // Regression test for the primary interaction (rapid panel switching):
+        // hide(animated:)'s completion reads `self.content` at fire time, and
+        // setVisible's completion unconditionally writes `isHidden`. If a show(B)
+        // lands while A's hide animation is still in flight, A's stale completion
+        // fires afterward, sees `content` is now B, tears B down, and hides the
+        // panel — with `isPresenting` left `true` and nothing to re-show B.
+        // All of the panel tests above use `animated: false`, which takes the
+        // synchronous branch in `setVisible` and never exercises this race.
+        let panel = EditorPanel()
+        let a = UIView()
+        let b = UIView()
+
+        panel.show(a, title: "A", animated: true)
+        panel.hide(animated: true)
+        panel.show(b, title: "B", animated: true)
+
+        let settled = expectation(description: "panel settles past the animation duration")
+        DispatchQueue.main.asyncAfter(deadline: .now() + Theme.Motion.quick + 0.2) {
+            settled.fulfill()
+        }
+        wait(for: [settled], timeout: Theme.Motion.quick + 1)
+
+        XCTAssertTrue(panel.isPresenting, "B is showing; isPresenting must reflect that")
+        XCTAssertEqual(panel.currentTitle, "B")
+        XCTAssertNotNil(b.superview, "B's content must still be installed")
+        XCTAssertFalse(panel.isHidden, "The panel must still be visible with B showing")
+    }
 }

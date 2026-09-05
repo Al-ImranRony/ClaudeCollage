@@ -9,11 +9,24 @@
 //  Hiding sets `isHidden` rather than removing the view, so the stage's height
 //  animation has something stable to animate against.
 //
+//  `isHidden` must not be set directly by callers. It is written internally by
+//  `show`/`hide` (via `setVisible`) and guarded by a generation counter so that
+//  an interrupted animation's completion can't clobber a newer presentation.
+//  Setting it from outside desyncs real visibility from `isPresenting`, after
+//  which `hide` becomes a permanent no-op while the panel stays on screen.
+//
 
 import UIKit
 
 @MainActor
 public final class EditorPanel: UIView {
+
+    /// A defensive floor so a caller that lays this out expecting it to
+    /// self-size (rather than being given an explicit height) gets a visibly
+    /// collapsed-looking panel instead of a silent zero-height view. Not a
+    /// real size contract — a caller's explicit height constraint still wins,
+    /// see the `.defaultLow` priority below.
+    private static let minimumHeight: CGFloat = Theme.Spacing.xxl * 2
 
     public var onClose: (() -> Void)?
     public private(set) var isPresenting = false
@@ -32,10 +45,21 @@ public final class EditorPanel: UIView {
     private let contentContainer = UIView()
     private var content: UIView?
 
+    /// Incremented at the start of every `show`/`hide`. An animation
+    /// completion captures the value in effect when it was scheduled and
+    /// bails out if it no longer matches — that's what keeps an interrupted
+    /// hide's completion from writing visibility/content state for a
+    /// presentation that has since moved on.
+    private var visibilityGeneration = 0
+
     public override init(frame: CGRect) {
         super.init(frame: frame)
         backgroundColor = Theme.Color.surfaceRaised
         isHidden = true
+        // Task 8's content isn't ours to trust the height of; without this,
+        // anything taller than the panel bleeds past its edge over the rail
+        // or the canvas instead of failing visibly.
+        clipsToBounds = true
         setupSubviews()
     }
 
@@ -94,11 +118,22 @@ public final class EditorPanel: UIView {
             contentContainer.bottomAnchor.constraint(equalTo: bottomAnchor,
                                                      constant: -Theme.Spacing.xs),
         ])
+
+        // Defensive only: every internal constraint above consumes height,
+        // none of them produce it, so a caller that lays this view out
+        // expecting it to self-size (no explicit height of its own) would
+        // otherwise silently collapse to zero — the same class of bug that
+        // already bit Task 4. `.defaultLow` so a caller's explicit height
+        // constraint still wins; this only stops the silent zero case.
+        let minimumHeight = heightAnchor.constraint(greaterThanOrEqualToConstant: Self.minimumHeight)
+        minimumHeight.priority = .defaultLow
+        minimumHeight.isActive = true
     }
 
     // MARK: - Presentation
 
     public func show(_ view: UIView, title: String, animated: Bool) {
+        visibilityGeneration += 1
         content?.removeFromSuperview()
         content = view
 
@@ -120,15 +155,30 @@ public final class EditorPanel: UIView {
 
     public func hide(animated: Bool) {
         guard isPresenting else { return }
+        visibilityGeneration += 1
         isPresenting = false
         currentTitle = nil
+        // Capture the view that's actually being hidden now, not whatever
+        // `content` happens to point to when this completion eventually
+        // fires — a `show` for a new panel can (and routinely does, in this
+        // component's primary rapid-switching interaction) land before that
+        // happens and replace `content` out from under us.
+        let outgoing = content
         setVisible(false, animated: animated) { [weak self] in
-            self?.content?.removeFromSuperview()
-            self?.content = nil
+            outgoing?.removeFromSuperview()
+            if self?.content === outgoing {
+                self?.content = nil
+            }
         }
     }
 
     private func setVisible(_ visible: Bool, animated: Bool, completion: (() -> Void)? = nil) {
+        // Captured now, checked when the animation completion fires: if a
+        // later show/hide has since bumped the generation, this completion
+        // is for a presentation that's no longer current and must not touch
+        // `isHidden` or run its teardown — the newer show/hide already left
+        // the view in the state it wants.
+        let generation = visibilityGeneration
         guard animated, !Theme.Motion.isReduced else {
             isHidden = !visible
             alpha = visible ? 1 : 0
@@ -139,6 +189,7 @@ public final class EditorPanel: UIView {
         UIView.animate(withDuration: Theme.Motion.quick) {
             self.alpha = visible ? 1 : 0
         } completion: { _ in
+            guard self.visibilityGeneration == generation else { return }
             self.isHidden = !visible
             completion?()
         }
