@@ -27,7 +27,17 @@ public final class EditorToolRail: UIView {
     private let stack = UIStackView()
     private var baseTools: [EditorTool] = []
     private var context: EditorRailContext?
-    private var activeToolID: EditorTool.ID?
+
+    /// The setter is private: only `setActiveTool` and the stale-highlight guard
+    /// in `rebuild()` may change this. The getter is left at the default
+    /// (internal) access level so tests can assert the highlight was cleared.
+    private(set) var activeToolID: EditorTool.ID?
+
+    /// Flat hairline width, matching the codebase's other hand-drawn seams
+    /// (`CarouselStripLayout.seamWidth`, `EmptyCellChrome.outlineWidth`) rather
+    /// than a `UIScreen.main.scale`-derived value. `UIScreen.main` is deprecated
+    /// as of iOS 26 and would misreport the scale on an external display anyway.
+    private static let separatorHeight: CGFloat = 1
 
     /// The accessibility identifiers of every tool button currently in the rail,
     /// in leading-to-trailing order. The chip and the divider are not tools.
@@ -71,7 +81,7 @@ public final class EditorToolRail: UIView {
             separator.topAnchor.constraint(equalTo: topAnchor),
             separator.leadingAnchor.constraint(equalTo: leadingAnchor),
             separator.trailingAnchor.constraint(equalTo: trailingAnchor),
-            separator.heightAnchor.constraint(equalToConstant: 1 / UIScreen.main.scale),
+            separator.heightAnchor.constraint(equalToConstant: Self.separatorHeight),
 
             // Content sits inside the safe area; the view's background does not.
             scrollView.topAnchor.constraint(equalTo: topAnchor),
@@ -99,6 +109,13 @@ public final class EditorToolRail: UIView {
 
     /// Sets or clears the contextual group. Passing a new context replaces the old
     /// one rather than adding to it.
+    ///
+    /// This does not itself choose what is highlighted: a previously active tool
+    /// (set via `setActiveTool`) stays highlighted only if a tool with that same
+    /// identifier is still present after the change — in the new context's tools
+    /// or the base tools. Otherwise the active highlight is silently cleared, so
+    /// a selection can never survive a context change and mislabel an unrelated
+    /// tool as chosen.
     public func setContext(_ context: EditorRailContext?) {
         self.context = context
         rebuild()
@@ -129,6 +146,14 @@ public final class EditorToolRail: UIView {
         }
         for tool in baseTools {
             stack.addArrangedSubview(makeButton(tool))
+        }
+
+        // A tool that no longer exists after this rebuild must not stay "active"
+        // in name only — otherwise an unrelated tool that happens to reuse the
+        // same identifier in a later context would light up unchosen.
+        let presentToolIDs = stack.arrangedSubviews.compactMap { ($0 as? ToolButton)?.toolID }
+        if let activeToolID, !presentToolIDs.contains(activeToolID) {
+            self.activeToolID = nil
         }
         setActiveTool(activeToolID)
     }
@@ -190,6 +215,15 @@ public final class EditorToolRail: UIView {
             .first(where: { $0.accessibilityIdentifier == Self.chipIdentifier }) else { return }
         chip.sendActions(for: .touchUpInside)
     }
+
+    /// The tool button currently in the rail for a given tool identifier, if any.
+    /// Exposed only so tests can inspect real geometry/hit-testing; production
+    /// code has no need to reach into an individual button.
+    func toolButton(for id: EditorTool.ID) -> UIControl? {
+        stack.arrangedSubviews
+            .compactMap { $0 as? ToolButton }
+            .first(where: { $0.toolID == id })
+    }
 }
 
 // MARK: - Tool button
@@ -205,6 +239,9 @@ private final class ToolButton: UIControl {
         self.toolID = tool.id
         super.init(frame: .zero)
 
+        isAccessibilityElement = true
+        accessibilityTraits = .button
+
         icon.image = UIImage(systemName: tool.systemImage)
         icon.contentMode = .scaleAspectFit
         icon.preferredSymbolConfiguration = UIImage.SymbolConfiguration(pointSize: 18, weight: .medium)
@@ -212,6 +249,12 @@ private final class ToolButton: UIControl {
         label.text = tool.title
         label.font = Theme.Typography.tabLabel
         label.textAlignment = .center
+        // The row is a flat 52pt that does not scale with Dynamic Type, so give
+        // the label somewhere to go at the largest accessibility sizes instead
+        // of clipping or overflowing into the neighbouring button.
+        label.numberOfLines = 1
+        label.adjustsFontSizeToFitWidth = true
+        label.minimumScaleFactor = 0.7
 
         let stack = UIStackView(arrangedSubviews: [icon, label])
         stack.axis = .vertical
@@ -223,7 +266,14 @@ private final class ToolButton: UIControl {
 
         NSLayoutConstraint.activate([
             stack.centerXAnchor.constraint(equalTo: centerXAnchor),
-            stack.centerYAnchor.constraint(equalTo: centerYAnchor),
+            // Pinned top/bottom (mirroring ContextChip's leading/trailing/top/bottom
+            // pins) rather than centerYAnchor-only: a UIStackView with
+            // alignment = .center does not stretch a cross-axis arranged subview,
+            // so without a top/bottom pin the button has no source for its own
+            // height and resolves to zero — invisible to hit-testing even though
+            // the icon still draws (clipsToBounds is off).
+            stack.topAnchor.constraint(equalTo: topAnchor),
+            stack.bottomAnchor.constraint(equalTo: bottomAnchor),
             icon.heightAnchor.constraint(equalToConstant: 22),
             widthAnchor.constraint(greaterThanOrEqualToConstant: 58),
         ])
@@ -252,6 +302,9 @@ private final class ContextChip: UIControl {
 
     init(title: String, systemImage: String) {
         super.init(frame: .zero)
+
+        isAccessibilityElement = true
+        accessibilityTraits = .button
 
         let icon = UIImageView(image: UIImage(systemName: systemImage))
         icon.preferredSymbolConfiguration = UIImage.SymbolConfiguration(pointSize: 11, weight: .semibold)

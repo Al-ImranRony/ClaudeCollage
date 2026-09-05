@@ -272,4 +272,53 @@ final class EditorChromeTests: XCTestCase {
         XCTAssertTrue(dismissed)
         XCTAssertEqual(rail.visibleToolIdentifiers, ["layoutTool", "frameTool", "backgroundTool"])
     }
+
+    func testAToolButtonResolvesToARealHitTarget() {
+        // Regression test for a zero-height ToolButton: its inner icon/label stack
+        // was pinned only by centerX/centerY, and a UIStackView with
+        // alignment = .center never stretches a cross-axis arranged subview, so
+        // the button had no source for its own height. It still drew fine
+        // (clipsToBounds is off), but hitTest at the exact point the icon draws
+        // resolved to the parent stack view, not the button — the button was
+        // untappable in a real window even though every prior test passed
+        // (simulateTap drives touchUpInside directly and never hit-tests).
+        let rail = EditorToolRail()
+        rail.frame = CGRect(x: 0, y: 0, width: 402, height: EditorToolRail.contentHeight)
+        rail.setBaseTools(makeBaseTools())
+        rail.layoutIfNeeded()
+
+        guard let button = rail.toolButton(for: "frame") else {
+            return XCTFail("Expected a tool button for the \"frame\" tool")
+        }
+
+        XCTAssertGreaterThan(button.bounds.height, 0,
+                             "ToolButton must derive a real height from its content")
+
+        let centre = button.convert(CGPoint(x: button.bounds.midX, y: button.bounds.midY), to: rail)
+        let hit = rail.hitTest(centre, with: nil)
+
+        XCTAssertTrue(hit?.isDescendant(of: button) ?? false,
+                     "Hit-testing the button's visual centre must reach the button itself, " +
+                     "not a parent stack view")
+    }
+
+    func testSwappingContextClearsAStaleActiveHighlight() {
+        // Regression test: setContext never touched activeToolID and rebuild()
+        // unconditionally reapplied it, so an active tool from the old context
+        // could keep lighting up after a swap — including on an unrelated tool
+        // in the new context that happens to reuse the same identifier.
+        let rail = EditorToolRail()
+        rail.setBaseTools(makeBaseTools())
+        rail.setContext(makePhotoContext())
+        rail.setActiveTool("adjust")
+        XCTAssertEqual(rail.activeToolID, "adjust")
+
+        rail.setContext(EditorRailContext(
+            chipTitle: "Text", chipSystemImage: "textformat",
+            tools: [EditorTool(id: "edit", title: "Edit",
+                               systemImage: "keyboard", accessibilityIdentifier: "editTextTool")]))
+
+        XCTAssertNil(rail.activeToolID,
+                     "A tool no longer present after a context swap must not stay silently active")
+    }
 }
