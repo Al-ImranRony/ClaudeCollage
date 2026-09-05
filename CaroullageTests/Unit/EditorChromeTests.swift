@@ -183,4 +183,93 @@ final class EditorChromeTests: XCTestCase {
         XCTAssertEqual(content.bounds.height, 657.78, accuracy: 0.5,
                        "Bounds must be the untransformed aspect-fit height")
     }
+
+    // MARK: - Tool rail
+
+    private func makeBaseTools() -> [EditorTool] {
+        [
+            EditorTool(id: "layout", title: "Layout",
+                       systemImage: "square.grid.2x2", accessibilityIdentifier: "layoutTool"),
+            EditorTool(id: "frame", title: "Frame",
+                       systemImage: "square.dashed", accessibilityIdentifier: "frameTool"),
+            EditorTool(id: "background", title: "Background",
+                       systemImage: "circle.lefthalf.filled", accessibilityIdentifier: "backgroundTool"),
+        ]
+    }
+
+    private func makePhotoContext() -> EditorRailContext {
+        EditorRailContext(
+            chipTitle: "Photo", chipSystemImage: "photo",
+            tools: [
+                EditorTool(id: "replace", title: "Replace",
+                           systemImage: "arrow.left.arrow.right", accessibilityIdentifier: "replacePhotoTool"),
+                EditorTool(id: "adjust", title: "Adjust",
+                           systemImage: "circle.lefthalf.filled", accessibilityIdentifier: "adjustPhotoTool"),
+            ])
+    }
+
+    func testTheRailShowsItsBaseToolsInOrder() {
+        let rail = EditorToolRail()
+        rail.setBaseTools(makeBaseTools())
+
+        XCTAssertEqual(rail.visibleToolIdentifiers, ["layoutTool", "frameTool", "backgroundTool"])
+    }
+
+    func testAContextIsInsertedAheadOfTheBaseToolsWithoutRemovingThem() {
+        // The whole point of the "A + C" decision: contextual tools are additive.
+        // A user must never lose a document tool because they tapped a photo.
+        let rail = EditorToolRail()
+        rail.setBaseTools(makeBaseTools())
+        rail.setContext(makePhotoContext())
+
+        XCTAssertEqual(
+            rail.visibleToolIdentifiers,
+            ["replacePhotoTool", "adjustPhotoTool", "layoutTool", "frameTool", "backgroundTool"])
+    }
+
+    func testClearingTheContextRestoresTheBaseToolsExactly() {
+        let rail = EditorToolRail()
+        rail.setBaseTools(makeBaseTools())
+        rail.setContext(makePhotoContext())
+        rail.setContext(nil)
+
+        XCTAssertEqual(rail.visibleToolIdentifiers, ["layoutTool", "frameTool", "backgroundTool"])
+    }
+
+    func testSwappingOneContextForAnotherDoesNotAccumulate() {
+        let rail = EditorToolRail()
+        rail.setBaseTools(makeBaseTools())
+        rail.setContext(makePhotoContext())
+        rail.setContext(EditorRailContext(
+            chipTitle: "Text", chipSystemImage: "textformat",
+            tools: [EditorTool(id: "edit", title: "Edit",
+                               systemImage: "keyboard", accessibilityIdentifier: "editTextTool")]))
+
+        XCTAssertEqual(rail.visibleToolIdentifiers,
+                       ["editTextTool", "layoutTool", "frameTool", "backgroundTool"])
+    }
+
+    func testTappingAToolReportsItsIdentifier() {
+        let rail = EditorToolRail()
+        rail.setBaseTools(makeBaseTools())
+        var selected: EditorTool.ID?
+        rail.onSelect = { selected = $0 }
+
+        rail.simulateTap(toolID: "frame")
+
+        XCTAssertEqual(selected, "frame")
+    }
+
+    func testDismissingTheChipReportsAndClearsTheContext() {
+        let rail = EditorToolRail()
+        rail.setBaseTools(makeBaseTools())
+        rail.setContext(makePhotoContext())
+        var dismissed = false
+        rail.onDismissContext = { dismissed = true }
+
+        rail.simulateChipDismiss()
+
+        XCTAssertTrue(dismissed)
+        XCTAssertEqual(rail.visibleToolIdentifiers, ["layoutTool", "frameTool", "backgroundTool"])
+    }
 }
