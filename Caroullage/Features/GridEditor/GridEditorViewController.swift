@@ -284,6 +284,7 @@ final class GridEditorViewController: UIViewController {
         toolRail.setBaseTools(tools)
 
         toolRail.onSelect = { [weak self] in self?.toolTapped($0) }
+        toolRail.onDismissContext = { [weak self] in self?.clearSelection() }
         toolPanel.onClose = { [weak self] in self?.closePanel() }
     }
 
@@ -297,6 +298,32 @@ final class GridEditorViewController: UIViewController {
         case "background":  openPanel(makeBackgroundPanel(), title: "Background", id: id)
         case "text":        addTextTapped()
         case "sticker":     addStickerTapped()
+        case "replace":
+            selectedCellIndex.map { presentPhotoPicker(for: $0) }
+        case "adjust":
+            selectedCellIndex.map { presentFilterPanel(for: $0) }
+        case "lift":
+            selectedCellIndex.map { liftSubject(fromCellAt: $0) }
+        case "erase":
+            selectedCellIndex.map { presentMagicEraser(forCellAt: $0) }
+        case "clear":
+            if let index = selectedCellIndex {
+                viewModel.clearCell(at: index)
+                clearSelection()
+            }
+        case "editText":
+            selectedTextID.map { presentTextStyleSheet(for: $0) }
+        case "styleText":
+            if let id = selectedTextID {
+                openPanel(makeTextStylePanel(for: id), title: "Text", id: "styleText")
+            }
+        case "duplicateText":
+            selectedTextID.map { duplicateTextOverlay($0) }
+        case "deleteText":
+            if let id = selectedTextID {
+                viewModel.removeTextOverlay(id: id)
+                clearSelection()
+            }
         default:            break
         }
     }
@@ -342,6 +369,82 @@ final class GridEditorViewController: UIViewController {
         ) {
             self.view.layoutIfNeeded()
         }
+    }
+
+    // MARK: - Selection context
+
+    private var selectedCellIndex: Int?
+    private var selectedTextID: UUID?
+
+    private static let photoTools: [EditorTool] = [
+        EditorTool(id: "replace", title: "Replace", systemImage: "arrow.left.arrow.right",
+                   accessibilityIdentifier: "replacePhotoTool"),
+        EditorTool(id: "adjust", title: "Adjust", systemImage: "circle.lefthalf.filled",
+                   accessibilityIdentifier: "adjustPhotoTool"),
+        // Identifiers preserved from the retired action sheet.
+        EditorTool(id: "lift", title: "Lift", systemImage: "person.and.background.dotted",
+                   accessibilityIdentifier: "liftSubjectAction"),
+        EditorTool(id: "erase", title: "Erase", systemImage: "eraser",
+                   accessibilityIdentifier: "magicEraserAction"),
+        EditorTool(id: "clear", title: "Clear", systemImage: "trash",
+                   accessibilityIdentifier: "clearCellTool"),
+    ]
+
+    private static let textTools: [EditorTool] = [
+        EditorTool(id: "editText", title: "Edit", systemImage: "keyboard",
+                   accessibilityIdentifier: "editTextTool"),
+        EditorTool(id: "styleText", title: "Style", systemImage: "textformat",
+                   accessibilityIdentifier: "styleTextTool"),
+        EditorTool(id: "duplicateText", title: "Duplicate", systemImage: "plus.square.on.square",
+                   accessibilityIdentifier: "duplicateTextTool"),
+        EditorTool(id: "deleteText", title: "Delete", systemImage: "trash",
+                   accessibilityIdentifier: "deleteTextTool"),
+    ]
+
+    private func selectCell(_ index: Int?) {
+        selectedCellIndex = index
+        selectedTextID = nil
+        canvasView.setSelectedCell(index)
+
+        guard index != nil else { return clearContext() }
+        // A fresh selection retires whatever panel was open for the PREVIOUS
+        // context — a base-tool panel like Frame, or a different overlay's
+        // Style panel. `EditorToolRail.setContext` below silently drops the
+        // rail's own highlight for a tool id that isn't in the new tool set
+        // (see its doc comment), but it has no way to know that `openToolID`
+        // and `toolPanel.isPresenting` are still describing that same tool as
+        // open — only this view controller tracks those two. Closing first
+        // keeps all three in lockstep instead of leaving an open panel with
+        // no highlighted tool (or a highlighted tool with no panel).
+        closePanel()
+        Haptics.selectionChanged()
+        toolRail.setContext(EditorRailContext(
+            chipTitle: "Photo", chipSystemImage: "photo", tools: Self.photoTools))
+    }
+
+    private func selectTextOverlay(_ id: UUID?) {
+        selectedTextID = id
+        selectedCellIndex = nil
+        canvasView.setSelectedCell(nil)
+
+        guard id != nil else { return clearContext() }
+        // See the matching comment in `selectCell` — same coherence rule.
+        closePanel()
+        Haptics.selectionChanged()
+        toolRail.setContext(EditorRailContext(
+            chipTitle: "Text", chipSystemImage: "textformat", tools: Self.textTools))
+    }
+
+    private func clearSelection() {
+        selectedCellIndex = nil
+        selectedTextID = nil
+        canvasView.setSelectedCell(nil)
+        clearContext()
+    }
+
+    private func clearContext() {
+        toolRail.setContext(nil)
+        closePanel()
     }
 
     // MARK: - Panel factories
@@ -473,7 +576,8 @@ final class GridEditorViewController: UIViewController {
 
         // Text zones drag themselves on the GPU during a gesture (like stickers); the
         // view model records the move without a snapshot and commits one on drag end.
-        // A plain tap opens the styling sheet.
+        // A plain tap now selects the overlay (inserting the contextual Text tools)
+        // rather than jumping straight to the full styling sheet.
         canvasView.onTextChanged = { [weak self] overlay in
             self?.viewModel.moveTextOverlay(overlay)
         }
@@ -482,7 +586,7 @@ final class GridEditorViewController: UIViewController {
         }
         canvasView.onTextTapped = { [weak self] id in
             guard let self, self.pendingSwapSource == nil else { return }
-            self.presentTextStyleSheet(for: id)
+            self.selectTextOverlay(id)
         }
     }
 
@@ -664,7 +768,7 @@ final class GridEditorViewController: UIViewController {
 
         if viewModel.state.cells.indices.contains(index),
            viewModel.state.cells[index].imageID != nil {
-            presentCellActions(for: index)
+            selectCell(index)
         } else {
             presentPhotoPicker(for: index)
         }
@@ -680,43 +784,6 @@ final class GridEditorViewController: UIViewController {
         canvasView.setSelectedCell(index)
         Haptics.impact()
         showToast("Tap another cell to swap")
-    }
-
-    private func presentCellActions(for index: Int) {
-        let sheet = UIAlertController(title: nil, message: nil, preferredStyle: .actionSheet)
-        sheet.addAction(UIAlertAction(title: "Replace Photo", style: .default) { [weak self] _ in
-            self?.presentPhotoPicker(for: index)
-        })
-        sheet.addAction(UIAlertAction(title: "Edit Cell", style: .default) { [weak self] _ in
-            self?.presentFilterPanel(for: index)
-        })
-        // Deliberately always offered, never conditionally hidden: the work happens
-        // on-device and whether this photo HAS a liftable subject is only knowable
-        // by trying. A "no subject found" reply is a normal outcome, not an error.
-        let lift = UIAlertAction(title: "Lift Subject", style: .default) { [weak self] _ in
-            self?.liftSubject(fromCellAt: index)
-        }
-        lift.accessibilityIdentifier = "liftSubjectAction"
-        sheet.addAction(lift)
-
-        let erase = UIAlertAction(title: "Magic Eraser", style: .default) { [weak self] _ in
-            self?.presentMagicEraser(forCellAt: index)
-        }
-        erase.accessibilityIdentifier = "magicEraserAction"
-        sheet.addAction(erase)
-        sheet.addAction(UIAlertAction(title: "Clear", style: .destructive) { [weak self] _ in
-            self?.viewModel.clearCell(at: index)
-            self?.canvasView.setSelectedCell(nil)
-        })
-        // Also fires when the sheet is dismissed by tapping outside it.
-        sheet.addAction(UIAlertAction(title: "Cancel", style: .cancel) { [weak self] _ in
-            self?.canvasView.setSelectedCell(nil)
-        })
-        anchorPopover(sheet) { popover in
-            popover.sourceView = canvasView
-            popover.sourceRect = cellRectOnScreen(index) ?? canvasView.bounds
-        }
-        present(sheet, animated: true)
     }
 
     private func presentFilterPanel(for index: Int) {
@@ -766,6 +833,47 @@ final class GridEditorViewController: UIViewController {
         }
         Haptics.selectionChanged()
         present(host, animated: true)
+    }
+
+    /// The tier-2 presets as one tappable row. Tapping one applies it immediately —
+    /// the canvas is visible behind the panel, so the preview IS the confirmation.
+    private func makeTextStylePanel(for id: UUID) -> UIView {
+        let row = UIStackView()
+        row.axis = .horizontal
+        row.spacing = Theme.Spacing.xs
+        row.alignment = .center
+        row.isLayoutMarginsRelativeArrangement = true
+        row.layoutMargins = UIEdgeInsets(
+            top: 0, left: Theme.Spacing.md, bottom: 0, right: Theme.Spacing.md)
+
+        for kind in TextStyle.Kind.allCases {
+            let button = UIButton(type: .system)
+            button.setTitle("Aa", for: .normal)
+            button.titleLabel?.font = Theme.Typography.headline
+            button.accessibilityIdentifier = "textStyle_\(kind.rawValue)"
+            button.accessibilityLabel = kind.rawValue.capitalized
+            button.addAction(UIAction { [weak self] _ in
+                guard let self, var overlay = self.viewModel.textOverlay(id: id) else { return }
+                overlay.style = TextStyle(
+                    kind: kind,
+                    colorHex: self.onLightBackground ? "#FFFFFF" : "#000000",
+                    width: 6)
+                self.viewModel.previewTextOverlay(overlay)
+                self.viewModel.commitInteractiveChange()
+                Haptics.selectionChanged()
+            }, for: .touchUpInside)
+            row.addArrangedSubview(button)
+        }
+        return row
+    }
+
+    private func duplicateTextOverlay(_ id: UUID) {
+        guard var overlay = viewModel.textOverlay(id: id) else { return }
+        overlay.id = UUID()
+        overlay.frame = overlay.frame.offsetBy(dx: 0.03, dy: 0.03)
+        let newID = viewModel.addTextOverlay(overlay)
+        selectTextOverlay(newID)
+        Haptics.tap()
     }
 
     // MARK: - Add overlays (text / stickers)
@@ -1126,10 +1234,6 @@ final class GridEditorViewController: UIViewController {
 
     // MARK: - Helpers
 
-    private func cellRectOnScreen(_ index: Int) -> CGRect? {
-        canvasView.cellRect(at: index)
-    }
-
     private func presentSpinner() -> UIAlertController {
         let alert = UIAlertController(title: nil, message: "Exporting…", preferredStyle: .alert)
         let indicator = UIActivityIndicatorView(style: .medium)
@@ -1148,6 +1252,21 @@ final class GridEditorViewController: UIViewController {
         let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "OK", style: .default))
         present(alert, animated: true)
+    }
+
+    // MARK: - Test seams
+
+    var selectedCellIndexForTesting: Int? { selectedCellIndex }
+
+    var viewModelForTesting: GridEditorViewModel { viewModel }
+
+    func selectCellForTesting(_ index: Int?) { selectCell(index) }
+
+    func selectTextOverlayForTesting(_ id: UUID?) { selectTextOverlay(id) }
+
+    func addTextOverlayForTesting() -> UUID {
+        viewModel.addTextOverlay(TextOverlay(
+            text: "Test", frame: CGRect(x: 0.1, y: 0.4, width: 0.8, height: 0.15)))
     }
 }
 

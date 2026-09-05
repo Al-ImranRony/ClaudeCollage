@@ -118,6 +118,128 @@ final class GridEditorRailTests: XCTestCase {
             .first { $0.accessibilityIdentifier == "layoutPicker" }
         XCTAssertNotNil(picker)
     }
+
+    // MARK: - Contextual groups
+
+    func testSelectingACellInsertsThePhotoToolsAheadOfTheDocumentTools() throws {
+        let editor = makeEditor()
+        editor.selectCellForTesting(0)
+
+        XCTAssertEqual(
+            try rail(in: editor).visibleToolIdentifiers,
+            ["replacePhotoTool", "adjustPhotoTool", "liftSubjectAction", "magicEraserAction",
+             "clearCellTool",
+             "layoutTool", "frameTool", "backgroundTool", "addTextButton", "addStickerButton"],
+            "Document tools must survive a selection — they scroll, they do not vanish")
+    }
+
+    func testDeselectingRestoresTheBaseRail() throws {
+        let editor = makeEditor()
+        editor.selectCellForTesting(0)
+        editor.selectCellForTesting(nil)
+
+        XCTAssertEqual(
+            try rail(in: editor).visibleToolIdentifiers,
+            ["layoutTool", "frameTool", "backgroundTool", "addTextButton", "addStickerButton"])
+    }
+
+    func testDismissingTheChipDeselectsTheCell() throws {
+        let editor = makeEditor()
+        editor.selectCellForTesting(0)
+        try rail(in: editor).simulateChipDismiss()
+
+        XCTAssertNil(editor.selectedCellIndexForTesting)
+    }
+
+    func testSelectingATextOverlayInsertsTheTextTools() throws {
+        let editor = makeEditor()
+        let id = editor.addTextOverlayForTesting()
+        editor.selectTextOverlayForTesting(id)
+
+        let identifiers = try rail(in: editor).visibleToolIdentifiers
+        XCTAssertEqual(Array(identifiers.prefix(4)),
+                       ["editTextTool", "styleTextTool", "duplicateTextTool", "deleteTextTool"])
+    }
+
+    func testDeletingATextOverlayRemovesItAndClearsTheSelection() throws {
+        let editor = makeEditor()
+        let id = editor.addTextOverlayForTesting()
+        editor.selectTextOverlayForTesting(id)
+        try rail(in: editor).simulateTap(toolID: "deleteText")
+
+        XCTAssertNil(editor.viewModelForTesting.textOverlay(id: id))
+        XCTAssertEqual(
+            try rail(in: editor).visibleToolIdentifiers,
+            ["layoutTool", "frameTool", "backgroundTool", "addTextButton", "addStickerButton"])
+    }
+
+    func testDeletingATextOverlayIsUndoable() throws {
+        // It rides `commit`, so it must land on the undo stack like every other edit.
+        let editor = makeEditor()
+        let id = editor.addTextOverlayForTesting()
+        editor.selectTextOverlayForTesting(id)
+        try rail(in: editor).simulateTap(toolID: "deleteText")
+        editor.viewModelForTesting.undo()
+
+        XCTAssertNotNil(editor.viewModelForTesting.textOverlay(id: id))
+    }
+
+    func testTheTextStylePanelOffersEveryPreset() throws {
+        let editor = makeEditor()
+        let id = editor.addTextOverlayForTesting()
+        editor.selectTextOverlayForTesting(id)
+        try rail(in: editor).simulateTap(toolID: "styleText")
+
+        let buttons = try panel(in: editor).recursiveSubviews
+            .compactMap { $0 as? UIControl }
+            .filter { ($0.accessibilityIdentifier ?? "").hasPrefix("textStyle_") }
+        XCTAssertEqual(buttons.count, TextStyle.Kind.allCases.count)
+    }
+
+    // MARK: - State coherence (rail highlight / panel / openToolID must agree)
+
+    func testClosingThePanelClearsTheRailsActiveTool() throws {
+        // Nothing asserted `toolRail`'s own active-tool bookkeeping before — a
+        // regression that forgot `setActiveTool(nil)` in `closePanel()` would
+        // pass every existing test (they only checked `isPresenting`).
+        let editor = makeEditor()
+        let rail = try rail(in: editor)
+        rail.simulateTap(toolID: "layout")
+        rail.simulateTap(toolID: "layout")   // same tool again → closePanel()
+
+        XCTAssertNil(rail.activeToolID)
+    }
+
+    func testTheCloseButtonClosesThePanelAndClearsTheRailHighlight() throws {
+        // `EditorPanel.simulateClose()` exists as a test seam but nothing fired
+        // it — this drives the close (✕) button's real callback path rather
+        // than the rail's own toggle-the-same-tool path.
+        let editor = makeEditor()
+        let rail = try rail(in: editor)
+        rail.simulateTap(toolID: "frame")
+        let panel = try panel(in: editor)
+        panel.simulateClose()
+
+        XCTAssertFalse(panel.isPresenting)
+        XCTAssertNil(rail.activeToolID)
+    }
+
+    func testTheBackgroundPanelHasNoGenerativeButtonWhenUnavailable() throws {
+        // Image Playground never reports available in the simulator (see
+        // AIService.ImagePlaygroundAvailability) and there is no injection seam
+        // to force it `true` — so only the `false` path is reachable from a
+        // unit test. That is still worth guarding: it exercises the same guard
+        // `makeGenerativeBackgroundButton()` uses, and would catch a regression
+        // that stopped checking the flag at all.
+        let editor = makeEditor()
+        XCTAssertFalse(editor.aiService.generativeBackgroundsAvailable,
+                       "Precondition: the simulator never reports Image Playground available")
+        try rail(in: editor).simulateTap(toolID: "background")
+
+        let button = try panel(in: editor).recursiveSubviews
+            .first { $0.accessibilityIdentifier == "generateBackgroundButton" }
+        XCTAssertNil(button)
+    }
 }
 
 extension UIView {
