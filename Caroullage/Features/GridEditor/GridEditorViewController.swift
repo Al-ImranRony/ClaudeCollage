@@ -405,6 +405,7 @@ final class GridEditorViewController: UIViewController {
         selectedCellIndex = index
         selectedTextID = nil
         canvasView.setSelectedCell(index)
+        canvasView.setSelectedTextOverlay(nil)
 
         guard index != nil else { return clearContext() }
         // A fresh selection retires whatever panel was open for the PREVIOUS
@@ -426,6 +427,7 @@ final class GridEditorViewController: UIViewController {
         selectedTextID = id
         selectedCellIndex = nil
         canvasView.setSelectedCell(nil)
+        canvasView.setSelectedTextOverlay(id)
 
         guard id != nil else { return clearContext() }
         // See the matching comment in `selectCell` — same coherence rule.
@@ -439,12 +441,50 @@ final class GridEditorViewController: UIViewController {
         selectedCellIndex = nil
         selectedTextID = nil
         canvasView.setSelectedCell(nil)
+        canvasView.setSelectedTextOverlay(nil)
         clearContext()
     }
 
     private func clearContext() {
         toolRail.setContext(nil)
         closePanel()
+    }
+
+    /// Re-validates the rail selection against the current document whenever it
+    /// changes underneath it — wired into `viewModel.onChange` below, the single
+    /// choke point every discrete edit funnels through (undo, redo, `setLayout`,
+    /// `removeTextOverlay`, `clearCell`, …all route through `GridEditorViewModel
+    /// .commit` or `undo()`/`redo()`, both of which call it).
+    ///
+    /// Deliberately NOT `clearSelection()`: a selected cell can legitimately
+    /// coexist with an open BASE panel (Frame / Layout / Background —
+    /// `EditorToolRail`'s own doc comment says document tools must survive a
+    /// selection, and `toolTapped`'s base-tool cases call `openPanel` directly
+    /// without going through `selectCell`). A blanket clear would force-close an
+    /// unrelated, legitimately-open Frame panel. So this only tears down the
+    /// half of the selection that actually went stale, and only closes the
+    /// panel when the open panel is the selection-specific Style sheet
+    /// (`openToolID == "styleText"`) — a base-tool panel is left exactly as it
+    /// was.
+    private func revalidateSelection() {
+        var didClearSelection = false
+
+        if let index = selectedCellIndex, !viewModel.state.cells.indices.contains(index) {
+            selectedCellIndex = nil
+            canvasView.setSelectedCell(nil)
+            didClearSelection = true
+        }
+        if let id = selectedTextID, viewModel.textOverlay(id: id) == nil {
+            selectedTextID = nil
+            canvasView.setSelectedTextOverlay(nil)
+            didClearSelection = true
+        }
+        guard didClearSelection else { return }
+
+        toolRail.setContext(nil)
+        if openToolID == "styleText" {
+            closePanel()
+        }
     }
 
     // MARK: - Panel factories
@@ -536,6 +576,9 @@ final class GridEditorViewController: UIViewController {
         viewModel.onChange = { [weak self] in
             self?.reconfigureCanvas()
             self?.refreshToolbar()
+            // After the canvas model is rebuilt, so a stale index/id is checked
+            // against the fresh document rather than the one it just replaced.
+            self?.revalidateSelection()
         }
         viewModel.onCellImageChanged = { [weak self] index in
             guard let self else { return }
@@ -870,10 +913,33 @@ final class GridEditorViewController: UIViewController {
     private func duplicateTextOverlay(_ id: UUID) {
         guard var overlay = viewModel.textOverlay(id: id) else { return }
         overlay.id = UUID()
-        overlay.frame = overlay.frame.offsetBy(dx: 0.03, dy: 0.03)
+        overlay.frame = Self.clampedDuplicateFrame(overlay.frame.offsetBy(dx: 0.03, dy: 0.03))
         let newID = viewModel.addTextOverlay(overlay)
         selectTextOverlay(newID)
         Haptics.tap()
+    }
+
+    /// Clamps a duplicated text zone's origin so the copy stays fully on the
+    /// normalized `[0, 1]` canvas — x into `[0, 1 - width]`, y into
+    /// `[0, 1 - height]`. Duplicate naturally chains (the copy is selected, so
+    /// another tap duplicates it again), and with no clamp a few taps on a zone
+    /// already near an edge walk it fully outside `[0, 1]`, where the canvas
+    /// clips it invisible and untappable — recoverable only by repeated global
+    /// Undo with no indication of what happened.
+    ///
+    /// A frame wider or taller than the canvas would make `1 - width` (or
+    /// `- height`) negative; `max(0, …)` floors the upper bound at 0 instead of
+    /// handing `min` a negative ceiling, which would otherwise force the origin
+    /// negative too.
+    private static func clampedDuplicateFrame(_ frame: CGRect) -> CGRect {
+        let maxX = max(0, 1 - frame.width)
+        let maxY = max(0, 1 - frame.height)
+        return CGRect(
+            x: min(max(frame.minX, 0), maxX),
+            y: min(max(frame.minY, 0), maxY),
+            width: frame.width,
+            height: frame.height
+        )
     }
 
     // MARK: - Add overlays (text / stickers)
@@ -1257,6 +1323,8 @@ final class GridEditorViewController: UIViewController {
     // MARK: - Test seams
 
     var selectedCellIndexForTesting: Int? { selectedCellIndex }
+
+    var selectedTextIDForTesting: UUID? { selectedTextID }
 
     var viewModelForTesting: GridEditorViewModel { viewModel }
 

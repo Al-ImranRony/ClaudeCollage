@@ -224,6 +224,100 @@ final class GridEditorRailTests: XCTestCase {
         XCTAssertNil(rail.activeToolID)
     }
 
+    // MARK: - Stale selection revalidation
+
+    func testShrinkingTheLayoutClearsAStaleCellSelection() throws {
+        // fourSquare (4 cells) → select the last cell → shrink to 2 cells via the
+        // view model (undo/redo/a layout swap all funnel through the same
+        // `viewModel.onChange` choke point) — the rail must not keep offering
+        // Photo tools for a cell that no longer exists.
+        let editor = makeEditor()
+        editor.selectCellForTesting(3)
+        XCTAssertEqual(try rail(in: editor).visibleToolIdentifiers.first, "replacePhotoTool",
+                       "Precondition: cell 3 is selected")
+
+        editor.viewModelForTesting.setLayout(.grid(.twoUpHorizontal))
+
+        XCTAssertNil(editor.selectedCellIndexForTesting)
+        XCTAssertEqual(
+            try rail(in: editor).visibleToolIdentifiers,
+            ["layoutTool", "frameTool", "backgroundTool", "addTextButton", "addStickerButton"])
+    }
+
+    func testRemovingTheSelectedTextOverlayReturnsTheRailToTheBaseTools() throws {
+        let editor = makeEditor()
+        let id = editor.addTextOverlayForTesting()
+        editor.selectTextOverlayForTesting(id)
+        XCTAssertEqual(try rail(in: editor).visibleToolIdentifiers.first, "editTextTool",
+                       "Precondition: the text overlay is selected")
+
+        editor.viewModelForTesting.removeTextOverlay(id: id)
+
+        XCTAssertNil(editor.selectedTextIDForTesting)
+        XCTAssertEqual(
+            try rail(in: editor).visibleToolIdentifiers,
+            ["layoutTool", "frameTool", "backgroundTool", "addTextButton", "addStickerButton"])
+    }
+
+    func testRevalidationLeavesAnOpenBasePanelAloneWhenTheCellSelectionGoesStale() throws {
+        // A selected cell can legitimately coexist with an open BASE panel (the
+        // rail's own doc comment: document tools must survive a selection).
+        // Revalidation must retire only the stale Photo context, never a Frame
+        // panel that happens to be open alongside it.
+        let editor = makeEditor()
+        editor.selectCellForTesting(3)
+        try rail(in: editor).simulateTap(toolID: "frame")
+        let panel = try panel(in: editor)
+        XCTAssertTrue(panel.isPresenting, "Precondition: Frame panel open alongside the selection")
+
+        editor.viewModelForTesting.setLayout(.grid(.twoUpHorizontal))
+
+        XCTAssertNil(editor.selectedCellIndexForTesting)
+        XCTAssertTrue(panel.isPresenting, "the Frame panel is unrelated to the stale selection")
+        XCTAssertEqual(panel.currentTitle, "Frame")
+    }
+
+    // MARK: - Duplicate text stays on canvas
+
+    func testDuplicatingATextZoneNearTheBottomRightStaysFullyOnCanvas() throws {
+        // With no clamp, offsetting by (0.03, 0.03) from a zone already this
+        // close to the edge walks the copy off the normalized [0, 1] canvas,
+        // where it is invisible (the canvas clips) and untappable.
+        let editor = makeEditor()
+        let original = TextOverlay(text: "Corner",
+                                   frame: CGRect(x: 0.9, y: 0.9, width: 0.08, height: 0.08))
+        let id = editor.viewModelForTesting.addTextOverlay(original)
+        editor.selectTextOverlayForTesting(id)
+
+        try rail(in: editor).simulateTap(toolID: "duplicateText")
+
+        let duplicate = try XCTUnwrap(
+            editor.viewModelForTesting.textOverlays.first { $0.id != id })
+        XCTAssertGreaterThanOrEqual(duplicate.frame.minX, 0)
+        XCTAssertGreaterThanOrEqual(duplicate.frame.minY, 0)
+        XCTAssertLessThanOrEqual(duplicate.frame.maxX, 1)
+        XCTAssertLessThanOrEqual(duplicate.frame.maxY, 1)
+        // The clamp moves the origin only — size is untouched.
+        XCTAssertEqual(duplicate.frame.width, original.frame.width, accuracy: 0.0001)
+        XCTAssertEqual(duplicate.frame.height, original.frame.height, accuracy: 0.0001)
+    }
+
+    // MARK: - On-canvas text selection indicator
+
+    func testSelectingATextOverlayMarksItsCanvasViewSelected() throws {
+        // The rail chip is not the only feedback that something is selected —
+        // `TextOverlayView` must show the same persistent selection chrome
+        // `StickerOverlayView` already does.
+        let editor = makeEditor()
+        let id = editor.addTextOverlayForTesting()
+        editor.selectTextOverlayForTesting(id)
+
+        let overlayView = try XCTUnwrap(
+            editor.view.recursiveSubviews.compactMap { $0 as? TextOverlayView }
+                .first { $0.overlayID == id })
+        XCTAssertTrue(overlayView.isSelected)
+    }
+
     func testTheBackgroundPanelHasNoGenerativeButtonWhenUnavailable() throws {
         // Image Playground never reports available in the simulator (see
         // AIService.ImagePlaygroundAvailability) and there is no injection seam
