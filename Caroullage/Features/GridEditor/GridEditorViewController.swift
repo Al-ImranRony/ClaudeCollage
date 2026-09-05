@@ -23,9 +23,18 @@ final class GridEditorViewController: UIViewController {
     private let stage = EditorStage()
     private let toolRail = EditorToolRail()
     private let toolPanel = EditorPanel()
+    /// Collapses the panel while it has no content, so Auto Layout cannot hand the
+    /// stage's height to an empty hidden view. Task 9 MUST either deactivate this when
+    /// showing a panel, or install its own height constraint at a priority strictly
+    /// greater than `.defaultHigh` — an equal priority ties silently, with no console
+    /// warning, because neither constraint is required.
+    private var collapsedPanelHeight: NSLayoutConstraint?
     private lazy var layoutModeControl = UISegmentedControl(items: ["Grid", "Shapes"])
     private lazy var layoutPicker = LayoutPickerView(selected: viewModel.state.layout.gridTemplate)
     private lazy var shapePicker = ShapePickerView(selected: viewModel.state.layout.polygonTemplate)
+    // Orphaned pending Task 9 — never read (see "Orphaned pending Task 9: Custom
+    // shape (premium)" further down); the whole chain is dead on purpose until the
+    // rail gains an entry point for it.
     private lazy var customShapeButton = makeCustomShapeButton()
     private lazy var backgroundPicker = BackgroundPickerView(selected: viewModel.state.background)
     private let borderSlider = UISlider()
@@ -208,6 +217,7 @@ final class GridEditorViewController: UIViewController {
         // here.
         let collapsedPanelHeight = toolPanel.heightAnchor.constraint(equalToConstant: 0)
         collapsedPanelHeight.priority = .defaultHigh
+        self.collapsedPanelHeight = collapsedPanelHeight
 
         NSLayoutConstraint.activate([
             stage.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
@@ -349,6 +359,12 @@ final class GridEditorViewController: UIViewController {
     }
 
     /// Re-sync the sliders/pickers after undo/redo changes state underneath them.
+    ///
+    /// Pending Task 9: `layoutModeControl`, `layoutPicker`, `shapePicker`,
+    /// `backgroundPicker`, `borderSlider` and `cornerSlider` are not currently in any
+    /// view hierarchy — Task 8 removed the controls tray that hosted them. This
+    /// method still runs on every undo/redo and keeps them correctly configured
+    /// underneath; that's harmless today, and Task 9 restores them to the panel.
     private func syncControls() {
         borderSlider.value = Float(normalizedBorder)
         cornerSlider.value = Float(normalizedCorner)
@@ -365,6 +381,10 @@ final class GridEditorViewController: UIViewController {
 
     /// Toggles the Grid/Shapes picker and applies that mode's default layout so
     /// the canvas immediately reflects the switch.
+    ///
+    /// Orphaned pending Task 9: `layoutModeControl` has no target/action wiring
+    /// (Task 8 removed the controls tray that owned it), so this is never called.
+    /// Dead on purpose — Task 9 re-homes it into the rail/panel. Do not delete.
     @objc private func layoutModeChanged() {
         let showShapes = layoutModeControl.selectedSegmentIndex == 1
         Haptics.selectionChanged()
@@ -398,6 +418,13 @@ final class GridEditorViewController: UIViewController {
         return max > 0 ? min(1, viewModel.state.cornerRadius / max) : 0
     }
 
+    // MARK: - Orphaned pending Task 9 (border / corner slider actions)
+    //
+    // Dead on purpose: `borderSlider`/`cornerSlider` have no `addTarget` wiring —
+    // Task 8 removed the controls tray that owned them — so none of the three
+    // methods below ever fire. Task 9 re-homes the sliders into the panel and
+    // re-wires these. Do not delete.
+
     @objc private func borderChanged() {
         viewModel.previewBorderWidth(Double(borderSlider.value) * viewModel.maxBorderWidth)
     }
@@ -415,7 +442,13 @@ final class GridEditorViewController: UIViewController {
         refreshToolbar()
     }
 
-    // MARK: - Custom shape (premium)
+    // MARK: - Orphaned pending Task 9: Custom shape (premium)
+    //
+    // Dead on purpose: `customShapeButton` (declared near the top of the class) is
+    // never read, so nothing in this section — `makeCustomShapeButton()`,
+    // `customShapeTapped()`, `presentBezierEditor()` — is reachable. This chain
+    // backs the Custom Shape premium feature, which is temporarily unreachable in
+    // the UI as a result. Task 9 re-homes it into the rail/panel. Do not delete.
 
     private func makeCustomShapeButton() -> UIButton {
         var config = UIButton.Configuration.tinted()
@@ -593,7 +626,12 @@ final class GridEditorViewController: UIViewController {
         present(host, animated: true)
     }
 
-    // MARK: - Add overlays (text / stickers)
+    // MARK: - Orphaned pending Task 9: Add overlays (text / stickers)
+    //
+    // Dead on purpose: `makeAddOverlayBar()` is never called — Task 8 removed the
+    // controls tray it was built into — so `makeAddButton()` and, transitively,
+    // `addTextTapped()` further down are unreachable too. Task 9 re-homes this bar
+    // into the rail/panel. Do not delete.
 
     private func makeAddOverlayBar() -> UIView {
         let textButton = makeAddButton(
@@ -741,6 +779,12 @@ final class GridEditorViewController: UIViewController {
         present(alert, animated: true)
     }
 
+    // MARK: - Orphaned pending Task 9 (generative background row)
+    //
+    // Dead on purpose: nothing calls `makeGenerativeBackgroundRow()` — Task 8
+    // removed the controls tray it was built for — so `presentGenerativeBackground()`
+    // below is unreachable too. Task 9 re-homes this row into the panel. Do not delete.
+
     /// The Image Playground entry point, present ONLY on hardware that can run it.
     ///
     /// Hidden rather than disabled, deliberately: this is a premium feature, and
@@ -829,6 +873,17 @@ final class GridEditorViewController: UIViewController {
         present(alert, animated: true)
         return alert
     }
+
+    // MARK: - Orphaned pending Task 9 (sticker picker + text-color helper)
+    //
+    // Dead on purpose: `addStickerTapped()` is only referenced from the dead
+    // `makeAddOverlayBar()` above — Task 8 removed the controls tray that called it
+    // — so `addPersonalSticker(_:)` and `addSticker(from:)` below are unreachable
+    // too. That pair wasn't called out in Task 8's brief, but the call graph
+    // confirms it. `onLightBackground`, at the end of this run, is likewise dead,
+    // reachable only from the equally-orphaned `addTextTapped()` above. Task 9
+    // re-homes the sticker picker (and its "add text" sibling) into the rail/panel.
+    // Do not delete.
 
     /// Opens the sticker picker; the chosen sticker becomes a selected canvas overlay.
     @objc private func addStickerTapped() {
@@ -1033,6 +1088,12 @@ final class GridEditorViewController: UIViewController {
         alert.addAction(UIAlertAction(title: "OK", style: .default))
         present(alert, animated: true)
     }
+
+    // MARK: - Orphaned pending Task 9 (panel layout helpers)
+    //
+    // Dead on purpose: nothing calls `sectionLabel(_:)` or `labelledSlider(...)` —
+    // Task 8 removed the controls tray that used them to lay out its rows. Task 9
+    // re-homes both into the new panel content. Do not delete.
 
     private func sectionLabel(_ text: String) -> UIView {
         let label = UILabel()
