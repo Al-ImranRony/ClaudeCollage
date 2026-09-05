@@ -31,9 +31,10 @@ public struct TextStyle: Codable, Sendable, Equatable {
     }
 
     public var kind: Kind
-    /// Stroke, pill, highlight or glow colour. Ignored by `.plain`.
+    /// Shadow, stroke, pill, highlight or glow colour. Ignored by `.plain`.
     public var colorHex: String
-    /// Stroke width, glow radius, or pill corner inset — reference-canvas points.
+    /// Stroke width, glow radius, shadow blur radius and offset, highlight inset, or pill corner inset — reference-canvas points.
+    /// Expected to stay non-negative; any setter (e.g. a future slider) should clamp with `max(0, ...)`.
     public var width: Double
 
     public init(kind: Kind = .plain, colorHex: String = "#000000", width: Double = 6) {

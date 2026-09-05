@@ -62,4 +62,18 @@ final class TextStyleTests: XCTestCase {
 
         XCTAssertEqual(decoded.style, overlay.style)
     }
+
+    func testANegativeWidthIsClampedOnDecode() throws {
+        // A corrupt or hand-edited project must not produce a negative stroke width
+        // or a negative-radius shadow downstream.
+        let json = Data(##"{"kind":"stroke","colorHex":"#000000","width":-5}"##.utf8)
+        let decoded = try JSONDecoder().decode(TextStyle.self, from: json)
+        XCTAssertEqual(decoded.width, 0)
+    }
+
+    func testStylesDifferingOnlyInWidthAreNotEqual() {
+        XCTAssertNotEqual(
+            TextStyle(kind: .stroke, colorHex: "#000000", width: 4),
+            TextStyle(kind: .stroke, colorHex: "#000000", width: 8))
+    }
 }
