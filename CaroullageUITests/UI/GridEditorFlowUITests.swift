@@ -31,15 +31,17 @@ final class GridEditorFlowUITests: XCTestCase {
             "Tapping New Collage should push the Grid editor"
         )
 
-        // The layout picker and sliders exist and are interactive.
-        XCTAssertTrue(app.staticTexts["Layout"].exists)
-        XCTAssertTrue(app.staticTexts["Background"].exists)
+        // The redesign moved these from always-visible section labels to rail tools.
+        XCTAssertTrue(app.buttons["layoutTool"].exists, "Layout tool is in the rail")
+        XCTAssertTrue(app.buttons["backgroundTool"].exists, "Background tool is in the rail")
 
         let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         shot.name = "GridEditor"
         shot.lifetime = .keepAlways
         add(shot)
 
+        // Border and Corners moved into the Frame panel.
+        app.buttons["frameTool"].tap()
         let sliders = app.sliders
         if sliders.count > 0 {
             sliders.element(boundBy: 0).adjust(toNormalizedSliderPosition: 0.6)
@@ -64,6 +66,9 @@ final class GridEditorFlowUITests: XCTestCase {
         XCTAssertTrue(addButton.waitForExistence(timeout: 5))
         addButton.tap()
         XCTAssertTrue(app.navigationBars["Grid Collage"].waitForExistence(timeout: 5))
+
+        // Grid/Shapes now lives inside the Layout panel.
+        app.buttons["layoutTool"].tap()
 
         // Flip the Grid/Shapes segmented control to "Shapes".
         let shapes = app.buttons["Shapes"]

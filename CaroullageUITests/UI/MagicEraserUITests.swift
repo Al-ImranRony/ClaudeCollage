@@ -45,6 +45,7 @@ final class MagicEraserUITests: XCTestCase {
         // control must be absent entirely, not present-but-disabled: offering a
         // premium feature the device can never run would be false advertising.
         let app = openEditor()
+        app.buttons["backgroundTool"].tap()
         XCTAssertFalse(app.buttons["generateBackgroundButton"].exists,
                        "Generate Background must not appear where it cannot run")
     }
