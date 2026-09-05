@@ -1282,7 +1282,7 @@ final class TextStyleTests: XCTestCase {
 
     func testAnUnknownKindFallsBackToPlainRatherThanThrowing() throws {
         // A project written by a future build must still open in this one.
-        let json = Data(#"{"kind":"hologram","colorHex":"#000000","width":6}"#.utf8)
+        let json = Data(##"{"kind":"hologram","colorHex":"#000000","width":6}"##.utf8)
         let decoded = try JSONDecoder().decode(TextStyle.self, from: json)
         XCTAssertEqual(decoded.kind, .plain)
     }
