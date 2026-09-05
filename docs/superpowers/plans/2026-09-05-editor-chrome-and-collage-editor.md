@@ -975,6 +975,33 @@ git commit -m "feat(editor): add EditorToolRail with additive contextual groups"
 
 ## Task 5: `EditorPanel`
 
+> **⚠ Corrections applied after code review — the code block below is NOT authoritative.**
+> Four defects in this task's specified code were found in review and fixed in commit
+> `e2c09a3`. Read the shipped `EditorPanel.swift`, not this listing, if you re-run this task.
+>
+> 1. **Critical — a stale animation completion tore down the NEXT panel's content.**
+>    `hide(animated:)`'s completion read `self.content` at *fire* time rather than capturing it
+>    at *call* time, and `setVisible`'s completion wrote `isHidden` unconditionally, ignoring the
+>    `finished` flag. Sequence: hide panel A → show panel B before A's completion fires → A's
+>    stale completion removes **B** from the hierarchy, nils `content`, and re-hides the panel.
+>    End state: `isPresenting == true`, title reads "B", panel blank and hidden. Rapid panel
+>    switching is this component's primary interaction, so this was not a corner case.
+>    Fix: capture `let outgoing = content` in `hide` and only clear `content` when it is still
+>    `=== outgoing`; plus a `visibilityGeneration` counter incremented in both `show` and `hide`,
+>    captured when scheduling, and checked in the completion before any state write.
+>    All five original tests used `animated: false`, which takes the synchronous branch and never
+>    enters the racing path — which is exactly why this was invisible. The regression test uses
+>    `animated: true` with `XCTestExpectation` and was verified to fail against the old code.
+> 2. **Important — `isHidden` was an unguarded back door.** `hide` guards on `isPresenting`, so a
+>    caller setting `panel.isHidden` directly desyncs the two and makes `hide` a permanent no-op
+>    while the panel is on screen. Documented as off-limits; callers use `show` / `hide`.
+> 3. **Important — the height contract existed only in prose.** Unlike `EditorToolRail`, which
+>    owns its height internally, this panel's constraints only consume height, never produce it —
+>    so a caller that expects it to self-size gets a silent zero-height collapse. Added a
+>    `.defaultLow` minimum-height floor so the failure is visible, not silent.
+> 4. **Important — `clipsToBounds` was never set** (`UIView` defaults it to `false`), so over-tall
+>    content would bleed past the panel over the rail or canvas with no layout error.
+
 **Files:**
 - Create: `Caroullage/Core/DesignSystem/Editor/EditorPanel.swift`
 - Test: `CaroullageTests/Unit/EditorChromeTests.swift` (append)
