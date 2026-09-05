@@ -235,11 +235,30 @@ presets rather than five loose sliders.
 plain · shadow · stroke · pill · highlight · glow
 ```
 
-Each preset carries its own parameters (colour, width, inset). They are drawn in **one
-place** — `TextRendering.draw(_:in:fontScale:context:)` — so the live canvas, the photo
-export and the video export cannot disagree. This is why `TextStyle` lands in Plan 1 with
-the collage editor rather than waiting for Plan 2: the collage editor benefits from it
-identically, and the shared draw path is what guarantees preview == export.
+Each preset carries its own parameters (colour, width, inset).
+
+> **Corrected during implementation (2026-09-06).** This section originally claimed all six
+> presets are drawn in one place — `TextRendering.draw(_:in:fontScale:context:)` — so preview
+> and export could not disagree. **That was false.** The live canvas never calls `draw`: it
+> builds a `UILabel` from `TextRendering.attributedString(...)` (`CanvasView.swift:743`), while
+> `draw` is reached only from `CollageRenderer` (photo export) and `VideoOverlayRenderer` (video
+> export). Attribute-based treatments were fine; painted ones were not, so `.pill` and
+> `.highlight` rendered *only after export* — a WYSIWYG break in the editor.
+
+The presets split by what each treatment actually is, and parity is now structural:
+
+- **`stroke`, `shadow`, `glow`** are `NSAttributedString` attributes set in `applyStyle`. Both
+  the canvas and both exporters build their text from `attributedString`, so these agree for free.
+- **`highlight`** is the `.backgroundColor` attribute. This is not a workaround but the better
+  model: it is drawn **per line**, which is what a marker-pen highlight is, where a single
+  block rectangle would band across the empty space beside a shorter second line.
+- **`pill`** is the one genuinely painted background. Its geometry lives in one shared helper,
+  `TextRendering.backgroundRect(for:in:fontScale:)`, called by both the exporter and the live
+  canvas's `TextOverlayView` — so the two agree by construction rather than by coincidence.
+  The rect is sized from the *measured* text and clamped to the overlay frame.
+
+`TextStyle` still lands in Plan 1 with the collage editor rather than waiting for Plan 2: the
+collage editor benefits identically, and the shared helpers are what guarantee preview == export.
 
 ### 4.3 Timed rendering
 
