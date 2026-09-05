@@ -61,7 +61,7 @@ xcodegen generate && xcodebuild test -project Caroullage.xcodeproj \
 |---|---|
 | `Caroullage/Core/DesignSystem/Editor/EditorTool.swift` | The value types: `EditorTool`, `EditorRailContext`. No UIKit behaviour. |
 | `Caroullage/Core/DesignSystem/Editor/EditorStageGeometry.swift` | Pure aspect-fit maths. No views, so it is testable without a window. |
-| `Caroullage/Core/DesignSystem/Editor/EditorStage.swift` | Canvas host. Owns the replaceable aspect constraint. |
+| `Caroullage/Core/DesignSystem/Editor/EditorStage.swift` | Canvas host. Sizes its canvas to the document aspect via `EditorStageGeometry`. |
 | `Caroullage/Core/DesignSystem/Editor/EditorToolRail.swift` | The bottom rail. Base tools plus an insertable contextual group. |
 | `Caroullage/Core/DesignSystem/Editor/EditorPanel.swift` | Swap-in panel container with animated height. |
 | `Caroullage/Core/Models/TextStyle.swift` | The tier-2 text presentation model. |
@@ -509,7 +509,7 @@ Same command as Step 2. Expected: PASS, 11 tests.
 
 ```bash
 git add Caroullage/Core/DesignSystem/Editor/EditorStage.swift CaroullageTests/Unit/EditorChromeTests.swift
-git commit -m "feat(editor): add EditorStage with a replaceable aspect constraint"
+git commit -m "feat(editor): size the editor stage canvas to the document aspect"
 ```
 
 ---
