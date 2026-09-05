@@ -321,4 +321,75 @@ final class EditorChromeTests: XCTestCase {
         XCTAssertNil(rail.activeToolID,
                      "A tool no longer present after a context swap must not stay silently active")
     }
+
+    // MARK: - Panel
+
+    func testAFreshPanelIsNotPresenting() {
+        let panel = EditorPanel()
+        XCTAssertFalse(panel.isPresenting)
+        XCTAssertTrue(panel.isHidden)
+    }
+
+    func testShowingAPanelInstallsTheContentAndTitle() {
+        let panel = EditorPanel()
+        let content = UIView()
+        panel.show(content, title: "Layout", animated: false)
+
+        XCTAssertTrue(panel.isPresenting)
+        XCTAssertFalse(panel.isHidden)
+        XCTAssertEqual(panel.currentTitle, "Layout")
+        XCTAssertNotNil(content.superview)
+    }
+
+    func testShowingASecondPanelReplacesTheFirstContent() {
+        let panel = EditorPanel()
+        let first = UIView()
+        let second = UIView()
+        panel.show(first, title: "Layout", animated: false)
+        panel.show(second, title: "Frame", animated: false)
+
+        XCTAssertNil(first.superview, "The previous panel content must be torn down")
+        XCTAssertNotNil(second.superview)
+        XCTAssertEqual(panel.currentTitle, "Frame")
+    }
+
+    func testHidingTearsDownTheContent() {
+        let panel = EditorPanel()
+        let content = UIView()
+        panel.show(content, title: "Layout", animated: false)
+        panel.hide(animated: false)
+
+        XCTAssertFalse(panel.isPresenting)
+        XCTAssertTrue(panel.isHidden)
+        XCTAssertNil(content.superview)
+    }
+
+    func testTheCloseControlReportsThrough() {
+        let panel = EditorPanel()
+        panel.frame = CGRect(x: 0, y: 0, width: 402, height: 120)
+        panel.show(UIView(), title: "Layout", animated: false)
+        panel.layoutIfNeeded()
+        var closed = false
+        panel.onClose = { closed = true }
+
+        panel.simulateClose()
+
+        XCTAssertTrue(closed)
+
+        // Regression check for a zero-height/width control: a close button whose
+        // content was pinned only by center constraints (with nothing sizing its
+        // own bounds) resolves to frame == .zero and cannot be hit-tested, while
+        // still drawing correctly and passing every other assertion here —
+        // simulateClose() drives touchUpInside directly and never hit-tests.
+        // Force real layout and hit-test the button's own visual centre.
+        let button = panel.closeButtonForHitTesting
+        XCTAssertGreaterThan(button.bounds.width, 0, "Close button must derive a real width")
+        XCTAssertGreaterThan(button.bounds.height, 0, "Close button must derive a real height")
+        XCTAssertNotNil(button.accessibilityLabel)
+
+        let centre = button.convert(CGPoint(x: button.bounds.midX, y: button.bounds.midY), to: panel)
+        let hit = panel.hitTest(centre, with: nil)
+        XCTAssertTrue(hit?.isDescendant(of: button) ?? false,
+                     "Hit-testing the close button's visual centre must reach the button itself")
+    }
 }
