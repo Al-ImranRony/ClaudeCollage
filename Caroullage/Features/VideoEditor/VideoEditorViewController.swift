@@ -39,6 +39,11 @@ final class VideoEditorViewController: UIViewController {
     private var pendingCellIndex: Int?
     /// Coalesces composition rebuilds while sliders are being dragged.
     private var rebuildTask: Task<Void, Never>?
+    /// Drives the canvas's timed-text visibility from playback — see
+    /// `startObservingPlaybackTime`. Removed in `viewWillDisappear` once the VC is
+    /// truly leaving (not merely covered by a modal), so it can't outlive the
+    /// screen and keep `player` (and this VC) alive.
+    private var timeObserver: Any?
     /// `nonisolated(unsafe)` so `deinit` (which is nonisolated) can unregister it.
     /// Only ever assigned once, on the main actor, in `viewDidLoad`.
     private nonisolated(unsafe) var didFinishObserver: (any NSObjectProtocol)?
@@ -80,6 +85,7 @@ final class VideoEditorViewController: UIViewController {
         bindViewModel()
         loopPlaybackForever()
         canvasView.player = player
+        startObservingPlaybackTime()
         refreshCanvas()
         rebuildComposition()
     }
@@ -94,6 +100,15 @@ final class VideoEditorViewController: UIViewController {
         player.pause()
         if isMovingFromParent {
             navigationController?.setToolbarHidden(true, animated: animated)
+            // A retained periodic time observer keeps `player` (and this VC) alive
+            // past the screen being popped — remove it only once we're truly
+            // leaving, not when merely covered by a modal (export progress, control
+            // sheets), which also fires viewWillDisappear but leaves us on the nav
+            // stack (`isMovingFromParent` stays false for those).
+            if let timeObserver {
+                player.removeTimeObserver(timeObserver)
+                self.timeObserver = nil
+            }
         }
     }
 
@@ -218,6 +233,30 @@ final class VideoEditorViewController: UIViewController {
         }
     }
 
+    /// Keeps the canvas's timed text overlays in sync with playback, so a caption
+    /// appears/disappears on the right beat instead of being frozen at whatever was
+    /// visible when the composition was last (re)built. 10 Hz is fine enough for
+    /// that and coarse enough not to churn layout every video frame.
+    private func startObservingPlaybackTime() {
+        let interval = CMTime(seconds: 0.1, preferredTimescale: 600)
+        timeObserver = player.addPeriodicTimeObserver(
+            forInterval: interval, queue: .main
+        ) { [weak self] time in
+            // Same trap `loopPlaybackForever`'s closure works around above: this
+            // closure isn't `@Sendable`, so it's inferred `@MainActor`, but
+            // AVFoundation invokes it on the `queue` given below (main) without
+            // knowing that — `assumeIsolated` asserts what's already true rather
+            // than hopping and crashing off-main.
+            MainActor.assumeIsolated {
+                // `time.seconds` is the same `CMTime.seconds` conversion the export
+                // applies to a frame's presentation time (see `overlayForFrame`), so
+                // an in/out point landing exactly on a frame boundary can't
+                // disagree between preview and export.
+                self?.canvasView.setPreviewTime(time.seconds)
+            }
+        }
+    }
+
     // MARK: - Canvas
 
     private func refreshCanvas() {
@@ -263,7 +302,13 @@ final class VideoEditorViewController: UIViewController {
                                  toleranceAfter: .positiveInfinity) { _ in }
             }
             if wasPlaying { self.player.play() }
-            self.canvasView.setOverlayImage(bundle.overlayImage.map { UIImage(cgImage: $0) })
+            // No preview overlay image to set here: `canvasView` shows text/sticker
+            // overlays through its own live, pooled views (kept current by
+            // `refreshCanvas`), which already match `bundle.overlayImage` pixel-for-
+            // pixel — and once any text overlay carries timing, `overlayImage` is
+            // nil anyway, so drawing it here would blank the overlays rather than
+            // show them. `bundle.overlayImage` / `timedOverlays` exist purely for
+            // the export below, which bakes into a `CVPixelBuffer`.
             await self.refreshGalleryThumbnail()
         }
     }

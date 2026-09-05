@@ -317,6 +317,69 @@ final class TextTimingTests: XCTestCase {
         return out
     }
 
+    // MARK: - Live preview timing
+
+    @MainActor
+    func testTheCanvasHidesTextOutsideItsWindow() {
+        let canvas = VideoCanvasView()
+        canvas.frame = CGRect(x: 0, y: 0, width: 300, height: 300)
+
+        let timed = overlay("TITLE", start: 2, end: 5)
+        canvas.configure(canvasSize: CGSize(width: 1080, height: 1080),
+                         cellFrames: [], filled: [], selectedIndex: nil)
+        canvas.updateTextOverlays([timed])
+        canvas.layoutIfNeeded()
+
+        canvas.setPreviewTime(0)
+        XCTAssertTrue(canvas.textOverlayViewsForTesting.allSatisfy { $0.isHidden },
+                      "A caption must be hidden before its in-point")
+
+        canvas.setPreviewTime(3)
+        XCTAssertTrue(canvas.textOverlayViewsForTesting.contains { !$0.isHidden },
+                      "A caption must be visible inside its window")
+
+        canvas.setPreviewTime(6)
+        XCTAssertTrue(canvas.textOverlayViewsForTesting.allSatisfy { $0.isHidden },
+                      "A caption must be hidden after its out-point")
+    }
+
+    @MainActor
+    func testAFreshlyConfiguredCanvasStartsHiddenRatherThanFlashing() {
+        // Regression for the flash the plan calls out: a newly pooled text view
+        // defaults to visible, so if nothing corrected that before the first
+        // player tick, an out-of-window caption would flash on screen for a frame.
+        let canvas = VideoCanvasView()
+        canvas.frame = CGRect(x: 0, y: 0, width: 300, height: 300)
+
+        let timed = overlay("TITLE", start: 2, end: 5)
+        canvas.configure(canvasSize: CGSize(width: 1080, height: 1080),
+                         cellFrames: [], filled: [], selectedIndex: nil)
+        canvas.updateTextOverlays([timed])
+        canvas.layoutIfNeeded()
+
+        // No setPreviewTime call at all — default preview time is 0, outside [2, 5).
+        XCTAssertTrue(canvas.textOverlayViewsForTesting.allSatisfy { $0.isHidden },
+                      "An overlay outside the default t=0 window must not flash visible")
+    }
+
+    @MainActor
+    func testAnUntimedOverlayStaysVisibleInThePreviewAtAnyTime() {
+        // The overwhelmingly common case: an existing project has no timing at all.
+        let canvas = VideoCanvasView()
+        canvas.frame = CGRect(x: 0, y: 0, width: 300, height: 300)
+
+        let plain = overlay("ALWAYS", start: nil, end: nil)
+        canvas.configure(canvasSize: CGSize(width: 1080, height: 1080),
+                         cellFrames: [], filled: [], selectedIndex: nil)
+        canvas.updateTextOverlays([plain])
+        canvas.layoutIfNeeded()
+
+        canvas.setPreviewTime(0)
+        XCTAssertTrue(canvas.textOverlayViewsForTesting.allSatisfy { !$0.isHidden })
+        canvas.setPreviewTime(500)
+        XCTAssertTrue(canvas.textOverlayViewsForTesting.allSatisfy { !$0.isHidden })
+    }
+
     // MARK: - Fixtures (real assets, following VideoCompositionTests' pattern)
 
     private func tempURL(ext: String) -> URL {
