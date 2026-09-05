@@ -516,6 +516,34 @@ git commit -m "feat(editor): size the editor stage canvas to the document aspect
 
 ## Task 4: `EditorToolRail`
 
+> **⚠ Corrections applied after code review — the code block below is NOT authoritative.**
+> Four defects in this task's specified code were found in review and fixed in commit
+> `5b7f05f`. Read the shipped `EditorToolRail.swift`, not this listing, if you re-run this task.
+>
+> 1. **Critical — `ToolButton` had a zero-height hit target.** Its inner icon+label stack was
+>    pinned by `centerXAnchor`/`centerYAnchor` only. A horizontal `UIStackView` with
+>    `alignment = .center` does not stretch a cross-axis arranged subview, so with nothing
+>    pinning top/bottom the control had no source of height and resolved to `height == 0`.
+>    The icon still drew (`clipsToBounds` is off) so it looked correct, and every test passed
+>    because `simulateTap(toolID:)` calls `sendActions` directly and bypasses hit-testing —
+>    the rail's entire tap surface was dead, invisibly. Fix: pin the stack's `topAnchor` and
+>    `bottomAnchor`, mirroring `ContextChip`. Covered now by a test that hit-tests the
+>    button's visual centre, verified to fail against the old constraints.
+> 2. **Important — stale `activeToolID` across a context change.** `setContext` never cleared
+>    it, so a tool id could stay active after the tool left the rail and spuriously highlight a
+>    same-named tool in the next context. `rebuild()` now clears it when the id names no tool
+>    that is present.
+> 3. **Important — `1 / UIScreen.main.scale`.** `UIScreen.main` is deprecated as of iOS 26.0,
+>    and this project builds Debug with `-warnings-as-errors` (`Config/Debug.xcconfig`), so it
+>    becomes a hard build break when the deployment target moves off 17.0. It is also wrong on
+>    external displays. Replaced with a flat point constant, matching the codebase's existing
+>    hairline idiom (`CarouselStripLayout.seamWidth`, `EmptyCellChrome.outlineWidth`).
+> 4. **Minor — accessibility.** A bare `UIControl` subclass is not accessible by default, so
+>    VoiceOver read the inner label with no button trait. Both `ToolButton` and `ContextChip`
+>    now set `isAccessibilityElement = true` and `accessibilityTraits = .button`; the label
+>    also got `adjustsFontSizeToFitWidth` / `minimumScaleFactor` for large Dynamic Type sizes
+>    against the flat 52pt row.
+
 **Files:**
 - Create: `Caroullage/Core/DesignSystem/Editor/EditorToolRail.swift`
 - Test: `CaroullageTests/Unit/EditorChromeTests.swift` (append)
