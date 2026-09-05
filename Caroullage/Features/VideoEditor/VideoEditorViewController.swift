@@ -40,9 +40,10 @@ final class VideoEditorViewController: UIViewController {
     /// Coalesces composition rebuilds while sliders are being dragged.
     private var rebuildTask: Task<Void, Never>?
     /// Drives the canvas's timed-text visibility from playback — see
-    /// `startObservingPlaybackTime`. Removed in `viewWillDisappear` once the VC is
-    /// truly leaving (not merely covered by a modal), so it can't outlive the
-    /// screen and keep `player` (and this VC) alive.
+    /// `startObservingPlaybackTime`. Removed in `viewDidDisappear` once the VC has
+    /// truly left (not merely covered by a modal), so it can't outlive the screen
+    /// and keep `player` (and this VC) alive. Deliberately NOT torn down in
+    /// `viewWillDisappear` — see that method's comment.
     private var timeObserver: Any?
     /// `nonisolated(unsafe)` so `deinit` (which is nonisolated) can unregister it.
     /// Only ever assigned once, on the main actor, in `viewDidLoad`.
@@ -100,15 +101,25 @@ final class VideoEditorViewController: UIViewController {
         player.pause()
         if isMovingFromParent {
             navigationController?.setToolbarHidden(true, animated: animated)
-            // A retained periodic time observer keeps `player` (and this VC) alive
-            // past the screen being popped — remove it only once we're truly
-            // leaving, not when merely covered by a modal (export progress, control
-            // sheets), which also fires viewWillDisappear but leaves us on the nav
-            // stack (`isMovingFromParent` stays false for those).
-            if let timeObserver {
-                player.removeTimeObserver(timeObserver)
-                self.timeObserver = nil
-            }
+        }
+    }
+
+    override func viewDidDisappear(_ animated: Bool) {
+        super.viewDidDisappear(animated)
+        // `isMovingFromParent` turns true as soon as a pop TRANSITION BEGINS —
+        // including the system interactive back-swipe — not only once it
+        // commits. `viewWillDisappear` above sees the same flag, so tearing the
+        // observer down there would drop it for a swipe the user cancels (the VC
+        // is never popped and stays on screen, with nothing left to re-arm it —
+        // frozen caption timing for the rest of that screen's life). This method,
+        // by contrast, only fires once the transition has actually completed: a
+        // cancelled swipe instead replays `viewWillAppear`/`viewDidAppear` on this
+        // VC and never reaches here. So `isMovingFromParent` read here means the
+        // pop genuinely went through, and a retained periodic time observer keeps
+        // `player` (and this VC) alive past that point unless removed.
+        if isMovingFromParent, let timeObserver {
+            player.removeTimeObserver(timeObserver)
+            self.timeObserver = nil
         }
     }
 
@@ -819,6 +830,13 @@ final class VideoEditorViewController: UIViewController {
         alert.addAction(UIAlertAction(title: "OK", style: .default))
         present(alert, animated: true)
     }
+
+    // MARK: - Test seams
+
+    /// Whether `startObservingPlaybackTime`'s periodic observer is currently
+    /// registered on `player`. Exercised by `VideoEditorPlaybackObserverTests` to
+    /// prove it survives a `viewWillDisappear` that doesn't lead to an actual pop.
+    var isObservingPlaybackTimeForTesting: Bool { timeObserver != nil }
 }
 
 // MARK: - Simultaneous pinch + pan framing
