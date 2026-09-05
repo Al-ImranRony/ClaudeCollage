@@ -683,6 +683,11 @@ public final class EditorToolRail: UIView {
     /// Content height above the safe-area inset.
     public static let contentHeight: CGFloat = 52
 
+    /// Flat 1pt hairline, matching the codebase idiom (CarouselStripLayout.seamWidth).
+    /// Never derive this from UIScreen.main.scale: deprecated in iOS 26, and Debug
+    /// builds with -warnings-as-errors so it becomes a hard build break.
+    private static let separatorHeight: CGFloat = 1
+
     private let scrollView = UIScrollView()
     private let stack = UIStackView()
     private var baseTools: [EditorTool] = []
@@ -731,7 +736,7 @@ public final class EditorToolRail: UIView {
             separator.topAnchor.constraint(equalTo: topAnchor),
             separator.leadingAnchor.constraint(equalTo: leadingAnchor),
             separator.trailingAnchor.constraint(equalTo: trailingAnchor),
-            separator.heightAnchor.constraint(equalToConstant: 1 / UIScreen.main.scale),
+            separator.heightAnchor.constraint(equalToConstant: Self.separatorHeight),
 
             // Content sits inside the safe area; the view's background does not.
             scrollView.topAnchor.constraint(equalTo: topAnchor),
@@ -1068,6 +1073,11 @@ public final class EditorPanel: UIView {
     public var onClose: (() -> Void)?
     public private(set) var isPresenting = false
 
+    /// Flat 1pt hairline, matching the codebase idiom (CarouselStripLayout.seamWidth).
+    /// Never derive this from UIScreen.main.scale: deprecated in iOS 26, and Debug
+    /// builds with -warnings-as-errors so it becomes a hard build break.
+    private static let separatorHeight: CGFloat = 1
+
     /// Exposed for tests and for the VC's own bookkeeping.
     public private(set) var currentTitle: String?
 
@@ -1115,7 +1125,7 @@ public final class EditorPanel: UIView {
             separator.topAnchor.constraint(equalTo: topAnchor),
             separator.leadingAnchor.constraint(equalTo: leadingAnchor),
             separator.trailingAnchor.constraint(equalTo: trailingAnchor),
-            separator.heightAnchor.constraint(equalToConstant: 1 / UIScreen.main.scale),
+            separator.heightAnchor.constraint(equalToConstant: Self.separatorHeight),
 
             titleLabel.topAnchor.constraint(equalTo: topAnchor, constant: Theme.Spacing.xs),
             titleLabel.leadingAnchor.constraint(equalTo: leadingAnchor, constant: Theme.Spacing.md),
