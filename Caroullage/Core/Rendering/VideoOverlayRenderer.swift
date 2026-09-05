@@ -20,13 +20,21 @@ public enum VideoOverlayRenderer {
     /// `textFontScale` maps the overlays' reference-canvas point sizes onto the
     /// render canvas, exactly as `RenderRequest.textFontScale` does (1 for a
     /// full-resolution render at the app's 1080-short-side sizing).
+    ///
+    /// - Parameter time: composition time in seconds. `nil` renders every overlay
+    ///   regardless of timing — that is what the still-image export wants. Passing a
+    ///   time filters to the overlays visible at that instant (`TextOverlay.isVisible(at:)`),
+    ///   so a frame with nothing visible returns `nil` and the caller skips the draw.
     public static func overlayImage(
         textOverlays: [TextOverlay],
         stickerOverlays: [StickerOverlay],
         canvasPx: CGSize,
-        textFontScale: CGFloat = 1
+        textFontScale: CGFloat = 1,
+        at time: Double? = nil
     ) -> CGImage? {
-        guard !textOverlays.isEmpty || !stickerOverlays.isEmpty,
+        let visibleText = time.map { t in textOverlays.filter { $0.isVisible(at: t) } }
+            ?? textOverlays
+        guard !visibleText.isEmpty || !stickerOverlays.isEmpty,
               canvasPx.width > 0, canvasPx.height > 0 else { return nil }
 
         let format = UIGraphicsImageRendererFormat()
@@ -36,7 +44,7 @@ public enum VideoOverlayRenderer {
 
         let image = renderer.image { rendererContext in
             let cg = rendererContext.cgContext
-            for overlay in textOverlays {
+            for overlay in visibleText {
                 TextRendering.draw(overlay,
                                    in: TextRendering.frame(for: overlay, in: canvasPx),
                                    fontScale: textFontScale,

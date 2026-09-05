@@ -95,23 +95,42 @@ public struct BackgroundMusic: @unchecked Sendable {
 /// The assembled composition + its video composition (per-cell layout/transform)
 /// + audio mix (per-cell mute/volume), ready to preview or export.
 ///
-/// `overlayImage` is the pre-rendered text+sticker layer (full-canvas, transparent).
-/// It is NOT part of the video composition — baking it there via
-/// `AVVideoCompositionCoreAnimationTool` crashes `AVAssetReaderVideoCompositionOutput`
-/// (no Core Animation render server in that pipeline / the simulator). Instead
-/// `export(bundle:…)` draws it onto each composited frame at write-time, and the
-/// live preview overlays it as a CALayer above the player. Either way, preview ==
-/// export because the same `VideoOverlayRenderer` image is used.
+/// `overlayImage` is the pre-rendered text+sticker layer (full-canvas, transparent) —
+/// present when no text overlay carries timing. It is NOT part of the video
+/// composition — baking it there via `AVVideoCompositionCoreAnimationTool` crashes
+/// `AVAssetReaderVideoCompositionOutput` (no Core Animation render server in that
+/// pipeline / the simulator). Instead `export(bundle:…)` draws it onto each
+/// composited frame at write-time, and the live preview overlays it as a CALayer
+/// above the player. Either way, preview == export because the same
+/// `VideoOverlayRenderer` image is used. When some text overlay does carry timing,
+/// `overlayImage` is nil and `timedOverlays` is carried instead, so the export can
+/// render (and cache) the overlay per frame — see `VideoComposer.overlayForFrame`.
 /// `@unchecked Sendable` for the same reason as `VideoCompositionCell`: a
 /// `@MainActor` editor builds the bundle and hands it to the nonisolated exporter,
 /// which is the only thing that touches it from then on.
 public struct VideoCompositionBundle: @unchecked Sendable {
+    /// Everything needed to render the overlay for an arbitrary frame time,
+    /// carried instead of a single baked image when at least one text overlay has
+    /// timing. Sticker overlays are untimed and always drawn — see
+    /// `VideoOverlayRenderer.overlayImage`.
+    public struct TimedOverlayInputs: @unchecked Sendable {
+        public let textOverlays: [TextOverlay]
+        public let stickerOverlays: [StickerOverlay]
+        public let canvasPx: CGSize
+        public let textFontScale: CGFloat
+    }
+
     public let composition: AVMutableComposition
     public let videoComposition: AVMutableVideoComposition
     public let audioMix: AVMutableAudioMix
     public let duration: CMTime
     public let renderSize: CGSize
     public let overlayImage: CGImage?
+    /// Non-nil only when some text overlay carries timing, in which case
+    /// `overlayImage` is nil and the export selects/renders the overlay per frame
+    /// instead (`VideoComposer.runExport`). `nil` for the untimed case, which
+    /// keeps using the single baked `overlayImage` exactly as before.
+    public let timedOverlays: TimedOverlayInputs?
 }
 
 extension VideoComposer {
@@ -271,13 +290,30 @@ extension VideoComposer {
 
         // Rendered at the output resolution so overlays are crisp at export size and
         // align 1:1 with the composited frames (normalized coords, so position holds).
-        let overlayImage = VideoOverlayRenderer.overlayImage(
-            textOverlays: textOverlays, stickerOverlays: stickerOverlays,
-            canvasPx: output, textFontScale: textFontScale)
+        //
+        // Untimed (the common case: every project saved before timing existed) keeps
+        // the original single-baked-image path unchanged. Once any overlay carries
+        // timing, baking one image up front is wrong — a caption's visibility would
+        // be frozen at whatever it was when the bundle was built — so the overlays
+        // are carried instead and rendered per frame during export.
+        let hasTiming = textOverlays.contains { $0.startTime != nil || $0.endTime != nil }
+        let overlayImage: CGImage?
+        let timedOverlays: VideoCompositionBundle.TimedOverlayInputs?
+        if hasTiming {
+            overlayImage = nil
+            timedOverlays = VideoCompositionBundle.TimedOverlayInputs(
+                textOverlays: textOverlays, stickerOverlays: stickerOverlays,
+                canvasPx: output, textFontScale: textFontScale)
+        } else {
+            overlayImage = VideoOverlayRenderer.overlayImage(
+                textOverlays: textOverlays, stickerOverlays: stickerOverlays,
+                canvasPx: output, textFontScale: textFontScale)
+            timedOverlays = nil
+        }
 
         return VideoCompositionBundle(composition: composition, videoComposition: videoComposition,
                                       audioMix: audioMix, duration: total, renderSize: output,
-                                      overlayImage: overlayImage)
+                                      overlayImage: overlayImage, timedOverlays: timedOverlays)
     }
 
     /// Turns a photo cell into a video track: renders `image` as a short still clip
@@ -346,7 +382,8 @@ extension VideoComposer {
             audioMix: AVMutableAudioMix(),      // no level changes — a faithful copy
             duration: duration,
             renderSize: videoComposition.renderSize,
-            overlayImage: nil)
+            overlayImage: nil,
+            timedOverlays: nil)
 
         try await export(bundle: bundle, codec: codec, container: container, to: url,
                          progress: progress, cancellation: cancellation)
@@ -425,6 +462,7 @@ extension VideoComposer {
                                     input: writerInput, adaptor: adaptor,
                                     audioOutput: audioOutput, audioInput: audioInput,
                                     overlay: bundle.overlayImage,
+                                    timedOverlays: bundle.timedOverlays,
                                     width: width, height: height, duration: bundle.duration.seconds,
                                     outputURL: url, cancellation: cancellation)
         let exportQueue = DispatchQueue(label: "com.devron.caroullage.videoexport")
@@ -474,6 +512,7 @@ extension VideoComposer {
         let audioOutput: AVAssetReaderAudioMixOutput?
         let audioInput: AVAssetWriterInput?
         let overlay: CGImage?
+        let timedOverlays: VideoCompositionBundle.TimedOverlayInputs?
         let width: Int
         let height: Int
         let duration: Double
@@ -500,6 +539,12 @@ extension VideoComposer {
 
         var videoDone = false
         var audioDone = (ctx.audioInput == nil)
+        // Per-visible-set cache for the timed path: text visibility only changes at
+        // in/out points, so a run of consecutive frames almost always shares the
+        // same image. Keyed on the sorted ids of the overlays visible at that
+        // instant (a stable proxy for "what would be drawn"), not on time itself,
+        // so the whole run between two in/out points costs one render.
+        var overlayCache: [[UUID]: CGImage?] = [:]
 
         while !videoDone || !audioDone {
             if ctx.cancellation?.isCancelled == true {
@@ -512,7 +557,7 @@ extension VideoComposer {
                 if let sample = ctx.output.copyNextSampleBuffer() {
                     let pts = CMSampleBufferGetPresentationTimeStamp(sample)
                     if let buffer = CMSampleBufferGetImageBuffer(sample) {
-                        if let overlay = ctx.overlay {
+                        if let overlay = overlayForFrame(ctx, at: pts, cache: &overlayCache) {
                             drawOverlay(overlay, into: buffer, width: ctx.width, height: ctx.height)
                         }
                         if !ctx.adaptor.append(buffer, withPresentationTime: pts) {
@@ -550,6 +595,30 @@ extension VideoComposer {
         ctx.writer.finishWriting { sema.signal() }
         sema.wait()
         guard ctx.writer.status == .completed else { throw ctx.writer.error ?? ComposerError.writeFailed }
+    }
+
+    /// Resolves the overlay image for one frame at presentation time `pts`.
+    ///
+    /// The untimed bundle (`ctx.timedOverlays == nil`, the common case — every
+    /// project saved before timing existed) just returns the single baked
+    /// `ctx.overlay`, exactly as before. Otherwise the frame's presentation time is
+    /// converted to seconds once, via the same `CMTime.seconds` the export already
+    /// used for progress reporting, and the overlays visible at that time are
+    /// looked up in `cache` (keyed on their sorted ids) before rendering — so a run
+    /// of frames sharing a visible set, which is most of them, costs one render.
+    private static func overlayForFrame(
+        _ ctx: ExportContext, at pts: CMTime, cache: inout [[UUID]: CGImage?]
+    ) -> CGImage? {
+        guard let timed = ctx.timedOverlays else { return ctx.overlay }
+        let seconds = pts.seconds
+        let visible = timed.textOverlays.filter { $0.isVisible(at: seconds) }
+        let key = visible.map(\.id).sorted { $0.uuidString < $1.uuidString }
+        if let cached = cache[key] { return cached }
+        let image = VideoOverlayRenderer.overlayImage(
+            textOverlays: visible, stickerOverlays: timed.stickerOverlays,
+            canvasPx: timed.canvasPx, textFontScale: timed.textFontScale)
+        cache[key] = image
+        return image
     }
 
     /// Composites the overlay image onto a BGRA composited frame in place. The

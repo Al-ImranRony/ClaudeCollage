@@ -9,6 +9,7 @@
 
 import XCTest
 import CoreGraphics
+import UIKit
 @testable import Caroullage
 
 final class TextTimingTests: XCTestCase {
@@ -145,5 +146,64 @@ final class TextTimingTests: XCTestCase {
         let alwaysVisible = TextOverlay(text: "hi")
         XCTAssertNil(alwaysVisible.startTime)
         XCTAssertNil(alwaysVisible.endTime)
+    }
+
+    // MARK: - Renderer timing
+
+    private func overlay(_ text: String, start: Double?, end: Double?) -> TextOverlay {
+        var o = TextOverlay(text: text, colorHex: "#FFFFFF",
+                            frame: CGRect(x: 0, y: 0.4, width: 1, height: 0.2))
+        o.startTime = start
+        o.endTime = end
+        return o
+    }
+
+    func testTheRendererDrawsNothingWhenNoOverlayIsVisibleAtThatTime() {
+        let image = VideoOverlayRenderer.overlayImage(
+            textOverlays: [overlay("TITLE", start: 2, end: 5)],
+            stickerOverlays: [],
+            canvasPx: CGSize(width: 200, height: 200),
+            at: 0)
+
+        XCTAssertNil(image, "No visible overlay at t=0 must skip the draw entirely")
+    }
+
+    func testTheRendererDrawsAnOverlayInsideItsWindow() {
+        let image = VideoOverlayRenderer.overlayImage(
+            textOverlays: [overlay("TITLE", start: 2, end: 5)],
+            stickerOverlays: [],
+            canvasPx: CGSize(width: 200, height: 200),
+            at: 3)
+
+        XCTAssertNotNil(image)
+    }
+
+    func testTwoCaptionsInSequenceProduceDifferentFrames() {
+        // The whole point of the feature: a title, then a different caption.
+        let overlays = [overlay("FIRST", start: 0, end: 2),
+                        overlay("SECOND", start: 2, end: 4)]
+        let size = CGSize(width: 200, height: 200)
+
+        let early = VideoOverlayRenderer.overlayImage(
+            textOverlays: overlays, stickerOverlays: [], canvasPx: size, at: 1)
+        let late = VideoOverlayRenderer.overlayImage(
+            textOverlays: overlays, stickerOverlays: [], canvasPx: size, at: 3)
+
+        XCTAssertNotNil(early)
+        XCTAssertNotNil(late)
+        XCTAssertNotEqual(UIImage(cgImage: early!).pngData(),
+                          UIImage(cgImage: late!).pngData(),
+                          "Different captions must produce different pixels")
+    }
+
+    func testUntimedOverlaysStillRenderAtEveryTime() {
+        // Backwards compatibility: an existing project has no timing at all.
+        let plain = [overlay("ALWAYS", start: nil, end: nil)]
+        let size = CGSize(width: 200, height: 200)
+
+        XCTAssertNotNil(VideoOverlayRenderer.overlayImage(
+            textOverlays: plain, stickerOverlays: [], canvasPx: size, at: 0))
+        XCTAssertNotNil(VideoOverlayRenderer.overlayImage(
+            textOverlays: plain, stickerOverlays: [], canvasPx: size, at: 500))
     }
 }
