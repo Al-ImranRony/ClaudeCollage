@@ -2285,6 +2285,18 @@ Add to `GridEditorViewController`, and call `setupRail()` from `viewDidLoad()` a
     private var openToolID: EditorTool.ID?
 
     private func setupRail() {
+        // Re-wire the controls Task 8 orphaned. Their `addTarget` calls lived in the
+        // old `setupLayout()` that Task 8 deleted, so without this the Border and
+        // Corner sliders and the Grid/Shapes control land in their panels looking
+        // perfectly functional and do NOTHING when dragged — no crash, no warning.
+        // This runs once, from `viewDidLoad`; do not move it into a panel factory,
+        // which would re-register a handler on every open and fire it twice.
+        layoutModeControl.addTarget(self, action: #selector(layoutModeChanged), for: .valueChanged)
+        borderSlider.addTarget(self, action: #selector(borderChanged), for: .valueChanged)
+        borderSlider.addTarget(self, action: #selector(sliderReleased), for: [.touchUpInside, .touchUpOutside])
+        cornerSlider.addTarget(self, action: #selector(cornerChanged), for: .valueChanged)
+        cornerSlider.addTarget(self, action: #selector(sliderReleased), for: [.touchUpInside, .touchUpOutside])
+
         var tools: [EditorTool] = []
         // A template defines its own geometry — offering a layout picker would claim
         // a selection the document does not have.
