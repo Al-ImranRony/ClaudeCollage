@@ -113,10 +113,20 @@ public struct VideoCompositionBundle: @unchecked Sendable {
     /// carried instead of a single baked image when at least one text overlay has
     /// timing. Sticker overlays are untimed and always drawn — see
     /// `VideoOverlayRenderer.overlayImage`.
-    public struct TimedOverlayInputs: @unchecked Sendable {
+    ///
+    /// Plain `Sendable`: every field (`[TextOverlay]`, `[StickerOverlay]`,
+    /// `CGFloat`) is already Sendable, unlike `VideoCompositionCell` /
+    /// `BackgroundMusic` / the enclosing bundle, whose `@unchecked` is earned by an
+    /// `AVAsset` field. No unchecked escape hatch needed here.
+    ///
+    /// No `canvasPx` here on purpose: it would just duplicate `bundle.renderSize`
+    /// (both set from the same `output` local in `buildComposition`). The export's
+    /// `overlayForFrame` derives the render size from `ExportContext.width`/
+    /// `height` instead — the same ints already sizing the pixel buffer the
+    /// overlay is drawn into — so there is one source of truth, not two.
+    public struct TimedOverlayInputs: Sendable {
         public let textOverlays: [TextOverlay]
         public let stickerOverlays: [StickerOverlay]
-        public let canvasPx: CGSize
         public let textFontScale: CGFloat
     }
 
@@ -303,7 +313,7 @@ extension VideoComposer {
             overlayImage = nil
             timedOverlays = VideoCompositionBundle.TimedOverlayInputs(
                 textOverlays: textOverlays, stickerOverlays: stickerOverlays,
-                canvasPx: output, textFontScale: textFontScale)
+                textFontScale: textFontScale)
         } else {
             overlayImage = VideoOverlayRenderer.overlayImage(
                 textOverlays: textOverlays, stickerOverlays: stickerOverlays,
@@ -539,12 +549,17 @@ extension VideoComposer {
 
         var videoDone = false
         var audioDone = (ctx.audioInput == nil)
-        // Per-visible-set cache for the timed path: text visibility only changes at
-        // in/out points, so a run of consecutive frames almost always shares the
-        // same image. Keyed on the sorted ids of the overlays visible at that
-        // instant (a stable proxy for "what would be drawn"), not on time itself,
-        // so the whole run between two in/out points costs one render.
-        var overlayCache: [[UUID]: CGImage?] = [:]
+        // Single-slot cache for the timed path: frames arrive in monotonic PTS
+        // order, so a run of consecutive frames between two in/out points almost
+        // always shares one visible set — remembering just the last one is enough
+        // to collapse that whole run to a single render, at O(1) memory instead of
+        // the O(N) a dictionary keyed on every visible-set-so-far would grow to (a
+        // few dozen overlapping captions at 1080×1920 is hundreds of MB of
+        // full-canvas CGImages held at once otherwise). This costs a re-render only
+        // when the SAME visible set recurs non-contiguously (e.g. A:[0,10) and
+        // B:[5,8) revisits `{A}` at [8,10) after `{A, B}` and `{A}` already played)
+        // — correct, just marginally slower than a full cache in that rare case.
+        var overlayCache: OverlayCacheSlot?
 
         while !videoDone || !audioDone {
             if ctx.cancellation?.isCancelled == true {
@@ -597,27 +612,41 @@ extension VideoComposer {
         guard ctx.writer.status == .completed else { throw ctx.writer.error ?? ComposerError.writeFailed }
     }
 
+    /// The single-slot overlay cache's contents: the visible-set key it was
+    /// rendered for, plus the resulting image (or `nil` — "rendered, and nothing
+    /// was visible" — kept distinguishable from "not cached yet", i.e. `cache ==
+    /// nil`, so a caption gap doesn't force a re-render every frame).
+    private struct OverlayCacheSlot {
+        let key: [UUID]
+        let image: CGImage?
+    }
+
     /// Resolves the overlay image for one frame at presentation time `pts`.
     ///
     /// The untimed bundle (`ctx.timedOverlays == nil`, the common case — every
     /// project saved before timing existed) just returns the single baked
     /// `ctx.overlay`, exactly as before. Otherwise the frame's presentation time is
     /// converted to seconds once, via the same `CMTime.seconds` the export already
-    /// used for progress reporting, and the overlays visible at that time are
-    /// looked up in `cache` (keyed on their sorted ids) before rendering — so a run
-    /// of frames sharing a visible set, which is most of them, costs one render.
+    /// used for progress reporting, and the overlays visible at that time (keyed on
+    /// their sorted ids, a stable proxy for "what would be drawn") are compared
+    /// against `cache`'s last key before rendering — so a run of frames sharing a
+    /// visible set, which is most of them given monotonic PTS order, costs one
+    /// render. `canvasPx` is derived from `ctx.width`/`height` (the same ints that
+    /// size the pixel buffer `drawOverlay` writes into) rather than carried on
+    /// `TimedOverlayInputs`, so there is one source of truth for the render size.
     private static func overlayForFrame(
-        _ ctx: ExportContext, at pts: CMTime, cache: inout [[UUID]: CGImage?]
+        _ ctx: ExportContext, at pts: CMTime, cache: inout OverlayCacheSlot?
     ) -> CGImage? {
         guard let timed = ctx.timedOverlays else { return ctx.overlay }
         let seconds = pts.seconds
         let visible = timed.textOverlays.filter { $0.isVisible(at: seconds) }
         let key = visible.map(\.id).sorted { $0.uuidString < $1.uuidString }
-        if let cached = cache[key] { return cached }
+        if let cache, cache.key == key { return cache.image }
         let image = VideoOverlayRenderer.overlayImage(
             textOverlays: visible, stickerOverlays: timed.stickerOverlays,
-            canvasPx: timed.canvasPx, textFontScale: timed.textFontScale)
-        cache[key] = image
+            canvasPx: CGSize(width: CGFloat(ctx.width), height: CGFloat(ctx.height)),
+            textFontScale: timed.textFontScale)
+        cache = OverlayCacheSlot(key: key, image: image)
         return image
     }
 
