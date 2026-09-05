@@ -105,4 +105,46 @@ final class EditorChromeTests: XCTestCase {
         XCTAssertEqual(rect.width, 370, accuracy: 0.5)
         XCTAssertEqual(rect.height, 370, accuracy: 0.5)
     }
+
+    // MARK: - Stage view
+
+    private func layOutStage(canvasSize: CGSize) -> (EditorStage, UIView) {
+        let stage = EditorStage()
+        let content = UIView()
+        stage.setContent(content)
+        stage.setCanvasAspect(canvasSize)
+        stage.frame = CGRect(x: 0, y: 0, width: 402, height: 681)
+        stage.layoutIfNeeded()
+        return (stage, content)
+    }
+
+    func testTheStageSizesItsContentToTheDocumentAspect() {
+        let (_, content) = layOutStage(canvasSize: CGSize(width: 1080, height: 1920))
+
+        XCTAssertEqual(content.bounds.width / content.bounds.height, 1080.0 / 1920.0,
+                       accuracy: 0.01, "Content must take the document's aspect, not a square")
+        XCTAssertGreaterThan(content.bounds.height, 370,
+                             "A story canvas must beat the old 370pt square cap")
+    }
+
+    func testChangingTheAspectRelaysOutTheContent() {
+        let (stage, content) = layOutStage(canvasSize: CGSize(width: 1080, height: 1080))
+        XCTAssertEqual(content.bounds.width / content.bounds.height, 1, accuracy: 0.01)
+
+        stage.setCanvasAspect(CGSize(width: 1080, height: 1920))
+        stage.layoutIfNeeded()
+
+        XCTAssertEqual(content.bounds.width / content.bounds.height, 1080.0 / 1920.0,
+                       accuracy: 0.01, "The aspect constraint must be replaced, not stacked")
+    }
+
+    func testReplacingContentRemovesThePreviousView() {
+        let (stage, first) = layOutStage(canvasSize: CGSize(width: 1080, height: 1080))
+        let second = UIView()
+        stage.setContent(second)
+        stage.layoutIfNeeded()
+
+        XCTAssertNil(first.superview)
+        XCTAssertEqual(second.superview, stage)
+    }
 }
