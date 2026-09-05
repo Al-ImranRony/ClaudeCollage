@@ -20,15 +20,13 @@ final class GridEditorViewController: UIViewController {
 
     // UI
     private let canvasView = CanvasView()
+    private let stage = EditorStage()
+    private let toolRail = EditorToolRail()
+    private let toolPanel = EditorPanel()
     private lazy var layoutModeControl = UISegmentedControl(items: ["Grid", "Shapes"])
     private lazy var layoutPicker = LayoutPickerView(selected: viewModel.state.layout.gridTemplate)
     private lazy var shapePicker = ShapePickerView(selected: viewModel.state.layout.polygonTemplate)
     private lazy var customShapeButton = makeCustomShapeButton()
-    /// The row wrapping `customShapeButton`; shown only in Shapes mode.
-    private var customShapeRow: UIStackView?
-    /// The whole "Layout" group (label, Grid/Shapes switch, both pickers).
-    /// Hidden for `.template` documents, which have no layout alternatives.
-    private var layoutSection: UIStackView?
     private lazy var backgroundPicker = BackgroundPickerView(selected: viewModel.state.background)
     private let borderSlider = UISlider()
     private let cornerSlider = UISlider()
@@ -176,131 +174,58 @@ final class GridEditorViewController: UIViewController {
     }
 
     private func setupLayout() {
-        canvasView.translatesAutoresizingMaskIntoConstraints = false
+        view.backgroundColor = Theme.Color.background
+
         canvasView.backgroundColor = Theme.Color.cellWell
-        canvasView.layer.cornerRadius = 12
+        canvasView.layer.cornerRadius = Theme.Radius.md
+        canvasView.layer.cornerCurve = .continuous
         canvasView.clipsToBounds = true
 
-        // Border + corner sliders live in a labelled stack. Both are normalized
-        // 0…1 and scaled through `viewModel.maxBorderWidth` / `maxCornerRadius`
-        // at read time, so the usable range follows the canvas and layout rather
-        // than a fixed constant that was far too small on a 1080pt canvas.
-        borderSlider.minimumValue = 0
-        borderSlider.maximumValue = 1
-        borderSlider.value = Float(normalizedBorder)
-        borderSlider.addTarget(self, action: #selector(borderChanged), for: .valueChanged)
-        borderSlider.addTarget(self, action: #selector(sliderReleased), for: [.touchUpInside, .touchUpOutside])
+        stage.setContent(canvasView)
+        stage.setCanvasAspect(viewModel.canvasSize)
 
-        cornerSlider.minimumValue = 0
-        cornerSlider.maximumValue = 1
-        cornerSlider.value = Float(normalizedCorner)
-        cornerSlider.addTarget(self, action: #selector(cornerChanged), for: .valueChanged)
-        cornerSlider.addTarget(self, action: #selector(sliderReleased), for: [.touchUpInside, .touchUpOutside])
+        stage.translatesAutoresizingMaskIntoConstraints = false
+        toolPanel.translatesAutoresizingMaskIntoConstraints = false
+        toolRail.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(stage)
+        view.addSubview(toolPanel)
+        view.addSubview(toolRail)
 
-        let borderRow = labelledSlider("Border", slider: borderSlider, systemImage: "square.dashed")
-        let cornerRow = labelledSlider("Corners", slider: cornerSlider, systemImage: "rotate.left")
-
-        // Grid / Shapes mode switch. Selecting a segment reveals the matching
-        // picker; both drive the same `setLayout` on the view model.
-        layoutModeControl.selectedSegmentIndex = viewModel.state.layout.isPolygon ? 1 : 0
-        ThemeSegmentedControl.apply(to: layoutModeControl)
-        layoutModeControl.addTarget(self, action: #selector(layoutModeChanged), for: .valueChanged)
-        let modeRow = UIStackView(arrangedSubviews: [layoutModeControl])
-        modeRow.isLayoutMarginsRelativeArrangement = true
-        modeRow.layoutMargins = UIEdgeInsets(top: 0, left: 16, bottom: 2, right: 16)
-
-        shapePicker.isHidden = !viewModel.state.layout.isPolygon
-        layoutPicker.isHidden = viewModel.state.layout.isPolygon
-
-        let customRow = UIStackView(arrangedSubviews: [customShapeButton])
-        customRow.isLayoutMarginsRelativeArrangement = true
-        customRow.layoutMargins = UIEdgeInsets(top: 0, left: 16, bottom: 2, right: 16)
-        customRow.isHidden = !viewModel.state.layout.isPolygon
-        customShapeRow = customRow
-
-        // The whole Layout group is hidden as one unit for `.template` documents:
-        // the template defines its own geometry, so both the Grid/Shapes switch
-        // and the pickers would be claiming a selection that does not exist.
-        let layoutSection = UIStackView(arrangedSubviews: [
-            sectionLabel("Layout"),
-            modeRow,
-            layoutPicker,
-            shapePicker,
-            customRow,
-        ])
-        layoutSection.axis = .vertical
-        layoutSection.spacing = 6
-        layoutSection.isHidden = !viewModel.state.layout.offersLayoutAlternatives
-        self.layoutSection = layoutSection
-
-        let controlsStack = UIStackView(arrangedSubviews: [
-            layoutSection,
-            borderRow,
-            cornerRow,
-            sectionLabel("Background"),
-            backgroundPicker,
-            makeGenerativeBackgroundRow(),
-        ])
-        controlsStack.axis = .vertical
-        controlsStack.spacing = 6
-        controlsStack.translatesAutoresizingMaskIntoConstraints = false
-
-        layoutPicker.onSelect = { [weak self] template in
-            self?.viewModel.setLayout(.grid(template))
-        }
-        shapePicker.onSelect = { [weak self] polygon in
-            self?.viewModel.setLayout(.polygon(polygon))
-        }
-        backgroundPicker.onSelect = { [weak self] background in
-            self?.viewModel.setBackground(background)
-        }
-
-        let scroll = UIScrollView()
-        scroll.translatesAutoresizingMaskIntoConstraints = false
-        scroll.showsVerticalScrollIndicator = false
-        // The tray reaches the screen edge (see its bottom constraint), so the
-        // automatic behaviour would hand the home-indicator inset straight back
-        // as content inset and restore the empty band it was pinned past.
-        scroll.contentInsetAdjustmentBehavior = .never
-        scroll.addSubview(controlsStack)
-
-        // A compact "add overlay" bar between the canvas and the controls: drop a
-        // fresh text zone or open the sticker picker. This is also the "add
-        // arbitrary text" affordance deferred from slice 5.
-        let addBar = makeAddOverlayBar()
-
-        view.addSubview(canvasView)
-        view.addSubview(addBar)
-        view.addSubview(scroll)
-
-        // The canvas is a fixed 1:1 square (matching the default Instagram-post
-        // ratio). The controls scroll fills whatever space remains beneath it.
-        let canvasSquare = canvasView.heightAnchor.constraint(equalTo: canvasView.widthAnchor)
-        canvasSquare.priority = .defaultHigh
+        // `toolPanel` is sandwiched between `stage.bottom` and `toolRail.top` with no
+        // height of its own — required equalities on both edges but nothing pinning
+        // either edge to an absolute position, so its height (and therefore the
+        // stage's) is left genuinely ambiguous. `EditorPanel`'s own internal floor
+        // is a breakable `.defaultLow` minimum, not an exact size, so it does not
+        // resolve this: empirically the solver was handing nearly ALL the space to
+        // the empty, invisible panel and collapsing the stage to ~16pt — the exact
+        // squashed-canvas failure this task exists to fix, just moved one view over.
+        //
+        // Task 8 never shows the panel (Task 9 wires that up), so it must rest at
+        // zero height until then. `.defaultHigh`, not `.required`, so Task 9 can
+        // introduce its own show/hide height constraint (per `EditorPanel`'s own
+        // doc comment: "the stage's height animation has something stable to
+        // animate against") without first having to unwind a required constraint
+        // here.
+        let collapsedPanelHeight = toolPanel.heightAnchor.constraint(equalToConstant: 0)
+        collapsedPanelHeight.priority = .defaultHigh
 
         NSLayoutConstraint.activate([
-            canvasView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 12),
-            canvasView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
-            canvasView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
-            canvasSquare,
+            stage.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            stage.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            stage.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            stage.bottomAnchor.constraint(equalTo: toolPanel.topAnchor),
 
-            addBar.topAnchor.constraint(equalTo: canvasView.bottomAnchor, constant: 8),
-            addBar.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
-            addBar.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
+            toolPanel.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            toolPanel.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            toolPanel.bottomAnchor.constraint(equalTo: toolRail.topAnchor),
+            collapsedPanelHeight,
 
-            scroll.topAnchor.constraint(equalTo: addBar.bottomAnchor, constant: 8),
-            scroll.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            scroll.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            // The real bottom, not the safe-area bottom. The tab bar is hidden
-            // while an editor is pushed, so pinning to the safe area left ~34pt
-            // of empty background under the last row of controls that nothing
-            // could ever scroll into — a dead band, not breathing room.
-            scroll.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-
-            controlsStack.topAnchor.constraint(equalTo: scroll.contentLayoutGuide.topAnchor, constant: 4),
-            controlsStack.bottomAnchor.constraint(equalTo: scroll.contentLayoutGuide.bottomAnchor, constant: -4),
-            controlsStack.leadingAnchor.constraint(equalTo: scroll.frameLayoutGuide.leadingAnchor),
-            controlsStack.trailingAnchor.constraint(equalTo: scroll.frameLayoutGuide.trailingAnchor),
+            toolRail.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            toolRail.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            // The REAL bottom, not the safe-area bottom: the tab bar is hidden while
+            // an editor is pushed, so pinning to the safe area leaves an empty band
+            // under the rail that nothing can ever fill.
+            toolRail.bottomAnchor.constraint(equalTo: view.bottomAnchor),
         ])
     }
 
@@ -357,8 +282,16 @@ final class GridEditorViewController: UIViewController {
         // Border / corner drags: reposition cells only. Deliberately does NOT call
         // `refreshToolbar` — undo state can't change until the drag is committed on
         // release, so there is nothing to refresh at slider frequency.
+        //
+        // Keeps `updateGeometry` (not `reconfigureCanvas`/`configure`) for the same
+        // reason `CanvasView.updateGeometry` documents: `configure` re-wraps every
+        // cell image and rebuilds every sticker view, which is what made the canvas
+        // stutter at slider frequency before that lightweight path existed. The
+        // stage's aspect assignment is cheap (a stored size + `setNeedsLayout`), so
+        // resyncing it here alongside the geometry update costs nothing.
         viewModel.onGeometryChange = { [weak self] in
             guard let self else { return }
+            self.stage.setCanvasAspect(self.viewModel.canvasSize)
             self.canvasView.updateGeometry(with: self.viewModel.canvasModel())
         }
 
@@ -420,11 +353,9 @@ final class GridEditorViewController: UIViewController {
         borderSlider.value = Float(normalizedBorder)
         cornerSlider.value = Float(normalizedCorner)
         let layout = viewModel.state.layout
-        layoutSection?.isHidden = !layout.offersLayoutAlternatives
         layoutModeControl.selectedSegmentIndex = layout.isPolygon ? 1 : 0
         layoutPicker.isHidden = layout.isPolygon
         shapePicker.isHidden = !layout.isPolygon
-        customShapeRow?.isHidden = !layout.isPolygon
         // Passed straight through (not `if let`) so the highlight clears when the
         // document has no grid layout, rather than sticking on a stale template.
         layoutPicker.setSelected(layout.gridTemplate)
@@ -440,7 +371,6 @@ final class GridEditorViewController: UIViewController {
         UIView.animate(withDuration: Theme.Motion.quick) {
             self.layoutPicker.isHidden = showShapes
             self.shapePicker.isHidden = !showShapes
-            self.customShapeRow?.isHidden = !showShapes
         }
         if showShapes {
             let polygon = viewModel.state.layout.polygonTemplate ?? .diagonalLeft
