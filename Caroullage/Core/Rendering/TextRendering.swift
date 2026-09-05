@@ -67,7 +67,64 @@ public enum TextRendering {
         if overlay.isUnderlined {
             attributes[.underlineStyle] = NSUnderlineStyle.single.rawValue
         }
+        applyStyle(overlay.style, fontScale: fontScale, to: &attributes)
         return NSAttributedString(string: overlay.text, attributes: attributes)
+    }
+
+    // `TextStyle` carries ONE `width` for every treatment, so the treatments that
+    // need a second dimension derive it here by a fixed ratio. Naming them makes the
+    // coupling legible: a `.shadow` cannot be art-directed as "soft blur, short
+    // offset" versus "sharp blur, long offset" — every shadow rides one curve. If a
+    // designer ever needs those independently, the fix is a second field on
+    // `TextStyle`, not a new literal in this file.
+    private enum StyleRatio {
+        /// Shadow offset as a fraction of `width`; the blur uses `width` directly.
+        static let shadowOffset: CGFloat = 0.35
+        /// A glow is a blur with no offset, softer than a drop shadow of the same width.
+        static let glowBlur: CGFloat = 1.6
+        /// Pill: generous horizontal inset, tighter vertical, near-capsule corners.
+        static let pillVerticalInset: CGFloat = 0.6
+        static let pillCornerInset: CGFloat = 2
+        /// Highlight: hugs the text, marker-pen corners.
+        static let highlightHorizontalInset: CGFloat = 0.5
+        static let highlightVerticalInset: CGFloat = 0.25
+        static let highlightCorner: CGFloat = 0.3
+    }
+
+    /// Applies the presentation treatment. Kept separate from typesetting so the
+    /// pill / highlight kinds — which paint behind the text rather than changing it
+    /// — can be no-ops here and handled in `draw`.
+    private static func applyStyle(
+        _ style: TextStyle,
+        fontScale: CGFloat,
+        to attributes: inout [NSAttributedString.Key: Any]
+    ) {
+        let colour = UIColor(hex: style.colorHex)
+        let width = CGFloat(style.width) * fontScale
+
+        switch style.kind {
+        case .plain, .pill, .highlight:
+            break
+
+        case .stroke:
+            // NEGATIVE means stroke AND fill. A positive value hollows the glyph out.
+            attributes[.strokeColor] = colour
+            attributes[.strokeWidth] = -width
+
+        case .shadow:
+            let shadow = NSShadow()
+            shadow.shadowColor = colour.withAlphaComponent(0.55)
+            shadow.shadowBlurRadius = max(1, width)
+            shadow.shadowOffset = CGSize(width: 0, height: max(1, width * StyleRatio.shadowOffset))
+            attributes[.shadow] = shadow
+
+        case .glow:
+            let shadow = NSShadow()
+            shadow.shadowColor = colour
+            shadow.shadowBlurRadius = max(1, width * StyleRatio.glowBlur)
+            shadow.shadowOffset = .zero
+            attributes[.shadow] = shadow
+        }
     }
 
     /// Draws the overlay into a Core Graphics context (export / thumbnail path),
@@ -92,10 +149,46 @@ public enum TextRendering {
 
         cg.saveGState()
         cg.clip(to: absoluteFrame)
+        drawBackground(for: overlay.style,
+                       textRect: CGRect(x: absoluteFrame.minX, y: originY,
+                                        width: absoluteFrame.width, height: drawnHeight),
+                       fontScale: fontScale,
+                       context: cg)
         attributed.draw(with: CGRect(x: absoluteFrame.minX, y: originY,
                                      width: absoluteFrame.width, height: drawnHeight),
                         options: [.usesLineFragmentOrigin, .usesFontLeading],
                         context: nil)
+        cg.restoreGState()
+    }
+
+    /// Paints the solid backgrounds that sit BEHIND the glyphs. `.pill` is a rounded
+    /// rectangle around the whole block; `.highlight` hugs the text with square-ish
+    /// corners, marker-pen style.
+    private static func drawBackground(
+        for style: TextStyle,
+        textRect: CGRect,
+        fontScale: CGFloat,
+        context cg: CGContext
+    ) {
+        let inset = CGFloat(style.width) * fontScale
+        let rect: CGRect
+        let radius: CGFloat
+
+        switch style.kind {
+        case .pill:
+            rect = textRect.insetBy(dx: -inset, dy: -inset * StyleRatio.pillVerticalInset)
+            radius = min(rect.height / 2, inset * StyleRatio.pillCornerInset)
+        case .highlight:
+            rect = textRect.insetBy(dx: -inset * StyleRatio.highlightHorizontalInset, dy: -inset * StyleRatio.highlightVerticalInset)
+            radius = inset * StyleRatio.highlightCorner
+        case .plain, .shadow, .stroke, .glow:
+            return
+        }
+
+        guard rect.width > 0, rect.height > 0 else { return }
+        cg.saveGState()
+        cg.setFillColor(UIColor(hex: style.colorHex).cgColor)
+        UIBezierPath(roundedRect: rect, cornerRadius: max(0, radius)).fill()
         cg.restoreGState()
     }
 
