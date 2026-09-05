@@ -308,9 +308,18 @@ final class VideoEditorViewController: UIViewController {
             item.audioMix = bundle.audioMix
             self.player.replaceCurrentItem(with: item)
             if resumeTime.isNumeric, resumeTime > .zero {
-                self.player.seek(to: CMTimeMinimum(resumeTime, bundle.duration),
+                let seekTime = CMTimeMinimum(resumeTime, bundle.duration)
+                self.player.seek(to: seekTime,
                                  toleranceBefore: .positiveInfinity,
                                  toleranceAfter: .positiveInfinity) { _ in }
+                // Push the seek straight into the canvas rather than waiting for the
+                // periodic observer. `addPeriodicTimeObserver` is only documented to
+                // fire during playback and across play/stop transitions — a seek while
+                // PAUSED is not guaranteed to reach it. Without this, an edit that
+                // shortens the composition clamps the position to a new time while
+                // `previewTime` keeps the old one, so caption visibility is computed
+                // against a frame that is not the one on screen.
+                self.canvasView.setPreviewTime(seekTime.seconds)
             }
             if wasPlaying { self.player.play() }
             // No preview overlay image to set here: `canvasView` shows text/sticker
