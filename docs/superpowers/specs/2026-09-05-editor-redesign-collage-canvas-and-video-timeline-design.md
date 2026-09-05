@@ -262,17 +262,31 @@ collage editor benefits identically, and the shared helpers are what guarantee p
 
 ### 4.3 Timed rendering
 
-`VideoOverlayRenderer.overlayImage(...)` currently returns **one flat image** for the whole
-export, composited through `AVVideoCompositionCoreAnimationTool`. Because that tool is
-already in the pipeline, timing is a modest change rather than a new architecture: build a
-`CALayer` per text overlay and drive its opacity with a keyframe animation
-(`beginTime = AVCoreAnimationBeginTimeAtZero`, `fillMode = .both`,
-`isRemovedOnCompletion = false`).
+> **Corrected during implementation (2026-09-06).** This section originally said the export
+> composites overlays through `AVVideoCompositionCoreAnimationTool`, and that timing was
+> therefore cheap because that tool was already in the pipeline. **The premise was wrong in
+> both halves.** This codebase deliberately does *not* use that tool — `VideoCompositionBuilder`'s
+> own header records that the `AVVideoCompositionCoreAnimationTool` path *crashes*
+> `AVAssetReaderVideoCompositionOutput`, so the export uses an `AVAssetWriter` path instead.
+> The conclusion survives, for a better reason: the export **already draws overlays per frame**.
 
-The renderer's entry point therefore changes from returning an image to returning a layer
-tree; sticker overlays keep their existing always-on behaviour as a layer with no
-animation. The live `VideoCanvasView` applies the same in/out points against the player's
-current time so preview matches export.
+There are two overlay paths, and both are already frame-by-frame:
+
+- **Export.** `VideoCompositionBuilder.runExport` draws a single pre-rendered
+  `bundle.overlayImage` into every composited `CVPixelBuffer` via `drawOverlay(_:into:width:height:)`.
+  Timing therefore means making that image **time-aware** — selecting or rendering the overlay
+  for the frame's presentation time instead of reusing one flat image for the whole export.
+  No new pipeline, no `CALayer` tree, and no contact with the crashing code path.
+- **Live preview.** `VideoCanvasView` overlays text as real UIKit views above the player
+  (the same pooled `TextOverlayView` the collage canvas uses). Timing there means driving each
+  view's visibility from the player's current time via a periodic time observer.
+
+Because both paths render per frame rather than baking one static layer, this design also
+leaves tier-3 animation (fade / slide / pop / typewriter) as a later change to the same two
+call sites rather than a migration.
+
+`startTime` / `endTime` are optional; `nil` means "always visible", so every already-saved
+project renders exactly as it does today.
 
 ---
 
