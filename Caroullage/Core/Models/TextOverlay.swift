@@ -14,6 +14,11 @@
 //     drawing into a differently-scaled canvas multiplies them by
 //     targetCanvas.height / referenceCanvas.height.
 //   • `lineHeight` is a unitless multiple of the font's natural line height.
+//   • `startTime` / `endTime` are SECONDS, relative to the composition timeline
+//     (not the source asset). `nil` means unbounded in that direction. Both are
+//     clamped to `max(0, …)` on init and decode (never turning `nil` into `0` —
+//     see the properties below and `isVisible(at:)` for the degenerate-window
+//     rules a Task 7 timeline editor must preserve).
 //
 
 import Foundation
@@ -41,8 +46,12 @@ public struct TextOverlay: Codable, Sendable, Equatable, Identifiable {
     public var style: TextStyle
     /// In-point in seconds. `nil` means "from the beginning" — the still-image
     /// paths ignore timing entirely, so this costs the photo editor nothing.
+    /// Clamped to `max(0, …)` on init/decode when non-nil; `nil` itself is never
+    /// clamped away. See `isVisible(at:)` for what a degenerate window does.
     public var startTime: Double?
     /// Out-point in seconds, exclusive. `nil` means "to the end".
+    /// Clamped to `max(0, …)` on init/decode when non-nil; `nil` itself is never
+    /// clamped away. See `isVisible(at:)` for what a degenerate window does.
     public var endTime: Double?
     public var frameX: Double
     public var frameY: Double
@@ -80,8 +89,8 @@ public struct TextOverlay: Codable, Sendable, Equatable, Identifiable {
         self.isItalic = isItalic
         self.isUnderlined = isUnderlined
         self.style = style
-        self.startTime = startTime
-        self.endTime = endTime
+        self.startTime = startTime.map { max(0, $0) }
+        self.endTime = endTime.map { max(0, $0) }
         self.frameX = Double(frame.origin.x)
         self.frameY = Double(frame.origin.y)
         self.frameWidth = Double(frame.size.width)
@@ -133,8 +142,8 @@ public struct TextOverlay: Codable, Sendable, Equatable, Identifiable {
         self.isItalic = try c.decodeIfPresent(Bool.self, forKey: .isItalic) ?? fallback.isItalic
         self.isUnderlined = try c.decodeIfPresent(Bool.self, forKey: .isUnderlined) ?? fallback.isUnderlined
         self.style = try c.decodeIfPresent(TextStyle.self, forKey: .style) ?? fallback.style
-        self.startTime = try c.decodeIfPresent(Double.self, forKey: .startTime)
-        self.endTime = try c.decodeIfPresent(Double.self, forKey: .endTime)
+        self.startTime = try c.decodeIfPresent(Double.self, forKey: .startTime).map { max(0, $0) }
+        self.endTime = try c.decodeIfPresent(Double.self, forKey: .endTime).map { max(0, $0) }
         self.frameX = try c.decodeIfPresent(Double.self, forKey: .frameX) ?? fallback.frameX
         self.frameY = try c.decodeIfPresent(Double.self, forKey: .frameY) ?? fallback.frameY
         self.frameWidth = try c.decodeIfPresent(Double.self, forKey: .frameWidth) ?? fallback.frameWidth
@@ -143,10 +152,24 @@ public struct TextOverlay: Codable, Sendable, Equatable, Identifiable {
 
     /// Whether this overlay is on screen at `time` (seconds into the composition).
     ///
-    /// An inverted window (`end <= start`) is treated as ALWAYS VISIBLE rather than
-    /// never visible. A corrupt or hand-edited project should not be able to make a
-    /// caption permanently invisible with nothing on screen to explain why — failing
-    /// loud beats failing silent.
+    /// Contract for callers (Task 2's frame-time conversion in particular): `time`
+    /// is the frame's presentation time in seconds, and the window is half-open —
+    /// `[start, end)` — compared with exact `>=` / `<`, no tolerance. A caller that
+    /// quantises to frames (e.g. against the composition's CMTime timescale) must
+    /// do so the same way in preview and export, or an in/out point that lands
+    /// exactly on a frame boundary can flicker a frame early or late between the
+    /// two. This method adds no tolerance of its own — quantise consistently
+    /// upstream instead.
+    ///
+    /// Every DEGENERATE window — one that can never contain a valid (non-negative)
+    /// time — is treated as ALWAYS VISIBLE rather than never visible: an inverted
+    /// window (`end <= start`), a zero-width window (`start == end`), and a
+    /// single-bound window whose only constraint is non-positive (e.g. `endTime`
+    /// of `0` or less with no `startTime` — reachable by hand-edited/corrupt JSON,
+    /// or by Task 7 dragging an out-point back to the very start). A corrupt or
+    /// mis-dragged project must not be able to make a caption permanently
+    /// invisible with nothing on screen to explain why — failing loud beats
+    /// failing silent.
     public func isVisible(at time: Double) -> Bool {
         switch (startTime, endTime) {
         case (nil, nil):
@@ -154,6 +177,11 @@ public struct TextOverlay: Codable, Sendable, Equatable, Identifiable {
         case let (start?, nil):
             return time >= start
         case let (nil, end?):
+            // A non-positive out-point with no in-point describes a window that can
+            // never contain a valid (non-negative) time. Fail OPEN, exactly as an
+            // inverted window does below — a corrupt or mis-dragged value must not be
+            // able to hide a caption with nothing on screen to explain why.
+            guard end > 0 else { return true }
             return time < end
         case let (start?, end?):
             guard end > start else { return true }
