@@ -813,6 +813,10 @@ public struct VideoTimelineModel: Equatable {
     /// visibly the one the tools act on.
     public var selectedClipIndex: Int?
     public var selectedTextID: UUID?
+    /// Drives the play/pause icon. The OWNER is the source of truth — the control
+    /// reports a tap and applies nothing itself, so the icon can never disagree with
+    /// the real player state.
+    public var isPlaying: Bool
 }
 
 public final class VideoTimeline: UIView {
@@ -822,6 +826,11 @@ public final class VideoTimeline: UIView {
 
     public var onScrub: ((Double) -> Void)?
     public var onToggleState: ((State) -> Void)?
+    /// The approved design puts a play control in the collapsed strip. WITHOUT this
+    /// callback the control has nothing to report to, and an implementer will rightly
+    /// refuse to build it — which is exactly how the video editor briefly ended up with
+    /// no way to pause at all.
+    public var onTogglePlayback: (() -> Void)?
     public var onSelectClip: ((Int) -> Void)?
     public var onSelectText: ((UUID) -> Void)?
     /// Fires `.changed` throughout a drag and `.committed` exactly once on release.
