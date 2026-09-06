@@ -380,9 +380,16 @@ final class VideoTimelineViewTests: XCTestCase {
         XCTAssertEqual(scrubbed ?? -1, 5, accuracy: 0.5)
     }
 
-    func testScrubbingDoesNotFireWhenTappingTheHeader() {
-        // The header (time readouts + chevron) must not also scrub — otherwise
-        // tapping the chevron would both toggle state AND seek the player.
+    /// Renamed from `testScrubbingDoesNotFireWhenTappingTheHeader`: what this
+    /// actually exercises is `simulateChevronTap`, i.e. `sendActions(for:
+    /// .touchUpInside)` on the button directly — it never goes anywhere near
+    /// `tapGesture`/`performTap` or the `gestureRecognizer(_:shouldReceive:)`
+    /// exclusion those rely on. It still documents a real (if narrow) fact —
+    /// firing the chevron's own action doesn't happen to also trip `onScrub`
+    /// — but the header-touch exclusion itself is covered by
+    /// `testGestureRecognizerShouldReceiveExcludesHeaderTouchesButNotOthers`
+    /// below, which calls the delegate method directly.
+    func testSimulatedChevronTapOnlyFiresItsOwnActionNotOnScrub() {
         let timeline = makeTimeline(width: 300)
         timeline.setModel(VideoTimelineModel(duration: 10))
         timeline.layoutIfNeeded()
@@ -392,6 +399,41 @@ final class VideoTimelineViewTests: XCTestCase {
         timeline.simulateChevronTap()
 
         XCTAssertFalse(scrubbed)
+    }
+
+    /// A `UITouch` whose `view` is fixed at construction. `UITouch` has no
+    /// public way to attach a view to a plain instance, so this overrides the
+    /// one property `gestureRecognizer(_:shouldReceive:)` actually reads.
+    private final class FakeTouch: UITouch {
+        private let fakeView: UIView?
+        init(view: UIView?) {
+            self.fakeView = view
+            super.init()
+        }
+        override var view: UIView? { fakeView }
+    }
+
+    /// Exercises `gestureRecognizer(_:shouldReceive:)` itself — the delegate
+    /// method `testSimulatedChevronTapOnlyFiresItsOwnActionNotOnScrub`
+    /// (formerly `testScrubbingDoesNotFireWhenTappingTheHeader`) nominally
+    /// guarded but never actually called, since it went through
+    /// `sendActions` instead. Before this test existed, nothing in the suite
+    /// referenced the delegate method at all, so deleting it changed nothing
+    /// observable; this one calls it directly, so removing the method now
+    /// fails the build.
+    func testGestureRecognizerShouldReceiveExcludesHeaderTouchesButNotOthers() {
+        let timeline = makeTimeline()
+        let recognizer = UIPanGestureRecognizer()
+
+        let headerTouch = FakeTouch(view: timeline.chevronButtonForHitTesting)
+        XCTAssertFalse(
+            timeline.gestureRecognizer(recognizer, shouldReceive: headerTouch),
+            "A touch on the header (the chevron) must be excluded from the timeline's own gestures")
+
+        let bodyTouch = FakeTouch(view: timeline)
+        XCTAssertTrue(
+            timeline.gestureRecognizer(recognizer, shouldReceive: bodyTouch),
+            "A touch outside the header must still be received")
     }
 
     // MARK: - Selection
@@ -433,6 +475,48 @@ final class VideoTimelineViewTests: XCTestCase {
         XCTAssertEqual(selected, id)
     }
 
+    // MARK: - Selection rendering (Fix 2: the model can now express selection)
+
+    func testASelectedClipRendersTheAccentColorUnlikeAnUnselectedClip() {
+        let timeline = makeTimeline(width: 300)
+        timeline.setState(.expanded, animated: false)
+        var model = threeClipModel()
+        model.selectedClipIndex = 1
+        timeline.setModel(model)
+        timeline.layoutIfNeeded()
+
+        let light = UITraitCollection(userInterfaceStyle: .light)
+        let accent = Theme.Color.accent.resolvedColor(with: light)
+
+        XCTAssertEqual(timeline.colorForClip(at: 1)?.resolvedColor(with: light), accent,
+                       "The selected clip must render the indigo state color")
+        XCTAssertNotEqual(timeline.colorForClip(at: 0)?.resolvedColor(with: light), accent,
+                          "An unselected clip must not render the indigo state color")
+    }
+
+    func testASelectedTextPillRendersTheAccentColorUnlikeAnUnselectedPill() {
+        let timeline = makeTimeline(width: 300)
+        timeline.setState(.expanded, animated: false)
+        let selectedID = UUID()
+        let otherID = UUID()
+        var model = VideoTimelineModel(duration: 10)
+        model.textPills = [
+            .init(id: selectedID, label: "Selected", start: 1, end: 3),
+            .init(id: otherID, label: "Other", start: 5, end: 6),
+        ]
+        model.selectedTextID = selectedID
+        timeline.setModel(model)
+        timeline.layoutIfNeeded()
+
+        let light = UITraitCollection(userInterfaceStyle: .light)
+        let accent = Theme.Color.accent.resolvedColor(with: light)
+
+        XCTAssertEqual(timeline.colorForTextPill(id: selectedID)?.resolvedColor(with: light), accent,
+                       "The selected text pill must render the indigo state color")
+        XCTAssertNotEqual(timeline.colorForTextPill(id: otherID)?.resolvedColor(with: light), accent,
+                          "An unselected text pill must not render the indigo state color")
+    }
+
     // MARK: - Trim / retime dragging
 
     func testDraggingAClipsTrailingEdgeReportsOnTrim() {
@@ -444,8 +528,8 @@ final class VideoTimelineViewTests: XCTestCase {
         guard let frame = timeline.frameForClip(at: 0) else {
             return XCTFail("Expected a rendered frame for clip 0")
         }
-        var trims: [(Int, Double, Double)] = []
-        timeline.onTrim = { trims.append(($0, $1, $2)) }
+        var trims: [(Int, Double, Double, VideoTimeline.EditPhase)] = []
+        timeline.onTrim = { trims.append(($0, $1, $2, $3)) }
 
         let trailingEdge = CGPoint(x: frame.maxX - 1, y: frame.midY)
         timeline.simulatePanBegan(at: trailingEdge)
@@ -456,6 +540,7 @@ final class VideoTimelineViewTests: XCTestCase {
         XCTAssertEqual(last.0, 0)
         XCTAssertEqual(last.1, 0, accuracy: 0.01, "The untouched (leading) edge must not move")
         XCTAssertGreaterThan(last.2, 4, "The dragged (trailing) edge must have moved later")
+        XCTAssertEqual(last.3, .committed, "The final report from a completed drag must be committed")
     }
 
     func testDraggingATextPillsLeadingEdgeReportsOnRetimeText() {
@@ -470,8 +555,8 @@ final class VideoTimelineViewTests: XCTestCase {
         guard let frame = timeline.frameForTextPill(id: id) else {
             return XCTFail("Expected a rendered frame for the text pill")
         }
-        var retimes: [(UUID, Double, Double)] = []
-        timeline.onRetimeText = { retimes.append(($0, $1, $2)) }
+        var retimes: [(UUID, Double, Double, VideoTimeline.EditPhase)] = []
+        timeline.onRetimeText = { retimes.append(($0, $1, $2, $3)) }
 
         let leadingEdge = CGPoint(x: frame.minX + 1, y: frame.midY)
         timeline.simulatePanBegan(at: leadingEdge)
@@ -482,6 +567,106 @@ final class VideoTimelineViewTests: XCTestCase {
         XCTAssertEqual(last.0, id)
         XCTAssertLessThan(last.1, 4, "The dragged (leading) edge must have moved earlier")
         XCTAssertEqual(last.2, 8, accuracy: 0.01, "The untouched (trailing) edge must not move")
+        XCTAssertEqual(last.3, .committed, "The final report from a completed drag must be committed")
+    }
+
+    // MARK: - Narrow-clip edge resolution (Fix 3)
+
+    func testANarrowClipIsTrimmableFromBothEdges() {
+        let timeline = makeTimeline(width: 380)
+        timeline.setState(.expanded, animated: false)
+        // ~1.5s of a 30s composition at 380pt renders under 24pt wide — the
+        // mainstream "short quick-cut clip" case a fixed 12pt-per-side
+        // tolerance couldn't reach on its trailing edge at all (it all
+        // resolved to the leading edge first).
+        let model = VideoTimelineModel(duration: 30, clips: [
+            .init(index: 0, start: 10, duration: 1.5, isFilled: true),
+        ])
+        timeline.setModel(model)
+        timeline.layoutIfNeeded()
+
+        guard let frame = timeline.frameForClip(at: 0) else {
+            return XCTFail("Expected a rendered frame for the narrow clip")
+        }
+        XCTAssertLessThan(frame.width, 24, "Precondition: narrower than 2x the old fixed tolerance")
+
+        var trims: [(Int, Double, Double, VideoTimeline.EditPhase)] = []
+        timeline.onTrim = { trims.append(($0, $1, $2, $3)) }
+
+        let trailingEdge = CGPoint(x: frame.maxX - 1, y: frame.midY)
+        timeline.simulatePanBegan(at: trailingEdge)
+        timeline.simulatePanEnded(at: CGPoint(x: trailingEdge.x + 30, y: frame.midY))
+
+        guard let trailingResult = trims.last else {
+            return XCTFail("Expected the trailing-edge drag to report onTrim")
+        }
+        XCTAssertEqual(trailingResult.1, 10, accuracy: 0.01, "Dragging the trailing edge must not move the start")
+        XCTAssertGreaterThan(trailingResult.2, 11.5, "Dragging the trailing edge must move the end later")
+
+        trims.removeAll()
+
+        let leadingEdge = CGPoint(x: frame.minX + 1, y: frame.midY)
+        timeline.simulatePanBegan(at: leadingEdge)
+        timeline.simulatePanEnded(at: CGPoint(x: leadingEdge.x - 5, y: frame.midY))
+
+        guard let leadingResult = trims.last else {
+            return XCTFail("Expected the leading-edge drag to report onTrim")
+        }
+        XCTAssertLessThan(leadingResult.1, 10, "Dragging the leading edge must move the start earlier")
+        XCTAssertEqual(leadingResult.2, 11.5, accuracy: 0.01, "Dragging the leading edge must not move the end")
+    }
+
+    // MARK: - Edit phase (Fix 1: trim/retime must distinguish in-progress from committed)
+
+    func testDraggingAClipReportsChangedThroughoutAndExactlyOneCommittedAtTheEnd() {
+        let timeline = makeTimeline(width: 300)
+        timeline.setState(.expanded, animated: false)
+        timeline.setModel(threeClipModel(duration: 12))
+        timeline.layoutIfNeeded()
+
+        guard let frame = timeline.frameForClip(at: 0) else {
+            return XCTFail("Expected a rendered frame for clip 0")
+        }
+        var phases: [VideoTimeline.EditPhase] = []
+        timeline.onTrim = { _, _, _, phase in phases.append(phase) }
+
+        let trailingEdge = CGPoint(x: frame.maxX - 1, y: frame.midY)
+        timeline.simulatePanBegan(at: trailingEdge) // 1 report (.changed)
+        timeline.simulatePanChanged(at: CGPoint(x: trailingEdge.x + 5, y: frame.midY))
+        timeline.simulatePanChanged(at: CGPoint(x: trailingEdge.x + 10, y: frame.midY))
+        timeline.simulatePanChanged(at: CGPoint(x: trailingEdge.x + 15, y: frame.midY)) // 3 more, all .changed
+        timeline.simulatePanEnded(at: CGPoint(x: trailingEdge.x + 20, y: frame.midY)) // 1 report (.committed)
+
+        XCTAssertEqual(phases.count, 5, "Precondition: began + 3 changed + ended")
+        XCTAssertEqual(phases.filter { $0 == .committed }.count, 1,
+                       "A drag must commit exactly once, at .ended")
+        XCTAssertEqual(phases.filter { $0 == .changed }.count, 4,
+                       "Every other report — began, plus every .changed tick — must be .changed")
+        XCTAssertEqual(phases.last, .committed, "The commit must be the drag's final report")
+    }
+
+    func testACancelledDragReportsChangedButNeverCommitted() {
+        let timeline = makeTimeline(width: 300)
+        timeline.setState(.expanded, animated: false)
+        timeline.setModel(threeClipModel(duration: 12))
+        timeline.layoutIfNeeded()
+
+        guard let frame = timeline.frameForClip(at: 0) else {
+            return XCTFail("Expected a rendered frame for clip 0")
+        }
+        var phases: [VideoTimeline.EditPhase] = []
+        timeline.onTrim = { _, _, _, phase in phases.append(phase) }
+
+        let trailingEdge = CGPoint(x: frame.maxX - 1, y: frame.midY)
+        timeline.simulatePanBegan(at: trailingEdge)
+        timeline.simulatePanChanged(at: CGPoint(x: trailingEdge.x + 10, y: frame.midY))
+        // The system interrupts the touch (e.g. an incoming call) instead of
+        // a normal lift-off.
+        timeline.simulatePanCancelled(at: CGPoint(x: trailingEdge.x + 20, y: frame.midY))
+
+        XCTAssertFalse(phases.isEmpty, "Precondition: the drag must have reported at least once")
+        XCTAssertTrue(phases.allSatisfy { $0 == .changed },
+                     "A gesture the system cancelled must never be reported as committed")
     }
 
     // MARK: - Stale gesture state (Trap #4)
@@ -495,8 +680,8 @@ final class VideoTimelineViewTests: XCTestCase {
         guard let frame = timeline.frameForClip(at: 2) else {
             return XCTFail("Expected a rendered frame for clip 2")
         }
-        var trims: [(Int, Double, Double)] = []
-        timeline.onTrim = { trims.append(($0, $1, $2)) }
+        var trims: [(Int, Double, Double, VideoTimeline.EditPhase)] = []
+        timeline.onTrim = { trims.append(($0, $1, $2, $3)) }
 
         let trailingEdge = CGPoint(x: frame.maxX - 1, y: frame.midY)
         timeline.simulatePanBegan(at: trailingEdge)

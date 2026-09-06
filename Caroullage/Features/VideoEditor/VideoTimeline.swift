@@ -35,10 +35,11 @@
 //  flight when the document changes underneath it stops reporting rather than
 //  continuing to act on a clip index or text id the new model may not have.
 //
-//  Palette: the playhead is state (`Theme.Color.accent`, indigo) because it is
-//  literally "what position is current"; everything else — filled/empty clip
-//  fills, text-pill chips, the ruler — is chrome (ink), because the model has
-//  no notion of a *selected* clip or pill for indigo to mark.
+//  Palette: the playhead and a selected clip/pill are state (`Theme.Color.accent`,
+//  indigo) — "what position is current" and "what is selected", respectively.
+//  Everything else — unselected clip fills, unselected text-pill chips, the
+//  ruler — stays chrome (ink). `VideoTimelineModel.selectedClipIndex` /
+//  `selectedTextID` are what let indigo mark a choice at all.
 //
 //  Scope deliberately left out of this task: the design lists a play control in
 //  the collapsed strip, but nothing in the given API reports it (no callback,
@@ -90,17 +91,26 @@ public struct VideoTimelineModel: Equatable, Sendable {
     public var clips: [Clip]
     public var textPills: [TextPill]
     public var musicTitle: String?
+    /// The clip currently shown selected (Task 6's "Clip selected" contextual
+    /// rail group). `nil` means nothing is selected.
+    public var selectedClipIndex: Int?
+    /// The text pill currently shown selected (Task 6's "Text selected" group).
+    public var selectedTextID: UUID?
 
     public init(
         duration: Double = 0,
         clips: [Clip] = [],
         textPills: [TextPill] = [],
-        musicTitle: String? = nil
+        musicTitle: String? = nil,
+        selectedClipIndex: Int? = nil,
+        selectedTextID: UUID? = nil
     ) {
         self.duration = duration
         self.clips = clips
         self.textPills = textPills
         self.musicTitle = musicTitle
+        self.selectedClipIndex = selectedClipIndex
+        self.selectedTextID = selectedTextID
     }
 }
 
@@ -140,12 +150,25 @@ public final class VideoTimeline: UIView {
         case collapsed, expanded
     }
 
+    /// Distinguishes a still-in-progress edit from its commit, so a caller
+    /// driving undo (this codebase's `updateXInteractive` + `commitInteractive`
+    /// pattern — see `VideoEditorViewModel`) can coalesce an entire drag into
+    /// one undo step instead of recording one per `.changed` tick.
+    public enum EditPhase: Equatable, Sendable {
+        /// Fired on `.began`/`.changed`, and once more on a `.cancelled`/`.failed`
+        /// gesture (see `performPanEnd`) — never treat this as a final value.
+        case changed
+        /// Fired exactly once, on a `.ended` gesture. Never fired for a
+        /// `.cancelled` or `.failed` one.
+        case committed
+    }
+
     public var onScrub: ((Double) -> Void)?
     public var onToggleState: ((State) -> Void)?
     public var onSelectClip: ((Int) -> Void)?
     public var onSelectText: ((UUID) -> Void)?
-    public var onTrim: ((_ clipIndex: Int, _ start: Double, _ end: Double) -> Void)?
-    public var onRetimeText: ((_ id: UUID, _ start: Double, _ end: Double) -> Void)?
+    public var onTrim: ((_ clipIndex: Int, _ start: Double, _ end: Double, _ phase: EditPhase) -> Void)?
+    public var onRetimeText: ((_ id: UUID, _ start: Double, _ end: Double, _ phase: EditPhase) -> Void)?
 
     public static let collapsedHeight: CGFloat = 56
     public static let expandedHeight: CGFloat = 190
@@ -154,6 +177,9 @@ public final class VideoTimeline: UIView {
     private static let chevronWidth: CGFloat = 32
     /// Touch slop for grabbing a clip/pill's edge to trim/retime rather than
     /// its middle to select. `Theme.Spacing.sm` rather than a bespoke literal.
+    /// This is a ceiling, not a fixed value — `edgeTolerance(for:)` scales it
+    /// down for a block narrower than `2 * edgeTolerance`, or the two edge
+    /// zones would overlap and swallow the whole block.
     private static let edgeTolerance: CGFloat = Theme.Spacing.sm
     /// A clip/pill can never be trimmed narrower than this, so a fast drag past
     /// the opposite edge can't invert start/end or produce a zero/negative span.
@@ -362,23 +388,47 @@ public final class VideoTimeline: UIView {
         return min(max(value, lowerBound), upperBound)
     }
 
+    /// The edge tolerance to use for a block `width` points wide: `edgeTolerance`
+    /// as a ceiling, scaled down to a third of the width for anything narrower
+    /// than `2 * edgeTolerance` (a quick-cut clip well under two seconds on a
+    /// typical composition). Without the scale-down, a narrow block's two edge
+    /// zones would overlap and cover the entire block, leaving no way to select
+    /// its middle — and, resolved leading-first, no way to reach the trailing
+    /// edge at all.
+    private func edgeTolerance(for width: CGFloat) -> CGFloat {
+        min(Self.edgeTolerance, width / 3)
+    }
+
     /// Only meaningful while expanded — the collapsed strip has no per-clip or
     /// per-pill targets, only a scrub track (see the class header).
+    ///
+    /// Resolves to whichever edge `point` is nearer, not "leading wins": a
+    /// block narrower than `2 * edgeTolerance` used to resolve entirely to its
+    /// leading edge, making the trailing edge of any short clip untrimmable.
+    /// A point exactly equidistant from both (only possible once the block is
+    /// narrower than `2 * edgeTolerance(for:)`) resolves to leading, matching
+    /// the old tie-break for a case that was already a hairline judgement call.
     private func hitTarget(at point: CGPoint) -> DragTarget {
         guard state == .expanded else { return .background }
 
         for (index, view) in expandedContent.clipBlockViews {
             let frame = view.convert(view.bounds, to: self)
             guard frame.contains(point) else { continue }
-            if point.x <= frame.minX + Self.edgeTolerance { return .clipEdge(index, .leading) }
-            if point.x >= frame.maxX - Self.edgeTolerance { return .clipEdge(index, .trailing) }
+            let tolerance = edgeTolerance(for: frame.width)
+            let toLeading = point.x - frame.minX
+            let toTrailing = frame.maxX - point.x
+            if toLeading <= tolerance, toLeading <= toTrailing { return .clipEdge(index, .leading) }
+            if toTrailing <= tolerance { return .clipEdge(index, .trailing) }
             return .clipMiddle(index)
         }
         for (id, view) in expandedContent.textPillBlockViews {
             let frame = view.convert(view.bounds, to: self)
             guard frame.contains(point) else { continue }
-            if point.x <= frame.minX + Self.edgeTolerance { return .textEdge(id, .leading) }
-            if point.x >= frame.maxX - Self.edgeTolerance { return .textEdge(id, .trailing) }
+            let tolerance = edgeTolerance(for: frame.width)
+            let toLeading = point.x - frame.minX
+            let toTrailing = frame.maxX - point.x
+            if toLeading <= tolerance, toLeading <= toTrailing { return .textEdge(id, .leading) }
+            if toTrailing <= tolerance { return .textEdge(id, .trailing) }
             return .textMiddle(id)
         }
         return .background
@@ -409,9 +459,17 @@ public final class VideoTimeline: UIView {
         case .began:
             performPanBegan(at: point)
         case .changed:
-            performPanContinue(at: point)
-        case .ended, .cancelled, .failed:
-            performPanEnd(at: point)
+            performPanContinue(at: point, phase: .changed)
+        case .ended:
+            performPanEnd(at: point, phase: .committed)
+        case .cancelled, .failed:
+            // A gesture the system interrupted (an incoming call, a modal
+            // taking over touches) must not be reported as committed — that
+            // would bake in whatever point the touch happened to be at when
+            // it was yanked away, as a real, undo-worthy edit. Report the
+            // final position as one more `.changed` instead, exactly like any
+            // other in-progress tick, and simply never fire `.committed`.
+            performPanEnd(at: point, phase: .changed)
         default:
             break
         }
@@ -436,15 +494,17 @@ public final class VideoTimeline: UIView {
             // over a clip's middle — only a plain tap there selects.
             activeDrag = .scrub
         }
-        performPanContinue(at: point)
+        performPanContinue(at: point, phase: .changed)
     }
 
-    private func performPanContinue(at point: CGPoint) {
+    private func performPanContinue(at point: CGPoint, phase: EditPhase) {
         guard let drag = activeDrag else { return }
         let time = timeForX(point.x)
 
         switch drag {
         case .scrub:
+            // Scrubbing has no undo step to coalesce, so `onScrub` carries no
+            // phase — every tick (including the final one) reports the same way.
             setPlayhead(time)
             onScrub?(time)
 
@@ -453,26 +513,26 @@ public final class VideoTimeline: UIView {
             switch edge {
             case .leading:
                 let newStart = clamped(time, 0, end - Self.minimumTrimDuration)
-                onTrim?(index, newStart, end)
+                onTrim?(index, newStart, end, phase)
             case .trailing:
                 let newEnd = clamped(time, start + Self.minimumTrimDuration, model.duration)
-                onTrim?(index, start, newEnd)
+                onTrim?(index, start, newEnd, phase)
             }
 
         case .retimeText(let id, let edge, let start, let end):
             switch edge {
             case .leading:
                 let newStart = clamped(time, 0, end - Self.minimumTrimDuration)
-                onRetimeText?(id, newStart, end)
+                onRetimeText?(id, newStart, end, phase)
             case .trailing:
                 let newEnd = clamped(time, start + Self.minimumTrimDuration, model.duration)
-                onRetimeText?(id, start, newEnd)
+                onRetimeText?(id, start, newEnd, phase)
             }
         }
     }
 
-    private func performPanEnd(at point: CGPoint) {
-        performPanContinue(at: point)
+    private func performPanEnd(at point: CGPoint, phase: EditPhase) {
+        performPanContinue(at: point, phase: phase)
         activeDrag = nil
     }
 
@@ -508,13 +568,28 @@ public final class VideoTimeline: UIView {
         return entry.view.convert(entry.view.bounds, to: self)
     }
 
+    /// A clip block's rendered fill, for asserting the selected/unselected
+    /// palette split (selected renders `Theme.Color.accent`; see `hitTarget`'s
+    /// callers in `ExpandedLanesView`/`ClipRowView`) without reaching past the
+    /// public model into private view internals.
+    func colorForClip(at index: Int) -> UIColor? {
+        expandedContent.clipBlockViews.first(where: { $0.index == index })?.view.backgroundColor
+    }
+
+    func colorForTextPill(id: UUID) -> UIColor? {
+        expandedContent.textPillBlockViews.first(where: { $0.id == id })?.view.backgroundColor
+    }
+
     /// Drives the same path a real tap does, without needing a live touch.
     /// Mirrors `EditorToolRail.simulateTap` / `EditorPanel.simulateClose`.
     func simulateTap(at point: CGPoint) { performTap(at: point) }
 
     func simulatePanBegan(at point: CGPoint) { performPanBegan(at: point) }
-    func simulatePanChanged(at point: CGPoint) { performPanContinue(at: point) }
-    func simulatePanEnded(at point: CGPoint) { performPanEnd(at: point) }
+    func simulatePanChanged(at point: CGPoint) { performPanContinue(at: point, phase: .changed) }
+    func simulatePanEnded(at point: CGPoint) { performPanEnd(at: point, phase: .committed) }
+    /// Mirrors what `handlePan` does for a `.cancelled`/`.failed` gesture: end
+    /// the drag, but only ever report `.changed`, never `.committed`.
+    func simulatePanCancelled(at point: CGPoint) { performPanEnd(at: point, phase: .changed) }
 }
 
 // MARK: - UIGestureRecognizerDelegate
@@ -609,7 +684,10 @@ private final class CollapsedStripView: UIScrollView {
         pillViews = model.textPills.map { _ in
             let view = UIView()
             view.backgroundColor = Theme.Color.accentStrong
-            view.layer.cornerRadius = 2
+            // Same token the equivalent expanded pill blocks use
+            // (`TextPillLaneRow`); at this track's height it simply rounds
+            // fully into a capsule rather than a softened rectangle.
+            view.layer.cornerRadius = Theme.Radius.sm
             pillTrack.addSubview(view)
             return view
         }
@@ -655,6 +733,29 @@ private final class ExpandedLanesView: UIView {
     private let stack = UIStackView()
     private let textPillRow = TextPillLaneRow()
     private let musicRow = MusicLaneRow()
+    /// The single playhead for every expanded lane — ruler included. A
+    /// non-interactive, top-level sibling of `ruler`/`scrollView` rather than
+    /// a per-row tick: vertical scrolling of the lane stack never changes
+    /// where "now" is horizontally, so a fixed overlay needs no coordination
+    /// with `scrollView`'s `contentOffset`/`contentSize` at all. Added last,
+    /// so it paints over both the ruler and the scrolling stack beneath it.
+    ///
+    /// Positioned entirely by hand (`updatePlayheadPosition`), like every
+    /// other playhead/tick in this file (`CollapsedStripView.playhead`,
+    /// formerly the per-row ticks this replaces) — not via Auto Layout.
+    ///
+    /// `setPlayhead` recomputes its frame immediately rather than only
+    /// calling `setNeedsLayout` and waiting for a subsequent `layoutSubviews`:
+    /// `self` hosts a live `UIScrollView` (unlike `CollapsedStripView`, whose
+    /// children are all plain frame-based views with none of their own
+    /// constraints), and empirically, a `setPlayhead`-only invalidation — no
+    /// constraint or size actually changes — was not reliably followed by
+    /// another `layoutSubviews` call for a view in that shape while off-screen
+    /// (no window), the situation every test here runs in. Recomputing the
+    /// frame at the moment `playheadTime` changes sidesteps the question
+    /// entirely; `layoutSubviews` still recomputes it too, to self-heal
+    /// across a real resize/rotation the scroll view's own layout responds to.
+    private let playhead = UIView()
 
     private var clipRows: [ClipRowView] = []
     private var model = VideoTimelineModel()
@@ -675,6 +776,10 @@ private final class ExpandedLanesView: UIView {
 
         stack.addArrangedSubview(textPillRow)
         stack.addArrangedSubview(musicRow)
+
+        playhead.backgroundColor = Theme.Color.accent
+        playhead.isUserInteractionEnabled = false
+        addSubview(playhead)
 
         ruler.translatesAutoresizingMaskIntoConstraints = false
         scrollView.translatesAutoresizingMaskIntoConstraints = false
@@ -701,9 +806,9 @@ private final class ExpandedLanesView: UIView {
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
 
-    func configure(model: VideoTimelineModel, playhead: Double) {
+    func configure(model: VideoTimelineModel, playhead time: Double) {
         self.model = model
-        self.playheadTime = playhead
+        self.playheadTime = time
 
         ruler.configure(duration: model.duration)
 
@@ -718,16 +823,19 @@ private final class ExpandedLanesView: UIView {
             }
         }
         for (clip, row) in zip(model.clips, clipRows) {
-            row.configure(clip: clip, compositionDuration: model.duration, playhead: playheadTime)
+            row.configure(clip: clip, compositionDuration: model.duration,
+                          isSelected: model.selectedClipIndex == clip.index)
         }
-        textPillRow.configure(pills: model.textPills, compositionDuration: model.duration, playhead: playheadTime)
+        textPillRow.configure(pills: model.textPills, compositionDuration: model.duration,
+                               selectedID: model.selectedTextID)
         musicRow.configure(title: model.musicTitle)
+        setNeedsLayout()
+        updatePlayheadPosition()
     }
 
     func setPlayhead(_ time: Double) {
         playheadTime = time
-        clipRows.forEach { $0.setPlayhead(time) }
-        textPillRow.setPlayhead(time)
+        updatePlayheadPosition()
     }
 
     var clipBlockViews: [(index: Int, view: UIView)] {
@@ -738,8 +846,17 @@ private final class ExpandedLanesView: UIView {
         textPillRow.interactiveBlocks
     }
 
-    var playheadXForTesting: CGFloat {
-        clipRows.first?.tickXForTesting ?? textPillRow.tickXForTesting
+    var playheadXForTesting: CGFloat { playhead.frame.midX }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        updatePlayheadPosition()
+    }
+
+    private func updatePlayheadPosition() {
+        let x = VideoTimelineGeometry.x(forTime: playheadTime, duration: model.duration, width: bounds.width)
+        let clampedX = min(max(0, x - videoTimelinePlayheadWidth / 2), max(0, bounds.width - videoTimelinePlayheadWidth))
+        playhead.frame = CGRect(x: pixelSnapped(clampedX), y: 0, width: videoTimelinePlayheadWidth, height: bounds.height)
     }
 }
 
@@ -751,12 +868,10 @@ private final class ClipRowView: UIView {
 
     let clipIndex: Int
     let block = UIView()
-    private let tick = UIView()
 
     private var clipStart: Double = 0
     private var clipDuration: Double = 0
     private var compositionDuration: Double = 0
-    private var playheadTime: Double = 0
 
     init(clipIndex: Int) {
         self.clipIndex = clipIndex
@@ -764,10 +879,6 @@ private final class ClipRowView: UIView {
         block.layer.cornerRadius = Theme.Radius.sm
         block.layer.cornerCurve = .continuous
         addSubview(block)
-
-        tick.backgroundColor = Theme.Color.accent
-        tick.isUserInteractionEnabled = false
-        addSubview(tick)
     }
 
     @available(*, unavailable)
@@ -775,13 +886,18 @@ private final class ClipRowView: UIView {
 
     override var intrinsicContentSize: CGSize { CGSize(width: UIView.noIntrinsicMetric, height: Self.rowHeight) }
 
-    func configure(clip: VideoTimelineModel.Clip, compositionDuration: Double, playhead: Double) {
+    /// `isSelected` paints the block `Theme.Color.accent` (indigo, state)
+    /// instead of its usual filled/empty ink fill — see the class header's
+    /// palette note.
+    func configure(clip: VideoTimelineModel.Clip, compositionDuration: Double, isSelected: Bool) {
         clipStart = clip.start
         clipDuration = clip.duration
         self.compositionDuration = compositionDuration
-        playheadTime = playhead
 
-        if clip.isFilled {
+        if isSelected {
+            block.backgroundColor = Theme.Color.accent
+            block.layer.borderColor = Theme.Color.accent.cgColor
+        } else if clip.isFilled {
             block.backgroundColor = Theme.Color.controlFill
             block.layer.borderColor = Theme.Color.separator.cgColor
         } else {
@@ -795,21 +911,10 @@ private final class ClipRowView: UIView {
         setNeedsLayout()
     }
 
-    func setPlayhead(_ time: Double) {
-        playheadTime = time
-        setNeedsLayout()
-    }
-
-    var tickXForTesting: CGFloat { tick.frame.midX }
-
     override func layoutSubviews() {
         super.layoutSubviews()
         block.frame = pixelSnapped(VideoTimelineGeometry.laneRect(
             start: clipStart, duration: clipDuration, compositionDuration: compositionDuration, in: bounds))
-
-        let x = VideoTimelineGeometry.x(forTime: playheadTime, duration: compositionDuration, width: bounds.width)
-        let clampedX = min(max(0, x - videoTimelinePlayheadWidth / 2), max(0, bounds.width - videoTimelinePlayheadWidth))
-        tick.frame = CGRect(x: pixelSnapped(clampedX), y: 0, width: videoTimelinePlayheadWidth, height: bounds.height)
     }
 }
 
@@ -822,15 +927,10 @@ private final class TextPillLaneRow: UIView {
 
     private(set) var pills: [VideoTimelineModel.TextPill] = []
     private var compositionDuration: Double = 0
-    private var playheadTime: Double = 0
     private var blocks: [UUID: UIView] = [:]
-    private let tick = UIView()
 
     override init(frame: CGRect) {
         super.init(frame: frame)
-        tick.backgroundColor = Theme.Color.accent
-        tick.isUserInteractionEnabled = false
-        addSubview(tick)
     }
 
     @available(*, unavailable)
@@ -838,36 +938,31 @@ private final class TextPillLaneRow: UIView {
 
     override var intrinsicContentSize: CGSize { CGSize(width: UIView.noIntrinsicMetric, height: Self.rowHeight) }
 
-    func configure(pills: [VideoTimelineModel.TextPill], compositionDuration: Double, playhead: Double) {
+    /// The pill matching `selectedID` paints `Theme.Color.accent` (indigo,
+    /// state) instead of the usual `accentStrong` ink chip — see the class
+    /// header's palette note.
+    func configure(pills: [VideoTimelineModel.TextPill], compositionDuration: Double, selectedID: UUID?) {
         self.pills = pills
         self.compositionDuration = compositionDuration
-        playheadTime = playhead
 
         blocks.values.forEach { $0.removeFromSuperview() }
         blocks = [:]
         for pill in pills {
             let view = UIView()
-            view.backgroundColor = Theme.Color.accentStrong
+            view.backgroundColor = pill.id == selectedID ? Theme.Color.accent : Theme.Color.accentStrong
             view.layer.cornerRadius = Theme.Radius.sm
             view.layer.cornerCurve = .continuous
             view.isAccessibilityElement = true
             view.accessibilityLabel = pill.label
-            insertSubview(view, belowSubview: tick)
+            addSubview(view)
             blocks[pill.id] = view
         }
-        setNeedsLayout()
-    }
-
-    func setPlayhead(_ time: Double) {
-        playheadTime = time
         setNeedsLayout()
     }
 
     var interactiveBlocks: [(id: UUID, view: UIView)] {
         pills.compactMap { pill in blocks[pill.id].map { (pill.id, $0) } }
     }
-
-    var tickXForTesting: CGFloat { tick.frame.midX }
 
     override func layoutSubviews() {
         super.layoutSubviews()
@@ -878,9 +973,6 @@ private final class TextPillLaneRow: UIView {
                 start: pill.start, duration: pill.end - pill.start,
                 compositionDuration: compositionDuration, in: bounds))
         }
-        let x = VideoTimelineGeometry.x(forTime: playheadTime, duration: compositionDuration, width: bounds.width)
-        let clampedX = min(max(0, x - videoTimelinePlayheadWidth / 2), max(0, bounds.width - videoTimelinePlayheadWidth))
-        tick.frame = CGRect(x: pixelSnapped(clampedX), y: 0, width: videoTimelinePlayheadWidth, height: bounds.height)
     }
 }
 
@@ -970,6 +1062,12 @@ private final class TimeRulerView: UIView {
         for (index, label) in labels.enumerated() {
             label.sizeToFit()
             let fraction = CGFloat(index) / CGFloat(Self.tickCount - 1)
+            // Deliberately not `VideoTimelineGeometry.x(forTime:duration:width:)`:
+            // that guards `duration > 0` and returns 0 otherwise, which would
+            // collapse all five ruler labels onto the leading edge for a
+            // zero-duration (empty) composition instead of spacing them
+            // evenly across the track. Do not "simplify" this to route
+            // through it.
             let x = fraction * bounds.width
             var frame = label.frame
             if index == 0 {
