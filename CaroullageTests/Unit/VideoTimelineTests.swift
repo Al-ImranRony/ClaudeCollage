@@ -349,6 +349,35 @@ final class VideoTimelineViewTests: XCTestCase {
         XCTAssertEqual(timeline.expandedClipLaneCount, 3)
     }
 
+    // MARK: - The music lane
+    //
+    // Plan 2's done-criteria name it alongside the clip and text lanes, and it
+    // was the only one of the three with no test at all.
+
+    func testTheExpandedTimelineNamesTheDocumentsMusic() {
+        let timeline = makeTimeline()
+        timeline.setState(.expanded, animated: false)
+        var model = threeClipModel()
+        model.musicTitle = "Music"
+        timeline.setModel(model)
+        timeline.layoutIfNeeded()
+
+        XCTAssertTrue(timeline.musicLaneIsLaidOutForTesting, "the lane is on screen, not just configured")
+        XCTAssertEqual(timeline.musicLaneTextForTesting, "Music")
+    }
+
+    func testTheMusicLaneSaysSoWhenThereIsNoMusic() {
+        // The lane is always present — an empty one that said nothing would read
+        // as a rendering bug rather than as "you have not added music".
+        let timeline = makeTimeline()
+        timeline.setState(.expanded, animated: false)
+        timeline.setModel(threeClipModel())
+        timeline.layoutIfNeeded()
+
+        XCTAssertTrue(timeline.musicLaneIsLaidOutForTesting)
+        XCTAssertEqual(timeline.musicLaneTextForTesting, "No music added")
+    }
+
     func testSetModelWithNoClipsProducesNoLanes() {
         let timeline = makeTimeline()
         timeline.setState(.expanded, animated: false)

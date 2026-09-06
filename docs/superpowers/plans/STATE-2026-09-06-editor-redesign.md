@@ -4,7 +4,30 @@ Resume point for the two-plan editor redesign. Everything below is committed on
 branch `editor-chrome-redesign` in the worktree
 `/Users/irony/Claude/Projects/ClaudeCollage/.claude/worktrees/editor-chrome-redesign`.
 
-Working tree is clean. **68 commits** ahead of `dev`.
+**Merged into `dev` as `381ca59` (2026-09-06).** The worktree has been removed; the
+`editor-chrome-redesign` branch ref is kept.
+
+### Post-merge verification on `dev` (2026-09-07)
+
+Both suites run against **committed** `dev` in a throwaway worktree:
+
+| | Result |
+|---|---|
+| Unit | **958 tests, 0 failures** |
+| UI | **87 tests, 1 skipped, 0 failures** (the PaywallUITests flake passed this time) |
+
+Every done-criterion of both plans was checked against code and tests, and all are met. The one
+gap found was **coverage, not behaviour**: the music lane is named in Plan 2's criteria alongside
+the clip and text lanes and was the only one of the three with no test at all. Now covered, with
+an assertion that the lane is actually LAID OUT rather than merely configured — without that,
+deleting its `addArrangedSubview` left the row object alive and configured, and a text-only
+assertion passed against a timeline showing no music lane.
+
+> **The unit suite is RED in the main checkout, and it is not this branch.** An uncommitted
+> `Localizable.xcstrings` there adds 5 keys with no translations, which
+> `LocalizationTests.testEveryStringIsTranslatedIntoAllElevenLanguages` reports as ~110 assertion
+> failures. Confirmed by provenance: the failing keys are absent from `dev` HEAD and present only
+> in the working copy. Left alone — it is another session's work in progress.
 
 ---
 

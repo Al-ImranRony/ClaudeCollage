@@ -691,6 +691,11 @@ public final class VideoTimeline: UIView {
     var expandedClipLaneCount: Int { expandedContent.clipBlockViews.count }
     var expandedTextPillCount: Int { expandedContent.textPillBlockViews.count }
 
+    /// What the music lane is currently saying — it is always present, and says
+    /// so either way, so "is there a lane" is not the interesting question.
+    var musicLaneTextForTesting: String? { expandedContent.musicLaneTextForTesting }
+    var musicLaneIsLaidOutForTesting: Bool { expandedContent.musicLaneIsLaidOutForTesting }
+
     /// The x position of the currently-visible state's playhead indicator, in
     /// this view's own coordinate space.
     var playheadXForTesting: CGFloat {
@@ -874,6 +879,16 @@ private final class ExpandedLanesView: UIView {
     private let stack = UIStackView()
     private let textPillRow = TextPillLaneRow()
     private let musicRow = MusicLaneRow()
+
+    var musicLaneTextForTesting: String? { musicRow.labelTextForTesting }
+
+    /// Whether the lane is actually laid out, not merely configured. Without
+    /// this, deleting the `addArrangedSubview` would leave the row object alive
+    /// and still configured — the text assertion alone would pass against a
+    /// timeline showing no music lane at all.
+    var musicLaneIsLaidOutForTesting: Bool {
+        musicRow.superview != nil && musicRow.bounds.height > 0
+    }
     /// The single playhead for every expanded lane — ruler included. A
     /// non-interactive, top-level sibling of `ruler`/`scrollView` rather than
     /// a per-row tick: vertical scrolling of the lane stack never changes
@@ -970,6 +985,7 @@ private final class ExpandedLanesView: UIView {
         textPillRow.configure(pills: model.textPills, compositionDuration: model.duration,
                                selectedID: model.selectedTextID)
         musicRow.configure(title: model.musicTitle)
+
         setNeedsLayout()
         updatePlayheadPosition()
     }
@@ -1160,6 +1176,8 @@ private final class MusicLaneRow: UIView {
         label.text = title ?? "No music added"
         label.textColor = title == nil ? Theme.Color.textSecondary : Theme.Color.textPrimary
     }
+
+    var labelTextForTesting: String? { label.text }
 }
 
 /// Five evenly-spaced timestamps (0%, 25%, 50%, 75%, 100% of the composition)
