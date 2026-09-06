@@ -35,12 +35,38 @@ redesign touched (19/19); a full UI run has not been done since Plan 2 began.
 
 ---
 
-## Resume here
+## Tomorrow's queue, in order
 
-1. **Re-run the Task 6 quality review** (it was running when we stopped; nothing depends on
-   its result being lost). Base `c343efe`, head `de9c6e1`. It was asked to judge: a new flaky
-   test, file size, cross-editor duplication, the `activeContextKind` tri-state, and test quality.
-2. Then **Task 7** — plan lines 914 onward.
+**1. Task 6 code-quality review** (was in flight when we stopped; re-run it).
+Base `c343efe`, head `de9c6e1`. Ask it to judge, specifically:
+- the new flaky test (`VideoEditorPlaybackControlTests.testPausingSurvivesACompositionRebuild`)
+  — diagnose the actual race, recommend a fix that keeps the test meaningful rather than
+  loosening it into uselessness;
+- `VideoEditorViewController`'s size after this task, and whether the panel factories should move out;
+- **cross-editor duplication** — `VideoEditorViewController` now closely mirrors
+  `GridEditorViewController`'s `setupRail` / `toolTapped` / `openPanel` / `closePanel` /
+  `animateStageResize` / `revalidateSelection`. Worth a shared base type, or would that couple
+  two screens that should stay independent? Want a definite recommendation;
+- whether the `activeContextKind` tri-state still earns its place now the desync is fixed;
+- test quality, especially whether the contextual panels' controls actually fire.
+
+Fix whatever it finds before starting Task 7.
+
+**2. `TextOverlay.animation`** — owner confirmed 2026-09-06: **add it.**
+- Reserved field per spec §4.1, defaulted `.none`, nothing reads it yet.
+- Must decode with a `decodeIfPresent` fallback like every other field on this type, so existing
+  saved projects are unaffected — `TextStyle` and the Task 1 timing fields are the pattern.
+- Do **not** wire any rendering. Tier-3 animation (fade / slide / pop / typewriter) is its own
+  spec; both render paths are already per-frame, so it will be a change to two call sites rather
+  than a migration.
+- Test: round-trips; a snapshot written **without** the key decodes to `.none`; an unknown raw
+  value from a future build falls back rather than throwing (the `TextStyle.Kind` precedent).
+- Watch the raw-string trap: use `##"..."##`, since a single-hash raw string self-terminates on
+  the `"#` inside a hex colour.
+
+**3. Task 7** — wire the timeline to the document. Plan lines 914 onward.
+
+**4. Tasks 8, 9, 10** — timing panel, `startOffset` (last, droppable), UI test updates.
 
 ### Environment
 
@@ -124,11 +150,13 @@ So the compensating discipline is in the **review briefs**, not the plan:
 - When a fix is dispatched, require the test to be **proven to fail first** — three tests in this
   run passed against deliberately broken code and only got teeth when someone tried to break them.
 
-### ⬜ Still open — `TextOverlay.animation`
+### ✅ Settled 2026-09-06 — add `TextOverlay.animation`
 
-Not added, though the spec reserves it. Its justification was avoiding a migration, but every
-field here decodes with `decodeIfPresent`, so adding it later is a one-line change rather than a
-migration. Does not block Task 7.
+Owner confirmed: add the reserved field. Plan 2 originally omitted it as YAGNI (defensive
+decoding makes adding it later a one-liner, not a migration) — that reasoning still holds, but
+the owner wants the spec honoured, so it goes in. Details in the queue above, item 2.
+
+No decisions remain open.
 
 ---
 
