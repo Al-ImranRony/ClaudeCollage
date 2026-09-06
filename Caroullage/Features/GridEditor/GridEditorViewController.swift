@@ -23,15 +23,10 @@ final class GridEditorViewController: UIViewController {
     private let stage = EditorStage()
     private let toolRail = EditorToolRail()
     private let toolPanel = EditorPanel()
-    /// Collapses the panel while it has no content, so Auto Layout cannot hand the
-    /// stage's height to an empty hidden view. `openPanel` deactivates this the
-    /// moment a panel gets content — a shown panel's own default 750-priority
-    /// intrinsic sizing is the SAME priority as this constraint, so leaving both
-    /// active would tie silently, with no console warning, rather than reliably
-    /// picking the content's real size. `closePanel` reactivates it only once the
-    /// outgoing content is actually gone; see that method's comment for why the
-    /// ordering there matters too.
-    private var collapsedPanelHeight: NSLayoutConstraint?
+    /// Owns the panel's open/close/animate sequence and the constraint trap that
+    /// goes with it — shared with the video editor. Lazy because it needs
+    /// `view`, which exists by the time `setupLayout` runs.
+    private lazy var panels = EditorPanelPresenter(panel: toolPanel, rail: toolRail, host: view)
     /// The currently-shown Layout panel, if any — kept so `layoutModeChanged()`
     /// can toggle its picker without the panel being re-created.
     private weak var layoutPanel: LayoutPanelView?
@@ -219,10 +214,6 @@ final class GridEditorViewController: UIViewController {
         // doc comment: "the stage's height animation has something stable to
         // animate against") without first having to unwind a required constraint
         // here.
-        let collapsedPanelHeight = toolPanel.heightAnchor.constraint(equalToConstant: 0)
-        collapsedPanelHeight.priority = .defaultHigh
-        self.collapsedPanelHeight = collapsedPanelHeight
-
         NSLayoutConstraint.activate([
             stage.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
             stage.leadingAnchor.constraint(equalTo: view.leadingAnchor),
@@ -232,7 +223,7 @@ final class GridEditorViewController: UIViewController {
             toolPanel.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             toolPanel.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             toolPanel.bottomAnchor.constraint(equalTo: toolRail.topAnchor),
-            collapsedPanelHeight,
+            panels.collapsedHeightConstraint,
 
             toolRail.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             toolRail.trailingAnchor.constraint(equalTo: view.trailingAnchor),
@@ -245,7 +236,6 @@ final class GridEditorViewController: UIViewController {
 
     // MARK: - Tool rail
 
-    private var openToolID: EditorTool.ID?
 
     private func setupRail() {
         // These three controls predate the rail (Step 01) and lost their
@@ -285,12 +275,13 @@ final class GridEditorViewController: UIViewController {
 
         toolRail.onSelect = { [weak self] in self?.toolTapped($0) }
         toolRail.onDismissContext = { [weak self] in self?.clearSelection() }
-        toolPanel.onClose = { [weak self] in self?.closePanel() }
+        // NOT `toolPanel.onClose` — `EditorPanelPresenter` owns that, so
+        // assigning it here would route the panel's own close button around it.
     }
 
     private func toolTapped(_ id: EditorTool.ID) {
         // Tapping the open tool again closes it and gives the canvas its height back.
-        guard id != openToolID else { return closePanel() }
+        guard id != panels.openToolID else { return closePanel() }
 
         switch id {
         case "layout":      openPanel(makeLayoutPanel(), title: "Layout", id: id)
@@ -329,47 +320,10 @@ final class GridEditorViewController: UIViewController {
     }
 
     private func openPanel(_ content: UIView, title: String, id: EditorTool.ID) {
-        openToolID = id
-        toolRail.setActiveTool(id)
-        // Must run BEFORE `show`: see `collapsedPanelHeight`'s doc comment for why
-        // leaving it active here would tie against the content we're about to
-        // add instead of cleanly losing to it.
-        collapsedPanelHeight?.isActive = false
-        toolPanel.show(content, title: title, animated: true)
-        animateStageResize()
+        panels.open(content, title: title, id: id)
     }
 
-    private func closePanel() {
-        openToolID = nil
-        toolRail.setActiveTool(nil)
-        // `EditorPanel.hide(animated:)` keeps its outgoing content attached (with
-        // the same 750-priority sizing `openPanel` above worries about) until ITS
-        // OWN fade finishes, so reactivating `collapsedPanelHeight` at the same
-        // moment would tie against that still-attached content instead of
-        // cleanly winning. Hiding un-animated removes the content synchronously,
-        // so by the time the constraint goes back up nothing contests it — the
-        // stage's resize just below is still animated, so the canvas growing
-        // back to fill the freed space reads as one continuous motion even
-        // though the panel itself disappears a beat faster.
-        toolPanel.hide(animated: false)
-        collapsedPanelHeight?.isActive = true
-        animateStageResize()
-    }
-
-    /// The stage and the panel share one animation block so the canvas grows and
-    /// shrinks smoothly instead of jumping a frame after the panel moves.
-    private func animateStageResize() {
-        guard !Theme.Motion.isReduced else { return view.layoutIfNeeded() }
-        UIView.animate(
-            withDuration: Theme.Motion.standard,
-            delay: 0,
-            usingSpringWithDamping: Theme.Motion.effectiveSpringDamping,
-            initialSpringVelocity: Theme.Motion.effectiveSpringVelocity,
-            options: [.allowUserInteraction]
-        ) {
-            self.view.layoutIfNeeded()
-        }
-    }
+    private func closePanel() { panels.close() }
 
     // MARK: - Selection context
 
@@ -482,7 +436,7 @@ final class GridEditorViewController: UIViewController {
         guard didClearSelection else { return }
 
         toolRail.setContext(nil)
-        if openToolID == "styleText" {
+        if panels.openToolID == "styleText" {
             closePanel()
         }
     }

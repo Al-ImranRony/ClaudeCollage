@@ -65,11 +65,10 @@ final class VideoEditorViewController: UIViewController {
     /// Where the playhead sits, in seconds. Moved by a scrub or a seek; shown by
     /// the timeline and used to decide which timed captions are on screen.
     private var playheadTime: Double = 0
-    /// See `GridEditorViewController.collapsedPanelHeight`'s doc comment — same
-    /// trap, same fix: deactivated before `show`, reactivated only after a
-    /// synchronous `hide`, so it never ties against the panel's own 750-priority
-    /// content sizing.
-    private var collapsedPanelHeight: NSLayoutConstraint?
+    /// Owns the panel's open/close/animate sequence and the constraint trap that
+    /// goes with it — shared with the collage editor. Lazy because it needs
+    /// `view`, which exists by the time `setupLayout` runs.
+    private lazy var panels = EditorPanelPresenter(panel: toolPanel, rail: toolRail, host: view)
     private let player = AVPlayer()
 
     /// Retains the PHPicker delegate for the life of a pick.
@@ -96,8 +95,6 @@ final class VideoEditorViewController: UIViewController {
         style: .plain, target: self, action: #selector(redoTapped))
 
     // MARK: - Tool rail / panel / selection state
-
-    private var openToolID: EditorTool.ID?
 
     private enum ContextKind { case clip, text }
     /// Which contextual group the rail is currently showing, if any.
@@ -262,14 +259,6 @@ final class VideoEditorViewController: UIViewController {
         view.addSubview(toolPanel)
         view.addSubview(toolRail)
 
-        // See `collapsedPanelHeight`'s doc comment / `GridEditorViewController
-        // .setupLayout`'s longer version of the same comment for why this must
-        // be `.defaultHigh` (not `.required`) and deactivated by `openPanel`
-        // before `show`, not left to tie against the shown content.
-        let collapsedPanelHeight = toolPanel.heightAnchor.constraint(equalToConstant: 0)
-        collapsedPanelHeight.priority = .defaultHigh
-        self.collapsedPanelHeight = collapsedPanelHeight
-
         NSLayoutConstraint.activate([
             stage.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
             stage.leadingAnchor.constraint(equalTo: view.leadingAnchor),
@@ -283,7 +272,7 @@ final class VideoEditorViewController: UIViewController {
             toolPanel.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             toolPanel.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             toolPanel.bottomAnchor.constraint(equalTo: toolRail.topAnchor),
-            collapsedPanelHeight,
+            panels.collapsedHeightConstraint,
 
             toolRail.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             toolRail.trailingAnchor.constraint(equalTo: view.trailingAnchor),
@@ -369,12 +358,21 @@ final class VideoEditorViewController: UIViewController {
 
         toolRail.onSelect = { [weak self] in self?.toolTapped($0) }
         toolRail.onDismissContext = { [weak self] in self?.clearSelection() }
-        toolPanel.onClose = { [weak self] in self?.closePanel() }
+        // NOT `toolPanel.onClose` — the presenter owns that, so assigning it here
+        // would route the panel's own close button around it. This fires after
+        // every close, however it was triggered.
+        panels.onClose = { [weak self] in
+            // The Timing steppers are owned by this controller and outlive the
+            // panel that shows them, so the id they act on is cleared whenever
+            // that panel goes — the invariant is "valid exactly while the panel
+            // is open", not "until someone remembers to reset it".
+            self?.timingPanelOverlayID = nil
+        }
     }
 
     private func toolTapped(_ id: EditorTool.ID) {
         // Tapping the open tool again closes it and gives the canvas its height back.
-        guard id != openToolID else { return closePanel() }
+        guard id != panels.openToolID else { return closePanel() }
 
         switch id {
         case "layout":      layoutTapped()
@@ -419,44 +417,10 @@ final class VideoEditorViewController: UIViewController {
     }
 
     private func openPanel(_ content: UIView, title: String, id: EditorTool.ID) {
-        openToolID = id
-        toolRail.setActiveTool(id)
-        // Must run BEFORE `show` — see `collapsedPanelHeight`'s doc comment.
-        collapsedPanelHeight?.isActive = false
-        toolPanel.show(content, title: title, animated: true)
-        animateStageResize()
+        panels.open(content, title: title, id: id)
     }
 
-    private func closePanel() {
-        openToolID = nil
-        toolRail.setActiveTool(nil)
-        // The Timing steppers are owned by this controller and outlive the panel
-        // that shows them, so the id they act on is cleared here — where the
-        // invariant is local ("valid exactly while the panel is open") rather
-        // than spread across every caller that can change the selection.
-        timingPanelOverlayID = nil
-        // Un-animated hide so the outgoing content is gone before the
-        // collapsed-height constraint goes back up — see
-        // `GridEditorViewController.closePanel`'s longer version of this comment.
-        toolPanel.hide(animated: false)
-        collapsedPanelHeight?.isActive = true
-        animateStageResize()
-    }
-
-    /// The stage and the panel share one animation block so the canvas grows and
-    /// shrinks smoothly instead of jumping a frame after the panel moves.
-    private func animateStageResize() {
-        guard !Theme.Motion.isReduced else { return view.layoutIfNeeded() }
-        UIView.animate(
-            withDuration: Theme.Motion.standard,
-            delay: 0,
-            usingSpringWithDamping: Theme.Motion.effectiveSpringDamping,
-            initialSpringVelocity: Theme.Motion.effectiveSpringVelocity,
-            options: [.allowUserInteraction]
-        ) {
-            self.view.layoutIfNeeded()
-        }
-    }
+    private func closePanel() { panels.close() }
 
     // MARK: - Selection context
 
@@ -538,7 +502,7 @@ final class VideoEditorViewController: UIViewController {
 
         activeContextKind = nil
         toolRail.setContext(nil)
-        if let openToolID, Self.selectionPanelToolIDs.contains(openToolID) {
+        if let openToolID = panels.openToolID, Self.selectionPanelToolIDs.contains(openToolID) {
             closePanel()
         }
 
