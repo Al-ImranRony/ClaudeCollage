@@ -244,13 +244,36 @@ final class VideoEditorTimelineWiringTests: XCTestCase {
     // MARK: - Trim drags
 
     func testDraggingALaneEndTrimsTheClip() throws {
-        let editor = makeEditor()
+        // A real drag moves exactly ONE edge, and reports the other at its
+        // anchor. This is a trailing drag: the lane still starts where it did.
+        let editor = makeEditor()   // cell 0 trimmed 0...8, no offset
         let tl = try timeline(in: editor)
 
-        tl.onTrim?(0, 1, 5, .committed)
+        tl.onTrim?(0, 0, 5, .committed)
 
-        XCTAssertEqual(editor.viewModelForTesting.cells[0].trim.start, 1, accuracy: 0.001)
+        XCTAssertEqual(editor.viewModelForTesting.cells[0].trim.start, 0, accuracy: 0.001,
+                       "the in-point is the fixed edge of a trailing drag")
         XCTAssertEqual(editor.viewModelForTesting.cells[0].trim.end, 5, accuracy: 0.001)
+        XCTAssertEqual(editor.viewModelForTesting.cells[0].startOffset, 0, accuracy: 0.001,
+                       "a trailing drag never moves the clip's entry")
+    }
+
+    func testDraggingALaneStartMovesBothTheEntryAndTheInPoint() throws {
+        // The block's left edge is where the clip begins, so trimming the head
+        // without moving `startOffset` would snap the block back to its old
+        // start on the next refresh and appear to move the right edge instead.
+        let editor = makeEditor()   // cell 0 trimmed 0...8, no offset
+        let vm = editor.viewModelForTesting
+        let tl = try timeline(in: editor)
+
+        tl.onTrim?(0, 2, 8, .committed)
+
+        XCTAssertEqual(vm.cells[0].startOffset, 2, accuracy: 0.001,
+                       "the clip now enters two seconds in")
+        XCTAssertEqual(vm.cells[0].trim.end, 8, accuracy: 0.001,
+                       "the out-point is the fixed edge of a leading drag")
+        XCTAssertEqual(vm.cells[0].trim.start, 2, accuracy: 0.001,
+                       "and six seconds of footage remain, taken from two seconds in")
     }
 
     func testATrimDragIsOneUndoStepNotOnePerTick() throws {
@@ -354,6 +377,90 @@ final class VideoEditorTimelineWiringTests: XCTestCase {
 
         XCTAssertEqual(vm.cells[0].trim, afterClear,
                        "a drag must not keep editing a clip the document no longer has")
+    }
+
+    // MARK: - Lane space is NOT source space
+
+    func testTrimmingFromTheTimelinePreservesTheSourceInPoint() throws {
+        // A lane is drawn in COMPOSITION time and always begins at the clip's
+        // entry; the trim it edits is in SOURCE time. Passing the lane's numbers
+        // straight through as a `VideoTrim` therefore rewrites the in-point to
+        // the lane's origin — the clip silently jumps to the start of the
+        // footage the moment its trailing edge is touched.
+        let editor = makeEditor()
+        let vm = editor.viewModelForTesting
+        vm.setTrim(VideoTrim(start: 4, end: 7), forCellAt: 0)   // 3s taken from mid-clip
+        let tl = try expandedTimeline(in: editor)
+
+        let frame = try XCTUnwrap(tl.frameForClip(at: 0))
+        let edge = CGPoint(x: frame.maxX - 1, y: frame.midY)
+        tl.simulatePanBegan(at: edge)
+        tl.simulatePanChanged(at: CGPoint(x: edge.x - 30, y: frame.midY))
+        tl.simulatePanEnded(at: CGPoint(x: edge.x - 30, y: frame.midY))
+
+        XCTAssertEqual(vm.cells[0].trim.start, 4, accuracy: 0.001,
+                       "dragging the OUT point must not move the IN point")
+        XCTAssertLessThan(vm.cells[0].trim.end, 7, "the out point did move")
+        XCTAssertGreaterThan(vm.cells[0].trim.end, 4, "and it stayed after the in point")
+    }
+
+    func testDraggingTheLeadingEdgePreservesTheSourceOutPoint() throws {
+        let editor = makeEditor()
+        let vm = editor.viewModelForTesting
+        vm.setTrim(VideoTrim(start: 4, end: 7), forCellAt: 0)
+        let tl = try expandedTimeline(in: editor)
+
+        let frame = try XCTUnwrap(tl.frameForClip(at: 0))
+        let edge = CGPoint(x: frame.minX + 1, y: frame.midY)
+        tl.simulatePanBegan(at: edge)
+        tl.simulatePanChanged(at: CGPoint(x: edge.x + 30, y: frame.midY))
+        tl.simulatePanEnded(at: CGPoint(x: edge.x + 30, y: frame.midY))
+
+        XCTAssertEqual(vm.cells[0].trim.end, 7, accuracy: 0.001,
+                       "dragging the IN point must not move the OUT point")
+        XCTAssertGreaterThan(vm.cells[0].trim.start, 4, "the in point did move later")
+    }
+
+    func testAnOffsetClipsLaneIsDrawnWhereItActuallyStarts() throws {
+        // The engine honours `startOffset` (Task 9), so a timeline that draws
+        // every clip at zero is not merely incomplete — it misrepresents the
+        // composition it is a picture of.
+        let editor = makeEditor()
+        let vm = editor.viewModelForTesting
+        vm.setStartOffset(2, forCellAt: 0)
+
+        let clip = try XCTUnwrap(
+            timeline(in: editor).modelForTesting.clips.first { $0.index == 0 })
+        XCTAssertEqual(clip.start, 2, accuracy: 0.001)
+    }
+
+    func testACompositionWithAnOffsetRunsUntilTheLastClipEnds() throws {
+        let editor = makeEditor()   // cell 0 trimmed 0...8
+        let vm = editor.viewModelForTesting
+        vm.setStartOffset(3, forCellAt: 0)
+
+        XCTAssertEqual(try timeline(in: editor).modelForTesting.duration, 11, accuracy: 0.001,
+                       "3s of waiting plus 8s of clip — the ruler must span what plays")
+    }
+
+    func testTrimmingAnOffsetClipStillEditsSourceTimeNotCompositionTime() throws {
+        let editor = makeEditor()
+        let vm = editor.viewModelForTesting
+        vm.setTrim(VideoTrim(start: 1, end: 5), forCellAt: 0)
+        vm.setStartOffset(2, forCellAt: 0)
+        let tl = try expandedTimeline(in: editor)
+
+        let frame = try XCTUnwrap(tl.frameForClip(at: 0))
+        let edge = CGPoint(x: frame.maxX - 1, y: frame.midY)
+        tl.simulatePanBegan(at: edge)
+        tl.simulatePanChanged(at: CGPoint(x: edge.x - 25, y: frame.midY))
+        tl.simulatePanEnded(at: CGPoint(x: edge.x - 25, y: frame.midY))
+
+        XCTAssertEqual(vm.cells[0].trim.start, 1, accuracy: 0.001,
+                       "the offset must not leak into the source in-point")
+        XCTAssertEqual(vm.cells[0].startOffset, 2, accuracy: 0.001,
+                       "and trimming must not move the clip's entry")
+        XCTAssertLessThan(vm.cells[0].trim.end, 5)
     }
 
     // MARK: - Text retiming

@@ -67,12 +67,14 @@ final class VideoCompositionMathTests: XCTestCase {
 
     // MARK: - compositionDuration
 
-    func testCompositionDurationIsLongestCell() {
-        XCTAssertEqual(VideoCompositionMath.compositionDuration(cellDurations: [2, 5, 3]), 5, accuracy: 1e-9)
+    func testCompositionDurationIsLongestCellWhenTheyAllStartTogether() {
+        XCTAssertEqual(
+            VideoCompositionMath.compositionDuration(cellSpans: [(0, 2), (0, 5), (0, 3)]),
+            5, accuracy: 1e-9)
     }
 
     func testCompositionDurationEmptyIsZero() {
-        XCTAssertEqual(VideoCompositionMath.compositionDuration(cellDurations: []), 0, accuracy: 1e-9)
+        XCTAssertEqual(VideoCompositionMath.compositionDuration(cellSpans: []), 0, accuracy: 1e-9)
     }
 
     // MARK: - effectiveVolume

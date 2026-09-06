@@ -430,6 +430,11 @@ final class VideoEditorViewController: UIViewController {
     private func closePanel() {
         openToolID = nil
         toolRail.setActiveTool(nil)
+        // The Timing steppers are owned by this controller and outlive the panel
+        // that shows them, so the id they act on is cleared here — where the
+        // invariant is local ("valid exactly while the panel is open") rather
+        // than spread across every caller that can change the selection.
+        timingPanelOverlayID = nil
         // Un-animated hide so the outgoing content is gone before the
         // collapsed-height constraint goes back up — see
         // `GridEditorViewController.closePanel`'s longer version of this comment.
@@ -536,10 +541,7 @@ final class VideoEditorViewController: UIViewController {
         if let openToolID, Self.selectionPanelToolIDs.contains(openToolID) {
             closePanel()
         }
-        // The Timing steppers are owned by this controller and reused across
-        // opens, so a stale id here would let them retime a caption the user is
-        // no longer looking at.
-        timingPanelOverlayID = nil
+
         // Fix 1: this used to retire the rail/panel chrome but leave
         // `viewModel.selectedIndex` dangling at the stale index — `refreshCanvas`
         // re-derives validity independently ("in range and filled"), so refilling
@@ -928,15 +930,62 @@ final class VideoEditorViewController: UIViewController {
     /// `VideoTimeline.onTrim`. A drag reports `.changed` throughout and
     /// `.committed` exactly once at the end, so it rides the interactive/commit
     /// pattern and lands as ONE undo step rather than one per tick.
+    ///
+    /// **`start`/`end` are COMPOSITION time; a `VideoTrim` is SOURCE time.** They
+    /// are not interchangeable, and passing the lane's numbers straight through
+    /// rewrote the in-point to the lane's origin — a clip taken from the middle
+    /// of its footage jumped back to the head the instant its out-point was
+    /// touched. Only one edge moves per drag, so each edge is converted against
+    /// the OTHER one, which the drag leaves alone:
+    ///
+    /// - trailing: the in-point is fixed, so the new out-point is
+    ///   `trim.start + newDuration`;
+    /// - leading: the out-point is fixed, so the new in-point is
+    ///   `trim.end - newDuration`.
+    ///
+    /// Anchoring on the fixed edge (rather than on the lane's start) is also what
+    /// keeps a drag from compounding: every tick recomputes from a value that
+    /// tick cannot have changed.
+    ///
+    /// A leading drag additionally moves the clip's ENTRY, because the block's
+    /// left edge is where it begins — trimming the head without moving
+    /// `startOffset` would snap the block back to its old start on the next
+    /// refresh while the right edge appeared to move instead.
     private func trimFromTimeline(
         clipIndex: Int, start: Double, end: Double, phase: VideoTimeline.EditPhase
     ) {
         guard viewModel.cells.indices.contains(clipIndex) else { return }
-        viewModel.setTrimInteractive(VideoTrim(start: start, end: end), forCellAt: clipIndex)
+        let cell = viewModel.cells[clipIndex]
+        let laneStart = max(0, cell.startOffset)
+        let newDuration = max(0, end - start)
+
+        // Which edge moved: the untouched one is still reported at its anchor.
+        if abs(start - laneStart) > 0.0001 {
+            viewModel.setStartOffsetInteractive(start, forCellAt: clipIndex)
+            viewModel.setTrimInteractive(
+                clampedToSource(VideoTrim(start: max(0, cell.trim.end - newDuration),
+                                          end: cell.trim.end), at: clipIndex),
+                forCellAt: clipIndex)
+        } else {
+            viewModel.setTrimInteractive(
+                clampedToSource(VideoTrim(start: cell.trim.start,
+                                          end: cell.trim.start + newDuration),
+                                at: clipIndex),
+                forCellAt: clipIndex)
+        }
         if phase == .committed {
             viewModel.commitInteractive()
             Haptics.tap()
         }
+    }
+
+    /// Keeps a trim inside its source. The timeline's own clamp is against the
+    /// COMPOSITION duration, which says nothing about how long the footage is.
+    /// Skipped while the source length is still loading — an unknown length must
+    /// not be treated as zero.
+    private func clampedToSource(_ trim: VideoTrim, at index: Int) -> VideoTrim {
+        guard let source = viewModel.sourceDuration(forCellAt: index), source > 0 else { return trim }
+        return trim.clamped(toAssetDuration: source)
     }
 
     /// `VideoTimeline.onRetimeText`. Same one-drag-one-undo-step contract as

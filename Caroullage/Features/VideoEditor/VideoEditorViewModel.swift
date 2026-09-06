@@ -391,6 +391,13 @@ public final class VideoEditorViewModel {
         return true
     }
 
+    /// The resolved length of a cell's source, once loaded. `nil` while the async
+    /// load is still outstanding — callers must not treat that as "zero length".
+    public func sourceDuration(forCellAt index: Int) -> Double? {
+        guard cells.indices.contains(index), let id = cells[index].videoID else { return nil }
+        return sourceDurations[id]
+    }
+
     /// The timeline's view model, built from the current document. Synchronous by
     /// design — it is rebuilt on every change — which is why the durations it
     /// needs are cached rather than loaded here.

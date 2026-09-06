@@ -136,19 +136,15 @@ public enum VideoCompositionMath {
                                  tx: cell.minX - scale * crop.minX, ty: cell.minY - scale * crop.minY)
     }
 
-    /// The composition duration is the longest cell; shorter cells either loop to
-    /// fill it or simply end early (leaving background).
-    ///
-    /// Correct only while every cell starts together. Once any cell carries a
-    /// `startOffset`, use `compositionDuration(cellSpans:)` — the longest cell is
-    /// no longer necessarily the last one to finish.
-    public static func compositionDuration(cellDurations: [Double]) -> Double {
-        cellDurations.max() ?? 0
-    }
-
-    /// The composition runs until the last cell ENDS, which with per-cell start
-    /// offsets is not the same as the longest cell: a 1s clip starting at 2s
+    /// The composition runs until the last cell ENDS. With per-cell start offsets
+    /// that is NOT the same as the longest cell: a 1s clip starting at 2s
     /// outlasts a 1.8s clip starting at zero.
+    ///
+    /// There was a `cellDurations:` overload taking the plain maximum, correct
+    /// only while every cell started together. It is gone rather than deprecated:
+    /// once offsets exist it is a silently-wrong function sitting next to the
+    /// right one, and it had no callers left. Shorter cells still either loop to
+    /// fill the composition or simply end early, leaving background.
     ///
     /// Both halves are floored at zero so a corrupt project cannot drag the
     /// composition backwards past its own start.

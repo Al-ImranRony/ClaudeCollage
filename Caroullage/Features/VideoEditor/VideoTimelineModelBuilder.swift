@@ -15,9 +15,12 @@
 //  • A lane's length is its TRIMMED length, never the source's. The lane's edges
 //    are the trim handles, so if the two disagreed, grabbing an edge would make
 //    the block jump before it moved.
-//  • Every clip starts at zero. A video collage plays its cells SIMULTANEOUSLY in
-//    separate regions of one canvas — it is not a sequential edit. `Clip.start`
-//    exists for `VideoCellState.startOffset` (Task 9), which is not here yet.
+//  • A clip's lane starts at its `startOffset`. Cells otherwise play
+//    SIMULTANEOUSLY in separate regions of one canvas — this is a collage, not a
+//    sequential edit — so without an offset every lane begins at zero.
+//  • Lane times are COMPOSITION time; a `VideoTrim` is SOURCE time. They are not
+//    interchangeable, and the owner converts between them — see
+//    `VideoEditorViewController.trimFromTimeline`.
 //
 
 import Foundation
@@ -40,18 +43,19 @@ public enum VideoTimelineModelBuilder {
     ) -> VideoTimelineModel {
 
         let clips = cells.enumerated().map { index, cell in
-            VideoTimelineModel.Clip(
+            let isFilled = cell.videoID != nil
+            return VideoTimelineModel.Clip(
                 index: index,
-                start: 0,
+                start: isFilled ? max(0, cell.startOffset) : 0,
                 duration: laneDuration(of: cell, source: sourceDurations[index]),
-                isFilled: cell.videoID != nil)
+                isFilled: isFilled)
         }
 
         // The same rule the engine uses, so the timeline's ruler and the real
-        // composition cannot disagree: the longest cell wins, and shorter ones
-        // either loop to fill or end early.
+        // composition cannot disagree: it runs until the LAST cell finishes,
+        // which with offsets is not the longest one.
         let duration = VideoCompositionMath.compositionDuration(
-            cellDurations: clips.filter(\.isFilled).map(\.duration))
+            cellSpans: clips.filter(\.isFilled).map { ($0.start, $0.duration) })
 
         let pills = textOverlays.map { overlay in
             // `nil` timing means "always visible" (`TextOverlay.isVisible`), which
