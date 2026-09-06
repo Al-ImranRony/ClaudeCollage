@@ -162,6 +162,39 @@ final class VideoEditorPlaybackControlTests: XCTestCase {
                        "The timeline's icon must not lie about the paused player")
     }
 
+    /// The end-of-item loop restart used to fire for ANY player item in the
+    /// process and to call `setPlaying(true)` unconditionally. Both halves are
+    /// bugs, and together they are the race behind this class's intermittent
+    /// failures under full-suite load: the fixture is 0.5s, so it can reach its
+    /// end while the main actor is busy, leaving the notification block queued.
+    /// When it finally runs — after the user's pause has landed — it seeks to
+    /// zero and starts playing again, and the next rebuild then reads a
+    /// `.playing` player and "preserves" playback the user never asked for.
+    ///
+    /// Posting the notification explicitly makes that ordering deterministic
+    /// instead of waiting for it to happen by luck.
+    func testAnEndOfItemNotificationDoesNotOverrideADeliberatePause() async throws {
+        let editor = makeEditor(asset: try await makeRealVideoAsset())
+        await editor.waitForPendingRebuildForTesting()
+        let tl = try timeline(in: editor)
+
+        tl.simulatePlaybackTap()
+        await waitUntil { editor.isPlayerPlayingForTesting }
+        tl.simulatePlaybackTap()
+        await waitUntil { !editor.isPlayerPlayingForTesting }
+        XCTAssertFalse(editor.isPlayerPlayingForTesting, "Precondition: deliberately paused")
+
+        let item = try XCTUnwrap(editor.currentPlayerItemForTesting)
+        NotificationCenter.default.post(name: .AVPlayerItemDidPlayToEndTime, object: item)
+        // Give the queued block, and any playback it might start, room to land.
+        await waitUntil(timeout: 0.5) { editor.isPlayerPlayingForTesting }
+
+        XCTAssertFalse(editor.isPlayerPlayingForTesting,
+                       "The loop restart must not resurrect playback the user deliberately stopped")
+        XCTAssertFalse(editor.isPlayingIntentForTesting)
+        XCTAssertEqual(tl.playbackButtonForHitTesting.accessibilityLabel, "Play")
+    }
+
     func testPlayingSurvivesACompositionRebuildToo() async throws {
         // The other half of the same fix: a rebuild while genuinely playing
         // must keep playing, not over-correct into freezing on every edit.

@@ -170,6 +170,98 @@ final class VideoEditorRailTests: XCTestCase {
              "videoAddStickerButton", "videoMusicButton"])
     }
 
+    // MARK: - The contextual panels' controls actually drive the model
+    //
+    // Opening a panel is not evidence that it works. Plan 1 Task 9 shipped a
+    // panel of sliders with no `addTarget` at all — visible, inert, and every
+    // test still green because they only ever asserted the panel appeared. The
+    // Frame panel's Border slider has a drag test; before these, Volume, Mute
+    // and Transition had none, so deleting any of their `setupRail` wirings
+    // would have broken the screen silently.
+
+    /// Locates the live control a panel is currently showing.
+    private func control<T: UIView>(_ type: T.Type, in editor: VideoEditorViewController,
+                                    at position: Int = 0) throws -> T {
+        let all = try panel(in: editor).recursiveSubviews.compactMap { $0 as? T }
+        guard all.indices.contains(position) else {
+            throw XCTSkip("no \(type) at \(position) in the open panel")
+        }
+        return all[position]
+    }
+
+    func testDraggingTheVolumeSliderThenReleasingRecordsExactlyOneUndoStep() throws {
+        let editor = makeEditor()
+        let vm = editor.viewModelForTesting
+        let original = vm.cells[0].volume
+
+        editor.selectClipForTesting(0)
+        try rail(in: editor).simulateTap(toolID: "volume")
+        let slider = try control(UISlider.self, in: editor)
+
+        for value: Float in [0.8, 0.5, 0.2] {
+            slider.value = value
+            slider.sendActions(for: .valueChanged)
+        }
+        XCTAssertEqual(vm.cells[0].volume, 0.2, accuracy: 0.001,
+                       "the Volume slider must drive the model live, not just render")
+
+        slider.sendActions(for: .touchUpInside)
+        vm.undo()
+        XCTAssertEqual(vm.cells[0].volume, original, accuracy: 0.001,
+                       "one undo must revert the whole drag — mid-drag ticks must not each push a step")
+    }
+
+    func testTogglingMuteAppliesImmediatelyAndIsUndoableInOneStep() throws {
+        let editor = makeEditor()
+        let vm = editor.viewModelForTesting
+        XCTAssertFalse(vm.cells[0].isMuted, "Precondition: audible")
+
+        editor.selectClipForTesting(0)
+        try rail(in: editor).simulateTap(toolID: "volume")
+        let muteSwitch = try control(UISwitch.self, in: editor)
+
+        muteSwitch.isOn = true
+        muteSwitch.sendActions(for: .valueChanged)
+        XCTAssertTrue(vm.cells[0].isMuted, "the Mute switch must drive the model")
+
+        vm.undo()
+        XCTAssertFalse(vm.cells[0].isMuted, "a switch commits its own single undo step")
+    }
+
+    func testPickingATransitionStyleAndDraggingItsDurationBothReachTheModel() throws {
+        let editor = makeEditor()
+        let vm = editor.viewModelForTesting
+        XCTAssertNil(vm.cells[0].transition, "Precondition: no transition yet")
+
+        editor.selectClipForTesting(0)
+        try rail(in: editor).simulateTap(toolID: "transition")
+
+        let fade = try XCTUnwrap(
+            panel(in: editor).recursiveSubviews
+                .compactMap { $0 as? UIButton }
+                .first { $0.configuration?.title == "Fade" },
+            "the Transition panel's Fade button")
+        fade.sendActions(for: .touchUpInside)
+        XCTAssertEqual(vm.cells[0].transition?.style, .crossfade,
+                       "a style button must set the transition, not merely highlight itself")
+
+        // The duration slider bails out unless a style is already set, so this
+        // has to run after the tap above — which is exactly the real order.
+        let slider = try control(UISlider.self, in: editor)
+        let seeded = try XCTUnwrap(vm.cells[0].transition?.duration)
+        slider.value = 1.5
+        slider.sendActions(for: .valueChanged)
+        XCTAssertEqual(vm.cells[0].transition?.duration ?? 0, 1.5, accuracy: 0.001,
+                       "the Duration slider must drive the model")
+        XCTAssertEqual(vm.cells[0].transition?.style, .crossfade,
+                       "changing duration must not drop the chosen style")
+
+        slider.sendActions(for: .touchUpInside)
+        vm.undo()
+        XCTAssertEqual(vm.cells[0].transition?.duration ?? 0, seeded, accuracy: 0.001,
+                       "one undo reverts the whole duration drag")
+    }
+
     // MARK: - Stale selection revalidation (the scenario this task calls out explicitly)
 
     func testClearingTheSelectedClipViaTheViewModelRevalidatesTheRail() throws {

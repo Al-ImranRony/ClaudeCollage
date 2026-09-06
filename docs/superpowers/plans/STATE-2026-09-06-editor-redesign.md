@@ -4,7 +4,7 @@ Resume point for the two-plan editor redesign. Everything below is committed on
 branch `editor-chrome-redesign` in the worktree
 `/Users/irony/Claude/Projects/ClaudeCollage/.claude/worktrees/editor-chrome-redesign`.
 
-Working tree is clean. **51 commits** ahead of `dev`.
+Working tree is clean. **55 commits** ahead of `dev`.
 
 ---
 
@@ -15,7 +15,7 @@ Working tree is clean. **51 commits** ahead of `dev`.
 | Status | **Complete, 11 / 11** | **6 / 10 implemented** |
 | Doc | `2026-09-05-editor-chrome-and-collage-editor.md` | `2026-09-06-video-editor-timeline-and-timed-text.md` |
 
-**Unit suite: 880 tests, 0 failures.** UI suite last run green on the four suites the
+**Unit suite: 884 tests, 0 failures.** UI suite last run green on the four suites the
 redesign touched (19/19); a full UI run has not been done since Plan 2 began.
 
 ### Plan 2 task status
@@ -27,7 +27,7 @@ redesign touched (19/19); a full UI run has not been done since Plan 2 began.
 | 3 · Preview honours timing | ✅ done, reviewed, observer lifecycle fixed |
 | 4 · `VideoTimelineGeometry` | ✅ done, reviewed, coverage gaps closed |
 | 5 · `VideoTimeline` view | ✅ done, reviewed, API defects fixed (edit phase, selection, play) |
-| 6 · Video editor adopts chrome | ✅ done, spec reviewed, desync + undo fixed. **Quality review was in flight when we stopped** |
+| 6 · Video editor adopts chrome | ✅ done, spec + quality reviewed, 2 Critical playback bugs fixed, control coverage added |
 | 7 · Wire timeline to document | ⬜ **next** |
 | 8 · Timing panel | ⬜ |
 | 9 · `startOffset` | ⬜ (deliberately last; droppable) |
@@ -37,22 +37,7 @@ redesign touched (19/19); a full UI run has not been done since Plan 2 began.
 
 ## Tomorrow's queue, in order
 
-**1. Task 6 code-quality review** (was in flight when we stopped; re-run it).
-Base `c343efe`, head `de9c6e1`. Ask it to judge, specifically:
-- the new flaky test (`VideoEditorPlaybackControlTests.testPausingSurvivesACompositionRebuild`)
-  — diagnose the actual race, recommend a fix that keeps the test meaningful rather than
-  loosening it into uselessness;
-- `VideoEditorViewController`'s size after this task, and whether the panel factories should move out;
-- **cross-editor duplication** — `VideoEditorViewController` now closely mirrors
-  `GridEditorViewController`'s `setupRail` / `toolTapped` / `openPanel` / `closePanel` /
-  `animateStageResize` / `revalidateSelection`. Worth a shared base type, or would that couple
-  two screens that should stay independent? Want a definite recommendation;
-- whether the `activeContextKind` tri-state still earns its place now the desync is fixed;
-- test quality, especially whether the contextual panels' controls actually fire.
-
-Fix whatever it finds before starting Task 7.
-
-**2. `TextOverlay.animation`** — owner confirmed 2026-09-06: **add it.**
+**1. `TextOverlay.animation`** — owner confirmed 2026-09-06: **add it.**
 - Reserved field per spec §4.1, defaulted `.none`, nothing reads it yet.
 - Must decode with a `decodeIfPresent` fallback like every other field on this type, so existing
   saved projects are unaffected — `TextStyle` and the Task 1 timing fields are the pattern.
@@ -64,9 +49,127 @@ Fix whatever it finds before starting Task 7.
 - Watch the raw-string trap: use `##"..."##`, since a single-hash raw string self-terminates on
   the `"#` inside a hex colour.
 
-**3. Task 7** — wire the timeline to the document. Plan lines 914 onward.
+**2. Task 7** — wire the timeline to the document. Plan lines 914 onward.
 
-**4. Tasks 8, 9, 10** — timing panel, `startOffset` (last, droppable), UI test updates.
+**3. Tasks 8, 9, 10** — timing panel, `startOffset` (last, droppable), UI test updates.
+
+**4. After Task 10, before the branch merges: extract `EditorPanelPresenter`.** See "Cross-editor
+duplication" under the Task 6 review below — a definite recommendation, deliberately sequenced
+after the video editor stops changing.
+
+---
+
+## Task 6 quality review — done 2026-09-06
+
+Re-ran the review that was in flight. Every question in the old brief is answered below.
+
+### Two Critical playback defects, both fixed
+
+Both live in the same mechanism, and together they were the **actual race** behind
+`VideoEditorPlaybackControlTests`' "fails only under full-suite load" flakiness. Neither was a
+test problem, so neither was fixed by touching the test.
+
+**1. The loop restart overrode a deliberate pause.** `loopPlaybackForever` observed
+`.AVPlayerItemDidPlayToEndTime` with `object: nil` and called `setPlaying(true)`
+*unconditionally*. AVFoundation posts that notification from its own thread, so the block is
+merely **enqueued** on the main queue: a 0.5s fixture that reaches its end while the main actor
+is busy can deliver **after** the user's pause has already landed, at which point the block
+seeks to zero and starts playing again. `rebuildComposition` then read a `.playing` player and
+faithfully "preserved" playback nobody asked for.
+
+Two guards added: the ended item must be `player.currentItem` (`object: nil` observes *every*
+`AVPlayerItem` in the process — every `LoopingPreviewPlayerView`, every player alive behind a
+presented sheet — so an unrelated preview finishing used to yank this editor's playhead to
+0:00), and `videoTimelineModel.isPlaying` must be true.
+
+Proven first: `testAnEndOfItemNotificationDoesNotOverrideADeliberatePause` posts the
+notification explicitly, making the ordering deterministic instead of reachable by luck. It
+**failed against the unfixed code** on all three assertions (player playing, intent flag true,
+icon reading "Pause") and passes now.
+
+Mechanical note: `Notification` is not `Sendable`, so the item's identity is reduced to an
+`ObjectIdentifier` before crossing into `MainActor.assumeIsolated`.
+
+**2. A rebuild resumed against transient player state, not intent.** `rebuildComposition` read
+`player.timeControlStatus == .playing` — a *transient* value — a 250ms debounce plus an async
+`buildBundle()` after the edit. A clip that reaches its end (or is still buffering) in that
+window reports something other than `.playing` while the user's intent is unchanged, so editing
+any control at a loop boundary silently froze a preview the user had left playing. It now reads
+`videoTimelineModel.isPlaying`. Intent defaults to `false`, so the first build still gets the
+correct "don't autoplay on load" that the old comment credited to `timeControlStatus`.
+
+This is what makes `testPlayingSurvivesACompositionRebuildToo` deterministic rather than lucky.
+**No dedicated new test:** post-fix, "intent true but player stalled" cannot be constructed
+cleanly (the loop observer legitimately restarts playback whenever intent is true), and a
+timing-dependent test for it would have exactly the toothlessness this plan keeps warning about.
+A draft test for it was written and then **deleted** for that reason.
+
+### Test coverage gap, closed
+
+Opening a panel is not evidence it works — the P1 T9 defect class (sliders re-homed into a panel
+with **no `addTarget`**: visible, inert, suite green). Only the Frame panel's Border slider had a
+drag test. **Volume, Mute and Transition had none**: deleting any of their `setupRail` wirings
+would have broken the screen with every test still passing.
+
+Three tests added to `VideoEditorRailTests`, each **verified to fail** against deliberately
+removed wiring before being kept:
+`testDraggingTheVolumeSliderThenReleasingRecordsExactlyOneUndoStep`,
+`testTogglingMuteAppliesImmediatelyAndIsUndoableInOneStep`,
+`testPickingATransitionStyleAndDraggingItsDurationBothReachTheModel`.
+
+Trim's two sliders and its loop switch are still unfired — `presentTrimPanel` is async on the
+source's duration, which `VideoEditorRailTests`' never-decoded fake asset resolves to 0. Worth a
+fixture-backed test; **carried forward as debt item 6 below**, not blocking.
+
+### Cross-editor duplication — definite recommendation
+
+**Extract a helper object, not a shared base class. Do it after Task 10, before the branch
+merges.**
+
+The genuinely identical surface is smaller than it looks: `openPanel`, `closePanel` and
+`animateStageResize` are verbatim identical (~26 lines) along with the `openToolID` and
+`collapsedPanelHeight` properties. `toolTapped` shares only its one-line guard — every case
+differs. `setupRail` differs. `revalidateSelection` is *substantially* different: the video
+editor's handles a model-owned selection and a synchronous re-entrancy hazard the grid editor
+simply does not have.
+
+A base class would inherit ~26 lines into two 1,450-line controllers and couple two screens that
+should stay independent. The right shape is a small owned collaborator — `EditorPanelPresenter`
+— holding `openToolID`, the collapsed-height constraint, and the show/hide/animate sequence,
+which each VC owns one of.
+
+The argument for doing it at all is **not** line count: those 26 lines encode a subtle UIKit
+constraint-ordering trap (deactivate before `show`; un-animated `hide` before reactivating) that
+is currently documented at length in *two* files. A duplicated trap is one that gets half-fixed
+later. The argument for doing it *after* Task 10 is that Tasks 7–10 keep changing this
+controller, and they touch the timeline and timing panel rather than this plumbing — so
+deferring adds no duplication.
+
+### `activeContextKind` — keep it, with one correction
+
+`.clip` genuinely earns its place even with the desync fixed. It is not a restatement of
+`viewModel.selectedIndex`: the two can legitimately disagree (an undo restoring a snapshot whose
+`selectedIndex` is nil while the rail still shows Clip tools), and it is what makes
+`revalidateSelection` re-entrancy-safe.
+
+`.text` is **write-only** — text selection is tracked entirely by `selectedTextID`, which is the
+VC's own state and cannot drift the way the model-owned clip selection can. Kept as a case
+(rather than collapsing to a `Bool`) because it names the state honestly at each assignment site
+and Task 8's timing panel is the obvious first reader, but the doc comment now says so plainly
+instead of implying both cases are load-bearing.
+
+### Controller size — no split needed beyond one extraction
+
+1,492 lines, against `GridEditorViewController`'s 1,470 — its sibling, not an outlier. The
+*view* code was already correctly extracted to `VideoEditorPanels.swift`, and the remaining
+factories are thin bindings that set values on VC-owned controls; moving them out would need a
+delegate interface back to the VC for a modest line saving. **Net complexity increase, not
+worth it.**
+
+The one real outlier was `makeTransitionStyleRow` — 75 lines building its own buttons and
+managing its own highlight state, which is pure layout and broke `VideoEditorPanels.swift`'s own
+stated convention. Extracted as `ClipTransitionStyleRow` (the controller now supplies only a
+"style was picked" callback; the row owns its highlight). Controller is 1,445 lines.
 
 ### Environment
 
@@ -97,9 +200,8 @@ Never run two simulator jobs at once. Do **not** `erase all` (resets Photos auth
 
 **Known debt, none blocking:**
 
-1. **New flaky test** — `VideoEditorPlaybackControlTests.testPausingSurvivesACompositionRebuild`
-   failed once under full-suite load, passed in isolation and on rerun. Real `AVPlayer` +
-   generated fixture + polling. Diagnosis was the first question of the in-flight quality review.
+1. ~~**New flaky test**~~ — **RESOLVED 2026-09-06.** Root-caused to two real playback defects,
+   not test flakiness; see the Task 6 review above. Fixed in the product, tests kept strict.
 2. **`VideoTimeline.swift` is ~1000 lines** with six private lane views. A reviewer recommended
    splitting the lane views into their own file; deliberately deferred so an API-change diff
    stayed reviewable. The mechanical caveat: `pixelSnapped`, `videoTimelineHairline`,
@@ -119,6 +221,11 @@ Never run two simulator jobs at once. Do **not** `erase all` (resets Photos auth
 6. **Trim/Volume/Transition panels use plain controls**, not a reproduction of
    `VideoCellControlsSheet`'s draggable filmstrip; the full sheet stays reachable as
    "More Options…".
+7. **The Trim panel's controls are untested.** Volume, Mute and Transition now have
+   fire-the-control tests; Trim's two sliders and loop switch do not, because
+   `presentTrimPanel` awaits the source's real duration and `VideoEditorRailTests`' fake asset
+   never decodes. Needs a fixture-backed editor like `VideoEditorPlaybackControlTests`
+   builds. Same silent-breakage exposure as the gap that was just closed.
 
 ---
 

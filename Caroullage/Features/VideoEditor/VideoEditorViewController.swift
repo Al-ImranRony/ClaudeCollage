@@ -95,10 +95,21 @@ final class VideoEditorViewController: UIViewController {
     private var openToolID: EditorTool.ID?
 
     private enum ContextKind { case clip, text }
-    /// Which contextual group the rail is currently showing, if any — tracked
-    /// separately from `viewModel.selectedIndex`/`selectedTextID` so
-    /// `revalidateSelection` can tell "no selection" apart from "a selection
-    /// just went stale underneath an unrelated open panel". See that method.
+    /// Which contextual group the rail is currently showing, if any.
+    ///
+    /// `.clip` is the load-bearing case: it is tracked separately from
+    /// `viewModel.selectedIndex` because the two can legitimately disagree —
+    /// an undo can restore a snapshot whose `selectedIndex` is nil while the
+    /// rail is still showing Clip tools, and only this flag notices. It is also
+    /// what makes `revalidateSelection` re-entrancy-safe (see its comment about
+    /// `selectCell(at:)` firing `onChanged` synchronously).
+    ///
+    /// `.text` is currently only WRITTEN, never read: text selection is tracked
+    /// entirely by `selectedTextID`, which is the VC's own state and so cannot
+    /// drift the way the model-owned clip selection can. It is kept as a case
+    /// rather than collapsing this to a `Bool` because it names the state
+    /// honestly at every assignment site, and Task 8's timing panel is the
+    /// obvious first reader.
     private var activeContextKind: ContextKind?
     /// The selected text overlay. Unlike clip selection (`viewModel.selectedIndex`,
     /// owned by the model), the video model has no notion of a selected overlay,
@@ -150,11 +161,6 @@ final class VideoEditorViewController: UIViewController {
     private let volumeSlider = UISlider()
     private let muteSwitch = UISwitch()
     private let transitionDurationSlider = UISlider()
-
-    private static let transitionOptions: [(label: String, style: CellTransition.Style?)] = [
-        ("None", nil), ("Fade", .crossfade), ("Slide ←", .slideLeft),
-        ("Slide →", .slideRight), ("Zoom", .zoomIn),
-    ]
 
     // MARK: - Init
 
@@ -584,61 +590,18 @@ final class VideoEditorViewController: UIViewController {
         return ClipTransitionPanelView(styleRow: styleRow, durationSlider: transitionDurationSlider)
     }
 
+    /// Binds `ClipTransitionStyleRow` (pure layout, in `VideoEditorPanels.swift`)
+    /// to the document. The row owns its own highlight; this only applies the
+    /// pick, preserving whatever duration the clip already had.
     private func makeTransitionStyleRow(selected: CellTransition.Style?) -> UIView {
-        let row = UIStackView()
-        row.axis = .horizontal
-        row.spacing = Theme.Spacing.xs
-        row.alignment = .center
-
-        var buttons: [(button: UIButton, style: CellTransition.Style?)] = []
-        func refreshHighlight(_ selected: CellTransition.Style?) {
-            for (button, style) in buttons {
-                var config = button.configuration
-                let isSelected = style == selected
-                config?.baseBackgroundColor = isSelected ? Theme.Color.accent : Theme.Color.controlFill
-                config?.baseForegroundColor = isSelected ? Theme.Color.textOnAccent : Theme.Color.textPrimary
-                button.configuration = config
-            }
+        ClipTransitionStyleRow(selected: selected) { [weak self] style in
+            guard let self, let index = self.viewModel.selectedIndex else { return }
+            let duration = self.viewModel.cells[index].transition?.duration ?? 0.5
+            self.viewModel.setTransitionInteractive(
+                style.map { CellTransition(style: $0, duration: duration) }, forCellAt: index)
+            self.viewModel.commitInteractive()
+            Haptics.tap()
         }
-
-        for option in Self.transitionOptions {
-            var config = UIButton.Configuration.tinted()
-            config.title = option.label
-            config.cornerStyle = .capsule   // never set layer.cornerRadius on a configured button
-            let button = UIButton(configuration: config)
-            button.accessibilityIdentifier = "clipTransition-\(option.label)"
-            button.addAction(UIAction { [weak self] _ in
-                guard let self, let index = self.viewModel.selectedIndex else { return }
-                let duration = self.viewModel.cells[index].transition?.duration ?? 0.5
-                let transition = option.style.map { CellTransition(style: $0, duration: duration) }
-                self.viewModel.setTransitionInteractive(transition, forCellAt: index)
-                self.viewModel.commitInteractive()
-                Haptics.tap()
-                refreshHighlight(option.style)
-            }, for: .touchUpInside)
-            buttons.append((button, option.style))
-            row.addArrangedSubview(button)
-        }
-        refreshHighlight(selected)
-
-        // A horizontally scrolling row — not a stack pinned edge-to-edge across
-        // the panel's full width — so "Slide ←" / "Slide →" keep their natural,
-        // unwrapped width instead of being squeezed into five equal columns.
-        // Mirrors EditorToolRail's own scrollView + stack pattern.
-        let scrollView = UIScrollView()
-        scrollView.showsHorizontalScrollIndicator = false
-        scrollView.translatesAutoresizingMaskIntoConstraints = false
-        row.translatesAutoresizingMaskIntoConstraints = false
-        scrollView.addSubview(row)
-        NSLayoutConstraint.activate([
-            row.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor),
-            row.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor),
-            row.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor),
-            row.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor),
-            row.heightAnchor.constraint(equalTo: scrollView.frameLayoutGuide.heightAnchor),
-            scrollView.heightAnchor.constraint(equalToConstant: 44),
-        ])
-        return scrollView
     }
 
     @objc private func volumeChanged() {
@@ -821,17 +784,38 @@ final class VideoEditorViewController: UIViewController {
     }
 
     /// Restarts the preview when it reaches the end — a collage reads better looping.
+    ///
+    /// Both guards below are load-bearing, and their absence was the race behind
+    /// `VideoEditorPlaybackControlTests`' intermittent failures:
+    ///
+    /// 1. **The item must be ours.** `object: nil` observes EVERY `AVPlayerItem`
+    ///    in the process — every `LoopingPreviewPlayerView`, every other player
+    ///    alive behind a presented sheet — so an unrelated preview finishing
+    ///    used to yank this editor's playhead back to 0:00.
+    /// 2. **The user must actually want playback.** The notification is posted
+    ///    from AVFoundation's own thread and merely ENQUEUED here, so a clip
+    ///    that ends while the main actor is busy can deliver after a pause has
+    ///    already landed — and this block then restarted the video the user had
+    ///    just deliberately stopped. `videoTimelineModel.isPlaying` is the
+    ///    intent `setPlaying` records, so reading it makes a late notification
+    ///    a no-op rather than an override.
     private func loopPlaybackForever() {
         player.actionAtItemEnd = .none
         didFinishObserver = NotificationCenter.default.addObserver(
             forName: .AVPlayerItemDidPlayToEndTime, object: nil, queue: .main
-        ) { [weak self] _ in
+        ) { [weak self] note in
+            // `Notification` is not `Sendable`, so the item's identity is reduced
+            // to an `ObjectIdentifier` (which is) out here, before crossing into
+            // the isolated block below.
+            let endedItem = (note.object as AnyObject?).map(ObjectIdentifier.init)
             guard let self else { return }
             MainActor.assumeIsolated {
+                guard let endedItem, let current = self.player.currentItem,
+                      ObjectIdentifier(current) == endedItem else { return }
+                guard self.videoTimelineModel.isPlaying else { return }
                 self.player.seek(to: .zero)
-                // The item just played to its end while playing, so this is a
-                // continuation of an already-in-progress playback, not a fresh
-                // "should we resume" decision — but it still must go through
+                // A continuation of an already-in-progress playback rather than a
+                // fresh "should we resume" decision — but it still goes through
                 // `setPlaying` so the icon stays correct through the restart.
                 self.setPlaying(true)
             }
@@ -899,15 +883,20 @@ final class VideoEditorViewController: UIViewController {
             guard let bundle = try? await self.viewModel.buildBundle() else { return }
             guard !Task.isCancelled else { return }
             // Preserve the user's scrub position AND play state so tweaking a
-            // control doesn't yank the preview back to 0:00 or — the bug this
-            // fixes — restart playback out from under someone who deliberately
-            // paused. `player.timeControlStatus` (not `videoTimelineModel
-            // .isPlaying`) is the read here: it's the ground truth for what the
-            // OLD item was actually doing right before it's replaced, and on
-            // the very first build (no item yet) it is naturally `.paused`,
-            // which is exactly the sensible "don't autoplay on load" default.
+            // control doesn't yank the preview back to 0:00 or restart playback
+            // out from under someone who deliberately paused.
+            //
+            // `videoTimelineModel.isPlaying` (the INTENT) is the read here, NOT
+            // `player.timeControlStatus`. The status is transient: a clip that
+            // reaches its end, or is still buffering, reports something other
+            // than `.playing` for a moment while the user's intent is unchanged
+            // — and this read happens a debounce plus an async `buildBundle()`
+            // after the edit, which is ample time to land in exactly that
+            // window. Reading the status there silently froze a preview the
+            // user had left playing. Intent defaults to `false`, so the very
+            // first build still gets the sensible "don't autoplay on load".
             let resumeTime = self.player.currentTime()
-            let wasPlaying = self.player.timeControlStatus == .playing
+            let wasPlaying = self.videoTimelineModel.isPlaying
             let item = AVPlayerItem(asset: bundle.composition)
             item.videoComposition = bundle.videoComposition
             item.audioMix = bundle.audioMix
@@ -1421,6 +1410,16 @@ final class VideoEditorViewController: UIViewController {
     /// last recorded), so a test can check the real AVPlayer state agrees with
     /// what the timeline's icon claims, not just that the icon changed.
     var isPlayerPlayingForTesting: Bool { player.timeControlStatus == .playing }
+
+    /// The item `player` is currently playing, so a test can post a genuine
+    /// `AVPlayerItemDidPlayToEndTime` for it (and for a foreign item) rather
+    /// than waiting for a real clip to run out — the end-of-item race is
+    /// otherwise only reachable by luck under load.
+    var currentPlayerItemForTesting: AVPlayerItem? { player.currentItem }
+
+    /// The INTENT `setPlaying` last recorded, which is what drives the
+    /// timeline's icon and (after this review) what a rebuild resumes against.
+    var isPlayingIntentForTesting: Bool { videoTimelineModel.isPlaying }
 
     /// Awaits whatever `rebuildComposition()` Task is currently in flight —
     /// including the one `viewDidLoad` already kicked off — so a test can wait

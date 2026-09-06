@@ -166,3 +166,79 @@ final class TimingStubPanelView: UIView {
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
 }
+
+/// The Transition panel's style picker: a horizontally scrolling row of capsule
+/// buttons that owns its own selected-state highlight.
+///
+/// Unlike the sliders and switches in this file, these buttons are created here
+/// rather than handed in — there is a variable number of them and they carry no
+/// state the controller needs to read back, so the controller only supplies the
+/// "a style was picked" callback. It scrolls rather than filling the panel width
+/// so "Slide ←" / "Slide →" keep their natural width instead of being squeezed
+/// into five equal columns; mirrors `EditorToolRail`'s own scrollView + stack.
+@MainActor
+final class ClipTransitionStyleRow: UIView {
+
+    static let options: [(label: String, style: CellTransition.Style?)] = [
+        ("None", nil), ("Fade", .crossfade), ("Slide ←", .slideLeft),
+        ("Slide →", .slideRight), ("Zoom", .zoomIn),
+    ]
+
+    private var buttons: [(button: UIButton, style: CellTransition.Style?)] = []
+
+    init(selected: CellTransition.Style?, onSelect: @escaping (CellTransition.Style?) -> Void) {
+        super.init(frame: .zero)
+
+        let row = UIStackView()
+        row.axis = .horizontal
+        row.spacing = Theme.Spacing.xs
+        row.alignment = .center
+
+        for option in Self.options {
+            var config = UIButton.Configuration.tinted()
+            config.title = option.label
+            config.cornerStyle = .capsule   // never set layer.cornerRadius on a configured button
+            let button = UIButton(configuration: config)
+            button.accessibilityIdentifier = "clipTransition-\(option.label)"
+            button.addAction(UIAction { [weak self] _ in
+                onSelect(option.style)
+                self?.refreshHighlight(option.style)
+            }, for: .touchUpInside)
+            buttons.append((button, option.style))
+            row.addArrangedSubview(button)
+        }
+        refreshHighlight(selected)
+
+        let scrollView = UIScrollView()
+        scrollView.showsHorizontalScrollIndicator = false
+        scrollView.translatesAutoresizingMaskIntoConstraints = false
+        row.translatesAutoresizingMaskIntoConstraints = false
+        scrollView.addSubview(row)
+        addSubview(scrollView)
+        NSLayoutConstraint.activate([
+            row.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor),
+            row.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor),
+            row.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor),
+            row.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor),
+            row.heightAnchor.constraint(equalTo: scrollView.frameLayoutGuide.heightAnchor),
+            scrollView.heightAnchor.constraint(equalToConstant: 44),
+            scrollView.topAnchor.constraint(equalTo: topAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: bottomAnchor),
+            scrollView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            scrollView.trailingAnchor.constraint(equalTo: trailingAnchor),
+        ])
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
+
+    private func refreshHighlight(_ selected: CellTransition.Style?) {
+        for (button, style) in buttons {
+            var config = button.configuration
+            let isSelected = style == selected
+            config?.baseBackgroundColor = isSelected ? Theme.Color.accent : Theme.Color.controlFill
+            config?.baseForegroundColor = isSelected ? Theme.Color.textOnAccent : Theme.Color.textPrimary
+            button.configuration = config
+        }
+    }
+}
