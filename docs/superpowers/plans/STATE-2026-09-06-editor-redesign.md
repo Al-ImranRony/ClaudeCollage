@@ -4,7 +4,7 @@ Resume point for the two-plan editor redesign. Everything below is committed on
 branch `editor-chrome-redesign` in the worktree
 `/Users/irony/Claude/Projects/ClaudeCollage/.claude/worktrees/editor-chrome-redesign`.
 
-Working tree is clean. **66 commits** ahead of `dev`.
+Working tree is clean. **68 commits** ahead of `dev`.
 
 ---
 
@@ -38,9 +38,38 @@ path this branch never touches. `VideoEditorUITests` is 8/8.
 
 ## Tomorrow's queue, in order
 
-**1. Before the branch merges: extract `EditorPanelPresenter`.** See "Cross-editor
-duplication" under the Task 6 review below — a definite recommendation, deliberately sequenced
-after the video editor stops changing.
+**Nothing is queued.** Both plans are complete and the pre-merge refactor has landed.
+
+Carried forward for whoever picks this up next, in the owner's court rather than an
+engineering task:
+
+- **A clip can be shortened from the timeline but never lengthened.** The trailing clamp is the
+  composition duration, and the ruler spans the composition — so the position meaning "longer
+  than the composition" is physically off the right edge. Fixing it means deciding what the
+  ruler spans (the composition, or the longest available SOURCE). The Trim panel's sliders do
+  carry the full source range, so the capability exists and the two surfaces disagree.
+- **Tier-3 text animation.** `TextOverlay.animation` is reserved and decoding; nothing reads it.
+  Its own spec, per the design doc's Out of Scope.
+- The rest of the debt list below.
+
+---
+
+## `EditorPanelPresenter` — done 2026-09-06
+
+The last queued item before the merge. `openPanel` / `closePanel` / `animateStageResize` and the
+two properties they lean on were verbatim identical in both editors, and now live in
+`Caroullage/Core/DesignSystem/Editor/EditorPanelPresenter.swift`.
+
+**A collaborator, not a base class**, as the Task 6 review recommended — the two screens'
+`toolTapped` / `setupRail` / `revalidateSelection` share almost nothing.
+
+The presenter **creates the collapsed-height constraint itself** (the owner just activates it
+alongside its own), so the constraint-ordering trap is in one file rather than split between
+owner and helper. It also **wires `EditorPanel.onClose` itself**, so neither controller can
+route the panel's own close button around it; owners hook `presenter.onClose` instead, which is
+what the video editor uses to drop the Timing panel's overlay id.
+
+Behaviour-preserving: 956 unit tests and both editors' UI suites (10/10) unchanged.
 
 ---
 
