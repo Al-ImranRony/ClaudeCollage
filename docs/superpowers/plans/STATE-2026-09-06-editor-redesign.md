@@ -4,7 +4,7 @@ Resume point for the two-plan editor redesign. Everything below is committed on
 branch `editor-chrome-redesign` in the worktree
 `/Users/irony/Claude/Projects/ClaudeCollage/.claude/worktrees/editor-chrome-redesign`.
 
-Working tree is clean. **59 commits** ahead of `dev`.
+Working tree is clean. **62 commits** ahead of `dev`.
 
 ---
 
@@ -12,10 +12,10 @@ Working tree is clean. **59 commits** ahead of `dev`.
 
 | | Plan 1 — chrome + collage editor | Plan 2 — video timeline + timed text |
 |---|---|---|
-| Status | **Complete, 11 / 11** | **7 / 10 implemented** |
+| Status | **Complete, 11 / 11** | **9 / 10 implemented** |
 | Doc | `2026-09-05-editor-chrome-and-collage-editor.md` | `2026-09-06-video-editor-timeline-and-timed-text.md` |
 
-**Unit suite: 926 tests, 0 failures.** UI suite last run green on the four suites the
+**Unit suite: 949 tests, 0 failures.** UI suite last run green on the four suites the
 redesign touched (19/19); a full UI run has not been done since Plan 2 began.
 
 ### Plan 2 task status
@@ -29,22 +29,84 @@ redesign touched (19/19); a full UI run has not been done since Plan 2 began.
 | 5 · `VideoTimeline` view | ✅ done, reviewed, API defects fixed (edit phase, selection, play) |
 | 6 · Video editor adopts chrome | ✅ done, spec + quality reviewed, 2 Critical playback bugs fixed, control coverage added |
 | 7 · Wire timeline to document | ✅ done, reviewed, 3 defects fixed (drag death, frozen playhead, inert lanes) |
-| 8 · Timing panel | ⬜ **next** |
-| 9 · `startOffset` | ⬜ (deliberately last; droppable) |
-| 10 · UI test updates | ⬜ |
+| 8 · Timing panel | ✅ done, not yet quality-reviewed |
+| 9 · `startOffset` | ✅ done, not yet quality-reviewed |
+| 10 · UI test updates | ⬜ **next** |
 
 ---
 
 ## Tomorrow's queue, in order
 
-**1. Task 8** — the Timing panel. Plan lines ~990 onward. Note it replaces
-`TimingStubPanelView`, which Task 6 left as a deliberate placeholder.
+**1. Quality review Tasks 8 and 9.** Neither has been reviewed; the review has found a defect
+in every Plan 2 task so far, including two Criticals in Task 7. Base `59844d9`, head `0e0e054`.
+Worth pointing it at specifically:
+- **Task 8's steppers are controller-owned and reused across opens.** `timingPanelOverlayID` is
+  cleared by `revalidateSelection`, but is that the only path that can strand them? What about
+  switching selection from one caption straight to another with the panel open?
+- **`timingCeiling` falls back to 60s** on an empty document. Arbitrary. Does anything downstream
+  care, and what happens when the composition later turns out to be shorter than a window
+  already typed against that 60?
+- **Task 9 has no UI.** `startOffset` is settable on the view model and honoured by the engine,
+  but nothing on screen sets it — the timeline shows every clip starting at zero
+  (`VideoTimelineModelBuilder` hardcodes `start: 0`). Is shipping the engine half alone right, or
+  does the lane need to move too?
+- **Looping + offset**: a looping cell now fills offset → end. Confirm that is what a user
+  expects rather than "loop for my own length, then stop".
+- whether `compositionDuration`'s two overloads are a trap — the `cellDurations:` one is still
+  correct only when no cell has an offset, and nothing enforces that.
 
-**2. Tasks 9, 10** — `startOffset` (last, droppable), UI test updates.
+**2. Task 10** — update the UI tests the redesign moved.
 
 **3. After Task 10, before the branch merges: extract `EditorPanelPresenter`.** See "Cross-editor
 duplication" under the Task 6 review below — a definite recommendation, deliberately sequenced
 after the video editor stops changing.
+
+---
+
+## Tasks 8 and 9 — done 2026-09-06
+
+### Task 8 — the Timing panel
+
+`TimingStubPanelView` replaced by real numeric in/out refinement.
+
+**Steppers, not text fields.** A decimal keypad in a bottom panel has no return key to dismiss
+it and covers the very timeline being timed against. 0.1s steps refine a dragged window precisely
+without one.
+
+**"Whole Video" is not a convenience.** `nil` timing — "always visible" — is a real state a pill
+drag can never reach, because a pill always has two edges. The panel is the only way back.
+
+**Both bounds clamp so the window cannot invert**, sharing `VideoTimeline.minimumTrimDuration`
+(made `internal` for exactly this) so typing and dragging cannot produce different minimums. This
+matters more than it looks: `isVisible(at:)` treats an inverted window as ALWAYS VISIBLE
+(fail-open by design), so an inverted window entered here would silently turn a timed caption
+back into a permanent one.
+
+Also strengthened the Style panel's test, which only COUNTED preset buttons — the exact gap a
+Plan 1 review found. Every preset is now tapped and its effect checked.
+
+### Task 9 — `startOffset`
+
+The backwards-compatibility test was written first, as the plan asked, and every pre-existing
+composition suite still passes untouched.
+
+Four call sites had to agree: composition duration is the LAST cell to finish rather than the
+longest; `insertLooping`'s `fillTo` became an absolute time rather than a length (so a looping
+cell fills offset → end while a plain one stops at offset + duration); `CellTransition.startTime`
+shifts by the offset, since it is relative to the CELL; and beat sync subtracts the offset,
+because its `startTimes` are absolute.
+
+**One plan instruction turned out to be belt-and-braces.** The explicit `insertEmptyTimeRange`
+before the first insert makes no difference — inserting past a track's end already extends it
+with empty time, and deleting the call changed no test. Kept for readability, with the comment
+saying so plainly rather than implying a test guards it. This was caught by deliberately breaking
+it; the test that was *supposed* to pin it could not tell the two apart, and its assertion
+message was corrected rather than left overclaiming.
+
+**Task 9 ships with no UI** — see the review queue above.
+
+**Plan deviation:** the plan said append to `CaroullageTests/Unit/VideoCompositionTests.swift`,
+which does not exist. Tests live in a new `VideoStartOffsetTests.swift`.
 
 ---
 
