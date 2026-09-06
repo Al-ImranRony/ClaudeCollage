@@ -96,18 +96,39 @@ Never run two simulator jobs at once. Do **not** `erase all` (resets Photos auth
 
 ---
 
-## Two decisions awaiting your call
+## Decisions
 
-Both were raised when Plan 2 was written and are still open. Neither blocks Task 7.
+### ✅ Settled 2026-09-06 — declarative style continues for Tasks 7–10
 
-1. **Tasks 5–9 are specified declaratively** (API + invariants, not full code), reversing what
-   the plan-writing skill asks for. Rationale is at the end of the Plan 2 document: Plan 1 had
-   complete code for every task and **ten defects were found in that code, all mine**, four of
-   which would have shipped — and they passed spec review *because* the code matched the plan.
-   Say the word if you want full code in the remaining tasks instead.
-2. **`TextOverlay.animation` was not added**, though the spec reserves it. Its justification was
-   avoiding a migration, but every field here decodes with `decodeIfPresent`, so adding it later
-   is a one-line change rather than a migration.
+The owner confirmed the remaining tasks stay specified **declaratively** (API, invariants and
+failure modes; not full implementation code). Do not rewrite them into prescriptive code blocks.
+
+Rationale is at the end of the Plan 2 document: Plan 1 carried complete code for every task and
+**ten defects were found in that code, all mine**, four of which would have shipped — and they
+passed spec review precisely *because* the implementation matched the plan.
+
+**Known cost of this style, and how to compensate.** Declarative plans fail differently: instead
+of specifying wrong code, they under-specify an invariant, and an agent fills the gap with a
+locally-sound choice that compounds. Every Plan 2 defect so far has that shape — an invariant
+defined too narrowly (T1 fail-open), a cache with no bound (T2), a test too weak to fail (T2),
+a lifecycle not thought through (T3), a callback with no gesture phase (T5), an API with no play
+callback (T5/T6). None were implementer errors.
+
+So the compensating discipline is in the **review briefs**, not the plan:
+
+- Tell every reviewer explicitly that the plan may be wrong, and ask for plan defects **listed
+  separately** from implementation issues. This is what has found all sixteen.
+- Ask reviewers to trace **specific named mechanisms** ("can a stale completion fire after a
+  newer call?"), not to confirm conformance.
+- Ask "what did the plan fail to say?" as its own question.
+- When a fix is dispatched, require the test to be **proven to fail first** — three tests in this
+  run passed against deliberately broken code and only got teeth when someone tried to break them.
+
+### ⬜ Still open — `TextOverlay.animation`
+
+Not added, though the spec reserves it. Its justification was avoiding a migration, but every
+field here decodes with `decodeIfPresent`, so adding it later is a one-line change rather than a
+migration. Does not block Task 7.
 
 ---
 
