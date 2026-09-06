@@ -808,17 +808,28 @@ public struct VideoTimelineModel: Equatable {
     public var clips: [Clip]
     public var textPills: [TextPill]
     public var musicTitle: String?
+    /// Indigo marks what is chosen (ink is chrome, indigo is state). Task 6 sets these
+    /// when a contextual rail group is shown, so the block under the user's finger is
+    /// visibly the one the tools act on.
+    public var selectedClipIndex: Int?
+    public var selectedTextID: UUID?
 }
 
 public final class VideoTimeline: UIView {
+    public enum EditPhase: Equatable, Sendable { case changed, committed }
+
     public enum State { case collapsed, expanded }
 
     public var onScrub: ((Double) -> Void)?
     public var onToggleState: ((State) -> Void)?
     public var onSelectClip: ((Int) -> Void)?
     public var onSelectText: ((UUID) -> Void)?
-    public var onTrim: ((_ clipIndex: Int, _ start: Double, _ end: Double) -> Void)?
-    public var onRetimeText: ((_ id: UUID, _ start: Double, _ end: Double) -> Void)?
+    /// Fires `.changed` throughout a drag and `.committed` exactly once on release.
+    /// WITHOUT this phase, Task 7 cannot honour its own requirement that a drag be ONE
+    /// undo step: it would have to guess with a debounce. A cancelled gesture reports
+    /// `.changed`, never `.committed`, so an interrupted drag is never baked in.
+    public var onTrim: ((_ clipIndex: Int, _ start: Double, _ end: Double, _ phase: EditPhase) -> Void)?
+    public var onRetimeText: ((_ id: UUID, _ start: Double, _ end: Double, _ phase: EditPhase) -> Void)?
 
     public private(set) var state: State
     public func setModel(_ model: VideoTimelineModel)
