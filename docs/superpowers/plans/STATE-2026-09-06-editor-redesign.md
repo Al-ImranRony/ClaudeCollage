@@ -4,7 +4,7 @@ Resume point for the two-plan editor redesign. Everything below is committed on
 branch `editor-chrome-redesign` in the worktree
 `/Users/irony/Claude/Projects/ClaudeCollage/.claude/worktrees/editor-chrome-redesign`.
 
-Working tree is clean. **64 commits** ahead of `dev`.
+Working tree is clean. **66 commits** ahead of `dev`.
 
 ---
 
@@ -12,11 +12,12 @@ Working tree is clean. **64 commits** ahead of `dev`.
 
 | | Plan 1 — chrome + collage editor | Plan 2 — video timeline + timed text |
 |---|---|---|
-| Status | **Complete, 11 / 11** | **9 / 10 implemented** |
+| Status | **Complete, 11 / 11** | **Complete, 10 / 10** |
 | Doc | `2026-09-05-editor-chrome-and-collage-editor.md` | `2026-09-06-video-editor-timeline-and-timed-text.md` |
 
-**Unit suite: 955 tests, 0 failures.** UI suite last run green on the four suites the
-redesign touched (19/19); a full UI run has not been done since Plan 2 began.
+**Unit suite: 956 tests, 0 failures.** **Full UI suite run 2026-09-06: 83 tests, 1 skipped, 1 failure** — `PaywallUITests
+.testTheCloseButtonIsThereFromTheFirstFrameAndDismisses`, load-sensitive, passes 4/4 alone, on a
+path this branch never touches. `VideoEditorUITests` is 8/8.
 
 ### Plan 2 task status
 
@@ -31,17 +32,48 @@ redesign touched (19/19); a full UI run has not been done since Plan 2 began.
 | 7 · Wire timeline to document | ✅ done, reviewed, 3 defects fixed (drag death, frozen playhead, inert lanes) |
 | 8 · Timing panel | ✅ done, reviewed |
 | 9 · `startOffset` | ✅ done, reviewed, now reachable from the timeline |
-| 10 · UI test updates | 🔄 in progress |
+| 10 · UI test updates | ✅ done — nothing had moved; added chrome coverage, found an a11y defect |
 
 ---
 
 ## Tomorrow's queue, in order
 
-**1. Task 10** — update the UI tests the redesign moved (in progress).
-
-**2. After Task 10, before the branch merges: extract `EditorPanelPresenter`.** See "Cross-editor
+**1. Before the branch merges: extract `EditorPanelPresenter`.** See "Cross-editor
 duplication" under the Task 6 review below — a definite recommendation, deliberately sequenced
 after the video editor stops changing.
+
+---
+
+## Task 10 — done 2026-09-06
+
+**Nothing had moved.** Task 6's decision to preserve `videoLayoutButton` / `videoMusicButton` /
+`videoAddTextButton` / `videoAddStickerButton` / `videoCanvas` / `videoExportButton` when the
+toolbar became a rail did its job: every existing `VideoEditorUITests` case passed untouched. The
+plan's Step 2 ("follow the controls into the rail") had no work in it.
+
+So the task became adding the coverage the redesign lacked. Four new UI tests: the five-tool
+rail is present AND hittable, a tool opens a panel that closes again, the preview can always be
+paused, and the timeline is collapsed by default and expands. These exist because the unit suites
+build the editor in a synthetic window — the real app path (navigation, hidden tab bar, safe
+areas) is where this branch has twice shipped bugs no unit test could see.
+
+### They immediately found a third
+
+**`VideoTimeline`'s play/pause and expand controls are bare `UIControl`s** — not accessibility
+elements, and carrying no `.button` trait. Both were typed `Other` in the accessibility tree, so
+`app.buttons["videoPlayButton"]` matched nothing.
+
+Not a test problem: **VoiceOver announced the only way to pause the preview as an unlabelled
+container** rather than something you can press. Fixed in the app; being an element also stops
+the chevron's inner image view leaking its SF Symbol name ("go down") into the tree. Pinned in
+the unit suite so it cannot regress without a 15-minute UI run.
+
+Diagnosed by dumping the real accessibility tree rather than guessing — the identifiers were all
+present and correct, which is exactly why the failure looked like a test bug at first.
+
+**Known flake, unrelated:** `PaywallUITests.testTheCloseButtonIsThereFromTheFirstFrameAndDismisses`
+failed once in the full run on `waitForExistence(timeout: 5)` and passes 4/4 alone. Same family
+as [[flaky-photos-success-moment-test]] — long-run load, not a regression.
 
 ---
 
