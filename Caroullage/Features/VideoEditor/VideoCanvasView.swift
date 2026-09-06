@@ -201,6 +201,10 @@ final class VideoCanvasView: UIView {
     /// rather than through screenshot comparison.
     var textOverlayViewsForTesting: [UIView] { textViews }
 
+    /// The time captions are currently being shown against. A scrub must move
+    /// this synchronously — see `VideoEditorViewController.scrub(to:)`.
+    var previewTimeForTesting: Double { previewTime }
+
     private func refreshTextVisibility() {
         for (view, overlay) in zip(textViews, textModels) {
             view.isHidden = !overlay.isVisible(at: previewTime)

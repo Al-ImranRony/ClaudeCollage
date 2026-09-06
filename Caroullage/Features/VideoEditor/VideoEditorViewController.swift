@@ -54,12 +54,17 @@ final class VideoEditorViewController: UIViewController {
     private let toolRail = EditorToolRail()
     private let toolPanel = EditorPanel()
     private let videoTimeline = VideoTimeline()
-    /// The model handed to `videoTimeline.setModel`. Task 7 owns everything
-    /// else in it (clips/text pills/selection stay at their empty defaults
-    /// until then) — this screen only ever mutates `isPlaying`, through
-    /// `setPlaying(_:)`, so the timeline's play/pause icon can't drift from
-    /// what `player` is actually doing.
-    private var videoTimelineModel = VideoTimelineModel()
+    /// Whether the user has asked for playback — the INTENT, written only by
+    /// `setPlaying(_:)`. Everything else in the timeline's model is derived from
+    /// the document by `refreshTimeline()`, but this is the screen's own state:
+    /// it is what the play/pause icon shows, what a composition rebuild resumes
+    /// against, and what stops a late end-of-item notification restarting a
+    /// video the user deliberately paused. Deliberately NOT a re-read of
+    /// `player.timeControlStatus`, which is transient — see `rebuildComposition`.
+    private var isPlayingIntent = false
+    /// Where the playhead sits, in seconds. Moved by a scrub or a seek; shown by
+    /// the timeline and used to decide which timed captions are on screen.
+    private var playheadTime: Double = 0
     /// See `GridEditorViewController.collapsedPanelHeight`'s doc comment — same
     /// trap, same fix: deactivated before `show`, reactivated only after a
     /// synchronous `hide`, so it never ties against the panel's own 750-priority
@@ -278,24 +283,23 @@ final class VideoEditorViewController: UIViewController {
             toolRail.bottomAnchor.constraint(equalTo: view.bottomAnchor),
         ])
 
-        // Task 7 wires this to the document (real clips/text pills/playhead).
-        // Here it is present in the hierarchy — so Task 7 doesn't have to touch
-        // layout — but carries a static, empty model apart from `isPlaying`;
-        // none of its document callbacks (`onScrub`/`onTrim`/`onRetimeText`/
-        // `onSelectClip`/`onSelectText`) are wired, so it cannot call into the
-        // view model.
-        //
-        // `onToggleState` and `onTogglePlayback` ARE wired: expand/collapse and
-        // play/pause are both pure view-state toggles the timeline only ever
-        // reports (`chevronTapped`/`playbackTapped` never apply them itself —
-        // see those methods), so leaving either unwired would be exactly the
-        // "visible, tappable, inert" control trap the plan calls out, not a
-        // faithful "not wired yet".
-        videoTimeline.setModel(videoTimelineModel)
+        // The timeline only ever REPORTS; every decision is made here. That is
+        // true of the two view-state toggles (expand/collapse, play/pause) and of
+        // the four document callbacks below — see each handler.
         videoTimeline.onToggleState = { [weak self] newState in
             self?.videoTimeline.setState(newState, animated: true)
         }
         videoTimeline.onTogglePlayback = { [weak self] in self?.toggleTimelinePlayback() }
+        videoTimeline.onScrub = { [weak self] time in self?.scrub(to: time) }
+        videoTimeline.onSelectClip = { [weak self] index in self?.selectClip(index) }
+        videoTimeline.onSelectText = { [weak self] id in self?.selectTextOverlay(id) }
+        videoTimeline.onTrim = { [weak self] index, start, end, phase in
+            self?.trimFromTimeline(clipIndex: index, start: start, end: end, phase: phase)
+        }
+        videoTimeline.onRetimeText = { [weak self] id, start, end, phase in
+            self?.retimeTextFromTimeline(id: id, start: start, end: end, phase: phase)
+        }
+        refreshTimeline()
 
         let tap = UITapGestureRecognizer(target: self, action: #selector(canvasTapped(_:)))
         canvasView.addGestureRecognizer(tap)
@@ -749,13 +753,83 @@ final class VideoEditorViewController: UIViewController {
         canvasView.onStickerSelected = { [weak self] in self?.selectedStickerID = $0 }
     }
 
+    // MARK: - Timeline
+
+    /// Rebuilds the timeline's model from the document. Called from
+    /// `refreshCanvas` (every document change funnels through it) and from
+    /// `setPlaying`, which owns the one piece of the model the document does not.
+    private func refreshTimeline() {
+        videoTimeline.setModel(viewModel.timelineModel(
+            selectedTextID: selectedTextID, isPlaying: isPlayingIntent))
+        videoTimeline.setPlayhead(playheadTime)
+    }
+
+    /// Resolves source durations in the background and refreshes once they land.
+    /// Lane lengths are unknowable until then — see `loadMissingSourceDurations`.
+    private func refreshTimelineDurations() {
+        Task { @MainActor [weak self] in
+            guard let self, await self.viewModel.loadMissingSourceDurations() else { return }
+            self.refreshTimeline()
+        }
+    }
+
+    /// `VideoTimeline.onScrub`. Moves the playhead NOW, on this run loop turn.
+    ///
+    /// The canvas is told directly rather than through `startObservingPlaybackTime`'s
+    /// periodic observer: `addPeriodicTimeObserver` is only documented to fire
+    /// during playback and across play/stop transitions, so a seek while PAUSED —
+    /// which is the whole point of scrubbing — is not guaranteed to reach it.
+    /// Waiting for it would leave captions computed against a frame that is not
+    /// the one on screen.
+    ///
+    /// The seek is tolerant in both directions on purpose: an exact seek per drag
+    /// tick decodes far more than it needs to and makes the drag lag, and
+    /// `AVPlayer` coalesces rapid seeks anyway. The commit at the end of the drag
+    /// is what lands the precise frame.
+    private func scrub(to time: Double) {
+        let clamped = max(0, time)
+        playheadTime = clamped
+        canvasView.setPreviewTime(clamped)
+        videoTimeline.setPlayhead(clamped)
+        player.seek(to: CMTime(seconds: clamped, preferredTimescale: 600),
+                    toleranceBefore: .positiveInfinity,
+                    toleranceAfter: .positiveInfinity) { _ in }
+    }
+
+    /// `VideoTimeline.onTrim`. A drag reports `.changed` throughout and
+    /// `.committed` exactly once at the end, so it rides the interactive/commit
+    /// pattern and lands as ONE undo step rather than one per tick.
+    private func trimFromTimeline(
+        clipIndex: Int, start: Double, end: Double, phase: VideoTimeline.EditPhase
+    ) {
+        guard viewModel.cells.indices.contains(clipIndex) else { return }
+        viewModel.setTrimInteractive(VideoTrim(start: start, end: end), forCellAt: clipIndex)
+        if phase == .committed {
+            viewModel.commitInteractive()
+            Haptics.tap()
+        }
+    }
+
+    /// `VideoTimeline.onRetimeText`. Same one-drag-one-undo-step contract as
+    /// `trimFromTimeline`.
+    private func retimeTextFromTimeline(
+        id: UUID, start: Double, end: Double, phase: VideoTimeline.EditPhase
+    ) {
+        guard viewModel.textOverlay(id: id) != nil else { return }
+        viewModel.setTextTimingInteractive(id: id, start: start, end: end)
+        if phase == .committed {
+            viewModel.commitInteractive()
+            Haptics.tap()
+        }
+    }
+
     // MARK: - Playback
 
     /// The single choke point for changing whether `player` is playing. Every
     /// other place in this file that used to touch `player.play()`/`.pause()`
     /// directly — the loop restart below, `viewWillDisappear`, export's pause,
     /// and the composition rebuild's conditional resume — now goes through
-    /// this instead, so `videoTimelineModel.isPlaying` (and the icon it drives)
+    /// this instead, so `isPlayingIntent` (and the icon it drives)
     /// can never disagree with what the player is actually doing. `playing`
     /// is the caller's INTENT, not a re-read of `player.timeControlStatus`
     /// after the call — deliberately, so the icon reflects "did the user ask
@@ -767,9 +841,9 @@ final class VideoEditorViewController: UIViewController {
         } else {
             player.pause()
         }
-        guard videoTimelineModel.isPlaying != playing else { return }
-        videoTimelineModel.isPlaying = playing
-        videoTimeline.setModel(videoTimelineModel)
+        guard isPlayingIntent != playing else { return }
+        isPlayingIntent = playing
+        refreshTimeline()
     }
 
     /// `VideoTimeline.onTogglePlayback`'s target — the timeline only ever
@@ -780,7 +854,7 @@ final class VideoEditorViewController: UIViewController {
             showInfo(title: "Nothing to Play", message: "Add a video to a slot first.")
             return
         }
-        setPlaying(!videoTimelineModel.isPlaying)
+        setPlaying(!isPlayingIntent)
     }
 
     /// Restarts the preview when it reaches the end — a collage reads better looping.
@@ -796,8 +870,8 @@ final class VideoEditorViewController: UIViewController {
     ///    from AVFoundation's own thread and merely ENQUEUED here, so a clip
     ///    that ends while the main actor is busy can deliver after a pause has
     ///    already landed — and this block then restarted the video the user had
-    ///    just deliberately stopped. `videoTimelineModel.isPlaying` is the
-    ///    intent `setPlaying` records, so reading it makes a late notification
+    ///    just deliberately stopped. `isPlayingIntent` is what `setPlaying`
+    ///    records, so reading it makes a late notification
     ///    a no-op rather than an override.
     private func loopPlaybackForever() {
         player.actionAtItemEnd = .none
@@ -812,7 +886,7 @@ final class VideoEditorViewController: UIViewController {
             MainActor.assumeIsolated {
                 guard let endedItem, let current = self.player.currentItem,
                       ObjectIdentifier(current) == endedItem else { return }
-                guard self.videoTimelineModel.isPlaying else { return }
+                guard self.isPlayingIntent else { return }
                 self.player.seek(to: .zero)
                 // A continuation of an already-in-progress playback rather than a
                 // fresh "should we resume" decision — but it still goes through
@@ -868,6 +942,7 @@ final class VideoEditorViewController: UIViewController {
         canvasView.updateStickerOverlays(viewModel.stickerOverlays, selected: selectedStickerID)
         undoItem.isEnabled = viewModel.canUndo
         redoItem.isEnabled = viewModel.canRedo
+        refreshTimeline()
     }
 
     /// Rebuilds the preview composition from the model (debounced — sliders fire fast).
@@ -886,7 +961,7 @@ final class VideoEditorViewController: UIViewController {
             // control doesn't yank the preview back to 0:00 or restart playback
             // out from under someone who deliberately paused.
             //
-            // `videoTimelineModel.isPlaying` (the INTENT) is the read here, NOT
+            // `isPlayingIntent` (the INTENT) is the read here, NOT
             // `player.timeControlStatus`. The status is transient: a clip that
             // reaches its end, or is still buffering, reports something other
             // than `.playing` for a moment while the user's intent is unchanged
@@ -896,7 +971,7 @@ final class VideoEditorViewController: UIViewController {
             // user had left playing. Intent defaults to `false`, so the very
             // first build still gets the sensible "don't autoplay on load".
             let resumeTime = self.player.currentTime()
-            let wasPlaying = self.videoTimelineModel.isPlaying
+            let wasPlaying = self.isPlayingIntent
             let item = AVPlayerItem(asset: bundle.composition)
             item.videoComposition = bundle.videoComposition
             item.audioMix = bundle.audioMix
@@ -926,6 +1001,10 @@ final class VideoEditorViewController: UIViewController {
             // show them. `bundle.overlayImage` / `timedOverlays` exist purely for
             // the export below, which bakes into a `CVPixelBuffer`.
             await self.refreshGalleryThumbnail()
+            // After the rebuild, not before: a freshly-picked clip's asset is in
+            // the cache by now, and the refresh this triggers is cheap once every
+            // duration is known.
+            self.refreshTimelineDurations()
         }
     }
 
@@ -1396,6 +1475,15 @@ final class VideoEditorViewController: UIViewController {
     var isObservingPlaybackTimeForTesting: Bool { timeObserver != nil }
 
     var viewModelForTesting: VideoEditorViewModel { viewModel }
+
+    /// What the canvas is showing captions against — proves a scrub reached it
+    /// directly rather than waiting on the periodic time observer.
+    var canvasPreviewTimeForTesting: Double { canvasView.previewTimeForTesting }
+
+    /// Where this screen believes the playhead is. `player.currentTime()` settles
+    /// asynchronously after a tolerant seek, so asserting on it would be a race;
+    /// this is the value the seek was issued for.
+    var lastSeekedTimeForTesting: Double? { playheadTime }
     var selectedTextIDForTesting: UUID? { selectedTextID }
     func selectClipForTesting(_ index: Int) { selectClip(index) }
     func selectTextOverlayForTesting(_ id: UUID) { selectTextOverlay(id) }
@@ -1406,7 +1494,7 @@ final class VideoEditorViewController: UIViewController {
     }
 
     /// The ground truth for whether `player` is actually playing right now —
-    /// distinct from `videoTimelineModel.isPlaying` (the INTENT `setPlaying`
+    /// distinct from `isPlayingIntent` (the INTENT `setPlaying`
     /// last recorded), so a test can check the real AVPlayer state agrees with
     /// what the timeline's icon claims, not just that the icon changed.
     var isPlayerPlayingForTesting: Bool { player.timeControlStatus == .playing }
@@ -1418,8 +1506,8 @@ final class VideoEditorViewController: UIViewController {
     var currentPlayerItemForTesting: AVPlayerItem? { player.currentItem }
 
     /// The INTENT `setPlaying` last recorded, which is what drives the
-    /// timeline's icon and (after this review) what a rebuild resumes against.
-    var isPlayingIntentForTesting: Bool { videoTimelineModel.isPlaying }
+    /// timeline's icon and what a rebuild resumes against.
+    var isPlayingIntentForTesting: Bool { isPlayingIntent }
 
     /// Awaits whatever `rebuildComposition()` Task is currently in flight —
     /// including the one `viewDidLoad` already kicked off — so a test can wait

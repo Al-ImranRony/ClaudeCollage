@@ -62,6 +62,12 @@ public final class VideoEditorViewModel {
     /// a delete restores a playable cell rather than an empty one.
     private var assets: [UUID: AVAsset] = [:]
     private var musicAsset: AVAsset?
+    /// Resolved source lengths in seconds, keyed by `videoID`. Loading an
+    /// `AVAsset`'s duration is async, but the timeline has to be built
+    /// synchronously on every change — so the result is cached here and
+    /// `loadMissingSourceDurations()` fills it in the background. Keyed by
+    /// asset, not by cell, so moving a clip between slots costs no reload.
+    private var sourceDurations: [UUID: Double] = [:]
 
     private let undoStack = UndoStack<Snapshot>(maxDepth: 20)
     private let engine = CollageLayoutEngine()
@@ -310,6 +316,34 @@ public final class VideoEditorViewModel {
         record()
     }
 
+    /// Sets a text overlay's in/out points. `nil` means unbounded in that
+    /// direction — see `TextOverlay.isVisible(at:)`. Records one undo step.
+    ///
+    /// Clamps each bound to `max(0, …)` the way `TextOverlay.init` does, because
+    /// assigning the properties directly (which this does) bypasses that. An
+    /// INVERTED window is deliberately not corrected here: `isVisible` already
+    /// treats one as "always visible" rather than "never", so a bad drag shows
+    /// the caption instead of silently hiding it. Task 8's numeric entry is
+    /// where a window gets actively prevented from inverting.
+    public func setTextTiming(id: UUID, start: Double?, end: Double?) {
+        guard let index = textOverlays.firstIndex(where: { $0.id == id }) else { return }
+        applyTiming(at: index, start: start, end: end)
+        record()
+    }
+
+    /// Live retiming from a timeline drag — no undo step until `commitInteractive()`,
+    /// so a whole drag is one step rather than one per frame.
+    public func setTextTimingInteractive(id: UUID, start: Double?, end: Double?) {
+        guard let index = textOverlays.firstIndex(where: { $0.id == id }) else { return }
+        applyTiming(at: index, start: start, end: end)
+        onChanged?()
+    }
+
+    private func applyTiming(at index: Int, start: Double?, end: Double?) {
+        textOverlays[index].startTime = start.map { max(0, $0) }
+        textOverlays[index].endTime = end.map { max(0, $0) }
+    }
+
     public func removeTextOverlay(id: UUID) {
         guard textOverlays.contains(where: { $0.id == id }) else { return }
         textOverlays.removeAll { $0.id == id }
@@ -320,6 +354,52 @@ public final class VideoEditorViewModel {
         guard stickerOverlays.contains(where: { $0.id == id }) else { return }
         stickerOverlays.removeAll { $0.id == id }
         record()
+    }
+
+    // MARK: - Timeline
+
+    /// Resolves any source duration not yet known. Cheap to call repeatedly: it
+    /// only touches assets missing from the cache, so the steady state is no work
+    /// at all. Returns whether anything actually landed, so a caller can skip a
+    /// redundant refresh.
+    @discardableResult
+    public func loadMissingSourceDurations() async -> Bool {
+        let missing = cells.compactMap(\.videoID).filter { sourceDurations[$0] == nil }
+        guard !missing.isEmpty else { return false }
+
+        var loaded: [UUID: Double] = [:]
+        for id in Set(missing) {
+            guard let asset = assets[id] else { continue }
+            // A source that will not load (a moved or deleted file) resolves to 0
+            // rather than throwing — the lane then shows nothing, which is honest,
+            // and the rest of the timeline still builds.
+            let seconds = (try? await asset.load(.duration).seconds) ?? 0
+            loaded[id] = seconds.isFinite ? max(0, seconds) : 0
+        }
+        guard !loaded.isEmpty else { return false }
+        sourceDurations.merge(loaded) { _, new in new }
+        return true
+    }
+
+    /// The timeline's view model, built from the current document. Synchronous by
+    /// design — it is rebuilt on every change — which is why the durations it
+    /// needs are cached rather than loaded here.
+    public func timelineModel(selectedTextID: UUID? = nil, isPlaying: Bool = false)
+        -> VideoTimelineModel {
+        var durationsByIndex: [Int: Double] = [:]
+        for (index, cell) in cells.enumerated() {
+            if let id = cell.videoID, let seconds = sourceDurations[id] {
+                durationsByIndex[index] = seconds
+            }
+        }
+        return VideoTimelineModelBuilder.make(
+            cells: cells,
+            sourceDurations: durationsByIndex,
+            textOverlays: textOverlays,
+            hasMusic: hasMusic,
+            selectedClipIndex: selectedIndex,
+            selectedTextID: selectedTextID,
+            isPlaying: isPlaying)
     }
 
     // MARK: - Composition bridge

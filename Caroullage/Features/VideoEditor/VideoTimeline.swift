@@ -623,6 +623,14 @@ public final class VideoTimeline: UIView {
 
     var heightForTesting: CGFloat { heightConstraint.constant }
 
+    /// The model this timeline was last given — so a test can assert what the
+    /// OWNER built and handed over, not just what happened to render.
+    var modelForTesting: VideoTimelineModel { model }
+
+    /// The playhead's time in seconds, as opposed to `playheadXForTesting`'s
+    /// rendered position.
+    var playheadTimeForTesting: Double { playheadTime }
+
     var expandedClipLaneCount: Int { expandedContent.clipBlockViews.count }
     var expandedTextPillCount: Int { expandedContent.textPillBlockViews.count }
 
