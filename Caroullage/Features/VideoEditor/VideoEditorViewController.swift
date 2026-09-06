@@ -262,10 +262,19 @@ final class VideoEditorViewController: UIViewController {
 
         // Task 7 wires this to the document (real clips/text pills/playhead).
         // Here it is present in the hierarchy — so Task 7 doesn't have to touch
-        // layout — but carries a static, empty model and stays collapsed; none
-        // of its callbacks (`onScrub`/`onTrim`/`onRetimeText`/`onSelectClip`/
+        // layout — but carries a static, empty model; none of its document
+        // callbacks (`onScrub`/`onTrim`/`onRetimeText`/`onSelectClip`/
         // `onSelectText`) are wired, so it cannot call into the view model.
+        //
+        // `onToggleState` IS wired: expand/collapse is a pure view-state toggle
+        // with no document behind it yet, and `chevronTapped()` only ever
+        // reports the flip — it never applies it itself (see that method) — so
+        // leaving this unwired would be exactly the "visible, tappable, inert"
+        // control trap the plan calls out, not a faithful "not wired yet".
         videoTimeline.setModel(VideoTimelineModel())
+        videoTimeline.onToggleState = { [weak self] newState in
+            self?.videoTimeline.setState(newState, animated: true)
+        }
 
         let tap = UITapGestureRecognizer(target: self, action: #selector(canvasTapped(_:)))
         canvasView.addGestureRecognizer(tap)
