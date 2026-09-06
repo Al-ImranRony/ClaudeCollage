@@ -291,7 +291,7 @@ final class VideoEditorViewController: UIViewController {
         }
         videoTimeline.onTogglePlayback = { [weak self] in self?.toggleTimelinePlayback() }
         videoTimeline.onScrub = { [weak self] time in self?.scrub(to: time) }
-        videoTimeline.onSelectClip = { [weak self] index in self?.selectClip(index) }
+        videoTimeline.onSelectClip = { [weak self] index in self?.selectClipFromTimeline(index) }
         videoTimeline.onSelectText = { [weak self] id in self?.selectTextOverlay(id) }
         videoTimeline.onTrim = { [weak self] index, start, end, phase in
             self?.trimFromTimeline(clipIndex: index, start: start, end: end, phase: phase)
@@ -773,6 +773,20 @@ final class VideoEditorViewController: UIViewController {
         }
     }
 
+    /// One tick of playback. Moves the same three things a scrub does, minus the
+    /// seek — the player is already there.
+    ///
+    /// `playheadTime` is updated, not just the canvas: it is what `refreshTimeline`
+    /// re-pushes, so leaving it behind would let any document change during
+    /// playback yank the timeline's playhead back to wherever the last scrub left
+    /// it. Driving only the canvas here also left the playhead and the
+    /// "0:00 / 0:08" readout frozen at the origin for the whole video.
+    private func playbackTimeAdvanced(to seconds: Double) {
+        playheadTime = seconds
+        canvasView.setPreviewTime(seconds)
+        videoTimeline.setPlayhead(seconds)
+    }
+
     /// `VideoTimeline.onScrub`. Moves the playhead NOW, on this run loop turn.
     ///
     /// The canvas is told directly rather than through `startObservingPlaybackTime`'s
@@ -794,6 +808,21 @@ final class VideoEditorViewController: UIViewController {
         player.seek(to: CMTime(seconds: clamped, preferredTimescale: 600),
                     toleranceBefore: .positiveInfinity,
                     toleranceAfter: .positiveInfinity) { _ in }
+    }
+
+    /// `VideoTimeline.onSelectClip`. Only a FILLED lane is selectable.
+    ///
+    /// Every tool the Clip group offers — Swap, Trim, Volume, Transition, Clear —
+    /// needs a clip to act on and no-ops without one, so selecting an empty slot
+    /// would raise five inert buttons. The canvas does not select an empty slot
+    /// either (`canvasTapped` offers to FILL it instead); it is not routed to the
+    /// picker from here because a timeline lane, unlike a canvas cell, gives no
+    /// spatial clue about which slot is about to be filled. Empty lanes stay
+    /// visible as composition context.
+    private func selectClipFromTimeline(_ index: Int) {
+        guard viewModel.cells.indices.contains(index),
+              viewModel.cells[index].videoID != nil else { return }
+        selectClip(index)
     }
 
     /// `VideoTimeline.onTrim`. A drag reports `.changed` throughout and
@@ -915,7 +944,7 @@ final class VideoEditorViewController: UIViewController {
                 // applies to a frame's presentation time (see `overlayForFrame`), so
                 // an in/out point landing exactly on a frame boundary can't
                 // disagree between preview and export.
-                self?.canvasView.setPreviewTime(time.seconds)
+                self?.playbackTimeAdvanced(to: time.seconds)
             }
         }
     }
@@ -1484,6 +1513,10 @@ final class VideoEditorViewController: UIViewController {
     /// asynchronously after a tolerant seek, so asserting on it would be a race;
     /// this is the value the seek was issued for.
     var lastSeekedTimeForTesting: Double? { playheadTime }
+
+    /// Drives one tick of `startObservingPlaybackTime`'s periodic observer, so a
+    /// test can assert what playback moves without waiting on a real player.
+    func simulatePlaybackTickForTesting(_ seconds: Double) { playbackTimeAdvanced(to: seconds) }
     var selectedTextIDForTesting: UUID? { selectedTextID }
     func selectClipForTesting(_ index: Int) { selectClip(index) }
     func selectTextOverlayForTesting(_ id: UUID) { selectTextOverlay(id) }

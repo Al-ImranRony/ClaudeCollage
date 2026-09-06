@@ -276,6 +276,86 @@ final class VideoEditorTimelineWiringTests: XCTestCase {
         XCTAssertEqual(editor.viewModelForTesting.cells[0].trim.end, 8, accuracy: 0.001)
     }
 
+    // MARK: - Real gestures, not just the callbacks
+    //
+    // The tests above call `onTrim` / `onRetimeText` directly, which proves the
+    // controller's handlers work but NOT that a real drag can reach them. These
+    // drive the actual gesture through the timeline the controller owns. That
+    // distinction is the whole ballgame here: `setModel` cancels an in-flight
+    // drag (Task 5's defence against acting on stale indices), and the
+    // controller's own refresh calls `setModel` — so the drag's first tick used
+    // to kill the drag that produced it.
+
+    private func expandedTimeline(in editor: VideoEditorViewController) throws -> VideoTimeline {
+        let tl = try timeline(in: editor)
+        tl.setState(.expanded, animated: false)
+        editor.view.layoutIfNeeded()
+        tl.layoutIfNeeded()
+        return tl
+    }
+
+    func testARealTrimDragMovesTheTrimAndCommitsExactlyOneUndoStep() throws {
+        let editor = makeEditor()
+        let vm = editor.viewModelForTesting
+        let tl = try expandedTimeline(in: editor)
+        let originalEnd = vm.cells[0].trim.end
+
+        let frame = try XCTUnwrap(tl.frameForClip(at: 0), "clip 0 must render a lane")
+        let edge = CGPoint(x: frame.maxX - 1, y: frame.midY)
+        tl.simulatePanBegan(at: edge)
+        tl.simulatePanChanged(at: CGPoint(x: edge.x - 40, y: frame.midY))
+        tl.simulatePanEnded(at: CGPoint(x: edge.x - 40, y: frame.midY))
+
+        XCTAssertLessThan(vm.cells[0].trim.end, originalEnd,
+                          "dragging the trailing edge left must actually shorten the clip — " +
+                          "the drag must survive the model refresh it causes")
+        let shortened = vm.cells[0].trim.end
+        vm.undo()
+        XCTAssertEqual(vm.cells[0].trim.end, originalEnd, accuracy: 0.001,
+                       "the whole drag must be exactly one undo step")
+        vm.redo()
+        XCTAssertEqual(vm.cells[0].trim.end, shortened, accuracy: 0.001)
+    }
+
+    func testARealTextPillDragRetimesTheOverlay() throws {
+        let editor = makeEditor()
+        let vm = editor.viewModelForTesting
+        let id = editor.addTextOverlayForTesting()
+        vm.setTextTiming(id: id, start: 2, end: 6)
+        let tl = try expandedTimeline(in: editor)
+
+        let frame = try XCTUnwrap(tl.frameForTextPill(id: id), "the caption must render a pill")
+        let edge = CGPoint(x: frame.minX + 1, y: frame.midY)
+        tl.simulatePanBegan(at: edge)
+        tl.simulatePanChanged(at: CGPoint(x: edge.x - 30, y: frame.midY))
+        tl.simulatePanEnded(at: CGPoint(x: edge.x - 30, y: frame.midY))
+
+        XCTAssertLessThan(vm.textOverlay(id: id)?.startTime ?? .infinity, 2,
+                          "dragging the pill's leading edge earlier must reach the document")
+    }
+
+    func testAForeignDocumentChangeStillCancelsAnInFlightDrag() throws {
+        // The other half of the contract: the drag must survive its OWN feedback
+        // but must still be abandoned when the thing it points at disappears.
+        let editor = makeEditor()
+        let vm = editor.viewModelForTesting
+        let tl = try expandedTimeline(in: editor)
+
+        let frame = try XCTUnwrap(tl.frameForClip(at: 0))
+        let edge = CGPoint(x: frame.maxX - 1, y: frame.midY)
+        tl.simulatePanBegan(at: edge)
+
+        // The clip the drag is holding is cleared out from under it.
+        vm.clearVideo(atCellIndex: 0)
+        let afterClear = vm.cells[0].trim
+
+        tl.simulatePanChanged(at: CGPoint(x: edge.x - 40, y: frame.midY))
+        tl.simulatePanEnded(at: CGPoint(x: edge.x - 40, y: frame.midY))
+
+        XCTAssertEqual(vm.cells[0].trim, afterClear,
+                       "a drag must not keep editing a clip the document no longer has")
+    }
+
     // MARK: - Text retiming
 
     func testDraggingATextPillRetimesTheOverlay() throws {
@@ -335,6 +415,34 @@ final class VideoEditorTimelineWiringTests: XCTestCase {
         XCTAssertEqual(tl.playheadTimeForTesting, 3, accuracy: 0.001)
     }
 
+    func testThePlayheadAdvancesWithPlaybackNotJustWithScrubbing() throws {
+        // The playhead is the timeline's primary feedback. Driving only the canvas
+        // from the periodic observer left it — and the "0:00 / 0:08" readout —
+        // frozen at the origin for the entire length of the video.
+        let editor = makeEditor()
+        let tl = try timeline(in: editor)
+
+        editor.simulatePlaybackTickForTesting(2.5)
+
+        XCTAssertEqual(tl.playheadTimeForTesting, 2.5, accuracy: 0.001,
+                       "the timeline must follow playback, not only a drag")
+        XCTAssertEqual(editor.canvasPreviewTimeForTesting, 2.5, accuracy: 0.001,
+                       "and the canvas must still be driven too")
+    }
+
+    func testAPlaybackTickSurvivesAModelRefresh() throws {
+        // `refreshTimeline` re-pushes the playhead it believes in; if playback
+        // ticks did not update that belief, any document change would yank the
+        // playhead back to where the last scrub left it.
+        let editor = makeEditor()
+        let tl = try timeline(in: editor)
+
+        editor.simulatePlaybackTickForTesting(3)
+        editor.viewModelForTesting.setLooping(true, forCellAt: 0)
+
+        XCTAssertEqual(tl.playheadTimeForTesting, 3, accuracy: 0.001)
+    }
+
     // MARK: - Selection from the timeline
 
     func testTappingALaneSelectsThatClipInTheEditor() throws {
@@ -346,6 +454,28 @@ final class VideoEditorTimelineWiringTests: XCTestCase {
         let rail = try XCTUnwrap(editor.view.subviews.compactMap { $0 as? EditorToolRail }.first)
         XCTAssertEqual(rail.visibleToolIdentifiers.first, "swapClipTool",
                        "selecting from the timeline must raise the same contextual group as the canvas")
+    }
+
+    func testTappingAnEmptyLaneRaisesNoClipToolsBecauseThereIsNothingToEdit() throws {
+        // The canvas does not select an empty slot either — it offers to fill it
+        // (`canvasTapped`). Selecting one here would raise Swap/Trim/Volume/
+        // Transition against a slot that has none of them: every one of those
+        // tools no-ops, which is the "visible, tappable, inert" trap this plan
+        // keeps finding.
+        let editor = makeEditor()   // cell 0 filled; 1...3 empty
+
+        try timeline(in: editor).onSelectClip?(1)
+
+        XCTAssertNil(editor.viewModelForTesting.selectedIndex)
+        let rail = try XCTUnwrap(editor.view.subviews.compactMap { $0 as? EditorToolRail }.first)
+        XCTAssertEqual(rail.visibleToolIdentifiers.first, "videoLayoutButton",
+                       "the rail must still be showing only its base tools")
+    }
+
+    func testTappingAFilledLaneStillSelectsIt() throws {
+        let editor = makeEditor()
+        try timeline(in: editor).onSelectClip?(0)
+        XCTAssertEqual(editor.viewModelForTesting.selectedIndex, 0)
     }
 
     func testTappingATextPillSelectsThatOverlay() throws {

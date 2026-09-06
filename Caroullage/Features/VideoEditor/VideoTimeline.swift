@@ -248,6 +248,25 @@ public final class VideoTimeline: UIView {
     /// the new model may not even have.
     private var activeDrag: ActiveDrag?
 
+    /// Whether `drag` still points at something the new model has. A trim needs a
+    /// lane that is still FILLED — an emptied slot keeps its lane (it is still a
+    /// slot you can fill) but has no trim left to drag.
+    private static func dragSurviving(
+        _ drag: ActiveDrag?, in newModel: VideoTimelineModel
+    ) -> ActiveDrag? {
+        switch drag {
+        case .none:
+            return nil
+        case .scrub:
+            // Scrubbing references no clip or caption, so nothing can invalidate it.
+            return drag
+        case .trimClip(let index, _, _, _):
+            return newModel.clips.contains { $0.index == index && $0.isFilled } ? drag : nil
+        case .retimeText(let id, _, _, _):
+            return newModel.textPills.contains { $0.id == id } ? drag : nil
+        }
+    }
+
     public override init(frame: CGRect) {
         super.init(frame: frame)
         backgroundColor = Theme.Color.surface
@@ -271,9 +290,26 @@ public final class VideoTimeline: UIView {
 
     // MARK: - Public API
 
+    /// Replaces the model. An in-flight drag SURVIVES this unless the thing it is
+    /// holding has gone.
+    ///
+    /// The distinction is load-bearing, and getting it wrong broke trimming
+    /// outright. This view renders a drag through its model — it never moves a
+    /// block itself — so the owner is *required* to feed each `onTrim` /
+    /// `onRetimeText` tick straight back here for the block to follow the finger.
+    /// Cancelling on every replacement therefore cancelled every drag on its own
+    /// first tick, and the `.committed` phase that ends it never arrived, so the
+    /// owner's edit was left uncommitted with no undo step.
+    ///
+    /// What the cancellation is actually FOR is a change that arrives from
+    /// somewhere else and invalidates what the drag captured at touch-down — the
+    /// clip deleted, the caption removed. That is an identity question, so it is
+    /// checked by identity. Deliberately NOT by geometry: a drag changes its own
+    /// target's duration on every tick, so validating that would cancel the drag
+    /// it is supposed to protect.
     public func setModel(_ newModel: VideoTimelineModel) {
         model = newModel
-        activeDrag = nil
+        activeDrag = Self.dragSurviving(activeDrag, in: newModel)
         collapsedContent.configure(model: model, playhead: playheadTime)
         expandedContent.configure(model: model, playhead: playheadTime)
         updatePlaybackIcon()
