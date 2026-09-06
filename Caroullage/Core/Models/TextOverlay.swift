@@ -44,6 +44,12 @@ public struct TextOverlay: Codable, Sendable, Equatable, Identifiable {
     public var isUnderlined: Bool
     /// How the text is presented over its background. See `TextStyle`.
     public var style: TextStyle
+    /// How the text enters/leaves its window. See `TextAnimation` — RESERVED,
+    /// nothing reads it yet. Stored as the raw string (like `alignmentRaw`, not
+    /// like `style`) so that a project saved by a future build that ships tier-3
+    /// animation opens here as `.none` AND keeps its value when this build
+    /// re-saves it. Read it through `animation`, which does the fallback.
+    public var animationRaw: String
     /// In-point in seconds. `nil` means "from the beginning" — the still-image
     /// paths ignore timing entirely, so this costs the photo editor nothing.
     /// Clamped to `max(0, …)` on init/decode when non-nil; `nil` itself is never
@@ -72,6 +78,7 @@ public struct TextOverlay: Codable, Sendable, Equatable, Identifiable {
         isItalic: Bool = false,
         isUnderlined: Bool = false,
         style: TextStyle = TextStyle(),
+        animation: TextAnimation = .none,
         startTime: Double? = nil,
         endTime: Double? = nil,
         frame: CGRect = .zero
@@ -89,6 +96,7 @@ public struct TextOverlay: Codable, Sendable, Equatable, Identifiable {
         self.isItalic = isItalic
         self.isUnderlined = isUnderlined
         self.style = style
+        self.animationRaw = animation.rawValue
         self.startTime = startTime.map { max(0, $0) }
         self.endTime = endTime.map { max(0, $0) }
         self.frameX = Double(frame.origin.x)
@@ -100,6 +108,13 @@ public struct TextOverlay: Codable, Sendable, Equatable, Identifiable {
     public var alignment: Alignment {
         get { Alignment(rawValue: alignmentRaw) ?? .center }
         set { alignmentRaw = newValue.rawValue }
+    }
+
+    /// A raw value this build does not recognise reads as `.none` rather than
+    /// throwing — `animationRaw` keeps it, so a newer build gets it back.
+    public var animation: TextAnimation {
+        get { TextAnimation(rawValue: animationRaw) ?? .none }
+        set { animationRaw = newValue.rawValue }
     }
 
     public var frame: CGRect {
@@ -122,6 +137,7 @@ public struct TextOverlay: Codable, Sendable, Equatable, Identifiable {
         case id, text, fontName, fontSize, colorHex, alignmentRaw
         case letterSpacing, lineHeight, opacity, isBold, isItalic, isUnderlined
         case style
+        case animationRaw
         case startTime, endTime
         case frameX, frameY, frameWidth, frameHeight
     }
@@ -142,6 +158,7 @@ public struct TextOverlay: Codable, Sendable, Equatable, Identifiable {
         self.isItalic = try c.decodeIfPresent(Bool.self, forKey: .isItalic) ?? fallback.isItalic
         self.isUnderlined = try c.decodeIfPresent(Bool.self, forKey: .isUnderlined) ?? fallback.isUnderlined
         self.style = try c.decodeIfPresent(TextStyle.self, forKey: .style) ?? fallback.style
+        self.animationRaw = try c.decodeIfPresent(String.self, forKey: .animationRaw) ?? fallback.animationRaw
         self.startTime = try c.decodeIfPresent(Double.self, forKey: .startTime).map { max(0, $0) }
         self.endTime = try c.decodeIfPresent(Double.self, forKey: .endTime).map { max(0, $0) }
         self.frameX = try c.decodeIfPresent(Double.self, forKey: .frameX) ?? fallback.frameX
