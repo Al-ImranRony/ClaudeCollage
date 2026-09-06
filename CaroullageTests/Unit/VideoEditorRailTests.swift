@@ -90,6 +90,39 @@ final class VideoEditorRailTests: XCTestCase {
         XCTAssertFalse(try panel(in: editor).isPresenting)
     }
 
+    // MARK: - Frame panel — Border slider undo (Fix 2)
+
+    func testDraggingTheBorderSliderThenReleasingRecordsExactlyOneUndoStep() throws {
+        // No pre-filled cell: `makeEditor()`'s default `setVideo` call would
+        // itself push an undo step, muddying the "exactly one step" assertions.
+        let editor = makeEditor(filledCellIndex: nil)
+        let vm = editor.viewModelForTesting
+        XCTAssertFalse(vm.canUndo, "Precondition: nothing to undo yet")
+
+        try rail(in: editor).simulateTap(toolID: "frame")
+        let slider = try XCTUnwrap(
+            panel(in: editor).recursiveSubviews.compactMap { $0 as? UISlider }.first,
+            "the Frame panel's Border slider")
+
+        // Simulate a drag: several mid-gesture ticks, then release.
+        for value: Float in [0.2, 0.5, 0.8, 1.0] {
+            slider.value = value
+            slider.sendActions(for: .valueChanged)
+        }
+        XCTAssertFalse(vm.canUndo, "mid-drag ticks must not each push an undo snapshot")
+        let widthDuringDrag = vm.borderWidth
+        XCTAssertGreaterThan(widthDuringDrag, 0, "the live value tracks the drag immediately")
+
+        slider.sendActions(for: .touchUpInside)
+
+        XCTAssertTrue(vm.canUndo, "releasing the slider must commit one undo step")
+        XCTAssertEqual(vm.borderWidth, widthDuringDrag, accuracy: 0.001)
+
+        vm.undo()
+        XCTAssertEqual(vm.borderWidth, 0, accuracy: 0.001, "undo reverts the whole drag in one step")
+        XCTAssertFalse(vm.canUndo, "exactly one step was recorded for the whole drag")
+    }
+
     // MARK: - Clip contextual group
 
     func testSelectingAClipInsertsTheClipToolsAheadOfTheDocumentTools() throws {
@@ -157,6 +190,50 @@ final class VideoEditorRailTests: XCTestCase {
              "videoAddStickerButton", "videoMusicButton"])
     }
 
+    func testClearingTheSelectedClipViaTheViewModelClearsTheModelsSelectionToo() throws {
+        // The bug: `revalidateSelection` retired the rail's contextual group and
+        // the panel, but never told the MODEL its selection had gone stale —
+        // `viewModel.selectedIndex` was left dangling at the cleared index.
+        let editor = makeEditor()
+        editor.selectClipForTesting(0)
+        XCTAssertEqual(editor.viewModelForTesting.selectedIndex, 0, "Precondition: clip 0 is selected")
+
+        editor.viewModelForTesting.clearVideo(atCellIndex: 0)
+
+        XCTAssertNil(editor.viewModelForTesting.selectedIndex,
+                     "revalidateSelection must clear viewModel.selectedIndex, not just the rail chrome")
+        XCTAssertEqual(
+            try rail(in: editor).visibleToolIdentifiers,
+            ["videoLayoutButton", "videoFrameTool", "videoAddTextButton",
+             "videoAddStickerButton", "videoMusicButton"],
+            "the rail returns to the base tools")
+    }
+
+    func testRefillingAClearedSlotDoesNotResurrectTheStaleSelectionOnTheCanvas() throws {
+        // The stronger regression: with the dangling `selectedIndex`, refilling
+        // the SAME slot makes `refreshCanvas`'s "in range and filled" check pass
+        // again, drawing an accent selection border around a cell the rail has
+        // no contextual group for at all — canvas and rail visibly disagree.
+        let editor = makeEditor()
+        editor.selectClipForTesting(0)
+
+        editor.viewModelForTesting.clearVideo(atCellIndex: 0)
+        editor.viewModelForTesting.setVideo(assetID: UUID(), asset: makeAsset(), forCellAt: 0)
+
+        XCTAssertNil(editor.viewModelForTesting.selectedIndex,
+                     "a refill must not resurrect a selection that was already invalidated")
+        let cellView = try XCTUnwrap(
+            editor.view.recursiveSubviews.first { $0.accessibilityIdentifier == "videoCell-0" },
+            "the canvas's chrome view for slot 0")
+        XCTAssertEqual(cellView.layer.borderWidth, 1,
+                       "must render as unselected (3pt accent border means selected)")
+        XCTAssertEqual(
+            try rail(in: editor).visibleToolIdentifiers,
+            ["videoLayoutButton", "videoFrameTool", "videoAddTextButton",
+             "videoAddStickerButton", "videoMusicButton"],
+            "the rail must show no contextual group, matching the canvas")
+    }
+
     func testUndoingThePlacementOfASelectedClipRevalidatesTheRail() throws {
         let editor = makeEditor(filledCellIndex: nil)
         editor.viewModelForTesting.setVideo(assetID: UUID(), asset: makeAsset(), forCellAt: 0)
@@ -166,6 +243,12 @@ final class VideoEditorRailTests: XCTestCase {
 
         editor.viewModelForTesting.undo()
 
+        // `apply(_:)` only nils `selectedIndex` when it's OUT of range, not when
+        // undo merely empties the cell it points at — this is the ordinary Undo
+        // button reaching the same dangling-selection bug as a direct
+        // `clearVideo` call.
+        XCTAssertNil(editor.viewModelForTesting.selectedIndex,
+                     "undo emptied the selected cell; the model's selection must not survive it")
         XCTAssertEqual(
             try rail(in: editor).visibleToolIdentifiers,
             ["videoLayoutButton", "videoFrameTool", "videoAddTextButton",

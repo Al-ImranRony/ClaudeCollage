@@ -489,12 +489,20 @@ final class VideoEditorViewController: UIViewController {
     /// when it belongs to that selection (`Self.selectionPanelToolIDs`).
     private func revalidateSelection() {
         var didClearSelection = false
+        // Tracked separately from `didClearSelection`: only the clip branch below
+        // needs to tell the MODEL its selection went stale (the text branch has
+        // no model-side selection of its own — `selectTextOverlay` already keeps
+        // `viewModel.selectedIndex` nil whenever a text overlay is selected).
+        var clipSelectionWentStale = false
 
         if activeContextKind == .clip {
             let stillFilled = viewModel.selectedIndex.map { index in
                 viewModel.cells.indices.contains(index) && viewModel.cells[index].videoID != nil
             } ?? false
-            if !stillFilled { didClearSelection = true }
+            if !stillFilled {
+                didClearSelection = true
+                clipSelectionWentStale = true
+            }
         }
         if let id = selectedTextID, viewModel.textOverlay(id: id) == nil {
             selectedTextID = nil
@@ -506,6 +514,23 @@ final class VideoEditorViewController: UIViewController {
         toolRail.setContext(nil)
         if let openToolID, Self.selectionPanelToolIDs.contains(openToolID) {
             closePanel()
+        }
+        // Fix 1: this used to retire the rail/panel chrome but leave
+        // `viewModel.selectedIndex` dangling at the stale index — `refreshCanvas`
+        // re-derives validity independently ("in range and filled"), so refilling
+        // the same slot later made the canvas resurrect a selection border the
+        // rail had already dropped all contextual tools for.
+        //
+        // This call MUST come after `activeContextKind = nil` above, not inside
+        // the `if activeContextKind == .clip` branch: `selectCell(at:)` fires
+        // `onChanged` synchronously, which re-enters this method before this
+        // call even returns. Placed here, that re-entrant pass reads
+        // `activeContextKind == nil`, fails the `.clip` check immediately, and
+        // returns — placed inside the branch above (still reading `.clip`, with
+        // `selectedIndex` already nil'd), it would call `selectCell(at: nil)`
+        // again forever.
+        if clipSelectionWentStale {
+            viewModel.selectCell(at: nil)
         }
     }
 
@@ -526,16 +551,17 @@ final class VideoEditorViewController: UIViewController {
     }
 
     @objc private func borderChanged() {
-        viewModel.borderWidth = CGFloat(borderSlider.value) * maxBorderWidth
-        // `borderWidth` isn't a model-owned undoable field (Task 6 doesn't
-        // extend `VideoEditorViewModel`), so nothing else refreshes the canvas
-        // for it — unlike every other control on this screen, which flows
-        // through an `*Interactive` setter and `viewModel.onChanged`.
-        refreshCanvas()
+        // Fix 2 (was a plan-level contradiction: Task 6's file list excluded
+        // this view model while asking it to mirror the collage editor's fully
+        // undoable border slider): now flows through the same
+        // `*Interactive` + `commitInteractive()` coalescing pattern as every
+        // other control on this screen, so `viewModel.onChanged` (refreshCanvas
+        // + rebuildComposition + revalidateSelection) fires on its own.
+        viewModel.setBorderWidthInteractive(CGFloat(borderSlider.value) * maxBorderWidth)
     }
 
     @objc private func borderReleased() {
-        rebuildComposition()
+        viewModel.commitInteractive()
     }
 
     // MARK: - Panel factories — Clip contextual group

@@ -32,6 +32,14 @@ public final class VideoEditorViewModel {
         public var layout: CollageLayout
         public var textOverlays: [TextOverlay] = []
         public var stickerOverlays: [StickerOverlay] = []
+        /// Added by the Fix 2 hardening pass: the Frame panel's Border slider used
+        /// to bypass `Snapshot` entirely (a plain settable property nothing ever
+        /// pushed onto the undo stack), making it the one edit in either editor
+        /// that undo couldn't reverse. `Snapshot` is never `Codable` — it is a
+        /// pure in-memory undo-stack element, never persisted — so this needs no
+        /// `decodeIfPresent` fallback the way `VideoProjectData.borderWidth`
+        /// (the actually-persisted field) does.
+        public var borderWidth: CGFloat = 0
     }
 
     public let projectID: UUID
@@ -46,7 +54,9 @@ public final class VideoEditorViewModel {
     public private(set) var stickerOverlays: [StickerOverlay] = []
     public private(set) var selectedIndex: Int?
     /// Gap between cells, in canvas pixels (mirrors the grid editor's border).
-    public var borderWidth: CGFloat
+    /// Settable only through `setBorderWidthInteractive` + `commitInteractive()`
+    /// (or `restore`) now that it rides the undo stack — see `Snapshot.borderWidth`.
+    public private(set) var borderWidth: CGFloat
 
     /// Decoded sources, kept out of the persisted state. Never evicted, so undoing
     /// a delete restores a playable cell rather than an empty one.
@@ -198,6 +208,17 @@ public final class VideoEditorViewModel {
 
     public func setTransitionInteractive(_ transition: CellTransition?, forCellAt index: Int) {
         mutateInteractive(index) { $0.transition = transition }
+    }
+
+    /// Live border-width drag from the Frame panel. Mirrors
+    /// `GridEditorViewModel.previewBorderWidth`: updates the live value + fires
+    /// `onChanged` for the preview, but records NO undo step — `commitInteractive()`
+    /// on release coalesces the whole drag into one. The caller (the Frame panel's
+    /// slider, 0…1 scaled by its own canvas-derived ceiling) is responsible for
+    /// clamping to a sane range; this only guards against a negative width.
+    public func setBorderWidthInteractive(_ width: CGFloat) {
+        borderWidth = max(0, width)
+        onChanged?()
     }
 
     /// Per-cell pan/zoom framing (interactive — pinch/pan gestures). `zoom` clamps to
@@ -476,6 +497,7 @@ public final class VideoEditorViewModel {
         layout = snapshot.layout
         textOverlays = snapshot.textOverlays
         stickerOverlays = snapshot.stickerOverlays
+        borderWidth = snapshot.borderWidth
         if let selected = selectedIndex, selected >= cells.count { selectedIndex = nil }
         onChanged?()
         onCommit?(self)
@@ -483,7 +505,8 @@ public final class VideoEditorViewModel {
 
     private func currentSnapshot() -> Snapshot {
         Snapshot(cells: cells, music: music, layout: layout,
-                 textOverlays: textOverlays, stickerOverlays: stickerOverlays)
+                 textOverlays: textOverlays, stickerOverlays: stickerOverlays,
+                 borderWidth: borderWidth)
     }
 
     private func record() {
