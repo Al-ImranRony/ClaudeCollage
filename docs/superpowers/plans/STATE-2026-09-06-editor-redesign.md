@@ -4,7 +4,7 @@ Resume point for the two-plan editor redesign. Everything below is committed on
 branch `editor-chrome-redesign` in the worktree
 `/Users/irony/Claude/Projects/ClaudeCollage/.claude/worktrees/editor-chrome-redesign`.
 
-Working tree is clean. **62 commits** ahead of `dev`.
+Working tree is clean. **64 commits** ahead of `dev`.
 
 ---
 
@@ -15,7 +15,7 @@ Working tree is clean. **62 commits** ahead of `dev`.
 | Status | **Complete, 11 / 11** | **9 / 10 implemented** |
 | Doc | `2026-09-05-editor-chrome-and-collage-editor.md` | `2026-09-06-video-editor-timeline-and-timed-text.md` |
 
-**Unit suite: 949 tests, 0 failures.** UI suite last run green on the four suites the
+**Unit suite: 955 tests, 0 failures.** UI suite last run green on the four suites the
 redesign touched (19/19); a full UI run has not been done since Plan 2 began.
 
 ### Plan 2 task status
@@ -29,37 +29,71 @@ redesign touched (19/19); a full UI run has not been done since Plan 2 began.
 | 5 · `VideoTimeline` view | ✅ done, reviewed, API defects fixed (edit phase, selection, play) |
 | 6 · Video editor adopts chrome | ✅ done, spec + quality reviewed, 2 Critical playback bugs fixed, control coverage added |
 | 7 · Wire timeline to document | ✅ done, reviewed, 3 defects fixed (drag death, frozen playhead, inert lanes) |
-| 8 · Timing panel | ✅ done, not yet quality-reviewed |
-| 9 · `startOffset` | ✅ done, not yet quality-reviewed |
-| 10 · UI test updates | ⬜ **next** |
+| 8 · Timing panel | ✅ done, reviewed |
+| 9 · `startOffset` | ✅ done, reviewed, now reachable from the timeline |
+| 10 · UI test updates | 🔄 in progress |
 
 ---
 
 ## Tomorrow's queue, in order
 
-**1. Quality review Tasks 8 and 9.** Neither has been reviewed; the review has found a defect
-in every Plan 2 task so far, including two Criticals in Task 7. Base `59844d9`, head `0e0e054`.
-Worth pointing it at specifically:
-- **Task 8's steppers are controller-owned and reused across opens.** `timingPanelOverlayID` is
-  cleared by `revalidateSelection`, but is that the only path that can strand them? What about
-  switching selection from one caption straight to another with the panel open?
-- **`timingCeiling` falls back to 60s** on an empty document. Arbitrary. Does anything downstream
-  care, and what happens when the composition later turns out to be shorter than a window
-  already typed against that 60?
-- **Task 9 has no UI.** `startOffset` is settable on the view model and honoured by the engine,
-  but nothing on screen sets it — the timeline shows every clip starting at zero
-  (`VideoTimelineModelBuilder` hardcodes `start: 0`). Is shipping the engine half alone right, or
-  does the lane need to move too?
-- **Looping + offset**: a looping cell now fills offset → end. Confirm that is what a user
-  expects rather than "loop for my own length, then stop".
-- whether `compositionDuration`'s two overloads are a trap — the `cellDurations:` one is still
-  correct only when no cell has an offset, and nothing enforces that.
+**1. Task 10** — update the UI tests the redesign moved (in progress).
 
-**2. Task 10** — update the UI tests the redesign moved.
-
-**3. After Task 10, before the branch merges: extract `EditorPanelPresenter`.** See "Cross-editor
+**2. After Task 10, before the branch merges: extract `EditorPanelPresenter`.** See "Cross-editor
 duplication" under the Task 6 review below — a definite recommendation, deliberately sequenced
 after the video editor stops changing.
+
+---
+
+## Tasks 8 and 9 quality review — done 2026-09-06
+
+Reviewing Task 9's offsets surfaced a **Critical that had been in Task 7 since it landed**.
+
+**1. Critical — timeline trimming destroyed the source in-point.** A lane is drawn in
+COMPOSITION time and begins at the clip's entry; the trim it edits is in SOURCE time. Passing
+the lane's numbers straight through as a `VideoTrim` rewrote the in-point to the lane's origin,
+so a clip taken from the middle of its footage **jumped back to the head** the instant its
+out-point was touched.
+
+Only one edge moves per drag, so each is now converted against the OTHER, which the drag leaves
+alone: trailing keeps the in-point (`trim.start + newDuration`), leading keeps the out-point
+(`trim.end - newDuration`). Anchoring on the fixed edge is also what stops a drag **compounding**
+— every tick recomputes from a value that tick cannot have changed. The result is clamped to the
+SOURCE length, which the timeline's own composition-duration clamp says nothing about.
+
+**Why Task 7's tests missed it:** every one of them trimmed a clip that already started at 0,
+where the bug is invisible. Same shape as the drag-death defect — the test set up the one case
+the bug does not reach.
+
+**2. High — the timeline drew every clip at zero regardless of `startOffset`.** Once Task 9
+landed, the timeline actively misrepresented the composition it is a picture of. Lanes now start
+at their offset and the ruler spans the last clip to END rather than the longest one.
+
+**This also answers "Task 9 has no UI".** Dragging a lane's leading edge now moves the clip's
+entry, which is both what an NLE does and what the block's left edge means. Without it the block
+would snap back to its old start on the next refresh and appear to move its right edge instead.
+`startOffset` is reachable, not dead weight.
+
+**3. Medium — `compositionDuration(cellDurations:)` was a trap, and is gone.** It took the plain
+maximum, correct only while every cell starts together, and after fix (2) had no callers left.
+Deleted rather than deprecated: a silently-wrong-with-offsets function sitting beside the right
+one invites a future caller to pick it.
+
+**4. Low — the Timing panel's overlay id is now cleared in `closePanel`**, so the invariant is
+local to the panel's lifetime rather than spread across every caller that can change the
+selection. No live defect: `EditorPanel.hide` detaches the steppers, so a stranded id was inert.
+
+### Answers to the other queued questions
+
+- **Stranded steppers: not reachable.** Every path that changes the selection closes the panel,
+  and hiding it detaches the controls. Hardened anyway (4) because the invariant was non-local.
+- **`timingCeiling`'s 60s fallback is arbitrary but harmless.** It only applies when there is no
+  composition at all. If a window is typed against it and a shorter clip is added later, the
+  stepper clamps what it SHOWS on the next open, and the next edit writes the clamped pair —
+  silently truncating an out-point that was already past the end of the composition. Judged
+  correct rather than sharp: an out-point beyond the composition means nothing.
+- **Looping + offset** fills offset → end of collage, which matches "loop until the collage
+  finishes". Pinned by a test.
 
 ---
 
