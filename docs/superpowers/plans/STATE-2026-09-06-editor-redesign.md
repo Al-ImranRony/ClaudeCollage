@@ -4,7 +4,7 @@ Resume point for the two-plan editor redesign. Everything below is committed on
 branch `editor-chrome-redesign` in the worktree
 `/Users/irony/Claude/Projects/ClaudeCollage/.claude/worktrees/editor-chrome-redesign`.
 
-Working tree is clean. **55 commits** ahead of `dev`.
+Working tree is clean. **57 commits** ahead of `dev`.
 
 ---
 
@@ -12,10 +12,10 @@ Working tree is clean. **55 commits** ahead of `dev`.
 
 | | Plan 1 — chrome + collage editor | Plan 2 — video timeline + timed text |
 |---|---|---|
-| Status | **Complete, 11 / 11** | **6 / 10 implemented** |
+| Status | **Complete, 11 / 11** | **7 / 10 implemented** |
 | Doc | `2026-09-05-editor-chrome-and-collage-editor.md` | `2026-09-06-video-editor-timeline-and-timed-text.md` |
 
-**Unit suite: 884 tests, 0 failures.** UI suite last run green on the four suites the
+**Unit suite: 919 tests, 0 failures.** UI suite last run green on the four suites the
 redesign touched (19/19); a full UI run has not been done since Plan 2 began.
 
 ### Plan 2 task status
@@ -28,8 +28,8 @@ redesign touched (19/19); a full UI run has not been done since Plan 2 began.
 | 4 · `VideoTimelineGeometry` | ✅ done, reviewed, coverage gaps closed |
 | 5 · `VideoTimeline` view | ✅ done, reviewed, API defects fixed (edit phase, selection, play) |
 | 6 · Video editor adopts chrome | ✅ done, spec + quality reviewed, 2 Critical playback bugs fixed, control coverage added |
-| 7 · Wire timeline to document | ⬜ **next** |
-| 8 · Timing panel | ⬜ |
+| 7 · Wire timeline to document | ✅ done, not yet quality-reviewed |
+| 8 · Timing panel | ⬜ **next** |
 | 9 · `startOffset` | ⬜ (deliberately last; droppable) |
 | 10 · UI test updates | ⬜ |
 
@@ -37,25 +37,81 @@ redesign touched (19/19); a full UI run has not been done since Plan 2 began.
 
 ## Tomorrow's queue, in order
 
-**1. `TextOverlay.animation`** — owner confirmed 2026-09-06: **add it.**
-- Reserved field per spec §4.1, defaulted `.none`, nothing reads it yet.
-- Must decode with a `decodeIfPresent` fallback like every other field on this type, so existing
-  saved projects are unaffected — `TextStyle` and the Task 1 timing fields are the pattern.
-- Do **not** wire any rendering. Tier-3 animation (fade / slide / pop / typewriter) is its own
-  spec; both render paths are already per-frame, so it will be a change to two call sites rather
-  than a migration.
-- Test: round-trips; a snapshot written **without** the key decodes to `.none`; an unknown raw
-  value from a future build falls back rather than throwing (the `TextStyle.Kind` precedent).
-- Watch the raw-string trap: use `##"..."##`, since a single-hash raw string self-terminates on
-  the `"#` inside a hex colour.
+**1. Task 7 quality review.** Base `2e612e1`, head `db83b8a`. Not yet reviewed — every
+other Plan 2 task has been, and the review has found a defect in every one. Ask it to judge
+specifically:
+- **the duration cache.** `sourceDurations` is keyed by `videoID` and never evicted, matching
+  `assets`. Is "never evicted" right here, and can a cell's asset be REPLACED under the same
+  id (Swap) such that a stale duration survives?
+- **`refreshTimeline` runs inside `refreshCanvas`,** so it fires on every interactive tick of
+  every drag — including the border slider. Is rebuilding the whole model that often a real
+  cost, and does `setModel` mid-drag risk the "replacing the model mid-drag cancels the drag"
+  path `VideoTimelineViewTests` already pins?
+- **the scrub seek's tolerance.** Infinite in both directions with no exact seek on
+  `.committed` — the plan's note says the commit is what should land the precise frame, and
+  it currently does not. Does that matter for Task 8's numeric timing?
+- **`playheadTime` never advances during playback.** It moves on a scrub, but the periodic
+  observer drives `canvasView.setPreviewTime` without touching it, so the timeline's playhead
+  sits still while the video plays. Deliberate scope or a gap?
+- whether the empty-cell lanes (a 4-up layout with one clip shows three empty lanes) read as
+  useful or as noise.
 
-**2. Task 7** — wire the timeline to the document. Plan lines 914 onward.
+**2. Task 8** — the Timing panel. Plan lines ~990 onward. Note it replaces
+`TimingStubPanelView`, which Task 6 left as a deliberate placeholder.
 
-**3. Tasks 8, 9, 10** — timing panel, `startOffset` (last, droppable), UI test updates.
+**3. Tasks 9, 10** — `startOffset` (last, droppable), UI test updates.
 
 **4. After Task 10, before the branch merges: extract `EditorPanelPresenter`.** See "Cross-editor
 duplication" under the Task 6 review below — a definite recommendation, deliberately sequenced
 after the video editor stops changing.
+
+---
+
+## Task 7 — done 2026-09-06
+
+Timeline wired to the document. `VideoTimelineModelBuilder` is pure and separate from both the
+view and the view model, so lane arithmetic is testable with no screen attached.
+
+**Two conventions worth not re-deriving:**
+
+- A lane's length is its **trimmed** length, never the source's — the lane's edges ARE the trim
+  handles, so a disagreement would make a block jump before it moved.
+- **Every clip starts at zero.** A video collage plays its cells simultaneously in separate
+  regions of one canvas; it is not a sequential edit. `Clip.start` exists for Task 9's
+  `startOffset` and is otherwise always 0.
+
+**Durations are async, lanes are not.** An unset trim (`end == 0`, "to the end") only becomes a
+real length once the source's duration is known. `VideoEditorViewModel` now caches those by
+`videoID` and `loadMissingSourceDurations()` fills them after each rebuild. Until a load lands
+the lane reports **zero** rather than inventing a length.
+
+**Scrubbing bypasses the periodic observer**, as the carried-forward note required — the canvas
+is told directly and synchronously, because a seek while paused is not guaranteed to reach
+`addPeriodicTimeObserver`. The seek is tolerant in both directions (an exact seek per drag tick
+decodes far more than it needs to).
+
+`videoTimelineModel` is gone. The model is derived from the document on every change; the one
+piece that is not — whether the user asked for playback — is now an explicit `isPlayingIntent`.
+
+**Plan deviation, deliberate:** the plan said append to `VideoTimelineTests.swift`. That file is
+the timeline VIEW's own suite; these tests are the controller/view-model seam and live in
+`VideoEditorTimelineTests.swift`, beside `VideoEditorRailTests`.
+
+**Every wiring test was verified to fail against a deliberately broken version** (scrub not
+reaching the canvas; a trim recording per tick instead of coalescing; the retime callback not
+connected at all) before being kept.
+
+---
+
+## `TextOverlay.animation` — done 2026-09-06
+
+The reserved field is in, defaulted `.none`, nothing reading it. Two tests pin that "nothing
+reads it" so a render path wired ahead of the tier-3 spec fails here rather than shipping quietly.
+
+Stored as `animationRaw` (the `alignmentRaw` precedent on this same type) rather than as a
+decoded enum like `style`. That matters for a field whose whole purpose is forward
+compatibility: a project written by a build that ships tier 3 opens here as `.none`, and
+re-saving it here does **not** downgrade the user's choice for the build that understands it.
 
 ---
 
