@@ -4,7 +4,7 @@ Resume point for the two-plan editor redesign. Everything below is committed on
 branch `editor-chrome-redesign` in the worktree
 `/Users/irony/Claude/Projects/ClaudeCollage/.claude/worktrees/editor-chrome-redesign`.
 
-Working tree is clean. **57 commits** ahead of `dev`.
+Working tree is clean. **59 commits** ahead of `dev`.
 
 ---
 
@@ -15,7 +15,7 @@ Working tree is clean. **57 commits** ahead of `dev`.
 | Status | **Complete, 11 / 11** | **7 / 10 implemented** |
 | Doc | `2026-09-05-editor-chrome-and-collage-editor.md` | `2026-09-06-video-editor-timeline-and-timed-text.md` |
 
-**Unit suite: 919 tests, 0 failures.** UI suite last run green on the four suites the
+**Unit suite: 926 tests, 0 failures.** UI suite last run green on the four suites the
 redesign touched (19/19); a full UI run has not been done since Plan 2 began.
 
 ### Plan 2 task status
@@ -28,7 +28,7 @@ redesign touched (19/19); a full UI run has not been done since Plan 2 began.
 | 4 · `VideoTimelineGeometry` | ✅ done, reviewed, coverage gaps closed |
 | 5 · `VideoTimeline` view | ✅ done, reviewed, API defects fixed (edit phase, selection, play) |
 | 6 · Video editor adopts chrome | ✅ done, spec + quality reviewed, 2 Critical playback bugs fixed, control coverage added |
-| 7 · Wire timeline to document | ✅ done, not yet quality-reviewed |
+| 7 · Wire timeline to document | ✅ done, reviewed, 3 defects fixed (drag death, frozen playhead, inert lanes) |
 | 8 · Timing panel | ⬜ **next** |
 | 9 · `startOffset` | ⬜ (deliberately last; droppable) |
 | 10 · UI test updates | ⬜ |
@@ -37,33 +37,73 @@ redesign touched (19/19); a full UI run has not been done since Plan 2 began.
 
 ## Tomorrow's queue, in order
 
-**1. Task 7 quality review.** Base `2e612e1`, head `db83b8a`. Not yet reviewed — every
-other Plan 2 task has been, and the review has found a defect in every one. Ask it to judge
-specifically:
-- **the duration cache.** `sourceDurations` is keyed by `videoID` and never evicted, matching
-  `assets`. Is "never evicted" right here, and can a cell's asset be REPLACED under the same
-  id (Swap) such that a stale duration survives?
-- **`refreshTimeline` runs inside `refreshCanvas`,** so it fires on every interactive tick of
-  every drag — including the border slider. Is rebuilding the whole model that often a real
-  cost, and does `setModel` mid-drag risk the "replacing the model mid-drag cancels the drag"
-  path `VideoTimelineViewTests` already pins?
-- **the scrub seek's tolerance.** Infinite in both directions with no exact seek on
-  `.committed` — the plan's note says the commit is what should land the precise frame, and
-  it currently does not. Does that matter for Task 8's numeric timing?
-- **`playheadTime` never advances during playback.** It moves on a scrub, but the periodic
-  observer drives `canvasView.setPreviewTime` without touching it, so the timeline's playhead
-  sits still while the video plays. Deliberate scope or a gap?
-- whether the empty-cell lanes (a 4-up layout with one clip shows three empty lanes) read as
-  useful or as noise.
-
-**2. Task 8** — the Timing panel. Plan lines ~990 onward. Note it replaces
+**1. Task 8** — the Timing panel. Plan lines ~990 onward. Note it replaces
 `TimingStubPanelView`, which Task 6 left as a deliberate placeholder.
 
-**3. Tasks 9, 10** — `startOffset` (last, droppable), UI test updates.
+**2. Tasks 9, 10** — `startOffset` (last, droppable), UI test updates.
 
-**4. After Task 10, before the branch merges: extract `EditorPanelPresenter`.** See "Cross-editor
+**3. After Task 10, before the branch merges: extract `EditorPanelPresenter`.** See "Cross-editor
 duplication" under the Task 6 review below — a definite recommendation, deliberately sequenced
 after the video editor stops changing.
+
+---
+
+## Task 7 quality review — done 2026-09-06
+
+Three defects, two visible on the first interaction with the feature.
+
+**1. Critical — trimming and retiming did not work at all through a real gesture.**
+`VideoTimeline` renders a drag *through its model*; it never moves a block itself. So the owner
+is REQUIRED to feed each `onTrim` tick back via `setModel` for the block to follow the finger —
+but `setModel` cancelled any in-flight drag (Task 5's defence against acting on stale indices).
+Every drag therefore killed itself on its own first tick, `.committed` never arrived,
+`commitInteractive()` never ran, and the edit was left applied **with no undo step** — undo
+jumped past it to the start of the session.
+
+The cancellation's real purpose is a change arriving from *elsewhere* that invalidates what the
+drag captured. That is an identity question and is now checked by identity (clip index still
+present and filled / pill id still present). Deliberately NOT by geometry: a drag changes its own
+target's duration every tick, so validating that would cancel the drag it exists to protect.
+Task 5's own `testReplacingTheModelMidDrag…` still passes.
+
+**Why Task 7's tests missed it:** they called `onTrim` / `onRetimeText` directly. That proves the
+handlers work but not that a real drag can reach them — the exact "test seam bypasses the broken
+path" signature this run keeps hitting. Replaced with real gestures driven through the hosted
+timeline; those failed before the fix.
+
+**2. High — the playhead never moved during playback.** The periodic observer drove only the
+canvas, so the timeline's playhead and its `0:00 / 0:08` readout sat frozen at the origin for the
+whole video. Both now go through one `playbackTimeAdvanced(to:)`, which also updates the time
+`refreshTimeline` re-pushes — otherwise any document change mid-playback yanked the playhead back
+to wherever the last scrub left it.
+
+**3. Medium — tapping an EMPTY lane raised five inert buttons.** It selected the slot, showing
+Swap/Trim/Volume/Transition against a cell that has none of them; every one no-ops. The canvas
+does not select an empty slot either. Only filled lanes are selectable now.
+
+### Answers to the other queued questions
+
+- **The duration cache is safe.** Every pick calls `setVideo(assetID: UUID(), …)` with a FRESH
+  id, so a Swap can never resolve to a stale duration under a reused key. It grows unboundedly
+  (an orphan Double per swap), which matches `assets`' own deliberate never-evict policy and
+  costs nothing.
+- **`refreshTimeline`'s frequency is not a problem — it is now a requirement.** Since the drag
+  renders through the model, the per-tick `setModel` is what makes trimming visible at all.
+  Rebuilding is O(cells + overlays) over value types.
+- **The scrub seek stays tolerant, and there is no exact seek to finish it** — because `onScrub`
+  carries no phase, so the owner cannot tell a mid-drag tick from the last one. Left as is:
+  **Task 8 should decide**, since it is numeric caption timing that would actually feel a frame
+  of error. The fix without an API change is a short debounced exact seek after scrubbing settles.
+
+### One limitation reported, deliberately NOT fixed
+
+**A clip cannot be lengthened from the timeline, only shortened.** The trailing-edge clamp is
+`model.duration`, which IS the longest clip's duration — so the longest clip (and any single
+clip) can never grow. This is not a stray clamp: the ruler spans the composition, so the position
+representing "longer than the composition" is physically off the right edge. Fixing it means
+deciding what the ruler spans (composition, or the longest available SOURCE), which is a design
+call, not a review's. The Trim panel's sliders do carry the full source range, so the capability
+exists — it is the two surfaces disagreeing that makes this worth an owner decision.
 
 ---
 
