@@ -41,13 +41,19 @@
 //  ruler — stays chrome (ink). `VideoTimelineModel.selectedClipIndex` /
 //  `selectedTextID` are what let indigo mark a choice at all.
 //
-//  Scope deliberately left out of this task: the design lists a play control in
-//  the collapsed strip, but nothing in the given API reports it (no callback,
-//  and no "isPlaying" field on the model to render its icon from), and every
-//  other listed element maps cleanly onto setModel/setPlayhead/onToggleState.
-//  Rather than ship a control with nowhere to report through — the exact
-//  "controls that are not wired" trap this plan calls out — it is left out
-//  here; VideoEditorViewController already owns a transport play button.
+//  Plan-defect fix: the approved design shows a play control with a time
+//  readout (`▶ 0:03.1`) in the collapsed strip's header, but the original API
+//  this file shipped against had no callback for it and no `isPlaying` field
+//  on the model to render its icon from — the exact "control with nowhere to
+//  report through" trap this codebase's other fixes call out, so it was left
+//  unbuilt rather than shipped inert. Both gaps are now closed:
+//  `VideoTimelineModel.isPlaying` drives the icon and `onTogglePlayback`
+//  reports a tap, exactly like every other control here — this view still
+//  never decides whether playback starts or stops, it only asks. The button
+//  sits in the header, left of the time readout, matching the design; it
+//  keeps the pre-existing `videoPlayButton` accessibility identifier so the
+//  UI suite that already knew that name keeps finding it.
+//
 //  Likewise the collapsed strip only scrubs (its 32pt-tall summary track is too
 //  small for reliable per-clip taps); selecting a clip or a text pill, and
 //  trimming/retiming, are expanded-lanes-only interactions.
@@ -96,6 +102,11 @@ public struct VideoTimelineModel: Equatable, Sendable {
     public var selectedClipIndex: Int?
     /// The text pill currently shown selected (Task 6's "Text selected" group).
     public var selectedTextID: UUID?
+    /// Whether the composition is currently playing. The owner (the screen that
+    /// actually holds the `AVPlayer`) is the single source of truth for this —
+    /// this view only ever reads it, to choose the collapsed strip's play/pause
+    /// icon; see `VideoTimeline.onTogglePlayback`.
+    public var isPlaying: Bool
 
     public init(
         duration: Double = 0,
@@ -103,7 +114,8 @@ public struct VideoTimelineModel: Equatable, Sendable {
         textPills: [TextPill] = [],
         musicTitle: String? = nil,
         selectedClipIndex: Int? = nil,
-        selectedTextID: UUID? = nil
+        selectedTextID: UUID? = nil,
+        isPlaying: Bool = false
     ) {
         self.duration = duration
         self.clips = clips
@@ -111,6 +123,7 @@ public struct VideoTimelineModel: Equatable, Sendable {
         self.musicTitle = musicTitle
         self.selectedClipIndex = selectedClipIndex
         self.selectedTextID = selectedTextID
+        self.isPlaying = isPlaying
     }
 }
 
@@ -165,6 +178,11 @@ public final class VideoTimeline: UIView {
 
     public var onScrub: ((Double) -> Void)?
     public var onToggleState: ((State) -> Void)?
+    /// Fired when the header's play/pause control is tapped. This view never
+    /// decides whether that means "start" or "stop" — it just reports the tap,
+    /// exactly like `onToggleState` reports a chevron tap without applying it;
+    /// the owner flips its player and calls `setModel` with the new `isPlaying`.
+    public var onTogglePlayback: (() -> Void)?
     public var onSelectClip: ((Int) -> Void)?
     public var onSelectText: ((UUID) -> Void)?
     public var onTrim: ((_ clipIndex: Int, _ start: Double, _ end: Double, _ phase: EditPhase) -> Void)?
@@ -175,6 +193,7 @@ public final class VideoTimeline: UIView {
 
     private static let headerHeight: CGFloat = 24
     private static let chevronWidth: CGFloat = 32
+    private static let playbackButtonWidth: CGFloat = 32
     /// Touch slop for grabbing a clip/pill's edge to trim/retime rather than
     /// its middle to select. `Theme.Spacing.sm` rather than a bespoke literal.
     /// This is a ceiling, not a fixed value — `edgeTolerance(for:)` scales it
@@ -194,6 +213,8 @@ public final class VideoTimeline: UIView {
     private let timeLabel = UILabel()
     private let chevronButton = UIControl()
     private let chevronImageView = UIImageView()
+    private let playbackButton = UIControl()
+    private let playbackImageView = UIImageView()
 
     private let contentHost = UIView()
     private let collapsedContent = CollapsedStripView()
@@ -241,6 +262,7 @@ public final class VideoTimeline: UIView {
         addGestureRecognizer(tapGesture)
 
         updateChevron()
+        updatePlaybackIcon()
         updateReadouts()
     }
 
@@ -254,6 +276,7 @@ public final class VideoTimeline: UIView {
         activeDrag = nil
         collapsedContent.configure(model: model, playhead: playheadTime)
         expandedContent.configure(model: model, playhead: playheadTime)
+        updatePlaybackIcon()
         updateReadouts()
         setNeedsLayout()
     }
@@ -296,6 +319,22 @@ public final class VideoTimeline: UIView {
         headerRow.translatesAutoresizingMaskIntoConstraints = false
         addSubview(headerRow)
 
+        // Left of the time readout, matching the approved design's
+        // `▶ 0:03.1` header — see the class header's plan-defect note.
+        playbackImageView.tintColor = Theme.Color.textSecondary
+        playbackImageView.contentMode = .center
+        playbackImageView.isUserInteractionEnabled = false
+        playbackImageView.translatesAutoresizingMaskIntoConstraints = false
+        playbackButton.addSubview(playbackImageView)
+
+        // The pre-existing identifier from the old transport play button —
+        // restoring it keeps the control discoverable to the UI suite without
+        // that suite having to learn a new name.
+        playbackButton.accessibilityIdentifier = "videoPlayButton"
+        playbackButton.addTarget(self, action: #selector(playbackTapped), for: .touchUpInside)
+        playbackButton.translatesAutoresizingMaskIntoConstraints = false
+        headerRow.addSubview(playbackButton)
+
         timeLabel.font = Theme.Typography.caption
         timeLabel.textColor = Theme.Color.textSecondary
         timeLabel.translatesAutoresizingMaskIntoConstraints = false
@@ -327,7 +366,21 @@ public final class VideoTimeline: UIView {
             headerRow.trailingAnchor.constraint(equalTo: trailingAnchor),
             headerRow.heightAnchor.constraint(equalToConstant: Self.headerHeight),
 
-            timeLabel.leadingAnchor.constraint(equalTo: headerRow.leadingAnchor, constant: Theme.Spacing.md),
+            // Same reasoning as the chevron button below: the image is centred
+            // within the button, but the button itself is pinned top/bottom to
+            // a non-zero-height ancestor (headerRow) and given an explicit
+            // width — its hit-testable bounds never depend on the image
+            // view's intrinsic size.
+            playbackImageView.centerXAnchor.constraint(equalTo: playbackButton.centerXAnchor),
+            playbackImageView.topAnchor.constraint(equalTo: playbackButton.topAnchor),
+            playbackImageView.bottomAnchor.constraint(equalTo: playbackButton.bottomAnchor),
+
+            playbackButton.leadingAnchor.constraint(equalTo: headerRow.leadingAnchor, constant: Theme.Spacing.xs),
+            playbackButton.topAnchor.constraint(equalTo: headerRow.topAnchor),
+            playbackButton.bottomAnchor.constraint(equalTo: headerRow.bottomAnchor),
+            playbackButton.widthAnchor.constraint(equalToConstant: Self.playbackButtonWidth),
+
+            timeLabel.leadingAnchor.constraint(equalTo: playbackButton.trailingAnchor, constant: Theme.Spacing.xs),
             timeLabel.centerYAnchor.constraint(equalTo: headerRow.centerYAnchor),
 
             // The image is centred within the button, but the button itself is
@@ -371,6 +424,21 @@ public final class VideoTimeline: UIView {
         let symbol = state == .collapsed ? "chevron.down" : "chevron.up"
         chevronImageView.image = UIImage(systemName: symbol)
         chevronButton.accessibilityLabel = state == .collapsed ? "Expand timeline" : "Collapse timeline"
+    }
+
+    /// Only ever reports the tap — like `chevronTapped` above, this view never
+    /// applies the toggle itself. The owner flips its player and calls back
+    /// into `setModel` with the resulting `isPlaying`, which is what
+    /// `updatePlaybackIcon` actually renders.
+    @objc private func playbackTapped() {
+        Haptics.tap()
+        onTogglePlayback?()
+    }
+
+    private func updatePlaybackIcon() {
+        let symbol = model.isPlaying ? "pause.fill" : "play.fill"
+        playbackImageView.image = UIImage(systemName: symbol)
+        playbackButton.accessibilityLabel = model.isPlaying ? "Pause" : "Play"
     }
 
     private func updateReadouts() {
@@ -544,6 +612,14 @@ public final class VideoTimeline: UIView {
     var chevronButtonForHitTesting: UIControl { chevronButton }
 
     func simulateChevronTap() { chevronButton.sendActions(for: .touchUpInside) }
+
+    /// The play/pause control itself. Exposed only so tests can inspect real
+    /// geometry and hit-testing, and read the icon's current accessibility
+    /// label — production code has no need to reach past `onTogglePlayback`.
+    /// Mirrors `chevronButtonForHitTesting` above.
+    var playbackButtonForHitTesting: UIControl { playbackButton }
+
+    func simulatePlaybackTap() { playbackButton.sendActions(for: .touchUpInside) }
 
     var heightForTesting: CGFloat { heightConstraint.constant }
 

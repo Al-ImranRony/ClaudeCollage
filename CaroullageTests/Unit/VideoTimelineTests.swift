@@ -250,6 +250,76 @@ final class VideoTimelineViewTests: XCTestCase {
                      "zero size and draws fine but cannot be tapped.")
     }
 
+    // MARK: - Playback control (plan-defect fix: restores play/pause)
+
+    func testTappingThePlaybackControlReportsThroughOnTogglePlayback() {
+        let timeline = makeTimeline()
+        var toggled = false
+        timeline.onTogglePlayback = { toggled = true }
+
+        timeline.simulatePlaybackTap()
+
+        XCTAssertTrue(toggled)
+    }
+
+    func testTappingThePlaybackControlDoesNotChangeItsOwnIcon() {
+        // Same split as the chevron: the view only ever reports the tap, it
+        // never applies the toggle itself — the icon only moves via setModel.
+        let timeline = makeTimeline()
+        timeline.onTogglePlayback = {}
+        XCTAssertEqual(timeline.playbackButtonForHitTesting.accessibilityLabel, "Play")
+
+        timeline.simulatePlaybackTap()
+
+        XCTAssertEqual(timeline.playbackButtonForHitTesting.accessibilityLabel, "Play",
+                       "setModel was never called back, so the icon must not have moved")
+    }
+
+    func testThePlaybackControlShowsPlayWhenTheModelIsNotPlaying() {
+        let timeline = makeTimeline()
+        var model = VideoTimelineModel(duration: 10)
+        model.isPlaying = false
+
+        timeline.setModel(model)
+
+        XCTAssertEqual(timeline.playbackButtonForHitTesting.accessibilityLabel, "Play")
+    }
+
+    func testThePlaybackControlShowsPauseWhenTheModelIsPlaying() {
+        let timeline = makeTimeline()
+        var model = VideoTimelineModel(duration: 10)
+        model.isPlaying = true
+
+        timeline.setModel(model)
+
+        XCTAssertEqual(timeline.playbackButtonForHitTesting.accessibilityLabel, "Pause")
+    }
+
+    func testThePlaybackControlKeepsTheVideoPlayButtonIdentifier() {
+        // The old transport Play button's identifier — restoring it keeps the
+        // control discoverable to the UI suite under the same name.
+        let timeline = makeTimeline()
+        XCTAssertEqual(timeline.playbackButtonForHitTesting.accessibilityIdentifier, "videoPlayButton")
+    }
+
+    // MARK: - The playback control's hit target (same regression class as the chevron)
+
+    func testThePlaybackControlHasARealHitTarget() {
+        let timeline = makeTimeline()
+        let playback = timeline.playbackButtonForHitTesting
+
+        XCTAssertGreaterThan(playback.bounds.width, 0, "Playback control must derive a real width")
+        XCTAssertGreaterThan(playback.bounds.height, 0, "Playback control must derive a real height")
+
+        let centre = playback.convert(CGPoint(x: playback.bounds.midX, y: playback.bounds.midY), to: timeline)
+        let hit = timeline.hitTest(centre, with: nil)
+
+        XCTAssertTrue(hit?.isDescendant(of: playback) ?? false,
+                     "Hit-testing the playback control's visual centre must reach the control itself, " +
+                     "not a parent view — a control pinned only by center anchors resolves to " +
+                     "zero size and draws fine but cannot be tapped.")
+    }
+
     // MARK: - setModel / lanes
 
     func testSetModelWithThreeClipsProducesThreeLanesWhenExpanded() {
