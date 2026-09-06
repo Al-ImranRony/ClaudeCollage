@@ -2,7 +2,9 @@
 //  VideoEditorViewController.swift
 //  Caroullage
 //
-//  Step 04 slice 5b — the video collage editor.
+//  Step 04 slice 5b — the video collage editor. Task 6 rebuilt it on the shared
+//  editor chrome (`EditorStage` / `EditorToolRail` / `EditorPanel`), mirroring
+//  `GridEditorViewController`'s structure rather than inventing a parallel one.
 //
 //  UIKit (the plan's requirement) because the canvas is an `AVPlayerLayer`. The
 //  screen is deliberately thin: it owns chrome, gestures and presentation, while
@@ -14,10 +16,28 @@
 //  background music all play exactly as they will export. The composition is
 //  rebuilt (debounced) whenever the model changes.
 //
+//  Plan-defect fix: Task 6 dropped the manual Play/Pause transport entirely —
+//  the preview played continuously (and loops, via `loopPlaybackForever`) with
+//  nothing left to pause it anywhere on screen. `VideoTimeline`'s collapsed
+//  strip now owns that control instead of a toolbar button (`onTogglePlayback`
+//  + `VideoTimelineModel.isPlaying`, both added by that same fix) — `play()`/
+//  `pause()` are only ever called through `setPlaying(_:)` below, the single
+//  place that keeps the timeline's icon and the player's actual state from
+//  drifting apart. This also matters for Task 7: scrubbing a timeline to place
+//  a caption needs a frame that holds still, which a video with no way to
+//  pause it cannot offer.
+//
+//  `VideoTimeline` (Task 5) sits between the stage and the panel, but wiring it
+//  to the document beyond play/pause is Task 7 — here it carries a static,
+//  empty model (playback state aside) and never calls into the view model;
+//  see `setupLayout` below.
+//
 //  v1 deviations (documented): cell content is placed by tapping a slot rather than
-//  dragging clips in; trim uses sliders over a thumbnail strip (see
-//  VideoCellControlsSheet); export renders at the canvas size (already 1080-based)
-//  rather than rescaling to the platform preset's pixel size.
+//  dragging clips in; the Trim/Volume/Transition contextual panels use plain
+//  sliders/toggles rather than reproducing `VideoCellControlsSheet`'s draggable
+//  filmstrip — that full sheet stays reachable as the Trim panel's "More Options"
+//  destination; export renders at the canvas size (already 1080-based) rather
+//  than rescaling to the platform preset's pixel size.
 //
 
 import AVFoundation
@@ -30,8 +50,26 @@ final class VideoEditorViewController: UIViewController {
     private let viewModel: VideoEditorViewModel
 
     private let canvasView = VideoCanvasView()
+    private let stage = EditorStage()
+    private let toolRail = EditorToolRail()
+    private let toolPanel = EditorPanel()
+    private let videoTimeline = VideoTimeline()
+    /// Whether the user has asked for playback — the INTENT, written only by
+    /// `setPlaying(_:)`. Everything else in the timeline's model is derived from
+    /// the document by `refreshTimeline()`, but this is the screen's own state:
+    /// it is what the play/pause icon shows, what a composition rebuild resumes
+    /// against, and what stops a late end-of-item notification restarting a
+    /// video the user deliberately paused. Deliberately NOT a re-read of
+    /// `player.timeControlStatus`, which is transient — see `rebuildComposition`.
+    private var isPlayingIntent = false
+    /// Where the playhead sits, in seconds. Moved by a scrub or a seek; shown by
+    /// the timeline and used to decide which timed captions are on screen.
+    private var playheadTime: Double = 0
+    /// Owns the panel's open/close/animate sequence and the constraint trap that
+    /// goes with it — shared with the collage editor. Lazy because it needs
+    /// `view`, which exists by the time `setupLayout` runs.
+    private lazy var panels = EditorPanelPresenter(panel: toolPanel, rail: toolRail, host: view)
     private let player = AVPlayer()
-    private let emptyHintLabel = UILabel()
 
     /// Retains the PHPicker delegate for the life of a pick.
     private var videoPicker: VideoSourcePicker?
@@ -39,6 +77,12 @@ final class VideoEditorViewController: UIViewController {
     private var pendingCellIndex: Int?
     /// Coalesces composition rebuilds while sliders are being dragged.
     private var rebuildTask: Task<Void, Never>?
+    /// Drives the canvas's timed-text visibility from playback — see
+    /// `startObservingPlaybackTime`. Removed in `viewDidDisappear` once the VC has
+    /// truly left (not merely covered by a modal), so it can't outlive the screen
+    /// and keep `player` (and this VC) alive. Deliberately NOT torn down in
+    /// `viewWillDisappear` — see that method's comment.
+    private var timeObserver: Any?
     /// `nonisolated(unsafe)` so `deinit` (which is nonisolated) can unregister it.
     /// Only ever assigned once, on the main actor, in `viewDidLoad`.
     private nonisolated(unsafe) var didFinishObserver: (any NSObjectProtocol)?
@@ -49,9 +93,85 @@ final class VideoEditorViewController: UIViewController {
     private lazy var redoItem = UIBarButtonItem(
         image: UIImage(systemName: "arrow.uturn.forward"),
         style: .plain, target: self, action: #selector(redoTapped))
-    private lazy var playItem = UIBarButtonItem(
-        image: UIImage(systemName: "play.fill"),
-        style: .plain, target: self, action: #selector(playTapped))
+
+    // MARK: - Tool rail / panel / selection state
+
+    private enum ContextKind { case clip, text }
+    /// Which contextual group the rail is currently showing, if any.
+    ///
+    /// `.clip` is the load-bearing case: it is tracked separately from
+    /// `viewModel.selectedIndex` because the two can legitimately disagree —
+    /// an undo can restore a snapshot whose `selectedIndex` is nil while the
+    /// rail is still showing Clip tools, and only this flag notices. It is also
+    /// what makes `revalidateSelection` re-entrancy-safe (see its comment about
+    /// `selectCell(at:)` firing `onChanged` synchronously).
+    ///
+    /// `.text` is currently only WRITTEN, never read: text selection is tracked
+    /// entirely by `selectedTextID`, which is the VC's own state and so cannot
+    /// drift the way the model-owned clip selection can. It is kept as a case
+    /// rather than collapsing this to a `Bool` because it names the state
+    /// honestly at every assignment site, and Task 8's timing panel is the
+    /// obvious first reader.
+    private var activeContextKind: ContextKind?
+    /// The selected text overlay. Unlike clip selection (`viewModel.selectedIndex`,
+    /// owned by the model), the video model has no notion of a selected overlay,
+    /// so — like `GridEditorViewController.selectedTextID` — this is purely the
+    /// VC's own UI state.
+    private var selectedTextID: UUID?
+    /// The currently-selected sticker (for its selection chrome). Not undoable state.
+    private var selectedStickerID: UUID?
+
+    /// Tool ids whose panel exists ONLY because of a live selection — as opposed
+    /// to a base/document panel like Frame. `revalidateSelection` closes only
+    /// these when the selection they belong to goes stale; a Frame panel left
+    /// open alongside an unrelated selection must survive untouched (mirrors
+    /// `GridEditorViewController.revalidateSelection`'s doc comment).
+    private static let selectionPanelToolIDs: Set<EditorTool.ID> =
+        ["trim", "volume", "transition", "styleText", "timingText"]
+
+    private static let clipTools: [EditorTool] = [
+        EditorTool(id: "swap", title: "Swap", systemImage: "arrow.left.arrow.right",
+                   accessibilityIdentifier: "swapClipTool"),
+        EditorTool(id: "trim", title: "Trim", systemImage: "scissors",
+                   accessibilityIdentifier: "trimClipTool"),
+        EditorTool(id: "volume", title: "Volume", systemImage: "speaker.wave.2",
+                   accessibilityIdentifier: "volumeClipTool"),
+        EditorTool(id: "transition", title: "Transition", systemImage: "wand.and.rays",
+                   accessibilityIdentifier: "transitionClipTool"),
+        EditorTool(id: "clear", title: "Clear", systemImage: "trash",
+                   accessibilityIdentifier: "clearClipTool"),
+    ]
+
+    private static let textTools: [EditorTool] = [
+        EditorTool(id: "editText", title: "Edit", systemImage: "keyboard",
+                   accessibilityIdentifier: "editTextTool"),
+        EditorTool(id: "styleText", title: "Style", systemImage: "textformat",
+                   accessibilityIdentifier: "styleTextTool"),
+        EditorTool(id: "timingText", title: "Timing", systemImage: "clock",
+                   accessibilityIdentifier: "timingTextTool"),
+        EditorTool(id: "deleteText", title: "Delete", systemImage: "trash",
+                   accessibilityIdentifier: "deleteTextTool"),
+    ]
+
+    // Owned here (not recreated per panel-open) so `setupRail` can wire each
+    // control's target/action exactly once — mirrors
+    // `GridEditorViewController.borderSlider`/`cornerSlider`.
+    private let borderSlider = UISlider()
+    private let trimStartSlider = UISlider()
+    private let trimEndSlider = UISlider()
+    private let loopSwitch = UISwitch()
+    private let volumeSlider = UISlider()
+    private let muteSwitch = UISwitch()
+    private let transitionDurationSlider = UISlider()
+    private let textInStepper = UIStepper()
+    private let textOutStepper = UIStepper()
+    private let textInValueLabel = UILabel()
+    private let textOutValueLabel = UILabel()
+    /// Which overlay the open Timing panel is editing. The steppers are owned
+    /// here and reused across opens, so their handlers need to know who they are
+    /// pointed at — and must go inert rather than retime the wrong caption when
+    /// the selection moves out from under an open panel.
+    private var timingPanelOverlayID: UUID?
 
     // MARK: - Init
 
@@ -75,25 +195,37 @@ final class VideoEditorViewController: UIViewController {
         view.backgroundColor = Theme.Color.background
         navigationItem.largeTitleDisplayMode = .never
         setupNavigationBar()
-        setupToolbar()
         setupLayout()
+        setupRail()
         bindViewModel()
         loopPlaybackForever()
         canvasView.player = player
+        startObservingPlaybackTime()
         refreshCanvas()
         rebuildComposition()
     }
 
-    override func viewWillAppear(_ animated: Bool) {
-        super.viewWillAppear(animated)
-        navigationController?.setToolbarHidden(false, animated: false)
-    }
-
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
-        player.pause()
-        if isMovingFromParent {
-            navigationController?.setToolbarHidden(true, animated: animated)
+        setPlaying(false)
+    }
+
+    override func viewDidDisappear(_ animated: Bool) {
+        super.viewDidDisappear(animated)
+        // `isMovingFromParent` turns true as soon as a pop TRANSITION BEGINS —
+        // including the system interactive back-swipe — not only once it
+        // commits. `viewWillDisappear` above sees the same flag, so tearing the
+        // observer down there would drop it for a swipe the user cancels (the VC
+        // is never popped and stays on screen, with nothing left to re-arm it —
+        // frozen caption timing for the rest of that screen's life). This method,
+        // by contrast, only fires once the transition has actually completed: a
+        // cancelled swipe instead replays `viewWillAppear`/`viewDidAppear` on this
+        // VC and never reaches here. So `isMovingFromParent` read here means the
+        // pop genuinely went through, and a retained periodic time observer keeps
+        // `player` (and this VC) alive past that point unless removed.
+        if isMovingFromParent, let timeObserver {
+            player.removeTimeObserver(timeObserver)
+            self.timeObserver = nil
         }
     }
 
@@ -112,69 +244,66 @@ final class VideoEditorViewController: UIViewController {
         navigationItem.rightBarButtonItems = [export, redoItem, undoItem]
     }
 
-    private func setupToolbar() {
-        let layout = UIBarButtonItem(
-            image: UIImage(systemName: "square.grid.2x2"),
-            style: .plain, target: self, action: #selector(layoutTapped))
-        layout.accessibilityIdentifier = "videoLayoutButton"
-        layout.accessibilityLabel = "Layout"
-
-        let music = UIBarButtonItem(
-            image: UIImage(systemName: "music.note"),
-            style: .plain, target: self, action: #selector(musicTapped))
-        music.accessibilityIdentifier = "videoMusicButton"
-        music.accessibilityLabel = "Music"
-
-        playItem.accessibilityIdentifier = "videoPlayButton"
-        playItem.accessibilityLabel = "Play"
-
-        let flex = UIBarButtonItem(systemItem: .flexibleSpace)
-        toolbarItems = [layout, flex, playItem, flex, music]
-    }
-
     private func setupLayout() {
-        canvasView.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(canvasView)
+        view.backgroundColor = Theme.Color.background
 
-        emptyHintLabel.text = "Tap a slot to add a video"
-        emptyHintLabel.font = Theme.Typography.caption
-        emptyHintLabel.textColor = Theme.Color.textSecondary
-        emptyHintLabel.textAlignment = .center
-        emptyHintLabel.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(emptyHintLabel)
+        stage.setContent(canvasView)
+        stage.setCanvasAspect(viewModel.canvasSize)
 
-        let addBar = makeAddOverlayBar()
-        view.addSubview(addBar)
-
-        let aspect = viewModel.canvasSize.height > 0
-            ? viewModel.canvasSize.width / viewModel.canvasSize.height : 1
+        stage.translatesAutoresizingMaskIntoConstraints = false
+        videoTimeline.translatesAutoresizingMaskIntoConstraints = false
+        toolPanel.translatesAutoresizingMaskIntoConstraints = false
+        toolRail.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(stage)
+        view.addSubview(videoTimeline)
+        view.addSubview(toolPanel)
+        view.addSubview(toolRail)
 
         NSLayoutConstraint.activate([
-            canvasView.centerYAnchor.constraint(equalTo: view.safeAreaLayoutGuide.centerYAnchor, constant: -28),
-            canvasView.leadingAnchor.constraint(greaterThanOrEqualTo: view.leadingAnchor, constant: 16),
-            canvasView.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -16),
-            canvasView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            canvasView.topAnchor.constraint(greaterThanOrEqualTo: view.safeAreaLayoutGuide.topAnchor, constant: 16),
-            canvasView.widthAnchor.constraint(equalTo: canvasView.heightAnchor, multiplier: aspect),
+            stage.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            stage.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            stage.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            stage.bottomAnchor.constraint(equalTo: videoTimeline.topAnchor),
 
-            emptyHintLabel.topAnchor.constraint(equalTo: canvasView.bottomAnchor, constant: 10),
-            emptyHintLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            videoTimeline.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            videoTimeline.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            videoTimeline.bottomAnchor.constraint(equalTo: toolPanel.topAnchor),
 
-            addBar.topAnchor.constraint(equalTo: emptyHintLabel.bottomAnchor, constant: 10),
-            addBar.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
-            addBar.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
+            toolPanel.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            toolPanel.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            toolPanel.bottomAnchor.constraint(equalTo: toolRail.topAnchor),
+            panels.collapsedHeightConstraint,
+
+            toolRail.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            toolRail.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            // The REAL bottom, not the safe-area bottom — the tab bar is hidden
+            // while an editor is pushed (mirrors GridEditorViewController).
+            toolRail.bottomAnchor.constraint(equalTo: view.bottomAnchor),
         ])
-        // Prefer a large canvas but let the aspect constraint win.
-        let width = canvasView.widthAnchor.constraint(equalTo: view.widthAnchor, constant: -32)
-        width.priority = .defaultHigh
-        width.isActive = true
+
+        // The timeline only ever REPORTS; every decision is made here. That is
+        // true of the two view-state toggles (expand/collapse, play/pause) and of
+        // the four document callbacks below — see each handler.
+        videoTimeline.onToggleState = { [weak self] newState in
+            self?.videoTimeline.setState(newState, animated: true)
+        }
+        videoTimeline.onTogglePlayback = { [weak self] in self?.toggleTimelinePlayback() }
+        videoTimeline.onScrub = { [weak self] time in self?.scrub(to: time) }
+        videoTimeline.onSelectClip = { [weak self] index in self?.selectClipFromTimeline(index) }
+        videoTimeline.onSelectText = { [weak self] id in self?.selectTextOverlay(id) }
+        videoTimeline.onTrim = { [weak self] index, start, end, phase in
+            self?.trimFromTimeline(clipIndex: index, start: start, end: end, phase: phase)
+        }
+        videoTimeline.onRetimeText = { [weak self] id, start, end, phase in
+            self?.retimeTextFromTimeline(id: id, start: start, end: end, phase: phase)
+        }
+        refreshTimeline()
 
         let tap = UITapGestureRecognizer(target: self, action: #selector(canvasTapped(_:)))
         canvasView.addGestureRecognizer(tap)
 
-        // Pinch to zoom, two-finger… actually one-finger pan to reposition the
-        // SELECTED filled cell's clip within its frame (a single tap on the cell
-        // opens its controls, so pan needs two fingers to avoid conflicting).
+        // Pinch/two-finger-pan to adjust the SELECTED filled cell's framing
+        // within its slot (a single tap selects the cell instead).
         let pinch = UIPinchGestureRecognizer(target: self, action: #selector(canvasPinched(_:)))
         pinch.delegate = self
         canvasView.addGestureRecognizer(pinch)
@@ -186,15 +315,501 @@ final class VideoEditorViewController: UIViewController {
         canvasView.isUserInteractionEnabled = true
     }
 
+    // MARK: - Tool rail
+
+    private func setupRail() {
+        // Wired once here — `make*Panel` factories below only set values/ranges
+        // on these same instances, they never re-add targets. Mirrors
+        // `GridEditorViewController.setupRail`'s border/corner sliders.
+        borderSlider.addTarget(self, action: #selector(borderChanged), for: .valueChanged)
+        borderSlider.addTarget(self, action: #selector(borderReleased),
+                               for: [.touchUpInside, .touchUpOutside, .touchCancel])
+        trimStartSlider.addTarget(self, action: #selector(trimStartChanged), for: .valueChanged)
+        trimStartSlider.addTarget(self, action: #selector(trimReleased),
+                                  for: [.touchUpInside, .touchUpOutside, .touchCancel])
+        trimEndSlider.addTarget(self, action: #selector(trimEndChanged), for: .valueChanged)
+        trimEndSlider.addTarget(self, action: #selector(trimReleased),
+                                for: [.touchUpInside, .touchUpOutside, .touchCancel])
+        loopSwitch.addTarget(self, action: #selector(loopToggled), for: .valueChanged)
+        volumeSlider.addTarget(self, action: #selector(volumeChanged), for: .valueChanged)
+        volumeSlider.addTarget(self, action: #selector(volumeReleased),
+                               for: [.touchUpInside, .touchUpOutside, .touchCancel])
+        muteSwitch.addTarget(self, action: #selector(muteToggled), for: .valueChanged)
+        transitionDurationSlider.addTarget(self, action: #selector(transitionDurationChanged), for: .valueChanged)
+        transitionDurationSlider.addTarget(self, action: #selector(transitionDurationReleased),
+                                           for: [.touchUpInside, .touchUpOutside, .touchCancel])
+        textInStepper.addTarget(self, action: #selector(textInChanged), for: .valueChanged)
+        textOutStepper.addTarget(self, action: #selector(textOutChanged), for: .valueChanged)
+
+        toolRail.setBaseTools([
+            EditorTool(id: "layout", title: "Layout", systemImage: "square.grid.2x2",
+                       accessibilityIdentifier: "videoLayoutButton"),
+            EditorTool(id: "frame", title: "Frame", systemImage: "square.dashed",
+                       accessibilityIdentifier: "videoFrameTool"),
+            // Identifiers preserved from the old pill buttons / toolbar so
+            // VideoEditorUITests keeps matching.
+            EditorTool(id: "text", title: "Text", systemImage: "textformat",
+                       accessibilityIdentifier: "videoAddTextButton"),
+            EditorTool(id: "sticker", title: "Sticker", systemImage: "face.smiling",
+                       accessibilityIdentifier: "videoAddStickerButton"),
+            EditorTool(id: "audio", title: "Audio", systemImage: "music.note",
+                       accessibilityIdentifier: "videoMusicButton"),
+        ])
+
+        toolRail.onSelect = { [weak self] in self?.toolTapped($0) }
+        toolRail.onDismissContext = { [weak self] in self?.clearSelection() }
+        // NOT `toolPanel.onClose` — the presenter owns that, so assigning it here
+        // would route the panel's own close button around it. This fires after
+        // every close, however it was triggered.
+        panels.onClose = { [weak self] in
+            // The Timing steppers are owned by this controller and outlive the
+            // panel that shows them, so the id they act on is cleared whenever
+            // that panel goes — the invariant is "valid exactly while the panel
+            // is open", not "until someone remembers to reset it".
+            self?.timingPanelOverlayID = nil
+        }
+    }
+
+    private func toolTapped(_ id: EditorTool.ID) {
+        // Tapping the open tool again closes it and gives the canvas its height back.
+        guard id != panels.openToolID else { return closePanel() }
+
+        switch id {
+        case "layout":      layoutTapped()
+        case "frame":       openPanel(makeFramePanel(), title: "Frame", id: id)
+        case "text":        addTextTapped()
+        case "sticker":     addStickerTapped()
+        case "audio":       musicTapped()
+        case "swap":
+            viewModel.selectedIndex.map { presentVideoPicker(for: $0) }
+        case "trim":
+            viewModel.selectedIndex.map { presentTrimPanel(for: $0) }
+        case "volume":
+            if let index = viewModel.selectedIndex {
+                openPanel(makeVolumePanel(for: index), title: "Volume", id: id)
+            }
+        case "transition":
+            if let index = viewModel.selectedIndex {
+                openPanel(makeTransitionPanel(for: index), title: "Transition", id: id)
+            }
+        case "clear":
+            if let index = viewModel.selectedIndex {
+                viewModel.clearVideo(atCellIndex: index)
+                clearSelection()
+            }
+        case "editText":
+            selectedTextID.map { presentTextStyleSheet(for: $0) }
+        case "styleText":
+            if let textID = selectedTextID {
+                openPanel(makeTextStylePanel(for: textID), title: "Style", id: id)
+            }
+        case "timingText":
+            if let textID = selectedTextID {
+                openPanel(makeTextTimingPanel(for: textID), title: "Timing", id: id)
+            }
+        case "deleteText":
+            if let textID = selectedTextID {
+                viewModel.removeTextOverlay(id: textID)
+                clearSelection()
+            }
+        default: break
+        }
+    }
+
+    private func openPanel(_ content: UIView, title: String, id: EditorTool.ID) {
+        panels.open(content, title: title, id: id)
+    }
+
+    private func closePanel() { panels.close() }
+
+    // MARK: - Selection context
+
+    /// Selects a FILLED clip, inserting the Clip contextual tools ahead of the
+    /// base tools. Mirrors `GridEditorViewController.selectCell`.
+    private func selectClip(_ index: Int) {
+        selectedTextID = nil
+        activeContextKind = .clip
+        // A fresh selection retires whatever panel was open for the PREVIOUS
+        // context, exactly like the grid editor's `selectCell` — see its doc
+        // comment for why closing first (rather than after `setContext`) keeps
+        // `openToolID` / the rail highlight / `isPresenting` in lockstep.
+        closePanel()
+        viewModel.selectCell(at: index)
+        Haptics.selectionChanged()
+        toolRail.setContext(EditorRailContext(
+            chipTitle: "Clip", chipSystemImage: "film", tools: Self.clipTools))
+    }
+
+    private func selectTextOverlay(_ id: UUID) {
+        selectedTextID = id
+        activeContextKind = .text
+        closePanel()
+        // The model has no notion of a selected clip alongside a selected text
+        // overlay; routing through `selectCell(at: nil)` (rather than leaving a
+        // stale `viewModel.selectedIndex` behind) also fires `onChanged`, which
+        // is what makes `refreshCanvas` pick up the freshly-set `selectedTextID`
+        // and show the new overlay's on-canvas selection chrome immediately.
+        viewModel.selectCell(at: nil)
+        Haptics.selectionChanged()
+        toolRail.setContext(EditorRailContext(
+            chipTitle: "Text", chipSystemImage: "textformat", tools: Self.textTools))
+    }
+
+    private func clearSelection() {
+        selectedTextID = nil
+        activeContextKind = nil
+        viewModel.selectCell(at: nil)
+        clearContext()
+    }
+
+    private func clearContext() {
+        toolRail.setContext(nil)
+        closePanel()
+    }
+
+    /// Re-validates the rail's contextual group against the current document
+    /// whenever it changes underneath it — wired into `viewModel.onChanged`
+    /// below, the single choke point every discrete edit funnels through.
+    ///
+    /// Deliberately NOT `clearSelection()`: a Frame panel opened alongside a
+    /// live clip selection must survive a selection that goes stale (mirrors
+    /// `GridEditorViewController.revalidateSelection`'s doc comment about the
+    /// grid editor's Frame/Layout/Background panels). This only tears down the
+    /// contextual group that actually went stale, and only closes the panel
+    /// when it belongs to that selection (`Self.selectionPanelToolIDs`).
+    private func revalidateSelection() {
+        var didClearSelection = false
+        // Tracked separately from `didClearSelection`: only the clip branch below
+        // needs to tell the MODEL its selection went stale (the text branch has
+        // no model-side selection of its own — `selectTextOverlay` already keeps
+        // `viewModel.selectedIndex` nil whenever a text overlay is selected).
+        var clipSelectionWentStale = false
+
+        if activeContextKind == .clip {
+            let stillFilled = viewModel.selectedIndex.map { index in
+                viewModel.cells.indices.contains(index) && viewModel.cells[index].videoID != nil
+            } ?? false
+            if !stillFilled {
+                didClearSelection = true
+                clipSelectionWentStale = true
+            }
+        }
+        if let id = selectedTextID, viewModel.textOverlay(id: id) == nil {
+            selectedTextID = nil
+            didClearSelection = true
+        }
+        guard didClearSelection else { return }
+
+        activeContextKind = nil
+        toolRail.setContext(nil)
+        if let openToolID = panels.openToolID, Self.selectionPanelToolIDs.contains(openToolID) {
+            closePanel()
+        }
+
+        // Fix 1: this used to retire the rail/panel chrome but leave
+        // `viewModel.selectedIndex` dangling at the stale index — `refreshCanvas`
+        // re-derives validity independently ("in range and filled"), so refilling
+        // the same slot later made the canvas resurrect a selection border the
+        // rail had already dropped all contextual tools for.
+        //
+        // This call MUST come after `activeContextKind = nil` above, not inside
+        // the `if activeContextKind == .clip` branch: `selectCell(at:)` fires
+        // `onChanged` synchronously, which re-enters this method before this
+        // call even returns. Placed here, that re-entrant pass reads
+        // `activeContextKind == nil`, fails the `.clip` check immediately, and
+        // returns — placed inside the branch above (still reading `.clip`, with
+        // `selectedIndex` already nil'd), it would call `selectCell(at: nil)`
+        // again forever.
+        if clipSelectionWentStale {
+            viewModel.selectCell(at: nil)
+        }
+    }
+
+    // MARK: - Panel factories — Frame
+
+    /// Video cells have no per-cell corner-safety clamp available without
+    /// reaching into the shared layout engine from here, so this is a simpler
+    /// bound than `GridEditorViewModel.maxBorderWidth`: a flat fraction of the
+    /// canvas's shorter side.
+    private var maxBorderWidth: CGFloat {
+        min(viewModel.canvasSize.width, viewModel.canvasSize.height) * 0.08
+    }
+
+    private func makeFramePanel() -> UIView {
+        let maxWidth = maxBorderWidth
+        borderSlider.value = maxWidth > 0 ? Float(viewModel.borderWidth / maxWidth) : 0
+        return VideoFramePanelView(borderSlider: borderSlider)
+    }
+
+    @objc private func borderChanged() {
+        // Fix 2 (was a plan-level contradiction: Task 6's file list excluded
+        // this view model while asking it to mirror the collage editor's fully
+        // undoable border slider): now flows through the same
+        // `*Interactive` + `commitInteractive()` coalescing pattern as every
+        // other control on this screen, so `viewModel.onChanged` (refreshCanvas
+        // + rebuildComposition + revalidateSelection) fires on its own.
+        viewModel.setBorderWidthInteractive(CGFloat(borderSlider.value) * maxBorderWidth)
+    }
+
+    @objc private func borderReleased() {
+        viewModel.commitInteractive()
+    }
+
+    // MARK: - Panel factories — Clip contextual group
+
+    private func makeVolumePanel(for index: Int) -> UIView {
+        let cell = viewModel.cells[index]
+        volumeSlider.minimumValue = 0
+        volumeSlider.maximumValue = 1
+        volumeSlider.value = Float(cell.volume)
+        muteSwitch.isOn = cell.isMuted
+        return ClipVolumePanelView(volumeSlider: volumeSlider, muteSwitch: muteSwitch)
+    }
+
+    private func makeTransitionPanel(for index: Int) -> UIView {
+        let cell = viewModel.cells[index]
+        transitionDurationSlider.minimumValue = 0.1
+        transitionDurationSlider.maximumValue = 2.0
+        transitionDurationSlider.value = Float(cell.transition?.duration ?? 0.5)
+        let styleRow = makeTransitionStyleRow(selected: cell.transition?.style)
+        return ClipTransitionPanelView(styleRow: styleRow, durationSlider: transitionDurationSlider)
+    }
+
+    /// Binds `ClipTransitionStyleRow` (pure layout, in `VideoEditorPanels.swift`)
+    /// to the document. The row owns its own highlight; this only applies the
+    /// pick, preserving whatever duration the clip already had.
+    private func makeTransitionStyleRow(selected: CellTransition.Style?) -> UIView {
+        ClipTransitionStyleRow(selected: selected) { [weak self] style in
+            guard let self, let index = self.viewModel.selectedIndex else { return }
+            let duration = self.viewModel.cells[index].transition?.duration ?? 0.5
+            self.viewModel.setTransitionInteractive(
+                style.map { CellTransition(style: $0, duration: duration) }, forCellAt: index)
+            self.viewModel.commitInteractive()
+            Haptics.tap()
+        }
+    }
+
+    @objc private func volumeChanged() {
+        guard let index = viewModel.selectedIndex else { return }
+        viewModel.setVolumeInteractive(Double(volumeSlider.value), forCellAt: index)
+    }
+
+    @objc private func volumeReleased() { viewModel.commitInteractive() }
+
+    @objc private func muteToggled() {
+        guard let index = viewModel.selectedIndex else { return }
+        viewModel.setMutedInteractive(muteSwitch.isOn, forCellAt: index)
+        viewModel.commitInteractive()
+    }
+
+    @objc private func transitionDurationChanged() {
+        guard let index = viewModel.selectedIndex,
+              let style = viewModel.cells[index].transition?.style else { return }
+        viewModel.setTransitionInteractive(
+            CellTransition(style: style, duration: Double(transitionDurationSlider.value)), forCellAt: index)
+    }
+
+    @objc private func transitionDurationReleased() { viewModel.commitInteractive() }
+
+    // MARK: - Panel factories — Trim (needs the source's async duration)
+
+    private func makeTrimPanel(for index: Int, duration: Double, trim: VideoTrim, isLooping: Bool) -> UIView {
+        trimStartSlider.minimumValue = 0
+        trimStartSlider.maximumValue = Float(duration)
+        trimStartSlider.value = Float(trim.start)
+        trimEndSlider.minimumValue = 0
+        trimEndSlider.maximumValue = Float(duration)
+        trimEndSlider.value = Float(trim.end)
+        loopSwitch.isOn = isLooping
+
+        let more = ThemeButton(
+            style: .tertiary, title: "More Options…",
+            image: UIImage(systemName: "slider.horizontal.3"),
+            action: UIAction { [weak self] _ in
+                guard let self, let index = self.viewModel.selectedIndex else { return }
+                self.presentCellControls(for: index)
+            })
+        more.accessibilityIdentifier = "clipTrimMoreButton"
+
+        return ClipTrimPanelView(startSlider: trimStartSlider, endSlider: trimEndSlider,
+                                 loopSwitch: loopSwitch, moreButton: more)
+    }
+
+    /// Loading the source's duration is async; by the time it resolves the
+    /// selection (or the clip itself, via Swap) may have moved on — the guard
+    /// below is the "stale completion handler" trap from the plan's Before You
+    /// Start section, acted on at CALL time (the captured `cell`/`videoID`),
+    /// not by trusting whatever is selected when this fires.
+    private func presentTrimPanel(for index: Int) {
+        guard let asset = viewModel.asset(forCellAt: index) else { return }
+        let cell = viewModel.cells[index]
+        Task { @MainActor in
+            let duration = (try? await asset.load(.duration).seconds) ?? 0
+            guard self.viewModel.selectedIndex == index,
+                  self.viewModel.cells.indices.contains(index),
+                  self.viewModel.cells[index].videoID == cell.videoID else { return }
+            let resolved = cell.trim.clamped(toAssetDuration: max(0.1, duration))
+            let panel = self.makeTrimPanel(for: index, duration: max(0.1, duration),
+                                           trim: resolved, isLooping: cell.isLooping)
+            self.openPanel(panel, title: "Trim", id: "trim")
+        }
+    }
+
+    @objc private func trimStartChanged() {
+        guard let index = viewModel.selectedIndex else { return }
+        let newStart = min(Double(trimStartSlider.value), Double(trimEndSlider.value) - 0.1)
+        viewModel.setTrimInteractive(
+            VideoTrim(start: max(0, newStart), end: Double(trimEndSlider.value)), forCellAt: index)
+    }
+
+    @objc private func trimEndChanged() {
+        guard let index = viewModel.selectedIndex else { return }
+        let newEnd = max(Double(trimEndSlider.value), Double(trimStartSlider.value) + 0.1)
+        viewModel.setTrimInteractive(
+            VideoTrim(start: Double(trimStartSlider.value), end: newEnd), forCellAt: index)
+    }
+
+    @objc private func trimReleased() { viewModel.commitInteractive() }
+
+    @objc private func loopToggled() {
+        guard let index = viewModel.selectedIndex else { return }
+        viewModel.setLoopingInteractive(loopSwitch.isOn, forCellAt: index)
+        viewModel.commitInteractive()
+    }
+
+    // MARK: - Panel factories — Text contextual group
+
+    /// The tier-2 presets as one tappable row — mirrors
+    /// `GridEditorViewController.makeTextStylePanel`. Video has no single
+    /// canvas background to read light/dark off (it's a video), so a fresh
+    /// preset always applies white, matching `addTextTapped`'s own default.
+    /// The composition's length, which bounds every caption window. Falls back to
+    /// a nominal minute when nothing is loaded yet, so the steppers are still
+    /// usable rather than pinned at 0...0 on an empty document.
+    private var timingCeiling: Double {
+        let duration = viewModel.timelineModel().duration
+        return duration > 0 ? duration : 60
+    }
+
+    private func makeTextTimingPanel(for id: UUID) -> UIView {
+        timingPanelOverlayID = id
+        let overlay = viewModel.textOverlay(id: id)
+        let ceiling = timingCeiling
+        // An unbounded caption ("always visible") opens spanning everything
+        // rather than as a collapsed 0...0 window the user has to undo by hand.
+        let start = overlay?.startTime ?? 0
+        let end = overlay?.endTime ?? ceiling
+
+        for stepper in [textInStepper, textOutStepper] {
+            stepper.minimumValue = 0
+            stepper.maximumValue = ceiling
+            stepper.stepValue = 0.1
+            stepper.autorepeat = true
+        }
+        textInStepper.value = start
+        textOutStepper.value = end
+        textInStepper.accessibilityIdentifier = "textTimingInStepper"
+        textOutStepper.accessibilityIdentifier = "textTimingOutStepper"
+        textInStepper.accessibilityLabel = "Caption start"
+        textOutStepper.accessibilityLabel = "Caption end"
+        refreshTimingLabels()
+
+        let wholeVideo = ThemeButton(
+            style: .tertiary, title: "Whole Video",
+            image: UIImage(systemName: "arrow.left.and.right"),
+            action: UIAction { [weak self] _ in self?.clearTextTiming() })
+        wholeVideo.accessibilityIdentifier = "textTimingWholeVideoButton"
+
+        return TextTimingPanelView(
+            inStepper: textInStepper, inValue: textInValueLabel,
+            outStepper: textOutStepper, outValue: textOutValueLabel,
+            wholeVideoButton: wholeVideo)
+    }
+
+    private func refreshTimingLabels() {
+        textInValueLabel.text = String(format: "%.1fs", textInStepper.value)
+        textOutValueLabel.text = String(format: "%.1fs", textOutStepper.value)
+        textInValueLabel.accessibilityValue = textInValueLabel.text
+        textOutValueLabel.accessibilityValue = textOutValueLabel.text
+    }
+
+    /// Both handlers clamp so the window can never invert. That matters more than
+    /// it looks: `TextOverlay.isVisible(at:)` treats an inverted window as ALWAYS
+    /// VISIBLE (fail-open, so a corrupt project can't hide a caption with nothing
+    /// on screen to explain why) — so an inverted window typed in here would
+    /// silently turn a timed caption back into a permanent one. Clamped rather
+    /// than rejected, so the control still responds to the press.
+    @objc private func textInChanged() {
+        guard let id = timingPanelOverlayID else { return }
+        let clamped = min(textInStepper.value, textOutStepper.value - VideoTimeline.minimumTrimDuration)
+        textInStepper.value = max(0, clamped)
+        refreshTimingLabels()
+        viewModel.setTextTiming(id: id, start: textInStepper.value, end: textOutStepper.value)
+        Haptics.selectionChanged()
+    }
+
+    @objc private func textOutChanged() {
+        guard let id = timingPanelOverlayID else { return }
+        let clamped = max(textOutStepper.value, textInStepper.value + VideoTimeline.minimumTrimDuration)
+        textOutStepper.value = min(clamped, textOutStepper.maximumValue)
+        refreshTimingLabels()
+        viewModel.setTextTiming(id: id, start: textInStepper.value, end: textOutStepper.value)
+        Haptics.selectionChanged()
+    }
+
+    /// Back to "always visible". `nil` is a real state a pill drag can never
+    /// reach, because a pill always has two edges — this is the only way back.
+    private func clearTextTiming() {
+        guard let id = timingPanelOverlayID else { return }
+        viewModel.setTextTiming(id: id, start: nil, end: nil)
+        textInStepper.value = 0
+        textOutStepper.value = timingCeiling
+        refreshTimingLabels()
+        Haptics.tap()
+    }
+
+    private func makeTextStylePanel(for id: UUID) -> UIView {
+        let row = UIStackView()
+        row.axis = .horizontal
+        row.spacing = Theme.Spacing.xs
+        row.alignment = .center
+        row.isLayoutMarginsRelativeArrangement = true
+        row.layoutMargins = UIEdgeInsets(
+            top: 0, left: Theme.Spacing.md, bottom: 0, right: Theme.Spacing.md)
+
+        for kind in TextStyle.Kind.allCases {
+            let button = UIButton(type: .system)
+            button.setTitle("Aa", for: .normal)
+            button.titleLabel?.font = Theme.Typography.headline
+            button.accessibilityIdentifier = "textStyle_\(kind.rawValue)"
+            button.accessibilityLabel = kind.rawValue.capitalized
+            button.addAction(UIAction { [weak self] _ in
+                guard let self, var overlay = self.viewModel.textOverlay(id: id) else { return }
+                overlay.style = TextStyle(kind: kind, colorHex: "#FFFFFF", width: 6)
+                self.viewModel.updateTextOverlay(overlay)
+                Haptics.selectionChanged()
+            }, for: .touchUpInside)
+            row.addArrangedSubview(button)
+        }
+        return row
+    }
+
     private func bindViewModel() {
         viewModel.onChanged = { [weak self] in
             self?.refreshCanvas()
             self?.rebuildComposition()
+            // After the canvas model is rebuilt, so a stale selection is
+            // checked against the fresh document rather than the one it just
+            // replaced.
+            self?.revalidateSelection()
         }
         // Interactive overlay gestures → the view model (coalesced into one undo step).
         canvasView.onTextChanged = { [weak self] in self?.viewModel.updateTextOverlayInteractive($0) }
         canvasView.onTextCommitted = { [weak self] in self?.viewModel.commitInteractive() }
-        canvasView.onTextTapped = { [weak self] in self?.presentTextStyleSheet(for: $0) }
+        // A tap now SELECTS the overlay (inserting the contextual Text tools)
+        // rather than jumping straight to the styling sheet — mirrors the grid
+        // editor's `canvasView.onTextTapped`.
+        canvasView.onTextTapped = { [weak self] in self?.selectTextOverlay($0) }
         canvasView.onStickerChanged = { [weak self] in self?.viewModel.updateStickerInteractive($0) }
         canvasView.onStickerCommitted = { [weak self] in self?.viewModel.commitInteractive() }
         canvasView.onStickerDeleted = { [weak self] in
@@ -204,16 +819,245 @@ final class VideoEditorViewController: UIViewController {
         canvasView.onStickerSelected = { [weak self] in self?.selectedStickerID = $0 }
     }
 
+    // MARK: - Timeline
+
+    /// Rebuilds the timeline's model from the document. Called from
+    /// `refreshCanvas` (every document change funnels through it) and from
+    /// `setPlaying`, which owns the one piece of the model the document does not.
+    private func refreshTimeline() {
+        videoTimeline.setModel(viewModel.timelineModel(
+            selectedTextID: selectedTextID, isPlaying: isPlayingIntent))
+        videoTimeline.setPlayhead(playheadTime)
+    }
+
+    /// Resolves source durations in the background and refreshes once they land.
+    /// Lane lengths are unknowable until then — see `loadMissingSourceDurations`.
+    private func refreshTimelineDurations() {
+        Task { @MainActor [weak self] in
+            guard let self, await self.viewModel.loadMissingSourceDurations() else { return }
+            self.refreshTimeline()
+        }
+    }
+
+    /// One tick of playback. Moves the same three things a scrub does, minus the
+    /// seek — the player is already there.
+    ///
+    /// `playheadTime` is updated, not just the canvas: it is what `refreshTimeline`
+    /// re-pushes, so leaving it behind would let any document change during
+    /// playback yank the timeline's playhead back to wherever the last scrub left
+    /// it. Driving only the canvas here also left the playhead and the
+    /// "0:00 / 0:08" readout frozen at the origin for the whole video.
+    private func playbackTimeAdvanced(to seconds: Double) {
+        playheadTime = seconds
+        canvasView.setPreviewTime(seconds)
+        videoTimeline.setPlayhead(seconds)
+    }
+
+    /// `VideoTimeline.onScrub`. Moves the playhead NOW, on this run loop turn.
+    ///
+    /// The canvas is told directly rather than through `startObservingPlaybackTime`'s
+    /// periodic observer: `addPeriodicTimeObserver` is only documented to fire
+    /// during playback and across play/stop transitions, so a seek while PAUSED —
+    /// which is the whole point of scrubbing — is not guaranteed to reach it.
+    /// Waiting for it would leave captions computed against a frame that is not
+    /// the one on screen.
+    ///
+    /// The seek is tolerant in both directions on purpose: an exact seek per drag
+    /// tick decodes far more than it needs to and makes the drag lag, and
+    /// `AVPlayer` coalesces rapid seeks anyway. The commit at the end of the drag
+    /// is what lands the precise frame.
+    private func scrub(to time: Double) {
+        let clamped = max(0, time)
+        playheadTime = clamped
+        canvasView.setPreviewTime(clamped)
+        videoTimeline.setPlayhead(clamped)
+        player.seek(to: CMTime(seconds: clamped, preferredTimescale: 600),
+                    toleranceBefore: .positiveInfinity,
+                    toleranceAfter: .positiveInfinity) { _ in }
+    }
+
+    /// `VideoTimeline.onSelectClip`. Only a FILLED lane is selectable.
+    ///
+    /// Every tool the Clip group offers — Swap, Trim, Volume, Transition, Clear —
+    /// needs a clip to act on and no-ops without one, so selecting an empty slot
+    /// would raise five inert buttons. The canvas does not select an empty slot
+    /// either (`canvasTapped` offers to FILL it instead); it is not routed to the
+    /// picker from here because a timeline lane, unlike a canvas cell, gives no
+    /// spatial clue about which slot is about to be filled. Empty lanes stay
+    /// visible as composition context.
+    private func selectClipFromTimeline(_ index: Int) {
+        guard viewModel.cells.indices.contains(index),
+              viewModel.cells[index].videoID != nil else { return }
+        selectClip(index)
+    }
+
+    /// `VideoTimeline.onTrim`. A drag reports `.changed` throughout and
+    /// `.committed` exactly once at the end, so it rides the interactive/commit
+    /// pattern and lands as ONE undo step rather than one per tick.
+    ///
+    /// **`start`/`end` are COMPOSITION time; a `VideoTrim` is SOURCE time.** They
+    /// are not interchangeable, and passing the lane's numbers straight through
+    /// rewrote the in-point to the lane's origin — a clip taken from the middle
+    /// of its footage jumped back to the head the instant its out-point was
+    /// touched. Only one edge moves per drag, so each edge is converted against
+    /// the OTHER one, which the drag leaves alone:
+    ///
+    /// - trailing: the in-point is fixed, so the new out-point is
+    ///   `trim.start + newDuration`;
+    /// - leading: the out-point is fixed, so the new in-point is
+    ///   `trim.end - newDuration`.
+    ///
+    /// Anchoring on the fixed edge (rather than on the lane's start) is also what
+    /// keeps a drag from compounding: every tick recomputes from a value that
+    /// tick cannot have changed.
+    ///
+    /// A leading drag additionally moves the clip's ENTRY, because the block's
+    /// left edge is where it begins — trimming the head without moving
+    /// `startOffset` would snap the block back to its old start on the next
+    /// refresh while the right edge appeared to move instead.
+    private func trimFromTimeline(
+        clipIndex: Int, start: Double, end: Double, phase: VideoTimeline.EditPhase
+    ) {
+        guard viewModel.cells.indices.contains(clipIndex) else { return }
+        let cell = viewModel.cells[clipIndex]
+        let laneStart = max(0, cell.startOffset)
+        let newDuration = max(0, end - start)
+
+        // Which edge moved: the untouched one is still reported at its anchor.
+        if abs(start - laneStart) > 0.0001 {
+            viewModel.setStartOffsetInteractive(start, forCellAt: clipIndex)
+            viewModel.setTrimInteractive(
+                clampedToSource(VideoTrim(start: max(0, cell.trim.end - newDuration),
+                                          end: cell.trim.end), at: clipIndex),
+                forCellAt: clipIndex)
+        } else {
+            viewModel.setTrimInteractive(
+                clampedToSource(VideoTrim(start: cell.trim.start,
+                                          end: cell.trim.start + newDuration),
+                                at: clipIndex),
+                forCellAt: clipIndex)
+        }
+        if phase == .committed {
+            viewModel.commitInteractive()
+            Haptics.tap()
+        }
+    }
+
+    /// Keeps a trim inside its source. The timeline's own clamp is against the
+    /// COMPOSITION duration, which says nothing about how long the footage is.
+    /// Skipped while the source length is still loading — an unknown length must
+    /// not be treated as zero.
+    private func clampedToSource(_ trim: VideoTrim, at index: Int) -> VideoTrim {
+        guard let source = viewModel.sourceDuration(forCellAt: index), source > 0 else { return trim }
+        return trim.clamped(toAssetDuration: source)
+    }
+
+    /// `VideoTimeline.onRetimeText`. Same one-drag-one-undo-step contract as
+    /// `trimFromTimeline`.
+    private func retimeTextFromTimeline(
+        id: UUID, start: Double, end: Double, phase: VideoTimeline.EditPhase
+    ) {
+        guard viewModel.textOverlay(id: id) != nil else { return }
+        viewModel.setTextTimingInteractive(id: id, start: start, end: end)
+        if phase == .committed {
+            viewModel.commitInteractive()
+            Haptics.tap()
+        }
+    }
+
+    // MARK: - Playback
+
+    /// The single choke point for changing whether `player` is playing. Every
+    /// other place in this file that used to touch `player.play()`/`.pause()`
+    /// directly — the loop restart below, `viewWillDisappear`, export's pause,
+    /// and the composition rebuild's conditional resume — now goes through
+    /// this instead, so `isPlayingIntent` (and the icon it drives)
+    /// can never disagree with what the player is actually doing. `playing`
+    /// is the caller's INTENT, not a re-read of `player.timeControlStatus`
+    /// after the call — deliberately, so the icon reflects "did the user ask
+    /// to play" rather than flickering through AVPlayer's own transient
+    /// buffering states (`.waitingToPlayAtSpecifiedRate`) on a slow load.
+    private func setPlaying(_ playing: Bool) {
+        if playing {
+            player.play()
+        } else {
+            player.pause()
+        }
+        guard isPlayingIntent != playing else { return }
+        isPlayingIntent = playing
+        refreshTimeline()
+    }
+
+    /// `VideoTimeline.onTogglePlayback`'s target — the timeline only ever
+    /// reports the tap (see that property's doc comment), so this is where the
+    /// actual play/pause decision is made.
+    private func toggleTimelinePlayback() {
+        guard viewModel.hasContent else {
+            showInfo(title: "Nothing to Play", message: "Add a video to a slot first.")
+            return
+        }
+        setPlaying(!isPlayingIntent)
+    }
+
     /// Restarts the preview when it reaches the end — a collage reads better looping.
+    ///
+    /// Both guards below are load-bearing, and their absence was the race behind
+    /// `VideoEditorPlaybackControlTests`' intermittent failures:
+    ///
+    /// 1. **The item must be ours.** `object: nil` observes EVERY `AVPlayerItem`
+    ///    in the process — every `LoopingPreviewPlayerView`, every other player
+    ///    alive behind a presented sheet — so an unrelated preview finishing
+    ///    used to yank this editor's playhead back to 0:00.
+    /// 2. **The user must actually want playback.** The notification is posted
+    ///    from AVFoundation's own thread and merely ENQUEUED here, so a clip
+    ///    that ends while the main actor is busy can deliver after a pause has
+    ///    already landed — and this block then restarted the video the user had
+    ///    just deliberately stopped. `isPlayingIntent` is what `setPlaying`
+    ///    records, so reading it makes a late notification
+    ///    a no-op rather than an override.
     private func loopPlaybackForever() {
         player.actionAtItemEnd = .none
         didFinishObserver = NotificationCenter.default.addObserver(
             forName: .AVPlayerItemDidPlayToEndTime, object: nil, queue: .main
-        ) { [weak self] _ in
+        ) { [weak self] note in
+            // `Notification` is not `Sendable`, so the item's identity is reduced
+            // to an `ObjectIdentifier` (which is) out here, before crossing into
+            // the isolated block below.
+            let endedItem = (note.object as AnyObject?).map(ObjectIdentifier.init)
             guard let self else { return }
             MainActor.assumeIsolated {
+                guard let endedItem, let current = self.player.currentItem,
+                      ObjectIdentifier(current) == endedItem else { return }
+                guard self.isPlayingIntent else { return }
                 self.player.seek(to: .zero)
-                self.player.play()
+                // A continuation of an already-in-progress playback rather than a
+                // fresh "should we resume" decision — but it still goes through
+                // `setPlaying` so the icon stays correct through the restart.
+                self.setPlaying(true)
+            }
+        }
+    }
+
+    /// Keeps the canvas's timed text overlays in sync with playback, so a caption
+    /// appears/disappears on the right beat instead of being frozen at whatever was
+    /// visible when the composition was last (re)built. 10 Hz is fine enough for
+    /// that and coarse enough not to churn layout every video frame.
+    private func startObservingPlaybackTime() {
+        let interval = CMTime(seconds: 0.1, preferredTimescale: 600)
+        timeObserver = player.addPeriodicTimeObserver(
+            forInterval: interval, queue: .main
+        ) { [weak self] time in
+            // Same trap `loopPlaybackForever`'s closure works around above: this
+            // closure isn't `@Sendable`, so it's inferred `@MainActor`, but
+            // AVFoundation invokes it on the `queue` given below (main) without
+            // knowing that — `assumeIsolated` asserts what's already true rather
+            // than hopping and crashing off-main.
+            MainActor.assumeIsolated {
+                // `time.seconds` is the same `CMTime.seconds` conversion the export
+                // applies to a frame's presentation time (see `overlayForFrame`), so
+                // an in/out point landing exactly on a frame boundary can't
+                // disagree between preview and export.
+                self?.playbackTimeAdvanced(to: time.seconds)
             }
         }
     }
@@ -221,21 +1065,27 @@ final class VideoEditorViewController: UIViewController {
     // MARK: - Canvas
 
     private func refreshCanvas() {
+        // Only ever highlight a selection that still points at a FILLED cell —
+        // `viewModel.selectedIndex` can briefly disagree with the document (an
+        // undo that emptied the cell it points at) before `revalidateSelection`
+        // gets a chance to run; this keeps the canvas honest without this
+        // method having to call back into the view model itself.
+        let highlightIndex = viewModel.selectedIndex.flatMap { index -> Int? in
+            guard viewModel.cells.indices.contains(index),
+                  viewModel.cells[index].videoID != nil else { return nil }
+            return index
+        }
         canvasView.configure(
             canvasSize: viewModel.canvasSize,
             cellFrames: viewModel.cellFrames().map(\.frame),
             filled: (0 ..< viewModel.cellCount).map { viewModel.cells[$0].videoID != nil },
-            selectedIndex: viewModel.selectedIndex)
-        canvasView.updateTextOverlays(viewModel.textOverlays)
+            selectedIndex: highlightIndex)
+        canvasView.updateTextOverlays(viewModel.textOverlays, selected: selectedTextID)
         canvasView.updateStickerOverlays(viewModel.stickerOverlays, selected: selectedStickerID)
-        emptyHintLabel.isHidden = viewModel.hasContent || !viewModel.textOverlays.isEmpty
-            || !viewModel.stickerOverlays.isEmpty
         undoItem.isEnabled = viewModel.canUndo
         redoItem.isEnabled = viewModel.canRedo
+        refreshTimeline()
     }
-
-    /// The currently-selected sticker (for its selection chrome). Not undoable state.
-    private var selectedStickerID: UUID?
 
     /// Rebuilds the preview composition from the model (debounced — sliders fire fast).
     private func rebuildComposition() {
@@ -249,22 +1099,54 @@ final class VideoEditorViewController: UIViewController {
             guard let self, !Task.isCancelled else { return }
             guard let bundle = try? await self.viewModel.buildBundle() else { return }
             guard !Task.isCancelled else { return }
-            // Preserve the user's place + play state so tweaking a control doesn't
-            // yank the preview back to 0:00.
+            // Preserve the user's scrub position AND play state so tweaking a
+            // control doesn't yank the preview back to 0:00 or restart playback
+            // out from under someone who deliberately paused.
+            //
+            // `isPlayingIntent` (the INTENT) is the read here, NOT
+            // `player.timeControlStatus`. The status is transient: a clip that
+            // reaches its end, or is still buffering, reports something other
+            // than `.playing` for a moment while the user's intent is unchanged
+            // — and this read happens a debounce plus an async `buildBundle()`
+            // after the edit, which is ample time to land in exactly that
+            // window. Reading the status there silently froze a preview the
+            // user had left playing. Intent defaults to `false`, so the very
+            // first build still gets the sensible "don't autoplay on load".
             let resumeTime = self.player.currentTime()
-            let wasPlaying = self.player.timeControlStatus == .playing
+            let wasPlaying = self.isPlayingIntent
             let item = AVPlayerItem(asset: bundle.composition)
             item.videoComposition = bundle.videoComposition
             item.audioMix = bundle.audioMix
             self.player.replaceCurrentItem(with: item)
             if resumeTime.isNumeric, resumeTime > .zero {
-                self.player.seek(to: CMTimeMinimum(resumeTime, bundle.duration),
+                let seekTime = CMTimeMinimum(resumeTime, bundle.duration)
+                self.player.seek(to: seekTime,
                                  toleranceBefore: .positiveInfinity,
                                  toleranceAfter: .positiveInfinity) { _ in }
+                // Push the seek straight into the canvas rather than waiting for the
+                // periodic observer. `addPeriodicTimeObserver` is only documented to
+                // fire during playback and across play/stop transitions — a seek while
+                // PAUSED is not guaranteed to reach it. Without this, an edit that
+                // shortens the composition clamps the position to a new time while
+                // `previewTime` keeps the old one, so caption visibility is computed
+                // against a frame that is not the one on screen.
+                self.canvasView.setPreviewTime(seekTime.seconds)
             }
-            if wasPlaying { self.player.play() }
-            self.canvasView.setOverlayImage(bundle.overlayImage.map { UIImage(cgImage: $0) })
+            // Resume ONLY if the old item was actually playing — never force
+            // playback on someone who paused before this rebuild started.
+            self.setPlaying(wasPlaying)
+            // No preview overlay image to set here: `canvasView` shows text/sticker
+            // overlays through its own live, pooled views (kept current by
+            // `refreshCanvas`), which already match `bundle.overlayImage` pixel-for-
+            // pixel — and once any text overlay carries timing, `overlayImage` is
+            // nil anyway, so drawing it here would blank the overlays rather than
+            // show them. `bundle.overlayImage` / `timedOverlays` exist purely for
+            // the export below, which bakes into a `CVPixelBuffer`.
             await self.refreshGalleryThumbnail()
+            // After the rebuild, not before: a freshly-picked clip's asset is in
+            // the cache by now, and the refresh this triggers is cheap once every
+            // duration is known.
+            self.refreshTimelineDurations()
         }
     }
 
@@ -290,12 +1172,11 @@ final class VideoEditorViewController: UIViewController {
         // Tapping empty canvas deselects any selected sticker.
         if selectedStickerID != nil { selectedStickerID = nil; refreshCanvas() }
         guard let index = canvasView.cellIndex(at: point) else { return }
-        viewModel.selectCell(at: index)
         Haptics.tap()
         if viewModel.cells[index].videoID == nil {
             presentVideoPicker(for: index)
         } else {
-            presentCellControls(for: index)
+            selectClip(index)
         }
     }
 
@@ -341,21 +1222,7 @@ final class VideoEditorViewController: UIViewController {
     @objc private func undoTapped() { viewModel.undo() }
     @objc private func redoTapped() { viewModel.redo() }
 
-    @objc private func playTapped() {
-        guard viewModel.hasContent else {
-            showInfo(title: "Nothing to Play", message: "Add a video to a slot first.")
-            return
-        }
-        if player.timeControlStatus == .playing {
-            player.pause()
-            playItem.image = UIImage(systemName: "play.fill")
-        } else {
-            player.play()
-            playItem.image = UIImage(systemName: "pause.fill")
-        }
-    }
-
-    @objc private func layoutTapped() {
+    private func layoutTapped() {
         let sheet = VideoLayoutPickerSheet(
             templates: GridTemplate.allCases,
             selected: viewModel.layout.gridTemplate ?? .twoUpVertical,
@@ -374,7 +1241,7 @@ final class VideoEditorViewController: UIViewController {
         present(host, animated: true)
     }
 
-    @objc private func musicTapped() {
+    private func musicTapped() {
         let sheet = UIAlertController(title: "Background Music", message: nil, preferredStyle: .actionSheet)
         sheet.addAction(UIAlertAction(title: viewModel.music == nil ? "Add Music…" : "Replace Music…",
                                       style: .default) { [weak self] _ in
@@ -395,7 +1262,7 @@ final class VideoEditorViewController: UIViewController {
         }
         sheet.addAction(UIAlertAction(title: "Cancel", style: .cancel))
         anchorPopover(sheet) { popover in
-            popover.barButtonItem = toolbarItems?.last
+            popover.sourceView = self.toolRail
         }
         present(sheet, animated: true)
     }
@@ -434,7 +1301,7 @@ final class VideoEditorViewController: UIViewController {
         present(picker.makePicker(), animated: true)
     }
 
-    // MARK: - Per-cell controls
+    // MARK: - Per-cell controls (the Trim panel's "More Options" destination)
 
     private func presentCellControls(for index: Int) {
         guard let asset = viewModel.asset(forCellAt: index) else { return }
@@ -528,39 +1395,7 @@ final class VideoEditorViewController: UIViewController {
 
     // MARK: - Text / sticker overlays (#7)
 
-    private func makeAddOverlayBar() -> UIView {
-        let text = makeAddButton(
-            title: "Text", systemImage: "textformat", identifier: "videoAddTextButton",
-            action: { [weak self] in self?.addTextTapped() })
-        let sticker = makeAddButton(
-            title: "Sticker", systemImage: "face.smiling", identifier: "videoAddStickerButton",
-            action: { [weak self] in self?.addStickerTapped() })
-        let row = UIStackView(arrangedSubviews: [text, sticker])
-        row.axis = .horizontal
-        row.distribution = .fillEqually
-        row.spacing = 12
-        row.translatesAutoresizingMaskIntoConstraints = false
-        return row
-    }
-
-    /// One definition of the editors' add-overlay pill, in the component layer:
-    /// the grid and video editors each carried an identical private copy, and
-    /// they had already drifted apart on contrast.
-    private func makeAddButton(
-        title: String, systemImage: String, identifier: String,
-        action: @escaping () -> Void
-    ) -> UIButton {
-        let button = ThemeButton(
-            style: .tinted,
-            title: title,
-            image: UIImage(systemName: systemImage),
-            action: UIAction { _ in action() }
-        )
-        button.accessibilityIdentifier = identifier
-        return button
-    }
-
-    @objc private func addTextTapped() {
+    private func addTextTapped() {
         Haptics.tap()
         let overlay = TextOverlay(
             text: "Your text", colorHex: "#FFFFFF",
@@ -569,7 +1404,7 @@ final class VideoEditorViewController: UIViewController {
         presentTextStyleSheet(for: id)
     }
 
-    @objc private func addStickerTapped() {
+    private func addStickerTapped() {
         Haptics.tap()
         let picker = StickerPickerViewController.sheet { [weak self] entry in
             guard let self else { return }
@@ -691,8 +1526,7 @@ final class VideoEditorViewController: UIViewController {
                 self.showInfo(title: "Nothing to Export", message: "Add a video to a slot first.")
                 return
             }
-            self.player.pause()
-            self.playItem.image = UIImage(systemName: "play.fill")
+            self.setPlaying(false)
 
             let token = ExportCancellationToken()
             let progressVC = ExportProgressViewController()
@@ -773,6 +1607,60 @@ final class VideoEditorViewController: UIViewController {
         let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "OK", style: .default))
         present(alert, animated: true)
+    }
+
+    // MARK: - Test seams
+
+    /// Whether `startObservingPlaybackTime`'s periodic observer is currently
+    /// registered on `player`. Exercised by `VideoEditorPlaybackObserverTests` to
+    /// prove it survives a `viewWillDisappear` that doesn't lead to an actual pop.
+    var isObservingPlaybackTimeForTesting: Bool { timeObserver != nil }
+
+    var viewModelForTesting: VideoEditorViewModel { viewModel }
+
+    /// What the canvas is showing captions against — proves a scrub reached it
+    /// directly rather than waiting on the periodic time observer.
+    var canvasPreviewTimeForTesting: Double { canvasView.previewTimeForTesting }
+
+    /// Where this screen believes the playhead is. `player.currentTime()` settles
+    /// asynchronously after a tolerant seek, so asserting on it would be a race;
+    /// this is the value the seek was issued for.
+    var lastSeekedTimeForTesting: Double? { playheadTime }
+
+    /// Drives one tick of `startObservingPlaybackTime`'s periodic observer, so a
+    /// test can assert what playback moves without waiting on a real player.
+    func simulatePlaybackTickForTesting(_ seconds: Double) { playbackTimeAdvanced(to: seconds) }
+    var selectedTextIDForTesting: UUID? { selectedTextID }
+    func selectClipForTesting(_ index: Int) { selectClip(index) }
+    func selectTextOverlayForTesting(_ id: UUID) { selectTextOverlay(id) }
+    func clearSelectionForTesting() { clearSelection() }
+    func addTextOverlayForTesting() -> UUID {
+        viewModel.addTextOverlay(TextOverlay(
+            text: "Test", frame: CGRect(x: 0.1, y: 0.4, width: 0.8, height: 0.15)))
+    }
+
+    /// The ground truth for whether `player` is actually playing right now —
+    /// distinct from `isPlayingIntent` (the INTENT `setPlaying`
+    /// last recorded), so a test can check the real AVPlayer state agrees with
+    /// what the timeline's icon claims, not just that the icon changed.
+    var isPlayerPlayingForTesting: Bool { player.timeControlStatus == .playing }
+
+    /// The item `player` is currently playing, so a test can post a genuine
+    /// `AVPlayerItemDidPlayToEndTime` for it (and for a foreign item) rather
+    /// than waiting for a real clip to run out — the end-of-item race is
+    /// otherwise only reachable by luck under load.
+    var currentPlayerItemForTesting: AVPlayerItem? { player.currentItem }
+
+    /// The INTENT `setPlaying` last recorded, which is what drives the
+    /// timeline's icon and what a rebuild resumes against.
+    var isPlayingIntentForTesting: Bool { isPlayingIntent }
+
+    /// Awaits whatever `rebuildComposition()` Task is currently in flight —
+    /// including the one `viewDidLoad` already kicked off — so a test can wait
+    /// out its 250ms debounce plus the async `buildBundle()`/seek work before
+    /// asserting on `player` or the timeline's icon.
+    func waitForPendingRebuildForTesting() async {
+        await rebuildTask?.value
     }
 }
 

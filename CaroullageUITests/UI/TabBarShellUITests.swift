@@ -169,6 +169,9 @@ final class TabBarShellUITests: XCTestCase {
         app.buttons["newProjectButton"].tap()
         XCTAssertTrue(app.navigationBars["Grid Collage"].waitForExistence(timeout: 8))
 
+        // Border/Corners now live in the Frame panel — opening it puts a slider
+        // back in the same bottom band the hidden "+" sits behind.
+        app.buttons["frameTool"].tap()
         app.sliders.element(boundBy: 0).adjust(toNormalizedSliderPosition: 0.6)
         // Asserted by identifier rather than `app.sheets.count`: the Start
         // Editing sheet is no longer a UIAlertController, so the old query would
@@ -213,6 +216,8 @@ final class TabBarShellUITests: XCTestCase {
         app.buttons["polygonQuickStartButton"].tap()
         XCTAssertTrue(app.navigationBars["Grid Collage"].waitForExistence(timeout: 8),
                       "Shapes opens the editor")
+        // Grid/Shapes and both pickers now live in the Layout panel.
+        app.buttons["layoutTool"].tap()
         XCTAssertTrue(app.collectionViews["shapePicker"].waitForExistence(timeout: 5),
                       "…already in Shapes mode, not Grid")
     }

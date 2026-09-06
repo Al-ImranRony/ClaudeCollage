@@ -54,6 +54,10 @@ final class CanvasView: UIView {
     /// which the view controller hit-tests.
     private var stickerViews: [StickerOverlayView] = []
     private var selectedStickerID: UUID?
+    /// The selected text zone, mirroring `selectedStickerID` — drives each
+    /// `TextOverlayView.isSelected` so the canvas shows which zone the rail's
+    /// Text tools will act on (see `setSelectedTextOverlay`).
+    private var selectedTextID: UUID?
     private var model: CanvasModel?
 
     // MARK: - Sticker callbacks (wired by the view controller)
@@ -134,6 +138,12 @@ final class CanvasView: UIView {
         // A layout change can leave the selection pointing past the new cell list.
         if let selected = selectedCellIndex, selected >= model.cells.count {
             selectedCellIndex = nil
+        }
+        // Defense in depth alongside the view controller's own revalidation: a
+        // text overlay removed elsewhere must not leave this view still showing
+        // selection chrome for an id that no longer exists.
+        if let selected = selectedTextID, !model.textOverlays.contains(where: { $0.id == selected }) {
+            selectedTextID = nil
         }
 
         if countChanged {
@@ -365,6 +375,11 @@ final class CanvasView: UIView {
         for (index, overlay) in model.textOverlays.enumerated() where overlayViews.indices.contains(index) {
             overlayViews[index].frame = TextRendering.frame(for: overlay, in: size)
             overlayViews[index].configure(with: overlay, fontScale: referenceScaleFactor)
+            // Views are pooled by INDEX, not identity (see `rebuildOverlayViewsIfNeeded`),
+            // so which overlay a given view renders can change (reorder, delete)
+            // without the pool being rebuilt — re-derive the flag here rather
+            // than trusting whatever `setSelectedTextOverlay` last set on it.
+            overlayViews[index].isSelected = overlay.id == selectedTextID
         }
     }
 
@@ -440,6 +455,20 @@ final class CanvasView: UIView {
         guard selectedStickerID != nil else { return }
         setSelectedSticker(nil)
         onStickerSelected?(nil)
+    }
+
+    // MARK: - Text selection
+
+    /// Marks one text zone selected (or clears the outline with `nil`),
+    /// mirroring `setSelectedCell`/`setSelectedSticker` — read by
+    /// `TextOverlayView.isSelected`, which paints the same dashed selection
+    /// chrome the sticker/cell selection already uses, so all three object
+    /// types read as the same kind of "selected". Preview chrome only, exactly
+    /// like the cell outline: it never reaches the export compositor.
+    func setSelectedTextOverlay(_ id: UUID?) {
+        guard id != selectedTextID else { return }
+        selectedTextID = id
+        for view in overlayViews { view.isSelected = view.overlayID == id }
     }
 
     /// The id of the topmost sticker whose (rotated) view contains `point`
@@ -695,11 +724,23 @@ final class CellContentView: UIView {
 final class TextOverlayView: UIView {
 
     private let label = UILabel()
+    /// `.pill`'s background, painted BEHIND the label. `.highlight` needs no such
+    /// layer — it rides `.backgroundColor` inside the label's attributed string
+    /// (see `TextRendering.applyStyle`), so it already matches the export.
+    private let backgroundLayer = CALayer()
     private let selectionLayer = CAShapeLayer()
 
     /// The overlay this view currently renders — set on `configure` and mutated as
     /// the view drags itself, so its emitted geometry always carries the right id.
     private var overlay: TextOverlay?
+    /// The id of the overlay this view currently renders, for the canvas's
+    /// identity-based selection lookup (mirrors `StickerOverlayView.stickerID`,
+    /// which is a stored `let` — this can't be, since a pooled view's overlay
+    /// changes identity across a rebuild).
+    var overlayID: UUID? { overlay?.id }
+    /// Stashed from the last `configure` so a bounds-only change (rotation, layout
+    /// pass) can still re-derive the background rect without a fresh `configure`.
+    private var fontScale: CGFloat = 1
 
     /// The finger's true (unsnapped) centre during a drag; snapping is layered on
     /// top of this as a display magnet so the zone never feels "stuck" to a guide.
@@ -712,8 +753,24 @@ final class TextOverlayView: UIView {
     /// Reports the engaged snap guides (normalized x's, y's); an empty pair clears them.
     var onGuidesChanged: (([CGFloat], [CGFloat]) -> Void)?
 
+    /// Persistent selection state, driven by the view controller's
+    /// `selectedTextID` via `CanvasView.setSelectedTextOverlay` — mirrors
+    /// `StickerOverlayView.isSelected`, so a selected text zone reads on the
+    /// canvas the same way a selected cell or sticker does, rather than relying
+    /// on the rail chip as the only feedback.
+    var isSelected: Bool = false {
+        didSet { updateSelectionLayerVisibility() }
+    }
+
+    /// Live drag also shows the selection outline (as it always has); the two
+    /// states are independent inputs to the same chrome; the layer is visible
+    /// whenever either is true.
     private var isDragging: Bool = false {
-        didSet { selectionLayer.isHidden = !isDragging }
+        didSet { updateSelectionLayerVisibility() }
+    }
+
+    private func updateSelectionLayerVisibility() {
+        selectionLayer.isHidden = !(isSelected || isDragging)
     }
 
     override init(frame: CGRect) {
@@ -721,6 +778,10 @@ final class TextOverlayView: UIView {
         isUserInteractionEnabled = true
         backgroundColor = .clear
         clipsToBounds = true
+
+        backgroundLayer.isHidden = true
+        layer.addSublayer(backgroundLayer)
+
         label.numberOfLines = 0
         label.lineBreakMode = .byWordWrapping
         addSubview(label)
@@ -740,7 +801,9 @@ final class TextOverlayView: UIView {
 
     func configure(with overlay: TextOverlay, fontScale: CGFloat) {
         self.overlay = overlay
+        self.fontScale = fontScale
         label.attributedText = TextRendering.attributedString(for: overlay, fontScale: fontScale)
+        refreshBackground()
     }
 
     override func layoutSubviews() {
@@ -750,6 +813,27 @@ final class TextOverlayView: UIView {
         selectionLayer.path = UIBezierPath(
             roundedRect: bounds.insetBy(dx: 1, dy: 1), cornerRadius: 6
         ).cgPath
+        refreshBackground()
+    }
+
+    /// Keeps the `.pill` background layer in lockstep with `TextRendering`'s shared
+    /// helper — the same geometry the export draws, computed in `bounds`' own
+    /// coordinate space (origin zero, matching how `label.frame = bounds` already
+    /// works), so the canvas and the export agree by construction.
+    private func refreshBackground() {
+        guard let overlay,
+              let background = TextRendering.backgroundRect(for: overlay, in: bounds, fontScale: fontScale)
+        else {
+            backgroundLayer.isHidden = true
+            return
+        }
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        backgroundLayer.isHidden = false
+        backgroundLayer.frame = background.rect
+        backgroundLayer.cornerRadius = background.cornerRadius
+        backgroundLayer.backgroundColor = UIColor(hex: overlay.style.colorHex).cgColor
+        CATransaction.commit()
     }
 
     // MARK: - Gestures

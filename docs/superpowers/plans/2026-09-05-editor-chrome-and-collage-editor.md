@@ -61,7 +61,7 @@ xcodegen generate && xcodebuild test -project Caroullage.xcodeproj \
 |---|---|
 | `Caroullage/Core/DesignSystem/Editor/EditorTool.swift` | The value types: `EditorTool`, `EditorRailContext`. No UIKit behaviour. |
 | `Caroullage/Core/DesignSystem/Editor/EditorStageGeometry.swift` | Pure aspect-fit maths. No views, so it is testable without a window. |
-| `Caroullage/Core/DesignSystem/Editor/EditorStage.swift` | Canvas host. Owns the replaceable aspect constraint. |
+| `Caroullage/Core/DesignSystem/Editor/EditorStage.swift` | Canvas host. Sizes its canvas to the document aspect via `EditorStageGeometry`. |
 | `Caroullage/Core/DesignSystem/Editor/EditorToolRail.swift` | The bottom rail. Base tools plus an insertable contextual group. |
 | `Caroullage/Core/DesignSystem/Editor/EditorPanel.swift` | Swap-in panel container with animated height. |
 | `Caroullage/Core/Models/TextStyle.swift` | The tier-2 text presentation model. |
@@ -401,7 +401,7 @@ Append inside `EditorChromeTests`:
         stage.layoutIfNeeded()
 
         XCTAssertEqual(content.bounds.width / content.bounds.height, 1080.0 / 1920.0,
-                       accuracy: 0.01, "The aspect constraint must be replaced, not stacked")
+                       accuracy: 0.01, "Changing the aspect must re-lay-out the content")
     }
 
     func testReplacingContentRemovesThePreviousView() {
@@ -435,7 +435,7 @@ Create `Caroullage/Core/DesignSystem/Editor/EditorStage.swift`:
 //  Caroullage
 //
 //  Hosts an editor's canvas and owns its geometry. The canvas takes the DOCUMENT's
-//  aspect ratio through a stored, replaceable multiplier constraint — the grid
+//  aspect ratio, sized by `EditorStageGeometry` in `layoutSubviews` — the grid
 //  editor previously pinned it square, which letterboxed every 9:16 story collage
 //  into 44% dead space.
 //
@@ -509,12 +509,40 @@ Same command as Step 2. Expected: PASS, 11 tests.
 
 ```bash
 git add Caroullage/Core/DesignSystem/Editor/EditorStage.swift CaroullageTests/Unit/EditorChromeTests.swift
-git commit -m "feat(editor): add EditorStage with a replaceable aspect constraint"
+git commit -m "feat(editor): size the editor stage canvas to the document aspect"
 ```
 
 ---
 
 ## Task 4: `EditorToolRail`
+
+> **⚠ Corrections applied after code review — the code block below is NOT authoritative.**
+> Four defects in this task's specified code were found in review and fixed in commit
+> `5b7f05f`. Read the shipped `EditorToolRail.swift`, not this listing, if you re-run this task.
+>
+> 1. **Critical — `ToolButton` had a zero-height hit target.** Its inner icon+label stack was
+>    pinned by `centerXAnchor`/`centerYAnchor` only. A horizontal `UIStackView` with
+>    `alignment = .center` does not stretch a cross-axis arranged subview, so with nothing
+>    pinning top/bottom the control had no source of height and resolved to `height == 0`.
+>    The icon still drew (`clipsToBounds` is off) so it looked correct, and every test passed
+>    because `simulateTap(toolID:)` calls `sendActions` directly and bypasses hit-testing —
+>    the rail's entire tap surface was dead, invisibly. Fix: pin the stack's `topAnchor` and
+>    `bottomAnchor`, mirroring `ContextChip`. Covered now by a test that hit-tests the
+>    button's visual centre, verified to fail against the old constraints.
+> 2. **Important — stale `activeToolID` across a context change.** `setContext` never cleared
+>    it, so a tool id could stay active after the tool left the rail and spuriously highlight a
+>    same-named tool in the next context. `rebuild()` now clears it when the id names no tool
+>    that is present.
+> 3. **Important — `1 / UIScreen.main.scale`.** `UIScreen.main` is deprecated as of iOS 26.0,
+>    and this project builds Debug with `-warnings-as-errors` (`Config/Debug.xcconfig`), so it
+>    becomes a hard build break when the deployment target moves off 17.0. It is also wrong on
+>    external displays. Replaced with a flat point constant, matching the codebase's existing
+>    hairline idiom (`CarouselStripLayout.seamWidth`, `EmptyCellChrome.outlineWidth`).
+> 4. **Minor — accessibility.** A bare `UIControl` subclass is not accessible by default, so
+>    VoiceOver read the inner label with no button trait. Both `ToolButton` and `ContextChip`
+>    now set `isAccessibilityElement = true` and `accessibilityTraits = .button`; the label
+>    also got `adjustsFontSizeToFitWidth` / `minimumScaleFactor` for large Dynamic Type sizes
+>    against the flat 52pt row.
 
 **Files:**
 - Create: `Caroullage/Core/DesignSystem/Editor/EditorToolRail.swift`
@@ -655,6 +683,11 @@ public final class EditorToolRail: UIView {
     /// Content height above the safe-area inset.
     public static let contentHeight: CGFloat = 52
 
+    /// Flat 1pt hairline, matching the codebase idiom (CarouselStripLayout.seamWidth).
+    /// Never derive this from UIScreen.main.scale: deprecated in iOS 26, and Debug
+    /// builds with -warnings-as-errors so it becomes a hard build break.
+    private static let separatorHeight: CGFloat = 1
+
     private let scrollView = UIScrollView()
     private let stack = UIStackView()
     private var baseTools: [EditorTool] = []
@@ -703,7 +736,7 @@ public final class EditorToolRail: UIView {
             separator.topAnchor.constraint(equalTo: topAnchor),
             separator.leadingAnchor.constraint(equalTo: leadingAnchor),
             separator.trailingAnchor.constraint(equalTo: trailingAnchor),
-            separator.heightAnchor.constraint(equalToConstant: 1 / UIScreen.main.scale),
+            separator.heightAnchor.constraint(equalToConstant: Self.separatorHeight),
 
             // Content sits inside the safe area; the view's background does not.
             scrollView.topAnchor.constraint(equalTo: topAnchor),
@@ -942,6 +975,33 @@ git commit -m "feat(editor): add EditorToolRail with additive contextual groups"
 
 ## Task 5: `EditorPanel`
 
+> **⚠ Corrections applied after code review — the code block below is NOT authoritative.**
+> Four defects in this task's specified code were found in review and fixed in commit
+> `e2c09a3`. Read the shipped `EditorPanel.swift`, not this listing, if you re-run this task.
+>
+> 1. **Critical — a stale animation completion tore down the NEXT panel's content.**
+>    `hide(animated:)`'s completion read `self.content` at *fire* time rather than capturing it
+>    at *call* time, and `setVisible`'s completion wrote `isHidden` unconditionally, ignoring the
+>    `finished` flag. Sequence: hide panel A → show panel B before A's completion fires → A's
+>    stale completion removes **B** from the hierarchy, nils `content`, and re-hides the panel.
+>    End state: `isPresenting == true`, title reads "B", panel blank and hidden. Rapid panel
+>    switching is this component's primary interaction, so this was not a corner case.
+>    Fix: capture `let outgoing = content` in `hide` and only clear `content` when it is still
+>    `=== outgoing`; plus a `visibilityGeneration` counter incremented in both `show` and `hide`,
+>    captured when scheduling, and checked in the completion before any state write.
+>    All five original tests used `animated: false`, which takes the synchronous branch and never
+>    enters the racing path — which is exactly why this was invisible. The regression test uses
+>    `animated: true` with `XCTestExpectation` and was verified to fail against the old code.
+> 2. **Important — `isHidden` was an unguarded back door.** `hide` guards on `isPresenting`, so a
+>    caller setting `panel.isHidden` directly desyncs the two and makes `hide` a permanent no-op
+>    while the panel is on screen. Documented as off-limits; callers use `show` / `hide`.
+> 3. **Important — the height contract existed only in prose.** Unlike `EditorToolRail`, which
+>    owns its height internally, this panel's constraints only consume height, never produce it —
+>    so a caller that expects it to self-size gets a silent zero-height collapse. Added a
+>    `.defaultLow` minimum-height floor so the failure is visible, not silent.
+> 4. **Important — `clipsToBounds` was never set** (`UIView` defaults it to `false`), so over-tall
+>    content would bleed past the panel over the rail or canvas with no layout error.
+
 **Files:**
 - Create: `Caroullage/Core/DesignSystem/Editor/EditorPanel.swift`
 - Test: `CaroullageTests/Unit/EditorChromeTests.swift` (append)
@@ -1040,6 +1100,11 @@ public final class EditorPanel: UIView {
     public var onClose: (() -> Void)?
     public private(set) var isPresenting = false
 
+    /// Flat 1pt hairline, matching the codebase idiom (CarouselStripLayout.seamWidth).
+    /// Never derive this from UIScreen.main.scale: deprecated in iOS 26, and Debug
+    /// builds with -warnings-as-errors so it becomes a hard build break.
+    private static let separatorHeight: CGFloat = 1
+
     /// Exposed for tests and for the VC's own bookkeeping.
     public private(set) var currentTitle: String?
 
@@ -1087,7 +1152,7 @@ public final class EditorPanel: UIView {
             separator.topAnchor.constraint(equalTo: topAnchor),
             separator.leadingAnchor.constraint(equalTo: leadingAnchor),
             separator.trailingAnchor.constraint(equalTo: trailingAnchor),
-            separator.heightAnchor.constraint(equalToConstant: 1 / UIScreen.main.scale),
+            separator.heightAnchor.constraint(equalToConstant: Self.separatorHeight),
 
             titleLabel.topAnchor.constraint(equalTo: topAnchor, constant: Theme.Spacing.xs),
             titleLabel.leadingAnchor.constraint(equalTo: leadingAnchor, constant: Theme.Spacing.md),
@@ -1217,7 +1282,7 @@ final class TextStyleTests: XCTestCase {
 
     func testAnUnknownKindFallsBackToPlainRatherThanThrowing() throws {
         // A project written by a future build must still open in this one.
-        let json = Data(#"{"kind":"hologram","colorHex":"#000000","width":6}"#.utf8)
+        let json = Data(##"{"kind":"hologram","colorHex":"#000000","width":6}"##.utf8)
         let decoded = try JSONDecoder().decode(TextStyle.self, from: json)
         XCTAssertEqual(decoded.kind, .plain)
     }
@@ -1506,6 +1571,26 @@ block and before `return`, insert:
         return NSAttributedString(string: overlay.text, attributes: attributes)
     }
 
+    // `TextStyle` carries ONE `width` for every treatment, so the treatments that
+    // need a second dimension derive it here by a fixed ratio. Naming them makes the
+    // coupling legible: a `.shadow` cannot be art-directed as "soft blur, short
+    // offset" versus "sharp blur, long offset" — every shadow rides one curve. If a
+    // designer ever needs those independently, the fix is a second field on
+    // `TextStyle`, not a new literal in this file.
+    private enum StyleRatio {
+        /// Shadow offset as a fraction of `width`; the blur uses `width` directly.
+        static let shadowOffset: CGFloat = 0.35
+        /// A glow is a blur with no offset, softer than a drop shadow of the same width.
+        static let glowBlur: CGFloat = 1.6
+        /// Pill: generous horizontal inset, tighter vertical, near-capsule corners.
+        static let pillVerticalInset: CGFloat = 0.6
+        static let pillCornerInset: CGFloat = 2
+        /// Highlight: hugs the text, marker-pen corners.
+        static let highlightHorizontalInset: CGFloat = 0.5
+        static let highlightVerticalInset: CGFloat = 0.25
+        static let highlightCorner: CGFloat = 0.3
+    }
+
     /// Applies the presentation treatment. Kept separate from typesetting so the
     /// pill / highlight kinds — which paint behind the text rather than changing it
     /// — can be no-ops here and handled in `draw`.
@@ -1530,13 +1615,13 @@ block and before `return`, insert:
             let shadow = NSShadow()
             shadow.shadowColor = colour.withAlphaComponent(0.55)
             shadow.shadowBlurRadius = max(1, width)
-            shadow.shadowOffset = CGSize(width: 0, height: max(1, width * 0.35))
+            shadow.shadowOffset = CGSize(width: 0, height: max(1, width * StyleRatio.shadowOffset))
             attributes[.shadow] = shadow
 
         case .glow:
             let shadow = NSShadow()
             shadow.shadowColor = colour
-            shadow.shadowBlurRadius = max(1, width * 1.6)
+            shadow.shadowBlurRadius = max(1, width * StyleRatio.glowBlur)
             shadow.shadowOffset = .zero
             attributes[.shadow] = shadow
         }
@@ -1584,11 +1669,11 @@ Then add the helper below `draw`:
 
         switch style.kind {
         case .pill:
-            rect = textRect.insetBy(dx: -inset, dy: -inset * 0.6)
-            radius = min(rect.height / 2, inset * 2)
+            rect = textRect.insetBy(dx: -inset, dy: -inset * StyleRatio.pillVerticalInset)
+            radius = min(rect.height / 2, inset * StyleRatio.pillCornerInset)
         case .highlight:
-            rect = textRect.insetBy(dx: -inset * 0.5, dy: -inset * 0.25)
-            radius = inset * 0.3
+            rect = textRect.insetBy(dx: -inset * StyleRatio.highlightHorizontalInset, dy: -inset * StyleRatio.highlightVerticalInset)
+            radius = inset * StyleRatio.highlightCorner
         case .plain, .shadow, .stroke, .glow:
             return
         }
@@ -1833,7 +1918,11 @@ handler if it is not already assigned), add:
         viewModel.onGeometryChange = { [weak self] in
             guard let self else { return }
             self.stage.setCanvasAspect(self.viewModel.canvasSize)
-            self.reconfigureCanvas()
+            // updateGeometry, NOT reconfigureCanvas: this fires on every tick of a Border/Corners
+            // drag, and the full configure path re-wraps every CGImage and rebuilds every sticker
+            // view. CanvasView.updateGeometry's doc comment records that doing this at slider
+            // frequency is what made the canvas stutter. Only ADD the aspect resync line; keep
+            // whatever light-path call the handler already made.
         }
 ```
 
@@ -2196,6 +2285,18 @@ Add to `GridEditorViewController`, and call `setupRail()` from `viewDidLoad()` a
     private var openToolID: EditorTool.ID?
 
     private func setupRail() {
+        // Re-wire the controls Task 8 orphaned. Their `addTarget` calls lived in the
+        // old `setupLayout()` that Task 8 deleted, so without this the Border and
+        // Corner sliders and the Grid/Shapes control land in their panels looking
+        // perfectly functional and do NOTHING when dragged — no crash, no warning.
+        // This runs once, from `viewDidLoad`; do not move it into a panel factory,
+        // which would re-register a handler on every open and fire it twice.
+        layoutModeControl.addTarget(self, action: #selector(layoutModeChanged), for: .valueChanged)
+        borderSlider.addTarget(self, action: #selector(borderChanged), for: .valueChanged)
+        borderSlider.addTarget(self, action: #selector(sliderReleased), for: [.touchUpInside, .touchUpOutside])
+        cornerSlider.addTarget(self, action: #selector(cornerChanged), for: .valueChanged)
+        cornerSlider.addTarget(self, action: #selector(sliderReleased), for: [.touchUpInside, .touchUpOutside])
+
         var tools: [EditorTool] = []
         // A template defines its own geometry — offering a layout picker would claim
         // a selection the document does not have.

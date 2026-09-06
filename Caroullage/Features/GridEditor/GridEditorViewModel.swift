@@ -213,6 +213,12 @@ public final class GridEditorViewModel {
         commit { $0.stickerOverlays.removeAll { $0.id == id } }
     }
 
+    /// Removes a text overlay (the Delete tool). Undoable.
+    public func removeTextOverlay(id: UUID) {
+        guard state.textOverlays.contains(where: { $0.id == id }) else { return }
+        commit { $0.textOverlays.removeAll { $0.id == id } }
+    }
+
     /// Live filter update from the filter panel — no undo snapshot; the filtered
     /// image is recomputed asynchronously and delivered via `onCellImageChanged`.
     public func previewFilters(_ filters: CellFilters, forCellAt index: Int) {

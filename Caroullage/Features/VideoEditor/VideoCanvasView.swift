@@ -15,9 +15,17 @@
 //  this screen is UIKit while the control sheets are SwiftUI.
 //
 //  Two things layer ABOVE the player:
-//  • `overlayImageView` — the baked text/sticker image. AVPlayer ignores the
-//    `AVVideoCompositionCoreAnimationTool`, and the exporter draws the same image at
-//    write-time (slice 4), so compositing it here keeps preview == export.
+//  • `textViews` / `stickerViews` — the same pooled, interactive overlay views the
+//    photo collage editor uses (`TextOverlayView` / `StickerOverlayView`), which
+//    already draw through the shared `TextRendering`/`StickerRendering` helpers, so
+//    a caption or sticker looks identical whether the project is a photo or video
+//    collage. There is deliberately no second, baked-image copy of this layer: an
+//    earlier slice tried compositing `bundle.overlayImage` into its own image view
+//    here too, but that view sat hidden underneath these live ones (and, once a
+//    text overlay carries timing, `overlayImage` is nil) — see `setPreviewTime`
+//    below for how the live views themselves follow playback time instead.
+//    `bundle.overlayImage` / `timedOverlays` still exist for the EXPORT, which
+//    draws into a `CVPixelBuffer` where UIKit views can't run.
 //  • `cellViews` — selection chrome + "tap to add" placeholders for empty slots.
 //
 
@@ -41,8 +49,6 @@ final class VideoCanvasView: UIView {
         set { playerLayer.player = newValue }
     }
 
-    /// The baked text/sticker overlay, drawn above the video (matches the export).
-    private let overlayImageView = UIImageView()
     /// One chrome view per layout slot (placeholder + selection outline).
     private var cellViews: [UIView] = []
 
@@ -50,12 +56,21 @@ final class VideoCanvasView: UIView {
     private var cellFrames: [CGRect] = []
 
     // Interactive text/sticker overlay views (reused from the grid editor), layered
-    // above the player. Shown live instead of the baked `overlayImageView`, which is
-    // only used at export — so preview == export.
+    // above the player — the only overlay rendering path in the preview; see the
+    // header comment for why there's no separate baked-image layer.
     private var textViews: [TextOverlayView] = []
     private var stickerViews: [StickerOverlayView] = []
     private var textModels: [TextOverlay] = []
     private var stickerModels: [StickerOverlay] = []
+
+    /// The composition time the preview is showing, in seconds — pushed by the VC's
+    /// player time observer. Drives which timed text overlays are on screen so the
+    /// canvas matches what the export will write for that same instant. Same
+    /// half-open `[start, end)` contract as `TextOverlay.isVisible(at:)`, compared
+    /// with no tolerance: the caller must feed the same `CMTime.seconds` conversion
+    /// the export uses, or an in/out point landing exactly on a frame boundary could
+    /// disagree between the two.
+    private var previewTime: Double = 0
 
     var onTextChanged: ((TextOverlay) -> Void)?
     var onTextCommitted: (() -> Void)?
@@ -73,10 +88,6 @@ final class VideoCanvasView: UIView {
         playerLayer.videoGravity = .resizeAspect
         clipsToBounds = true
         layer.cornerRadius = Theme.Radius.md
-
-        overlayImageView.contentMode = .scaleToFill
-        overlayImageView.isUserInteractionEnabled = false
-        addSubview(overlayImageView)
 
         isAccessibilityElement = false
         accessibilityIdentifier = "videoCanvas"
@@ -117,17 +128,17 @@ final class VideoCanvasView: UIView {
         setNeedsLayout()
     }
 
-    /// The baked text/sticker layer (nil clears it).
-    func setOverlayImage(_ image: UIImage?) {
-        overlayImageView.image = image
-        overlayImageView.isHidden = (image == nil)
-    }
-
     // MARK: - Interactive overlays
 
     /// Pools/rebuilds the interactive text views and repositions them. Wires each
     /// view's gesture callbacks back out through this canvas.
-    func updateTextOverlays(_ overlays: [TextOverlay]) {
+    ///
+    /// `selected` mirrors `updateStickerOverlays(_:selected:)` — Task 6's "Text
+    /// selected" contextual rail group is not the only feedback that something
+    /// is selected: `TextOverlayView` already carries the same persistent
+    /// selection chrome `StickerOverlayView` does, so the tapped zone shows it
+    /// on the canvas too.
+    func updateTextOverlays(_ overlays: [TextOverlay], selected: UUID? = nil) {
         textModels = overlays
         if textViews.count != overlays.count {
             textViews.forEach { $0.removeFromSuperview() }
@@ -140,9 +151,15 @@ final class VideoCanvasView: UIView {
                 return view
             }
         }
+        for (view, overlay) in zip(textViews, overlays) {
+            view.isSelected = overlay.id == selected
+        }
         textViews.forEach { bringSubviewToFront($0) }
         stickerViews.forEach { bringSubviewToFront($0) }   // stickers above text
         setNeedsLayout()
+        // A freshly pooled view defaults to visible — refresh immediately so a
+        // timed-out caption doesn't flash on screen before the next player tick.
+        refreshTextVisibility()
     }
 
     func updateStickerOverlays(_ overlays: [StickerOverlay], selected: UUID?) {
@@ -168,11 +185,36 @@ final class VideoCanvasView: UIView {
             || textViews.contains { $0.frame.contains(point) }
     }
 
+    // MARK: - Playback time
+
+    /// The VC's player time observer calls this ~10x/sec with the current playback
+    /// time (seconds). Hides/shows the pooled text views so a caption is only ever
+    /// on screen inside its `startTime`/`endTime` window — the same thing the
+    /// export's per-frame overlay selection does, so preview and export agree.
+    func setPreviewTime(_ seconds: Double) {
+        guard seconds != previewTime else { return }
+        previewTime = seconds
+        refreshTextVisibility()
+    }
+
+    /// Test seam: the pooled text overlay views, to assert visibility directly
+    /// rather than through screenshot comparison.
+    var textOverlayViewsForTesting: [UIView] { textViews }
+
+    /// The time captions are currently being shown against. A scrub must move
+    /// this synchronously — see `VideoEditorViewController.scrub(to:)`.
+    var previewTimeForTesting: Double { previewTime }
+
+    private func refreshTextVisibility() {
+        for (view, overlay) in zip(textViews, textModels) {
+            view.isHidden = !overlay.isVisible(at: previewTime)
+        }
+    }
+
     // MARK: - Layout
 
     override func layoutSubviews() {
         super.layoutSubviews()
-        overlayImageView.frame = bounds
         let transform = canvasToView()
         for (index, cellView) in cellViews.enumerated() where cellFrames.indices.contains(index) {
             cellView.frame = cellFrames[index].applying(transform)

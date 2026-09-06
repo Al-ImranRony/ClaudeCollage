@@ -32,6 +32,14 @@ public final class VideoEditorViewModel {
         public var layout: CollageLayout
         public var textOverlays: [TextOverlay] = []
         public var stickerOverlays: [StickerOverlay] = []
+        /// Added by the Fix 2 hardening pass: the Frame panel's Border slider used
+        /// to bypass `Snapshot` entirely (a plain settable property nothing ever
+        /// pushed onto the undo stack), making it the one edit in either editor
+        /// that undo couldn't reverse. `Snapshot` is never `Codable` — it is a
+        /// pure in-memory undo-stack element, never persisted — so this needs no
+        /// `decodeIfPresent` fallback the way `VideoProjectData.borderWidth`
+        /// (the actually-persisted field) does.
+        public var borderWidth: CGFloat = 0
     }
 
     public let projectID: UUID
@@ -46,12 +54,20 @@ public final class VideoEditorViewModel {
     public private(set) var stickerOverlays: [StickerOverlay] = []
     public private(set) var selectedIndex: Int?
     /// Gap between cells, in canvas pixels (mirrors the grid editor's border).
-    public var borderWidth: CGFloat
+    /// Settable only through `setBorderWidthInteractive` + `commitInteractive()`
+    /// (or `restore`) now that it rides the undo stack — see `Snapshot.borderWidth`.
+    public private(set) var borderWidth: CGFloat
 
     /// Decoded sources, kept out of the persisted state. Never evicted, so undoing
     /// a delete restores a playable cell rather than an empty one.
     private var assets: [UUID: AVAsset] = [:]
     private var musicAsset: AVAsset?
+    /// Resolved source lengths in seconds, keyed by `videoID`. Loading an
+    /// `AVAsset`'s duration is async, but the timeline has to be built
+    /// synchronously on every change — so the result is cached here and
+    /// `loadMissingSourceDurations()` fills it in the background. Keyed by
+    /// asset, not by cell, so moving a clip between slots costs no reload.
+    private var sourceDurations: [UUID: Double] = [:]
 
     private let undoStack = UndoStack<Snapshot>(maxDepth: 20)
     private let engine = CollageLayoutEngine()
@@ -172,6 +188,16 @@ public final class VideoEditorViewModel {
         mutate(index) { $0.transition = transition }
     }
 
+    /// Delays this cell's entry into the collage. Clamped `max(0, …)` — a
+    /// negative offset would mean starting before the collage does.
+    public func setStartOffset(_ seconds: Double, forCellAt index: Int) {
+        mutate(index) { $0.startOffset = max(0, seconds) }
+    }
+
+    public func setStartOffsetInteractive(_ seconds: Double, forCellAt index: Int) {
+        mutateInteractive(index) { $0.startOffset = max(0, seconds) }
+    }
+
     // MARK: - Interactive (coalesced) edits
 
     // A continuous gesture (dragging a slider) calls the `*Interactive` setters,
@@ -198,6 +224,17 @@ public final class VideoEditorViewModel {
 
     public func setTransitionInteractive(_ transition: CellTransition?, forCellAt index: Int) {
         mutateInteractive(index) { $0.transition = transition }
+    }
+
+    /// Live border-width drag from the Frame panel. Mirrors
+    /// `GridEditorViewModel.previewBorderWidth`: updates the live value + fires
+    /// `onChanged` for the preview, but records NO undo step — `commitInteractive()`
+    /// on release coalesces the whole drag into one. The caller (the Frame panel's
+    /// slider, 0…1 scaled by its own canvas-derived ceiling) is responsible for
+    /// clamping to a sane range; this only guards against a negative width.
+    public func setBorderWidthInteractive(_ width: CGFloat) {
+        borderWidth = max(0, width)
+        onChanged?()
     }
 
     /// Per-cell pan/zoom framing (interactive — pinch/pan gestures). `zoom` clamps to
@@ -289,6 +326,34 @@ public final class VideoEditorViewModel {
         record()
     }
 
+    /// Sets a text overlay's in/out points. `nil` means unbounded in that
+    /// direction — see `TextOverlay.isVisible(at:)`. Records one undo step.
+    ///
+    /// Clamps each bound to `max(0, …)` the way `TextOverlay.init` does, because
+    /// assigning the properties directly (which this does) bypasses that. An
+    /// INVERTED window is deliberately not corrected here: `isVisible` already
+    /// treats one as "always visible" rather than "never", so a bad drag shows
+    /// the caption instead of silently hiding it. Task 8's numeric entry is
+    /// where a window gets actively prevented from inverting.
+    public func setTextTiming(id: UUID, start: Double?, end: Double?) {
+        guard let index = textOverlays.firstIndex(where: { $0.id == id }) else { return }
+        applyTiming(at: index, start: start, end: end)
+        record()
+    }
+
+    /// Live retiming from a timeline drag — no undo step until `commitInteractive()`,
+    /// so a whole drag is one step rather than one per frame.
+    public func setTextTimingInteractive(id: UUID, start: Double?, end: Double?) {
+        guard let index = textOverlays.firstIndex(where: { $0.id == id }) else { return }
+        applyTiming(at: index, start: start, end: end)
+        onChanged?()
+    }
+
+    private func applyTiming(at index: Int, start: Double?, end: Double?) {
+        textOverlays[index].startTime = start.map { max(0, $0) }
+        textOverlays[index].endTime = end.map { max(0, $0) }
+    }
+
     public func removeTextOverlay(id: UUID) {
         guard textOverlays.contains(where: { $0.id == id }) else { return }
         textOverlays.removeAll { $0.id == id }
@@ -299,6 +364,59 @@ public final class VideoEditorViewModel {
         guard stickerOverlays.contains(where: { $0.id == id }) else { return }
         stickerOverlays.removeAll { $0.id == id }
         record()
+    }
+
+    // MARK: - Timeline
+
+    /// Resolves any source duration not yet known. Cheap to call repeatedly: it
+    /// only touches assets missing from the cache, so the steady state is no work
+    /// at all. Returns whether anything actually landed, so a caller can skip a
+    /// redundant refresh.
+    @discardableResult
+    public func loadMissingSourceDurations() async -> Bool {
+        let missing = cells.compactMap(\.videoID).filter { sourceDurations[$0] == nil }
+        guard !missing.isEmpty else { return false }
+
+        var loaded: [UUID: Double] = [:]
+        for id in Set(missing) {
+            guard let asset = assets[id] else { continue }
+            // A source that will not load (a moved or deleted file) resolves to 0
+            // rather than throwing — the lane then shows nothing, which is honest,
+            // and the rest of the timeline still builds.
+            let seconds = (try? await asset.load(.duration).seconds) ?? 0
+            loaded[id] = seconds.isFinite ? max(0, seconds) : 0
+        }
+        guard !loaded.isEmpty else { return false }
+        sourceDurations.merge(loaded) { _, new in new }
+        return true
+    }
+
+    /// The resolved length of a cell's source, once loaded. `nil` while the async
+    /// load is still outstanding — callers must not treat that as "zero length".
+    public func sourceDuration(forCellAt index: Int) -> Double? {
+        guard cells.indices.contains(index), let id = cells[index].videoID else { return nil }
+        return sourceDurations[id]
+    }
+
+    /// The timeline's view model, built from the current document. Synchronous by
+    /// design — it is rebuilt on every change — which is why the durations it
+    /// needs are cached rather than loaded here.
+    public func timelineModel(selectedTextID: UUID? = nil, isPlaying: Bool = false)
+        -> VideoTimelineModel {
+        var durationsByIndex: [Int: Double] = [:]
+        for (index, cell) in cells.enumerated() {
+            if let id = cell.videoID, let seconds = sourceDurations[id] {
+                durationsByIndex[index] = seconds
+            }
+        }
+        return VideoTimelineModelBuilder.make(
+            cells: cells,
+            sourceDurations: durationsByIndex,
+            textOverlays: textOverlays,
+            hasMusic: hasMusic,
+            selectedClipIndex: selectedIndex,
+            selectedTextID: selectedTextID,
+            isPlaying: isPlaying)
     }
 
     // MARK: - Composition bridge
@@ -320,7 +438,8 @@ public final class VideoEditorViewModel {
                 isMuted: cell.isMuted,
                 volume: cell.volume,
                 transition: cell.transition,
-                transform: cell.transform)
+                transform: cell.transform,
+                startOffset: cell.startOffset)
         }
     }
 
@@ -360,12 +479,19 @@ public final class VideoEditorViewModel {
     /// default crossfade so it has something to pop in with.
     public func applyBeatSync(startTimes: [Double]) {
         for index in cells.indices where index < startTimes.count {
+            // `startTimes` are absolute times in the collage, but
+            // `CellTransition.startTime` is relative to the CELL — so a cell that
+            // enters late has to have the beat expressed against its own start,
+            // or it would reveal at `startOffset + beat`. A beat that falls
+            // before the cell exists collapses to 0: the earliest it can appear
+            // is when it appears.
+            let beat = max(0, startTimes[index] - cells[index].startOffset)
             if var transition = cells[index].transition {
-                transition.startTime = startTimes[index]
+                transition.startTime = beat
                 cells[index].transition = transition
             } else {
                 cells[index].transition = CellTransition(
-                    style: .crossfade, duration: 0.4, startTime: startTimes[index])
+                    style: .crossfade, duration: 0.4, startTime: beat)
             }
         }
         record()
@@ -476,6 +602,7 @@ public final class VideoEditorViewModel {
         layout = snapshot.layout
         textOverlays = snapshot.textOverlays
         stickerOverlays = snapshot.stickerOverlays
+        borderWidth = snapshot.borderWidth
         if let selected = selectedIndex, selected >= cells.count { selectedIndex = nil }
         onChanged?()
         onCommit?(self)
@@ -483,7 +610,8 @@ public final class VideoEditorViewModel {
 
     private func currentSnapshot() -> Snapshot {
         Snapshot(cells: cells, music: music, layout: layout,
-                 textOverlays: textOverlays, stickerOverlays: stickerOverlays)
+                 textOverlays: textOverlays, stickerOverlays: stickerOverlays,
+                 borderWidth: borderWidth)
     }
 
     private func record() {

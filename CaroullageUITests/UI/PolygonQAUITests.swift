@@ -36,6 +36,9 @@ final class PolygonQAUITests: XCTestCase {
         XCTAssertTrue(app.navigationBars["Grid Collage"].waitForExistence(timeout: 8), "Editor pushes")
         attach(app, "01_editor_grid_default")
 
+        // Grid/Shapes and both pickers now live in the Layout panel.
+        app.buttons["layoutTool"].tap()
+
         // Grid/Shapes segmented control.
         let gridSeg = app.buttons["Grid"]
         let shapesSeg = app.buttons["Shapes"]

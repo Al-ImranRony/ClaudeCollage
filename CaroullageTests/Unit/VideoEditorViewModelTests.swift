@@ -155,6 +155,30 @@ final class VideoEditorViewModelTests: XCTestCase {
         XCTAssertTrue(vm.canUndo)
     }
 
+    // MARK: - Border width (Fix 2: the Frame panel's Border slider must be undoable)
+
+    // Simulate a slider drag: many mid-gesture updates ending at 18.
+    private let dragBorderWidths: [CGFloat] = [2, 5, 9, 14, 18]
+
+    func testInteractiveBorderWidthDoesNotRecordUndoUntilCommitted() {
+        let vm = makeViewModel()
+        for w in dragBorderWidths { vm.setBorderWidthInteractive(w) }
+        XCTAssertFalse(vm.canUndo, "mid-drag updates must not each push an undo snapshot")
+        XCTAssertEqual(vm.borderWidth, 18, accuracy: 1e-9, "but the live value still tracks the drag")
+    }
+
+    func testCommitInteractiveRecordsExactlyOneUndoStepForBorderWidth() {
+        let vm = makeViewModel()
+        for w in dragBorderWidths { vm.setBorderWidthInteractive(w) }
+        vm.commitInteractive()
+        XCTAssertTrue(vm.canUndo)
+
+        vm.undo()
+        XCTAssertEqual(vm.borderWidth, 0, accuracy: 1e-9,
+                       "one undo returns the whole drag to where it began")
+        XCTAssertFalse(vm.canUndo, "exactly one step was recorded for the whole drag, not one per tick")
+    }
+
     // MARK: - Selection
 
     func testSelectCellIgnoresOutOfRange() {

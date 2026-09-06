@@ -14,6 +14,11 @@
 //     drawing into a differently-scaled canvas multiplies them by
 //     targetCanvas.height / referenceCanvas.height.
 //   • `lineHeight` is a unitless multiple of the font's natural line height.
+//   • `startTime` / `endTime` are SECONDS, relative to the composition timeline
+//     (not the source asset). `nil` means unbounded in that direction. Both are
+//     clamped to `max(0, …)` on init and decode (never turning `nil` into `0` —
+//     see the properties below and `isVisible(at:)` for the degenerate-window
+//     rules a Task 7 timeline editor must preserve).
 //
 
 import Foundation
@@ -37,6 +42,23 @@ public struct TextOverlay: Codable, Sendable, Equatable, Identifiable {
     public var isBold: Bool
     public var isItalic: Bool
     public var isUnderlined: Bool
+    /// How the text is presented over its background. See `TextStyle`.
+    public var style: TextStyle
+    /// How the text enters/leaves its window. See `TextAnimation` — RESERVED,
+    /// nothing reads it yet. Stored as the raw string (like `alignmentRaw`, not
+    /// like `style`) so that a project saved by a future build that ships tier-3
+    /// animation opens here as `.none` AND keeps its value when this build
+    /// re-saves it. Read it through `animation`, which does the fallback.
+    public var animationRaw: String
+    /// In-point in seconds. `nil` means "from the beginning" — the still-image
+    /// paths ignore timing entirely, so this costs the photo editor nothing.
+    /// Clamped to `max(0, …)` on init/decode when non-nil; `nil` itself is never
+    /// clamped away. See `isVisible(at:)` for what a degenerate window does.
+    public var startTime: Double?
+    /// Out-point in seconds, exclusive. `nil` means "to the end".
+    /// Clamped to `max(0, …)` on init/decode when non-nil; `nil` itself is never
+    /// clamped away. See `isVisible(at:)` for what a degenerate window does.
+    public var endTime: Double?
     public var frameX: Double
     public var frameY: Double
     public var frameWidth: Double
@@ -55,6 +77,10 @@ public struct TextOverlay: Codable, Sendable, Equatable, Identifiable {
         isBold: Bool = false,
         isItalic: Bool = false,
         isUnderlined: Bool = false,
+        style: TextStyle = TextStyle(),
+        animation: TextAnimation = .none,
+        startTime: Double? = nil,
+        endTime: Double? = nil,
         frame: CGRect = .zero
     ) {
         self.id = id
@@ -69,6 +95,10 @@ public struct TextOverlay: Codable, Sendable, Equatable, Identifiable {
         self.isBold = isBold
         self.isItalic = isItalic
         self.isUnderlined = isUnderlined
+        self.style = style
+        self.animationRaw = animation.rawValue
+        self.startTime = startTime.map { max(0, $0) }
+        self.endTime = endTime.map { max(0, $0) }
         self.frameX = Double(frame.origin.x)
         self.frameY = Double(frame.origin.y)
         self.frameWidth = Double(frame.size.width)
@@ -78,6 +108,13 @@ public struct TextOverlay: Codable, Sendable, Equatable, Identifiable {
     public var alignment: Alignment {
         get { Alignment(rawValue: alignmentRaw) ?? .center }
         set { alignmentRaw = newValue.rawValue }
+    }
+
+    /// A raw value this build does not recognise reads as `.none` rather than
+    /// throwing — `animationRaw` keeps it, so a newer build gets it back.
+    public var animation: TextAnimation {
+        get { TextAnimation(rawValue: animationRaw) ?? .none }
+        set { animationRaw = newValue.rawValue }
     }
 
     public var frame: CGRect {
@@ -99,6 +136,9 @@ public struct TextOverlay: Codable, Sendable, Equatable, Identifiable {
     private enum CodingKeys: String, CodingKey {
         case id, text, fontName, fontSize, colorHex, alignmentRaw
         case letterSpacing, lineHeight, opacity, isBold, isItalic, isUnderlined
+        case style
+        case animationRaw
+        case startTime, endTime
         case frameX, frameY, frameWidth, frameHeight
     }
 
@@ -117,9 +157,52 @@ public struct TextOverlay: Codable, Sendable, Equatable, Identifiable {
         self.isBold = try c.decodeIfPresent(Bool.self, forKey: .isBold) ?? fallback.isBold
         self.isItalic = try c.decodeIfPresent(Bool.self, forKey: .isItalic) ?? fallback.isItalic
         self.isUnderlined = try c.decodeIfPresent(Bool.self, forKey: .isUnderlined) ?? fallback.isUnderlined
+        self.style = try c.decodeIfPresent(TextStyle.self, forKey: .style) ?? fallback.style
+        self.animationRaw = try c.decodeIfPresent(String.self, forKey: .animationRaw) ?? fallback.animationRaw
+        self.startTime = try c.decodeIfPresent(Double.self, forKey: .startTime).map { max(0, $0) }
+        self.endTime = try c.decodeIfPresent(Double.self, forKey: .endTime).map { max(0, $0) }
         self.frameX = try c.decodeIfPresent(Double.self, forKey: .frameX) ?? fallback.frameX
         self.frameY = try c.decodeIfPresent(Double.self, forKey: .frameY) ?? fallback.frameY
         self.frameWidth = try c.decodeIfPresent(Double.self, forKey: .frameWidth) ?? fallback.frameWidth
         self.frameHeight = try c.decodeIfPresent(Double.self, forKey: .frameHeight) ?? fallback.frameHeight
+    }
+
+    /// Whether this overlay is on screen at `time` (seconds into the composition).
+    ///
+    /// Contract for callers (Task 2's frame-time conversion in particular): `time`
+    /// is the frame's presentation time in seconds, and the window is half-open —
+    /// `[start, end)` — compared with exact `>=` / `<`, no tolerance. A caller that
+    /// quantises to frames (e.g. against the composition's CMTime timescale) must
+    /// do so the same way in preview and export, or an in/out point that lands
+    /// exactly on a frame boundary can flicker a frame early or late between the
+    /// two. This method adds no tolerance of its own — quantise consistently
+    /// upstream instead.
+    ///
+    /// Every DEGENERATE window — one that can never contain a valid (non-negative)
+    /// time — is treated as ALWAYS VISIBLE rather than never visible: an inverted
+    /// window (`end <= start`), a zero-width window (`start == end`), and a
+    /// single-bound window whose only constraint is non-positive (e.g. `endTime`
+    /// of `0` or less with no `startTime` — reachable by hand-edited/corrupt JSON,
+    /// or by Task 7 dragging an out-point back to the very start). A corrupt or
+    /// mis-dragged project must not be able to make a caption permanently
+    /// invisible with nothing on screen to explain why — failing loud beats
+    /// failing silent.
+    public func isVisible(at time: Double) -> Bool {
+        switch (startTime, endTime) {
+        case (nil, nil):
+            return true
+        case let (start?, nil):
+            return time >= start
+        case let (nil, end?):
+            // A non-positive out-point with no in-point describes a window that can
+            // never contain a valid (non-negative) time. Fail OPEN, exactly as an
+            // inverted window does below — a corrupt or mis-dragged value must not be
+            // able to hide a caption with nothing on screen to explain why.
+            guard end > 0 else { return true }
+            return time < end
+        case let (start?, end?):
+            guard end > start else { return true }
+            return time >= start && time < end
+        }
     }
 }

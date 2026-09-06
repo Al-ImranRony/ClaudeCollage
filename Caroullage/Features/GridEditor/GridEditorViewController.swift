@@ -20,15 +20,20 @@ final class GridEditorViewController: UIViewController {
 
     // UI
     private let canvasView = CanvasView()
+    private let stage = EditorStage()
+    private let toolRail = EditorToolRail()
+    private let toolPanel = EditorPanel()
+    /// Owns the panel's open/close/animate sequence and the constraint trap that
+    /// goes with it — shared with the video editor. Lazy because it needs
+    /// `view`, which exists by the time `setupLayout` runs.
+    private lazy var panels = EditorPanelPresenter(panel: toolPanel, rail: toolRail, host: view)
+    /// The currently-shown Layout panel, if any — kept so `layoutModeChanged()`
+    /// can toggle its picker without the panel being re-created.
+    private weak var layoutPanel: LayoutPanelView?
     private lazy var layoutModeControl = UISegmentedControl(items: ["Grid", "Shapes"])
     private lazy var layoutPicker = LayoutPickerView(selected: viewModel.state.layout.gridTemplate)
     private lazy var shapePicker = ShapePickerView(selected: viewModel.state.layout.polygonTemplate)
     private lazy var customShapeButton = makeCustomShapeButton()
-    /// The row wrapping `customShapeButton`; shown only in Shapes mode.
-    private var customShapeRow: UIStackView?
-    /// The whole "Layout" group (label, Grid/Shapes switch, both pickers).
-    /// Hidden for `.template` documents, which have no layout alternatives.
-    private var layoutSection: UIStackView?
     private lazy var backgroundPicker = BackgroundPickerView(selected: viewModel.state.background)
     private let borderSlider = UISlider()
     private let cornerSlider = UISlider()
@@ -90,6 +95,7 @@ final class GridEditorViewController: UIViewController {
         view.backgroundColor = Theme.Color.background
         setupNavigationBar()
         setupLayout()
+        setupRail()
         setupGestures()
         setupDropInteraction()
         bindViewModel()
@@ -176,132 +182,311 @@ final class GridEditorViewController: UIViewController {
     }
 
     private func setupLayout() {
-        canvasView.translatesAutoresizingMaskIntoConstraints = false
+        view.backgroundColor = Theme.Color.background
+
         canvasView.backgroundColor = Theme.Color.cellWell
-        canvasView.layer.cornerRadius = 12
+        canvasView.layer.cornerRadius = Theme.Radius.md
+        canvasView.layer.cornerCurve = .continuous
         canvasView.clipsToBounds = true
 
-        // Border + corner sliders live in a labelled stack. Both are normalized
-        // 0…1 and scaled through `viewModel.maxBorderWidth` / `maxCornerRadius`
-        // at read time, so the usable range follows the canvas and layout rather
-        // than a fixed constant that was far too small on a 1080pt canvas.
-        borderSlider.minimumValue = 0
-        borderSlider.maximumValue = 1
-        borderSlider.value = Float(normalizedBorder)
-        borderSlider.addTarget(self, action: #selector(borderChanged), for: .valueChanged)
-        borderSlider.addTarget(self, action: #selector(sliderReleased), for: [.touchUpInside, .touchUpOutside])
+        stage.setContent(canvasView)
+        stage.setCanvasAspect(viewModel.canvasSize)
 
-        cornerSlider.minimumValue = 0
-        cornerSlider.maximumValue = 1
-        cornerSlider.value = Float(normalizedCorner)
-        cornerSlider.addTarget(self, action: #selector(cornerChanged), for: .valueChanged)
-        cornerSlider.addTarget(self, action: #selector(sliderReleased), for: [.touchUpInside, .touchUpOutside])
+        stage.translatesAutoresizingMaskIntoConstraints = false
+        toolPanel.translatesAutoresizingMaskIntoConstraints = false
+        toolRail.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(stage)
+        view.addSubview(toolPanel)
+        view.addSubview(toolRail)
 
-        let borderRow = labelledSlider("Border", slider: borderSlider, systemImage: "square.dashed")
-        let cornerRow = labelledSlider("Corners", slider: cornerSlider, systemImage: "rotate.left")
-
-        // Grid / Shapes mode switch. Selecting a segment reveals the matching
-        // picker; both drive the same `setLayout` on the view model.
-        layoutModeControl.selectedSegmentIndex = viewModel.state.layout.isPolygon ? 1 : 0
-        ThemeSegmentedControl.apply(to: layoutModeControl)
-        layoutModeControl.addTarget(self, action: #selector(layoutModeChanged), for: .valueChanged)
-        let modeRow = UIStackView(arrangedSubviews: [layoutModeControl])
-        modeRow.isLayoutMarginsRelativeArrangement = true
-        modeRow.layoutMargins = UIEdgeInsets(top: 0, left: 16, bottom: 2, right: 16)
-
-        shapePicker.isHidden = !viewModel.state.layout.isPolygon
-        layoutPicker.isHidden = viewModel.state.layout.isPolygon
-
-        let customRow = UIStackView(arrangedSubviews: [customShapeButton])
-        customRow.isLayoutMarginsRelativeArrangement = true
-        customRow.layoutMargins = UIEdgeInsets(top: 0, left: 16, bottom: 2, right: 16)
-        customRow.isHidden = !viewModel.state.layout.isPolygon
-        customShapeRow = customRow
-
-        // The whole Layout group is hidden as one unit for `.template` documents:
-        // the template defines its own geometry, so both the Grid/Shapes switch
-        // and the pickers would be claiming a selection that does not exist.
-        let layoutSection = UIStackView(arrangedSubviews: [
-            sectionLabel("Layout"),
-            modeRow,
-            layoutPicker,
-            shapePicker,
-            customRow,
-        ])
-        layoutSection.axis = .vertical
-        layoutSection.spacing = 6
-        layoutSection.isHidden = !viewModel.state.layout.offersLayoutAlternatives
-        self.layoutSection = layoutSection
-
-        let controlsStack = UIStackView(arrangedSubviews: [
-            layoutSection,
-            borderRow,
-            cornerRow,
-            sectionLabel("Background"),
-            backgroundPicker,
-            makeGenerativeBackgroundRow(),
-        ])
-        controlsStack.axis = .vertical
-        controlsStack.spacing = 6
-        controlsStack.translatesAutoresizingMaskIntoConstraints = false
-
-        layoutPicker.onSelect = { [weak self] template in
-            self?.viewModel.setLayout(.grid(template))
-        }
-        shapePicker.onSelect = { [weak self] polygon in
-            self?.viewModel.setLayout(.polygon(polygon))
-        }
-        backgroundPicker.onSelect = { [weak self] background in
-            self?.viewModel.setBackground(background)
-        }
-
-        let scroll = UIScrollView()
-        scroll.translatesAutoresizingMaskIntoConstraints = false
-        scroll.showsVerticalScrollIndicator = false
-        // The tray reaches the screen edge (see its bottom constraint), so the
-        // automatic behaviour would hand the home-indicator inset straight back
-        // as content inset and restore the empty band it was pinned past.
-        scroll.contentInsetAdjustmentBehavior = .never
-        scroll.addSubview(controlsStack)
-
-        // A compact "add overlay" bar between the canvas and the controls: drop a
-        // fresh text zone or open the sticker picker. This is also the "add
-        // arbitrary text" affordance deferred from slice 5.
-        let addBar = makeAddOverlayBar()
-
-        view.addSubview(canvasView)
-        view.addSubview(addBar)
-        view.addSubview(scroll)
-
-        // The canvas is a fixed 1:1 square (matching the default Instagram-post
-        // ratio). The controls scroll fills whatever space remains beneath it.
-        let canvasSquare = canvasView.heightAnchor.constraint(equalTo: canvasView.widthAnchor)
-        canvasSquare.priority = .defaultHigh
-
+        // `toolPanel` is sandwiched between `stage.bottom` and `toolRail.top` with no
+        // height of its own — required equalities on both edges but nothing pinning
+        // either edge to an absolute position, so its height (and therefore the
+        // stage's) is left genuinely ambiguous. `EditorPanel`'s own internal floor
+        // is a breakable `.defaultLow` minimum, not an exact size, so it does not
+        // resolve this: empirically the solver was handing nearly ALL the space to
+        // the empty, invisible panel and collapsing the stage to ~16pt — the exact
+        // squashed-canvas failure this task exists to fix, just moved one view over.
+        //
+        // Task 8 never shows the panel (Task 9 wires that up), so it must rest at
+        // zero height until then. `.defaultHigh`, not `.required`, so Task 9 can
+        // introduce its own show/hide height constraint (per `EditorPanel`'s own
+        // doc comment: "the stage's height animation has something stable to
+        // animate against") without first having to unwind a required constraint
+        // here.
         NSLayoutConstraint.activate([
-            canvasView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 12),
-            canvasView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
-            canvasView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
-            canvasSquare,
+            stage.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            stage.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            stage.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            stage.bottomAnchor.constraint(equalTo: toolPanel.topAnchor),
 
-            addBar.topAnchor.constraint(equalTo: canvasView.bottomAnchor, constant: 8),
-            addBar.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
-            addBar.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
+            toolPanel.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            toolPanel.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            toolPanel.bottomAnchor.constraint(equalTo: toolRail.topAnchor),
+            panels.collapsedHeightConstraint,
 
-            scroll.topAnchor.constraint(equalTo: addBar.bottomAnchor, constant: 8),
-            scroll.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            scroll.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            // The real bottom, not the safe-area bottom. The tab bar is hidden
-            // while an editor is pushed, so pinning to the safe area left ~34pt
-            // of empty background under the last row of controls that nothing
-            // could ever scroll into — a dead band, not breathing room.
-            scroll.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-
-            controlsStack.topAnchor.constraint(equalTo: scroll.contentLayoutGuide.topAnchor, constant: 4),
-            controlsStack.bottomAnchor.constraint(equalTo: scroll.contentLayoutGuide.bottomAnchor, constant: -4),
-            controlsStack.leadingAnchor.constraint(equalTo: scroll.frameLayoutGuide.leadingAnchor),
-            controlsStack.trailingAnchor.constraint(equalTo: scroll.frameLayoutGuide.trailingAnchor),
+            toolRail.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            toolRail.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            // The REAL bottom, not the safe-area bottom: the tab bar is hidden while
+            // an editor is pushed, so pinning to the safe area leaves an empty band
+            // under the rail that nothing can ever fill.
+            toolRail.bottomAnchor.constraint(equalTo: view.bottomAnchor),
         ])
+    }
+
+    // MARK: - Tool rail
+
+
+    private func setupRail() {
+        // These three controls predate the rail (Step 01) and lost their
+        // target/action wiring when the controls tray that used to host them was
+        // removed. Restoring it here is what makes `layoutModeChanged()`,
+        // `borderChanged()`, `cornerChanged()` and `sliderReleased()` live again.
+        layoutModeControl.addTarget(self, action: #selector(layoutModeChanged), for: .valueChanged)
+        borderSlider.addTarget(self, action: #selector(borderChanged), for: .valueChanged)
+        borderSlider.addTarget(self, action: #selector(sliderReleased),
+                               for: [.touchUpInside, .touchUpOutside, .touchCancel])
+        cornerSlider.addTarget(self, action: #selector(cornerChanged), for: .valueChanged)
+        cornerSlider.addTarget(self, action: #selector(sliderReleased),
+                               for: [.touchUpInside, .touchUpOutside, .touchCancel])
+
+        var tools: [EditorTool] = []
+        // A template defines its own geometry — offering a layout picker would claim
+        // a selection the document does not have.
+        if viewModel.state.layout.offersLayoutAlternatives {
+            tools.append(EditorTool(id: "layout", title: "Layout",
+                                    systemImage: "square.grid.2x2",
+                                    accessibilityIdentifier: "layoutTool"))
+        }
+        tools.append(contentsOf: [
+            EditorTool(id: "frame", title: "Frame",
+                       systemImage: "square.dashed", accessibilityIdentifier: "frameTool"),
+            EditorTool(id: "background", title: "Background",
+                       systemImage: "circle.lefthalf.filled",
+                       accessibilityIdentifier: "backgroundTool"),
+            // Identifiers preserved from the old pill buttons so existing UI tests
+            // keep matching.
+            EditorTool(id: "text", title: "Text",
+                       systemImage: "textformat", accessibilityIdentifier: "addTextButton"),
+            EditorTool(id: "sticker", title: "Sticker",
+                       systemImage: "face.smiling", accessibilityIdentifier: "addStickerButton"),
+        ])
+        toolRail.setBaseTools(tools)
+
+        toolRail.onSelect = { [weak self] in self?.toolTapped($0) }
+        toolRail.onDismissContext = { [weak self] in self?.clearSelection() }
+        // NOT `toolPanel.onClose` — `EditorPanelPresenter` owns that, so
+        // assigning it here would route the panel's own close button around it.
+    }
+
+    private func toolTapped(_ id: EditorTool.ID) {
+        // Tapping the open tool again closes it and gives the canvas its height back.
+        guard id != panels.openToolID else { return closePanel() }
+
+        switch id {
+        case "layout":      openPanel(makeLayoutPanel(), title: "Layout", id: id)
+        case "frame":       openPanel(makeFramePanel(), title: "Frame", id: id)
+        case "background":  openPanel(makeBackgroundPanel(), title: "Background", id: id)
+        case "text":        addTextTapped()
+        case "sticker":     addStickerTapped()
+        case "replace":
+            selectedCellIndex.map { presentPhotoPicker(for: $0) }
+        case "adjust":
+            selectedCellIndex.map { presentFilterPanel(for: $0) }
+        case "lift":
+            selectedCellIndex.map { liftSubject(fromCellAt: $0) }
+        case "erase":
+            selectedCellIndex.map { presentMagicEraser(forCellAt: $0) }
+        case "clear":
+            if let index = selectedCellIndex {
+                viewModel.clearCell(at: index)
+                clearSelection()
+            }
+        case "editText":
+            selectedTextID.map { presentTextStyleSheet(for: $0) }
+        case "styleText":
+            if let id = selectedTextID {
+                openPanel(makeTextStylePanel(for: id), title: "Text", id: "styleText")
+            }
+        case "duplicateText":
+            selectedTextID.map { duplicateTextOverlay($0) }
+        case "deleteText":
+            if let id = selectedTextID {
+                viewModel.removeTextOverlay(id: id)
+                clearSelection()
+            }
+        default:            break
+        }
+    }
+
+    private func openPanel(_ content: UIView, title: String, id: EditorTool.ID) {
+        panels.open(content, title: title, id: id)
+    }
+
+    private func closePanel() { panels.close() }
+
+    // MARK: - Selection context
+
+    private var selectedCellIndex: Int?
+    private var selectedTextID: UUID?
+
+    private static let photoTools: [EditorTool] = [
+        EditorTool(id: "replace", title: "Replace", systemImage: "arrow.left.arrow.right",
+                   accessibilityIdentifier: "replacePhotoTool"),
+        EditorTool(id: "adjust", title: "Adjust", systemImage: "circle.lefthalf.filled",
+                   accessibilityIdentifier: "adjustPhotoTool"),
+        // Identifiers preserved from the retired action sheet.
+        EditorTool(id: "lift", title: "Lift", systemImage: "person.and.background.dotted",
+                   accessibilityIdentifier: "liftSubjectAction"),
+        EditorTool(id: "erase", title: "Erase", systemImage: "eraser",
+                   accessibilityIdentifier: "magicEraserAction"),
+        EditorTool(id: "clear", title: "Clear", systemImage: "trash",
+                   accessibilityIdentifier: "clearCellTool"),
+    ]
+
+    private static let textTools: [EditorTool] = [
+        EditorTool(id: "editText", title: "Edit", systemImage: "keyboard",
+                   accessibilityIdentifier: "editTextTool"),
+        EditorTool(id: "styleText", title: "Style", systemImage: "textformat",
+                   accessibilityIdentifier: "styleTextTool"),
+        EditorTool(id: "duplicateText", title: "Duplicate", systemImage: "plus.square.on.square",
+                   accessibilityIdentifier: "duplicateTextTool"),
+        EditorTool(id: "deleteText", title: "Delete", systemImage: "trash",
+                   accessibilityIdentifier: "deleteTextTool"),
+    ]
+
+    private func selectCell(_ index: Int?) {
+        selectedCellIndex = index
+        selectedTextID = nil
+        canvasView.setSelectedCell(index)
+        canvasView.setSelectedTextOverlay(nil)
+
+        guard index != nil else { return clearContext() }
+        // A fresh selection retires whatever panel was open for the PREVIOUS
+        // context — a base-tool panel like Frame, or a different overlay's
+        // Style panel. `EditorToolRail.setContext` below silently drops the
+        // rail's own highlight for a tool id that isn't in the new tool set
+        // (see its doc comment), but it has no way to know that `openToolID`
+        // and `toolPanel.isPresenting` are still describing that same tool as
+        // open — only this view controller tracks those two. Closing first
+        // keeps all three in lockstep instead of leaving an open panel with
+        // no highlighted tool (or a highlighted tool with no panel).
+        closePanel()
+        Haptics.selectionChanged()
+        toolRail.setContext(EditorRailContext(
+            chipTitle: "Photo", chipSystemImage: "photo", tools: Self.photoTools))
+    }
+
+    private func selectTextOverlay(_ id: UUID?) {
+        selectedTextID = id
+        selectedCellIndex = nil
+        canvasView.setSelectedCell(nil)
+        canvasView.setSelectedTextOverlay(id)
+
+        guard id != nil else { return clearContext() }
+        // See the matching comment in `selectCell` — same coherence rule.
+        closePanel()
+        Haptics.selectionChanged()
+        toolRail.setContext(EditorRailContext(
+            chipTitle: "Text", chipSystemImage: "textformat", tools: Self.textTools))
+    }
+
+    private func clearSelection() {
+        selectedCellIndex = nil
+        selectedTextID = nil
+        canvasView.setSelectedCell(nil)
+        canvasView.setSelectedTextOverlay(nil)
+        clearContext()
+    }
+
+    private func clearContext() {
+        toolRail.setContext(nil)
+        closePanel()
+    }
+
+    /// Re-validates the rail selection against the current document whenever it
+    /// changes underneath it — wired into `viewModel.onChange` below, the single
+    /// choke point every discrete edit funnels through (undo, redo, `setLayout`,
+    /// `removeTextOverlay`, `clearCell`, …all route through `GridEditorViewModel
+    /// .commit` or `undo()`/`redo()`, both of which call it).
+    ///
+    /// Deliberately NOT `clearSelection()`: a selected cell can legitimately
+    /// coexist with an open BASE panel (Frame / Layout / Background —
+    /// `EditorToolRail`'s own doc comment says document tools must survive a
+    /// selection, and `toolTapped`'s base-tool cases call `openPanel` directly
+    /// without going through `selectCell`). A blanket clear would force-close an
+    /// unrelated, legitimately-open Frame panel. So this only tears down the
+    /// half of the selection that actually went stale, and only closes the
+    /// panel when the open panel is the selection-specific Style sheet
+    /// (`openToolID == "styleText"`) — a base-tool panel is left exactly as it
+    /// was.
+    private func revalidateSelection() {
+        var didClearSelection = false
+
+        if let index = selectedCellIndex, !viewModel.state.cells.indices.contains(index) {
+            selectedCellIndex = nil
+            canvasView.setSelectedCell(nil)
+            didClearSelection = true
+        }
+        if let id = selectedTextID, viewModel.textOverlay(id: id) == nil {
+            selectedTextID = nil
+            canvasView.setSelectedTextOverlay(nil)
+            didClearSelection = true
+        }
+        guard didClearSelection else { return }
+
+        toolRail.setContext(nil)
+        if panels.openToolID == "styleText" {
+            closePanel()
+        }
+    }
+
+    // MARK: - Panel factories
+
+    private func makeLayoutPanel() -> UIView {
+        layoutModeControl.selectedSegmentIndex = viewModel.state.layout.isPolygon ? 1 : 0
+        let panel = LayoutPanelView(
+            modeControl: layoutModeControl,
+            layoutPicker: layoutPicker,
+            shapePicker: shapePicker,
+            customButton: customShapeButton)
+        panel.showPolygonControls(viewModel.state.layout.isPolygon)
+        layoutPanel = panel
+        return panel
+    }
+
+    private func makeFramePanel() -> UIView {
+        borderSlider.value = Float(normalizedBorder)
+        cornerSlider.value = Float(normalizedCorner)
+        return FramePanelView(borderSlider: borderSlider, cornerSlider: cornerSlider)
+    }
+
+    private func makeBackgroundPanel() -> UIView {
+        BackgroundPanelView(picker: backgroundPicker,
+                            generativeButton: makeGenerativeBackgroundButton())
+    }
+
+    /// The AI generative-background entry, as the trailing chip of the Background
+    /// panel rather than a row of its own.
+    ///
+    /// Returns `nil` where Image Playground cannot run — the old row hid itself for
+    /// the same reason, and `MagicEraserUITests` asserts the button is ABSENT, not
+    /// merely disabled. Do not simplify this to always return a button.
+    private func makeGenerativeBackgroundButton() -> UIButton? {
+        guard aiService.generativeBackgroundsAvailable else { return nil }
+
+        var config = UIButton.Configuration.tinted()
+        config.image = UIImage(systemName: "sparkles")
+        config.cornerStyle = .capsule   // never set layer.cornerRadius on a configured button
+        config.baseBackgroundColor = Theme.Color.accent
+        config.baseForegroundColor = Theme.Color.accent
+        let button = UIButton(configuration: config, primaryAction: UIAction { [weak self] _ in
+            Haptics.tap()
+            self?.presentGenerativeBackground()
+        })
+        button.accessibilityIdentifier = "generateBackgroundButton"
+        button.accessibilityLabel = "Generate background"
+        return button
     }
 
     private func setupGestures() {
@@ -345,6 +530,9 @@ final class GridEditorViewController: UIViewController {
         viewModel.onChange = { [weak self] in
             self?.reconfigureCanvas()
             self?.refreshToolbar()
+            // After the canvas model is rebuilt, so a stale index/id is checked
+            // against the fresh document rather than the one it just replaced.
+            self?.revalidateSelection()
         }
         viewModel.onCellImageChanged = { [weak self] index in
             guard let self else { return }
@@ -357,8 +545,16 @@ final class GridEditorViewController: UIViewController {
         // Border / corner drags: reposition cells only. Deliberately does NOT call
         // `refreshToolbar` — undo state can't change until the drag is committed on
         // release, so there is nothing to refresh at slider frequency.
+        //
+        // Keeps `updateGeometry` (not `reconfigureCanvas`/`configure`) for the same
+        // reason `CanvasView.updateGeometry` documents: `configure` re-wraps every
+        // cell image and rebuilds every sticker view, which is what made the canvas
+        // stutter at slider frequency before that lightweight path existed. The
+        // stage's aspect assignment is cheap (a stored size + `setNeedsLayout`), so
+        // resyncing it here alongside the geometry update costs nothing.
         viewModel.onGeometryChange = { [weak self] in
             guard let self else { return }
+            self.stage.setCanvasAspect(self.viewModel.canvasSize)
             self.canvasView.updateGeometry(with: self.viewModel.canvasModel())
         }
 
@@ -377,7 +573,8 @@ final class GridEditorViewController: UIViewController {
 
         // Text zones drag themselves on the GPU during a gesture (like stickers); the
         // view model records the move without a snapshot and commits one on drag end.
-        // A plain tap opens the styling sheet.
+        // A plain tap now selects the overlay (inserting the contextual Text tools)
+        // rather than jumping straight to the full styling sheet.
         canvasView.onTextChanged = { [weak self] overlay in
             self?.viewModel.moveTextOverlay(overlay)
         }
@@ -386,7 +583,7 @@ final class GridEditorViewController: UIViewController {
         }
         canvasView.onTextTapped = { [weak self] id in
             guard let self, self.pendingSwapSource == nil else { return }
-            self.presentTextStyleSheet(for: id)
+            self.selectTextOverlay(id)
         }
     }
 
@@ -416,15 +613,24 @@ final class GridEditorViewController: UIViewController {
     }
 
     /// Re-sync the sliders/pickers after undo/redo changes state underneath them.
+    ///
+    /// The pickers live inside their panels, which may be closed when this runs, so it
+    /// keeps them configured whether or not they are on screen. Polygon visibility goes
+    /// through `LayoutPanelView.showPolygonControls` rather than setting each picker's
+    /// `isHidden` directly: the direct route skips `customShapeButton`, which left the
+    /// Custom Shape button stale after an undo that flipped grid to polygon.
     private func syncControls() {
         borderSlider.value = Float(normalizedBorder)
         cornerSlider.value = Float(normalizedCorner)
         let layout = viewModel.state.layout
-        layoutSection?.isHidden = !layout.offersLayoutAlternatives
         layoutModeControl.selectedSegmentIndex = layout.isPolygon ? 1 : 0
-        layoutPicker.isHidden = layout.isPolygon
-        shapePicker.isHidden = !layout.isPolygon
-        customShapeRow?.isHidden = !layout.isPolygon
+        // Routed through the panel (a no-op when it isn't currently shown, rather
+        // than setting `layoutPicker`/`shapePicker.isHidden` directly) so
+        // `customShapeButton`'s visibility stays in lockstep with the two
+        // pickers'. An undo/redo that flips grid⇄polygon while the Layout panel
+        // happens to be open must not leave the Custom Shape button showing (or
+        // hidden) for the wrong mode.
+        layoutPanel?.showPolygonControls(layout.isPolygon)
         // Passed straight through (not `if let`) so the highlight clears when the
         // document has no grid layout, rather than sticking on a stale template.
         layoutPicker.setSelected(layout.gridTemplate)
@@ -438,9 +644,7 @@ final class GridEditorViewController: UIViewController {
         let showShapes = layoutModeControl.selectedSegmentIndex == 1
         Haptics.selectionChanged()
         UIView.animate(withDuration: Theme.Motion.quick) {
-            self.layoutPicker.isHidden = showShapes
-            self.shapePicker.isHidden = !showShapes
-            self.customShapeRow?.isHidden = !showShapes
+            self.layoutPanel?.showPolygonControls(showShapes)
         }
         if showShapes {
             let polygon = viewModel.state.layout.polygonTemplate ?? .diagonalLeft
@@ -467,6 +671,8 @@ final class GridEditorViewController: UIViewController {
         let max = viewModel.maxCornerRadius
         return max > 0 ? min(1, viewModel.state.cornerRadius / max) : 0
     }
+
+    // MARK: - Frame slider actions
 
     @objc private func borderChanged() {
         viewModel.previewBorderWidth(Double(borderSlider.value) * viewModel.maxBorderWidth)
@@ -559,7 +765,7 @@ final class GridEditorViewController: UIViewController {
 
         if viewModel.state.cells.indices.contains(index),
            viewModel.state.cells[index].imageID != nil {
-            presentCellActions(for: index)
+            selectCell(index)
         } else {
             presentPhotoPicker(for: index)
         }
@@ -575,43 +781,6 @@ final class GridEditorViewController: UIViewController {
         canvasView.setSelectedCell(index)
         Haptics.impact()
         showToast("Tap another cell to swap")
-    }
-
-    private func presentCellActions(for index: Int) {
-        let sheet = UIAlertController(title: nil, message: nil, preferredStyle: .actionSheet)
-        sheet.addAction(UIAlertAction(title: "Replace Photo", style: .default) { [weak self] _ in
-            self?.presentPhotoPicker(for: index)
-        })
-        sheet.addAction(UIAlertAction(title: "Edit Cell", style: .default) { [weak self] _ in
-            self?.presentFilterPanel(for: index)
-        })
-        // Deliberately always offered, never conditionally hidden: the work happens
-        // on-device and whether this photo HAS a liftable subject is only knowable
-        // by trying. A "no subject found" reply is a normal outcome, not an error.
-        let lift = UIAlertAction(title: "Lift Subject", style: .default) { [weak self] _ in
-            self?.liftSubject(fromCellAt: index)
-        }
-        lift.accessibilityIdentifier = "liftSubjectAction"
-        sheet.addAction(lift)
-
-        let erase = UIAlertAction(title: "Magic Eraser", style: .default) { [weak self] _ in
-            self?.presentMagicEraser(forCellAt: index)
-        }
-        erase.accessibilityIdentifier = "magicEraserAction"
-        sheet.addAction(erase)
-        sheet.addAction(UIAlertAction(title: "Clear", style: .destructive) { [weak self] _ in
-            self?.viewModel.clearCell(at: index)
-            self?.canvasView.setSelectedCell(nil)
-        })
-        // Also fires when the sheet is dismissed by tapping outside it.
-        sheet.addAction(UIAlertAction(title: "Cancel", style: .cancel) { [weak self] _ in
-            self?.canvasView.setSelectedCell(nil)
-        })
-        anchorPopover(sheet) { popover in
-            popover.sourceView = canvasView
-            popover.sourceRect = cellRectOnScreen(index) ?? canvasView.bounds
-        }
-        present(sheet, animated: true)
     }
 
     private func presentFilterPanel(for index: Int) {
@@ -663,39 +832,71 @@ final class GridEditorViewController: UIViewController {
         present(host, animated: true)
     }
 
-    // MARK: - Add overlays (text / stickers)
-
-    private func makeAddOverlayBar() -> UIView {
-        let textButton = makeAddButton(
-            title: "Text", systemImage: "textformat", identifier: "addTextButton",
-            action: { [weak self] in self?.addTextTapped() })
-        let stickerButton = makeAddButton(
-            title: "Sticker", systemImage: "face.smiling", identifier: "addStickerButton",
-            action: { [weak self] in self?.addStickerTapped() })
-        let row = UIStackView(arrangedSubviews: [textButton, stickerButton])
+    /// The tier-2 presets as one tappable row. Tapping one applies it immediately —
+    /// the canvas is visible behind the panel, so the preview IS the confirmation.
+    private func makeTextStylePanel(for id: UUID) -> UIView {
+        let row = UIStackView()
         row.axis = .horizontal
-        row.distribution = .fillEqually
-        row.spacing = 12
-        row.translatesAutoresizingMaskIntoConstraints = false
+        row.spacing = Theme.Spacing.xs
+        row.alignment = .center
+        row.isLayoutMarginsRelativeArrangement = true
+        row.layoutMargins = UIEdgeInsets(
+            top: 0, left: Theme.Spacing.md, bottom: 0, right: Theme.Spacing.md)
+
+        for kind in TextStyle.Kind.allCases {
+            let button = UIButton(type: .system)
+            button.setTitle("Aa", for: .normal)
+            button.titleLabel?.font = Theme.Typography.headline
+            button.accessibilityIdentifier = "textStyle_\(kind.rawValue)"
+            button.accessibilityLabel = kind.rawValue.capitalized
+            button.addAction(UIAction { [weak self] _ in
+                guard let self, var overlay = self.viewModel.textOverlay(id: id) else { return }
+                overlay.style = TextStyle(
+                    kind: kind,
+                    colorHex: self.onLightBackground ? "#FFFFFF" : "#000000",
+                    width: 6)
+                self.viewModel.previewTextOverlay(overlay)
+                self.viewModel.commitInteractiveChange()
+                Haptics.selectionChanged()
+            }, for: .touchUpInside)
+            row.addArrangedSubview(button)
+        }
         return row
     }
 
-    /// One definition of the editors' add-overlay pill, in the component layer:
-    /// the grid and video editors each carried an identical private copy, and
-    /// they had already drifted apart on contrast.
-    private func makeAddButton(
-        title: String, systemImage: String, identifier: String,
-        action: @escaping () -> Void
-    ) -> UIButton {
-        let button = ThemeButton(
-            style: .tinted,
-            title: title,
-            image: UIImage(systemName: systemImage),
-            action: UIAction { _ in action() }
-        )
-        button.accessibilityIdentifier = identifier
-        return button
+    private func duplicateTextOverlay(_ id: UUID) {
+        guard var overlay = viewModel.textOverlay(id: id) else { return }
+        overlay.id = UUID()
+        overlay.frame = Self.clampedDuplicateFrame(overlay.frame.offsetBy(dx: 0.03, dy: 0.03))
+        let newID = viewModel.addTextOverlay(overlay)
+        selectTextOverlay(newID)
+        Haptics.tap()
     }
+
+    /// Clamps a duplicated text zone's origin so the copy stays fully on the
+    /// normalized `[0, 1]` canvas — x into `[0, 1 - width]`, y into
+    /// `[0, 1 - height]`. Duplicate naturally chains (the copy is selected, so
+    /// another tap duplicates it again), and with no clamp a few taps on a zone
+    /// already near an edge walk it fully outside `[0, 1]`, where the canvas
+    /// clips it invisible and untappable — recoverable only by repeated global
+    /// Undo with no indication of what happened.
+    ///
+    /// A frame wider or taller than the canvas would make `1 - width` (or
+    /// `- height`) negative; `max(0, …)` floors the upper bound at 0 instead of
+    /// handing `min` a negative ceiling, which would otherwise force the origin
+    /// negative too.
+    private static func clampedDuplicateFrame(_ frame: CGRect) -> CGRect {
+        let maxX = max(0, 1 - frame.width)
+        let maxY = max(0, 1 - frame.height)
+        return CGRect(
+            x: min(max(frame.minX, 0), maxX),
+            y: min(max(frame.minY, 0), maxY),
+            width: frame.width,
+            height: frame.height
+        )
+    }
+
+    // MARK: - Add overlays (text / stickers)
 
     /// Adds a fresh text zone at the canvas centre and opens the styling sheet so
     /// the user can type immediately.
@@ -811,36 +1012,7 @@ final class GridEditorViewController: UIViewController {
         present(alert, animated: true)
     }
 
-    /// The Image Playground entry point, present ONLY on hardware that can run it.
-    ///
-    /// Hidden rather than disabled, deliberately: this is a premium feature, and
-    /// showing a locked control on a device that could never run it even after
-    /// paying would be false advertising. On the simulator and on pre-Apple
-    /// Intelligence devices the row simply does not exist.
-    private func makeGenerativeBackgroundRow() -> UIView {
-        let row = UIStackView()
-        row.isLayoutMarginsRelativeArrangement = true
-        row.layoutMargins = UIEdgeInsets(top: 0, left: 16, bottom: 2, right: 16)
-        guard aiService.generativeBackgroundsAvailable else {
-            row.isHidden = true
-            return row
-        }
-
-        var config = UIButton.Configuration.tinted()
-        config.title = "Generate Background"
-        config.image = UIImage(systemName: "sparkles")
-        config.imagePadding = 6
-        config.cornerStyle = .large
-        config.baseBackgroundColor = Theme.Color.accent
-        config.baseForegroundColor = Theme.Color.accent
-        let button = UIButton(configuration: config, primaryAction: UIAction { [weak self] _ in
-            Haptics.tap()
-            self?.presentGenerativeBackground()
-        })
-        button.accessibilityIdentifier = "generateBackgroundButton"
-        row.addArrangedSubview(button)
-        return row
-    }
+    // MARK: - Generative background
 
     private func presentGenerativeBackground() {
         guard EntitlementStore.shared.isPremiumUnlocked else {
@@ -899,6 +1071,8 @@ final class GridEditorViewController: UIViewController {
         present(alert, animated: true)
         return alert
     }
+
+    // MARK: - Sticker picker + text-color helper
 
     /// Opens the sticker picker; the chosen sticker becomes a selected canvas overlay.
     @objc private func addStickerTapped() {
@@ -1080,10 +1254,6 @@ final class GridEditorViewController: UIViewController {
 
     // MARK: - Helpers
 
-    private func cellRectOnScreen(_ index: Int) -> CGRect? {
-        canvasView.cellRect(at: index)
-    }
-
     private func presentSpinner() -> UIAlertController {
         let alert = UIAlertController(title: nil, message: "Exporting…", preferredStyle: .alert)
         let indicator = UIActivityIndicatorView(style: .medium)
@@ -1104,36 +1274,21 @@ final class GridEditorViewController: UIViewController {
         present(alert, animated: true)
     }
 
-    private func sectionLabel(_ text: String) -> UIView {
-        let label = UILabel()
-        label.text = text
-        label.font = Theme.Typography.headline
-        label.textColor = Theme.Color.textPrimary
+    // MARK: - Test seams
 
-        let row = UIStackView(arrangedSubviews: [label])
-        row.isLayoutMarginsRelativeArrangement = true
-        row.layoutMargins = UIEdgeInsets(top: 6, left: 16, bottom: 0, right: 16)
-        return row
-    }
+    var selectedCellIndexForTesting: Int? { selectedCellIndex }
 
-    private func labelledSlider(_ title: String, slider: UISlider, systemImage: String) -> UIView {
-        let icon = UIImageView(image: UIImage(systemName: systemImage))
-        icon.tintColor = Theme.Color.textSecondary
-        icon.setContentHuggingPriority(.required, for: .horizontal)
-        let label = UILabel()
-        label.text = title
-        label.font = Theme.Typography.subheadline
-        label.textColor = Theme.Color.textSecondary
-        label.setContentHuggingPriority(.required, for: .horizontal)
-        label.widthAnchor.constraint(equalToConstant: 72).isActive = true
+    var selectedTextIDForTesting: UUID? { selectedTextID }
 
-        let row = UIStackView(arrangedSubviews: [icon, label, slider])
-        row.axis = .horizontal
-        row.spacing = 8
-        row.alignment = .center
-        row.isLayoutMarginsRelativeArrangement = true
-        row.layoutMargins = UIEdgeInsets(top: 0, left: 16, bottom: 0, right: 16)
-        return row
+    var viewModelForTesting: GridEditorViewModel { viewModel }
+
+    func selectCellForTesting(_ index: Int?) { selectCell(index) }
+
+    func selectTextOverlayForTesting(_ id: UUID?) { selectTextOverlay(id) }
+
+    func addTextOverlayForTesting() -> UUID {
+        viewModel.addTextOverlay(TextOverlay(
+            text: "Test", frame: CGRect(x: 0.1, y: 0.4, width: 0.8, height: 0.15)))
     }
 }
 

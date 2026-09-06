@@ -51,6 +51,9 @@ public struct VideoCompositionCell: @unchecked Sendable {
     /// (−1…1) reposition. Applied to the fill crop; ignored in `.fit` mode.
     /// Rotation is not supported for video cells (crop-based framing is axis-aligned).
     public var transform: CellTransform
+    /// Seconds to delay this cell within the collage. `0` (the default) is the
+    /// pre-offset behaviour exactly: every cell starts together.
+    public var startOffset: Double
 
     public init(
         asset: AVAsset,
@@ -62,6 +65,8 @@ public struct VideoCompositionCell: @unchecked Sendable {
         transition: CellTransition? = nil,
         contentMode: ContentMode = .fill,
         transform: CellTransform = CellTransform()
+    ,
+        startOffset: Double = 0
     ) {
         self.asset = asset
         self.frame = frame
@@ -72,6 +77,7 @@ public struct VideoCompositionCell: @unchecked Sendable {
         self.transition = transition
         self.contentMode = contentMode
         self.transform = transform
+        self.startOffset = max(0, startOffset)
     }
 }
 
@@ -95,23 +101,52 @@ public struct BackgroundMusic: @unchecked Sendable {
 /// The assembled composition + its video composition (per-cell layout/transform)
 /// + audio mix (per-cell mute/volume), ready to preview or export.
 ///
-/// `overlayImage` is the pre-rendered text+sticker layer (full-canvas, transparent).
-/// It is NOT part of the video composition — baking it there via
-/// `AVVideoCompositionCoreAnimationTool` crashes `AVAssetReaderVideoCompositionOutput`
-/// (no Core Animation render server in that pipeline / the simulator). Instead
-/// `export(bundle:…)` draws it onto each composited frame at write-time, and the
-/// live preview overlays it as a CALayer above the player. Either way, preview ==
-/// export because the same `VideoOverlayRenderer` image is used.
+/// `overlayImage` is the pre-rendered text+sticker layer (full-canvas, transparent) —
+/// present when no text overlay carries timing. It is NOT part of the video
+/// composition — baking it there via `AVVideoCompositionCoreAnimationTool` crashes
+/// `AVAssetReaderVideoCompositionOutput` (no Core Animation render server in that
+/// pipeline / the simulator). Instead `export(bundle:…)` draws it onto each
+/// composited frame at write-time, and the live preview overlays it as a CALayer
+/// above the player. Either way, preview == export because the same
+/// `VideoOverlayRenderer` image is used. When some text overlay does carry timing,
+/// `overlayImage` is nil and `timedOverlays` is carried instead, so the export can
+/// render (and cache) the overlay per frame — see `VideoComposer.overlayForFrame`.
 /// `@unchecked Sendable` for the same reason as `VideoCompositionCell`: a
 /// `@MainActor` editor builds the bundle and hands it to the nonisolated exporter,
 /// which is the only thing that touches it from then on.
 public struct VideoCompositionBundle: @unchecked Sendable {
+    /// Everything needed to render the overlay for an arbitrary frame time,
+    /// carried instead of a single baked image when at least one text overlay has
+    /// timing. Sticker overlays are untimed and always drawn — see
+    /// `VideoOverlayRenderer.overlayImage`.
+    ///
+    /// Plain `Sendable`: every field (`[TextOverlay]`, `[StickerOverlay]`,
+    /// `CGFloat`) is already Sendable, unlike `VideoCompositionCell` /
+    /// `BackgroundMusic` / the enclosing bundle, whose `@unchecked` is earned by an
+    /// `AVAsset` field. No unchecked escape hatch needed here.
+    ///
+    /// No `canvasPx` here on purpose: it would just duplicate `bundle.renderSize`
+    /// (both set from the same `output` local in `buildComposition`). The export's
+    /// `overlayForFrame` derives the render size from `ExportContext.width`/
+    /// `height` instead — the same ints already sizing the pixel buffer the
+    /// overlay is drawn into — so there is one source of truth, not two.
+    public struct TimedOverlayInputs: Sendable {
+        public let textOverlays: [TextOverlay]
+        public let stickerOverlays: [StickerOverlay]
+        public let textFontScale: CGFloat
+    }
+
     public let composition: AVMutableComposition
     public let videoComposition: AVMutableVideoComposition
     public let audioMix: AVMutableAudioMix
     public let duration: CMTime
     public let renderSize: CGSize
     public let overlayImage: CGImage?
+    /// Non-nil only when some text overlay carries timing, in which case
+    /// `overlayImage` is nil and the export selects/renders the overlay per frame
+    /// instead (`VideoComposer.runExport`). `nil` for the untimed case, which
+    /// keeps using the single baked `overlayImage` exactly as before.
+    public let timedOverlays: TimedOverlayInputs?
 }
 
 extension VideoComposer {
@@ -166,8 +201,11 @@ extension VideoComposer {
                                               oriented: oriented, range: range))
         }
 
-        // 2) Composition duration = the longest trimmed cell.
-        let totalSeconds = VideoCompositionMath.compositionDuration(cellDurations: resolved.map { $0.range.duration.seconds })
+        // 2) Composition duration = the LAST cell to finish. With per-cell start
+        //    offsets that is not the longest cell: a 1s clip starting at 2s
+        //    outlasts a 1.8s clip starting at zero.
+        let totalSeconds = VideoCompositionMath.compositionDuration(
+            cellSpans: resolved.map { ($0.cell.startOffset, $0.range.duration.seconds) })
         let total = CMTime(seconds: totalSeconds, preferredTimescale: ts)
 
         // 3) One video track + layer instruction (+ audio) per cell.
@@ -178,8 +216,13 @@ extension VideoComposer {
             guard let videoComp = composition.addMutableTrack(withMediaType: .video,
                                                               preferredTrackID: kCMPersistentTrackID_Invalid)
             else { continue }
-            let fillTo = item.cell.isLooping ? total : item.range.duration
-            try insertLooping(range: item.range, of: item.videoTrack, into: videoComp, fillTo: fillTo)
+            // `fillTo` is an ABSOLUTE composition time, not a length: a looping
+            // cell fills from its offset to the end of the collage, a plain one
+            // stops one clip-length after its offset.
+            let offset = CMTime(seconds: item.cell.startOffset, preferredTimescale: ts)
+            let fillTo = item.cell.isLooping ? total : offset + item.range.duration
+            try insertLooping(range: item.range, of: item.videoTrack, into: videoComp,
+                              fillTo: fillTo, startingAt: offset)
 
             let layer = AVMutableVideoCompositionLayerInstruction(assetTrack: videoComp)
             // AVFoundation's video-composition layer transforms use the same
@@ -222,13 +265,14 @@ extension VideoComposer {
             }
             applyPlacement(transform, transition: item.cell.transition,
                            cellFrame: mappedFrame, clipDuration: item.range.duration,
-                           timescale: ts, to: layer)
+                           startOffset: offset, timescale: ts, to: layer)
             layerInstructions.append(layer)
 
             if let audioTrack = item.audioTrack,
                let audioComp = composition.addMutableTrack(withMediaType: .audio,
                                                            preferredTrackID: kCMPersistentTrackID_Invalid) {
-                try? insertLooping(range: item.range, of: audioTrack, into: audioComp, fillTo: fillTo)
+                try? insertLooping(range: item.range, of: audioTrack, into: audioComp,
+                                   fillTo: fillTo, startingAt: offset)
                 let params = AVMutableAudioMixInputParameters(track: audioComp)
                 params.setVolume(VideoCompositionMath.effectiveVolume(isMuted: item.cell.isMuted,
                                                                       volume: item.cell.volume), at: .zero)
@@ -271,13 +315,30 @@ extension VideoComposer {
 
         // Rendered at the output resolution so overlays are crisp at export size and
         // align 1:1 with the composited frames (normalized coords, so position holds).
-        let overlayImage = VideoOverlayRenderer.overlayImage(
-            textOverlays: textOverlays, stickerOverlays: stickerOverlays,
-            canvasPx: output, textFontScale: textFontScale)
+        //
+        // Untimed (the common case: every project saved before timing existed) keeps
+        // the original single-baked-image path unchanged. Once any overlay carries
+        // timing, baking one image up front is wrong — a caption's visibility would
+        // be frozen at whatever it was when the bundle was built — so the overlays
+        // are carried instead and rendered per frame during export.
+        let hasTiming = textOverlays.contains { $0.startTime != nil || $0.endTime != nil }
+        let overlayImage: CGImage?
+        let timedOverlays: VideoCompositionBundle.TimedOverlayInputs?
+        if hasTiming {
+            overlayImage = nil
+            timedOverlays = VideoCompositionBundle.TimedOverlayInputs(
+                textOverlays: textOverlays, stickerOverlays: stickerOverlays,
+                textFontScale: textFontScale)
+        } else {
+            overlayImage = VideoOverlayRenderer.overlayImage(
+                textOverlays: textOverlays, stickerOverlays: stickerOverlays,
+                canvasPx: output, textFontScale: textFontScale)
+            timedOverlays = nil
+        }
 
         return VideoCompositionBundle(composition: composition, videoComposition: videoComposition,
                                       audioMix: audioMix, duration: total, renderSize: output,
-                                      overlayImage: overlayImage)
+                                      overlayImage: overlayImage, timedOverlays: timedOverlays)
     }
 
     /// Turns a photo cell into a video track: renders `image` as a short still clip
@@ -346,7 +407,8 @@ extension VideoComposer {
             audioMix: AVMutableAudioMix(),      // no level changes — a faithful copy
             duration: duration,
             renderSize: videoComposition.renderSize,
-            overlayImage: nil)
+            overlayImage: nil,
+            timedOverlays: nil)
 
         try await export(bundle: bundle, codec: codec, container: container, to: url,
                          progress: progress, cancellation: cancellation)
@@ -425,6 +487,7 @@ extension VideoComposer {
                                     input: writerInput, adaptor: adaptor,
                                     audioOutput: audioOutput, audioInput: audioInput,
                                     overlay: bundle.overlayImage,
+                                    timedOverlays: bundle.timedOverlays,
                                     width: width, height: height, duration: bundle.duration.seconds,
                                     outputURL: url, cancellation: cancellation)
         let exportQueue = DispatchQueue(label: "com.devron.caroullage.videoexport")
@@ -474,6 +537,7 @@ extension VideoComposer {
         let audioOutput: AVAssetReaderAudioMixOutput?
         let audioInput: AVAssetWriterInput?
         let overlay: CGImage?
+        let timedOverlays: VideoCompositionBundle.TimedOverlayInputs?
         let width: Int
         let height: Int
         let duration: Double
@@ -500,6 +564,17 @@ extension VideoComposer {
 
         var videoDone = false
         var audioDone = (ctx.audioInput == nil)
+        // Single-slot cache for the timed path: frames arrive in monotonic PTS
+        // order, so a run of consecutive frames between two in/out points almost
+        // always shares one visible set — remembering just the last one is enough
+        // to collapse that whole run to a single render, at O(1) memory instead of
+        // the O(N) a dictionary keyed on every visible-set-so-far would grow to (a
+        // few dozen overlapping captions at 1080×1920 is hundreds of MB of
+        // full-canvas CGImages held at once otherwise). This costs a re-render only
+        // when the SAME visible set recurs non-contiguously (e.g. A:[0,10) and
+        // B:[5,8) revisits `{A}` at [8,10) after `{A, B}` and `{A}` already played)
+        // — correct, just marginally slower than a full cache in that rare case.
+        var overlayCache: OverlayCacheSlot?
 
         while !videoDone || !audioDone {
             if ctx.cancellation?.isCancelled == true {
@@ -512,7 +587,7 @@ extension VideoComposer {
                 if let sample = ctx.output.copyNextSampleBuffer() {
                     let pts = CMSampleBufferGetPresentationTimeStamp(sample)
                     if let buffer = CMSampleBufferGetImageBuffer(sample) {
-                        if let overlay = ctx.overlay {
+                        if let overlay = overlayForFrame(ctx, at: pts, cache: &overlayCache) {
                             drawOverlay(overlay, into: buffer, width: ctx.width, height: ctx.height)
                         }
                         if !ctx.adaptor.append(buffer, withPresentationTime: pts) {
@@ -552,6 +627,44 @@ extension VideoComposer {
         guard ctx.writer.status == .completed else { throw ctx.writer.error ?? ComposerError.writeFailed }
     }
 
+    /// The single-slot overlay cache's contents: the visible-set key it was
+    /// rendered for, plus the resulting image (or `nil` — "rendered, and nothing
+    /// was visible" — kept distinguishable from "not cached yet", i.e. `cache ==
+    /// nil`, so a caption gap doesn't force a re-render every frame).
+    private struct OverlayCacheSlot {
+        let key: [UUID]
+        let image: CGImage?
+    }
+
+    /// Resolves the overlay image for one frame at presentation time `pts`.
+    ///
+    /// The untimed bundle (`ctx.timedOverlays == nil`, the common case — every
+    /// project saved before timing existed) just returns the single baked
+    /// `ctx.overlay`, exactly as before. Otherwise the frame's presentation time is
+    /// converted to seconds once, via the same `CMTime.seconds` the export already
+    /// used for progress reporting, and the overlays visible at that time (keyed on
+    /// their sorted ids, a stable proxy for "what would be drawn") are compared
+    /// against `cache`'s last key before rendering — so a run of frames sharing a
+    /// visible set, which is most of them given monotonic PTS order, costs one
+    /// render. `canvasPx` is derived from `ctx.width`/`height` (the same ints that
+    /// size the pixel buffer `drawOverlay` writes into) rather than carried on
+    /// `TimedOverlayInputs`, so there is one source of truth for the render size.
+    private static func overlayForFrame(
+        _ ctx: ExportContext, at pts: CMTime, cache: inout OverlayCacheSlot?
+    ) -> CGImage? {
+        guard let timed = ctx.timedOverlays else { return ctx.overlay }
+        let seconds = pts.seconds
+        let visible = timed.textOverlays.filter { $0.isVisible(at: seconds) }
+        let key = visible.map(\.id).sorted { $0.uuidString < $1.uuidString }
+        if let cache, cache.key == key { return cache.image }
+        let image = VideoOverlayRenderer.overlayImage(
+            textOverlays: visible, stickerOverlays: timed.stickerOverlays,
+            canvasPx: CGSize(width: CGFloat(ctx.width), height: CGFloat(ctx.height)),
+            textFontScale: timed.textFontScale)
+        cache = OverlayCacheSlot(key: key, image: image)
+        return image
+    }
+
     /// Composites the overlay image onto a BGRA composited frame in place. The
     /// reader's frame buffer and the `UIGraphicsImageRenderer` overlay image share
     /// the same top-down raster orientation, so `draw` needs no CTM flip (verified
@@ -587,11 +700,17 @@ extension VideoComposer {
     /// pushed it later, the cell is *held* in its start state (transparent for a
     /// crossfade, offset/scaled for slide/zoom) from t=0 until the beat, then
     /// animates in — so it pops onto the beat.
+    /// - Parameter startOffset: when this cell enters the collage.
+    ///   `CellTransition.startTime` is relative to the CELL, not the composition,
+    ///   so it is shifted by this — otherwise a fade-in written as "at my time 0"
+    ///   would run while the cell is still absent from the timeline and the clip
+    ///   would simply pop in at full opacity once its track began.
     private func applyPlacement(
         _ transform: CGAffineTransform,
         transition: CellTransition?,
         cellFrame: CGRect,
         clipDuration: CMTime,
+        startOffset: CMTime,
         timescale: CMTimeScale,
         to layer: AVMutableVideoCompositionLayerInstruction
     ) {
@@ -599,7 +718,8 @@ extension VideoComposer {
             layer.setTransform(transform, at: .zero)
             return
         }
-        let start = CMTime(seconds: transition.startTime, preferredTimescale: timescale)
+        let start = startOffset
+            + CMTime(seconds: transition.startTime, preferredTimescale: timescale)
         let window = CMTimeRange(
             start: start,
             duration: CMTimeMinimum(CMTime(seconds: transition.duration, preferredTimescale: timescale),
@@ -622,11 +742,24 @@ extension VideoComposer {
         }
     }
 
-    /// Inserts `range` of `source` into `dest`, repeating it until `fillTo` is
-    /// reached (looping cells). A single insert when `fillTo <= range.duration`.
+    /// Inserts `range` of `source` into `dest` from `startingAt`, repeating it
+    /// until the absolute time `fillTo` is reached (looping cells).
+    ///
+    /// The leading gap is stated explicitly rather than left implied by starting
+    /// the cursor late. This is belt-and-braces, not a fix: inserting at a time
+    /// past the track's current end already extends it with empty time, and
+    /// removing this call does not change the resulting segments (verified by
+    /// deleting it — every offset test still passed). It stays because a reader
+    /// should not have to know that rule to see that the cell is absent until
+    /// its offset. No test distinguishes the two, deliberately: there is no
+    /// behaviour here to pin.
     private func insertLooping(range: CMTimeRange, of source: AVAssetTrack,
-                               into dest: AVMutableCompositionTrack, fillTo: CMTime) throws {
-        var cursor = CMTime.zero
+                               into dest: AVMutableCompositionTrack, fillTo: CMTime,
+                               startingAt offset: CMTime = .zero) throws {
+        if offset > .zero {
+            dest.insertEmptyTimeRange(CMTimeRange(start: .zero, duration: offset))
+        }
+        var cursor = offset
         while cursor < fillTo {
             let remaining = fillTo - cursor
             let thisDuration = CMTimeMinimum(range.duration, remaining)
