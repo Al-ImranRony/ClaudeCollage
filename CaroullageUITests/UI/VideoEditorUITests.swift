@@ -84,6 +84,82 @@ final class VideoEditorUITests: XCTestCase {
                       "the text style sheet opens for the new overlay")
     }
 
+    // MARK: - The redesigned chrome (Plan 1 Task 6 / Plan 2)
+    //
+    // The unit suites build this controller in a synthetic window; these prove it
+    // survives the real app — navigation, hidden tab bar, safe areas. That
+    // distinction has mattered here: Plan 1 shipped a tool rail with a ZERO
+    // HEIGHT hit target that every unit test passed, and Task 6 briefly shipped a
+    // video editor with no way to pause at all. Both are asserted below.
+
+    @MainActor
+    func testTheEditorBottomIsAFiveToolRail() {
+        let app = XCUIApplication.underTest()
+        openVideoEditor(app)
+
+        for id in ["videoLayoutButton", "videoFrameTool", "videoAddTextButton",
+                   "videoAddStickerButton", "videoMusicButton"] {
+            let tool = app.buttons[id]
+            XCTAssertTrue(tool.waitForExistence(timeout: 5), "\(id) is on the rail")
+            XCTAssertTrue(tool.isHittable, "\(id) must be tappable, not merely present")
+        }
+    }
+
+    @MainActor
+    func testAToolOpensAPanelThatClosesAgain() {
+        let app = XCUIApplication.underTest()
+        openVideoEditor(app)
+
+        let frameTool = app.buttons["videoFrameTool"]
+        XCTAssertTrue(frameTool.waitForExistence(timeout: 5))
+        frameTool.tap()
+
+        let close = app.buttons["editorPanelCloseButton"]
+        XCTAssertTrue(close.waitForExistence(timeout: 5), "the Frame panel opens")
+        XCTAssertTrue(close.isHittable, "its close button is a real hit target")
+        close.tap()
+        XCTAssertFalse(close.waitForExistence(timeout: 2), "and the panel closes again")
+    }
+
+    @MainActor
+    func testThePreviewCanAlwaysBePaused() {
+        // Task 6 removed the toolbar Play button and made the preview autoplay,
+        // leaving nothing on screen to stop it. The timeline owns that control now.
+        let app = XCUIApplication.underTest()
+        openVideoEditor(app)
+
+        let playback = app.buttons["videoPlayButton"]
+        XCTAssertTrue(playback.waitForExistence(timeout: 5),
+                      "a playback control must be reachable without expanding anything")
+        XCTAssertTrue(playback.isHittable)
+    }
+
+    @MainActor
+    func testTheTimelineIsCollapsedByDefaultAndExpands() {
+        let app = XCUIApplication.underTest()
+        openVideoEditor(app)
+
+        let timeline = app.otherElements["videoTimeline"]
+        XCTAssertTrue(timeline.waitForExistence(timeout: 5), "the timeline is on screen")
+        let collapsed = timeline.frame.height
+        XCTAssertGreaterThan(collapsed, 0,
+                             "a zero-height timeline would be invisible and untappable — the " +
+                             "exact bug a unit test cannot see")
+
+        let chevron = app.buttons["videoTimelineChevron"]
+        XCTAssertTrue(chevron.isHittable, "the expand control is a real hit target")
+        chevron.tap()
+
+        // The expansion is animated, so give the layout a bounded moment to land
+        // rather than asserting on the frame mid-transition.
+        let deadline = Date().addingTimeInterval(5)
+        while timeline.frame.height <= collapsed, Date() < deadline {
+            usleep(100_000)
+        }
+        XCTAssertGreaterThan(timeline.frame.height, collapsed,
+                             "tapping the chevron expands the timeline into its lanes")
+    }
+
     @MainActor
     func testChangingLayoutChangesSlotCount() {
         let app = XCUIApplication.underTest()

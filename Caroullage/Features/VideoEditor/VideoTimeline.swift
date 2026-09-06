@@ -371,6 +371,15 @@ public final class VideoTimeline: UIView {
         // restoring it keeps the control discoverable to the UI suite without
         // that suite having to learn a new name.
         playbackButton.accessibilityIdentifier = "videoPlayButton"
+        // A bare `UIControl` is not an accessibility element and carries no
+        // `.button` trait, so VoiceOver announced this — the only way to pause
+        // the preview — as an unlabelled container rather than something you can
+        // press. Caught by a UI test asserting `app.buttons[…]`, which matched
+        // nothing because the element was typed `Other`. Being an element also
+        // collapses the inner image view, which was leaking its own SF Symbol
+        // name ("go down") into the tree.
+        playbackButton.isAccessibilityElement = true
+        playbackButton.accessibilityTraits = .button
         playbackButton.addTarget(self, action: #selector(playbackTapped), for: .touchUpInside)
         playbackButton.translatesAutoresizingMaskIntoConstraints = false
         headerRow.addSubview(playbackButton)
@@ -387,9 +396,17 @@ public final class VideoTimeline: UIView {
         chevronButton.addSubview(chevronImageView)
 
         chevronButton.accessibilityIdentifier = "videoTimelineChevron"
+        // Same trap as `playbackButton` above.
+        chevronButton.isAccessibilityElement = true
+        chevronButton.accessibilityTraits = .button
         chevronButton.addTarget(self, action: #selector(chevronTapped), for: .touchUpInside)
         chevronButton.translatesAutoresizingMaskIntoConstraints = false
         headerRow.addSubview(chevronButton)
+
+        // On the container itself so a UI test can measure the real laid-out
+        // height. Plan 1 shipped a zero-height tool rail that every unit test
+        // passed; only a real render catches that class of bug.
+        accessibilityIdentifier = "videoTimeline"
 
         contentHost.translatesAutoresizingMaskIntoConstraints = false
         addSubview(contentHost)

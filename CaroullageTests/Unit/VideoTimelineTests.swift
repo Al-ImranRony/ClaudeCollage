@@ -304,6 +304,24 @@ final class VideoTimelineViewTests: XCTestCase {
 
     // MARK: - The playback control's hit target (same regression class as the chevron)
 
+    func testTheHeaderControlsAreExposedAsButtonsNotBareContainers() {
+        // Both are plain `UIControl`s, which are not accessibility elements and
+        // carry no `.button` trait — VoiceOver announced the only way to pause
+        // the preview as an unlabelled container. A UI test asserting
+        // `app.buttons["videoPlayButton"]` matched nothing at all.
+        let timeline = makeTimeline()
+
+        for (control, name) in [(timeline.playbackButtonForHitTesting, "playback"),
+                                (timeline.chevronButtonForHitTesting, "chevron")] {
+            XCTAssertTrue(control.isAccessibilityElement,
+                          "the \(name) control must be an accessibility element")
+            XCTAssertTrue(control.accessibilityTraits.contains(.button),
+                          "the \(name) control must announce itself as a button")
+            XCTAssertFalse(control.accessibilityLabel?.isEmpty ?? true,
+                           "the \(name) control must say what it does")
+        }
+    }
+
     func testThePlaybackControlHasARealHitTarget() {
         let timeline = makeTimeline()
         let playback = timeline.playbackButtonForHitTesting
