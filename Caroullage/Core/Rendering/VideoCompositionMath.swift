@@ -138,8 +138,22 @@ public enum VideoCompositionMath {
 
     /// The composition duration is the longest cell; shorter cells either loop to
     /// fill it or simply end early (leaving background).
+    ///
+    /// Correct only while every cell starts together. Once any cell carries a
+    /// `startOffset`, use `compositionDuration(cellSpans:)` — the longest cell is
+    /// no longer necessarily the last one to finish.
     public static func compositionDuration(cellDurations: [Double]) -> Double {
         cellDurations.max() ?? 0
+    }
+
+    /// The composition runs until the last cell ENDS, which with per-cell start
+    /// offsets is not the same as the longest cell: a 1s clip starting at 2s
+    /// outlasts a 1.8s clip starting at zero.
+    ///
+    /// Both halves are floored at zero so a corrupt project cannot drag the
+    /// composition backwards past its own start.
+    public static func compositionDuration(cellSpans: [(offset: Double, duration: Double)]) -> Double {
+        cellSpans.map { max(0, $0.offset) + max(0, $0.duration) }.max() ?? 0
     }
 
     /// Maps a rect from canvas space into the render-output space, aspect-fit and

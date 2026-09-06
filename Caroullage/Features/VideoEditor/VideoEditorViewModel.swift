@@ -188,6 +188,16 @@ public final class VideoEditorViewModel {
         mutate(index) { $0.transition = transition }
     }
 
+    /// Delays this cell's entry into the collage. Clamped `max(0, …)` — a
+    /// negative offset would mean starting before the collage does.
+    public func setStartOffset(_ seconds: Double, forCellAt index: Int) {
+        mutate(index) { $0.startOffset = max(0, seconds) }
+    }
+
+    public func setStartOffsetInteractive(_ seconds: Double, forCellAt index: Int) {
+        mutateInteractive(index) { $0.startOffset = max(0, seconds) }
+    }
+
     // MARK: - Interactive (coalesced) edits
 
     // A continuous gesture (dragging a slider) calls the `*Interactive` setters,
@@ -421,7 +431,8 @@ public final class VideoEditorViewModel {
                 isMuted: cell.isMuted,
                 volume: cell.volume,
                 transition: cell.transition,
-                transform: cell.transform)
+                transform: cell.transform,
+                startOffset: cell.startOffset)
         }
     }
 
@@ -461,12 +472,19 @@ public final class VideoEditorViewModel {
     /// default crossfade so it has something to pop in with.
     public func applyBeatSync(startTimes: [Double]) {
         for index in cells.indices where index < startTimes.count {
+            // `startTimes` are absolute times in the collage, but
+            // `CellTransition.startTime` is relative to the CELL — so a cell that
+            // enters late has to have the beat expressed against its own start,
+            // or it would reveal at `startOffset + beat`. A beat that falls
+            // before the cell exists collapses to 0: the earliest it can appear
+            // is when it appears.
+            let beat = max(0, startTimes[index] - cells[index].startOffset)
             if var transition = cells[index].transition {
-                transition.startTime = startTimes[index]
+                transition.startTime = beat
                 cells[index].transition = transition
             } else {
                 cells[index].transition = CellTransition(
-                    style: .crossfade, duration: 0.4, startTime: startTimes[index])
+                    style: .crossfade, duration: 0.4, startTime: beat)
             }
         }
         record()

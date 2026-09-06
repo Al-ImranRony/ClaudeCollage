@@ -59,6 +59,10 @@ public struct VideoCellState: Equatable, Sendable, Codable {
     public var filters: CellFilters
     /// Optional intro animation played at the start of the collage.
     public var transition: CellTransition?
+    /// Seconds to delay this cell's start within the collage. Cells otherwise all
+    /// begin together — this is what lets one clip enter after another. Clamped
+    /// `max(0, …)`: a negative offset would mean starting before the collage does.
+    public var startOffset: Double
 
     public init(
         videoID: UUID? = nil,
@@ -68,7 +72,8 @@ public struct VideoCellState: Equatable, Sendable, Codable {
         volume: Double = 1,
         transform: CellTransform = CellTransform(),
         filters: CellFilters = CellFilters(),
-        transition: CellTransition? = nil
+        transition: CellTransition? = nil,
+        startOffset: Double = 0
     ) {
         self.videoID = videoID
         self.trim = trim
@@ -78,12 +83,14 @@ public struct VideoCellState: Equatable, Sendable, Codable {
         self.transform = transform
         self.filters = filters
         self.transition = transition
+        self.startOffset = max(0, startOffset)
     }
 
     private static func clampVolume(_ value: Double) -> Double { min(1, max(0, value)) }
 
     private enum CodingKeys: String, CodingKey {
         case videoID, trim, isLooping, isMuted, volume, transform, filters, transition
+        case startOffset
     }
 
     public init(from decoder: Decoder) throws {
@@ -96,5 +103,6 @@ public struct VideoCellState: Equatable, Sendable, Codable {
         self.transform = try c.decodeIfPresent(CellTransform.self, forKey: .transform) ?? CellTransform()
         self.filters = try c.decodeIfPresent(CellFilters.self, forKey: .filters) ?? CellFilters()
         self.transition = try c.decodeIfPresent(CellTransition.self, forKey: .transition)
+        self.startOffset = max(0, try c.decodeIfPresent(Double.self, forKey: .startOffset) ?? 0)
     }
 }

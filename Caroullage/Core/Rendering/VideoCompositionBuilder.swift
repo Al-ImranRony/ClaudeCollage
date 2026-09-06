@@ -51,6 +51,9 @@ public struct VideoCompositionCell: @unchecked Sendable {
     /// (−1…1) reposition. Applied to the fill crop; ignored in `.fit` mode.
     /// Rotation is not supported for video cells (crop-based framing is axis-aligned).
     public var transform: CellTransform
+    /// Seconds to delay this cell within the collage. `0` (the default) is the
+    /// pre-offset behaviour exactly: every cell starts together.
+    public var startOffset: Double
 
     public init(
         asset: AVAsset,
@@ -62,6 +65,8 @@ public struct VideoCompositionCell: @unchecked Sendable {
         transition: CellTransition? = nil,
         contentMode: ContentMode = .fill,
         transform: CellTransform = CellTransform()
+    ,
+        startOffset: Double = 0
     ) {
         self.asset = asset
         self.frame = frame
@@ -72,6 +77,7 @@ public struct VideoCompositionCell: @unchecked Sendable {
         self.transition = transition
         self.contentMode = contentMode
         self.transform = transform
+        self.startOffset = max(0, startOffset)
     }
 }
 
@@ -195,8 +201,11 @@ extension VideoComposer {
                                               oriented: oriented, range: range))
         }
 
-        // 2) Composition duration = the longest trimmed cell.
-        let totalSeconds = VideoCompositionMath.compositionDuration(cellDurations: resolved.map { $0.range.duration.seconds })
+        // 2) Composition duration = the LAST cell to finish. With per-cell start
+        //    offsets that is not the longest cell: a 1s clip starting at 2s
+        //    outlasts a 1.8s clip starting at zero.
+        let totalSeconds = VideoCompositionMath.compositionDuration(
+            cellSpans: resolved.map { ($0.cell.startOffset, $0.range.duration.seconds) })
         let total = CMTime(seconds: totalSeconds, preferredTimescale: ts)
 
         // 3) One video track + layer instruction (+ audio) per cell.
@@ -207,8 +216,13 @@ extension VideoComposer {
             guard let videoComp = composition.addMutableTrack(withMediaType: .video,
                                                               preferredTrackID: kCMPersistentTrackID_Invalid)
             else { continue }
-            let fillTo = item.cell.isLooping ? total : item.range.duration
-            try insertLooping(range: item.range, of: item.videoTrack, into: videoComp, fillTo: fillTo)
+            // `fillTo` is an ABSOLUTE composition time, not a length: a looping
+            // cell fills from its offset to the end of the collage, a plain one
+            // stops one clip-length after its offset.
+            let offset = CMTime(seconds: item.cell.startOffset, preferredTimescale: ts)
+            let fillTo = item.cell.isLooping ? total : offset + item.range.duration
+            try insertLooping(range: item.range, of: item.videoTrack, into: videoComp,
+                              fillTo: fillTo, startingAt: offset)
 
             let layer = AVMutableVideoCompositionLayerInstruction(assetTrack: videoComp)
             // AVFoundation's video-composition layer transforms use the same
@@ -251,13 +265,14 @@ extension VideoComposer {
             }
             applyPlacement(transform, transition: item.cell.transition,
                            cellFrame: mappedFrame, clipDuration: item.range.duration,
-                           timescale: ts, to: layer)
+                           startOffset: offset, timescale: ts, to: layer)
             layerInstructions.append(layer)
 
             if let audioTrack = item.audioTrack,
                let audioComp = composition.addMutableTrack(withMediaType: .audio,
                                                            preferredTrackID: kCMPersistentTrackID_Invalid) {
-                try? insertLooping(range: item.range, of: audioTrack, into: audioComp, fillTo: fillTo)
+                try? insertLooping(range: item.range, of: audioTrack, into: audioComp,
+                                   fillTo: fillTo, startingAt: offset)
                 let params = AVMutableAudioMixInputParameters(track: audioComp)
                 params.setVolume(VideoCompositionMath.effectiveVolume(isMuted: item.cell.isMuted,
                                                                       volume: item.cell.volume), at: .zero)
@@ -685,11 +700,17 @@ extension VideoComposer {
     /// pushed it later, the cell is *held* in its start state (transparent for a
     /// crossfade, offset/scaled for slide/zoom) from t=0 until the beat, then
     /// animates in — so it pops onto the beat.
+    /// - Parameter startOffset: when this cell enters the collage.
+    ///   `CellTransition.startTime` is relative to the CELL, not the composition,
+    ///   so it is shifted by this — otherwise a fade-in written as "at my time 0"
+    ///   would run while the cell is still absent from the timeline and the clip
+    ///   would simply pop in at full opacity once its track began.
     private func applyPlacement(
         _ transform: CGAffineTransform,
         transition: CellTransition?,
         cellFrame: CGRect,
         clipDuration: CMTime,
+        startOffset: CMTime,
         timescale: CMTimeScale,
         to layer: AVMutableVideoCompositionLayerInstruction
     ) {
@@ -697,7 +718,8 @@ extension VideoComposer {
             layer.setTransform(transform, at: .zero)
             return
         }
-        let start = CMTime(seconds: transition.startTime, preferredTimescale: timescale)
+        let start = startOffset
+            + CMTime(seconds: transition.startTime, preferredTimescale: timescale)
         let window = CMTimeRange(
             start: start,
             duration: CMTimeMinimum(CMTime(seconds: transition.duration, preferredTimescale: timescale),
@@ -720,11 +742,24 @@ extension VideoComposer {
         }
     }
 
-    /// Inserts `range` of `source` into `dest`, repeating it until `fillTo` is
-    /// reached (looping cells). A single insert when `fillTo <= range.duration`.
+    /// Inserts `range` of `source` into `dest` from `startingAt`, repeating it
+    /// until the absolute time `fillTo` is reached (looping cells).
+    ///
+    /// The leading gap is stated explicitly rather than left implied by starting
+    /// the cursor late. This is belt-and-braces, not a fix: inserting at a time
+    /// past the track's current end already extends it with empty time, and
+    /// removing this call does not change the resulting segments (verified by
+    /// deleting it — every offset test still passed). It stays because a reader
+    /// should not have to know that rule to see that the cell is absent until
+    /// its offset. No test distinguishes the two, deliberately: there is no
+    /// behaviour here to pin.
     private func insertLooping(range: CMTimeRange, of source: AVAssetTrack,
-                               into dest: AVMutableCompositionTrack, fillTo: CMTime) throws {
-        var cursor = CMTime.zero
+                               into dest: AVMutableCompositionTrack, fillTo: CMTime,
+                               startingAt offset: CMTime = .zero) throws {
+        if offset > .zero {
+            dest.insertEmptyTimeRange(CMTimeRange(start: .zero, duration: offset))
+        }
+        var cursor = offset
         while cursor < fillTo {
             let remaining = fillTo - cursor
             let thisDuration = CMTimeMinimum(range.duration, remaining)
