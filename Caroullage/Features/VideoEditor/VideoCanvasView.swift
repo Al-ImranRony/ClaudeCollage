@@ -132,7 +132,13 @@ final class VideoCanvasView: UIView {
 
     /// Pools/rebuilds the interactive text views and repositions them. Wires each
     /// view's gesture callbacks back out through this canvas.
-    func updateTextOverlays(_ overlays: [TextOverlay]) {
+    ///
+    /// `selected` mirrors `updateStickerOverlays(_:selected:)` — Task 6's "Text
+    /// selected" contextual rail group is not the only feedback that something
+    /// is selected: `TextOverlayView` already carries the same persistent
+    /// selection chrome `StickerOverlayView` does, so the tapped zone shows it
+    /// on the canvas too.
+    func updateTextOverlays(_ overlays: [TextOverlay], selected: UUID? = nil) {
         textModels = overlays
         if textViews.count != overlays.count {
             textViews.forEach { $0.removeFromSuperview() }
@@ -144,6 +150,9 @@ final class VideoCanvasView: UIView {
                 addSubview(view)
                 return view
             }
+        }
+        for (view, overlay) in zip(textViews, overlays) {
+            view.isSelected = overlay.id == selected
         }
         textViews.forEach { bringSubviewToFront($0) }
         stickerViews.forEach { bringSubviewToFront($0) }   // stickers above text
