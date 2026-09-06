@@ -166,6 +166,15 @@ final class VideoEditorViewController: UIViewController {
     private let volumeSlider = UISlider()
     private let muteSwitch = UISwitch()
     private let transitionDurationSlider = UISlider()
+    private let textInStepper = UIStepper()
+    private let textOutStepper = UIStepper()
+    private let textInValueLabel = UILabel()
+    private let textOutValueLabel = UILabel()
+    /// Which overlay the open Timing panel is editing. The steppers are owned
+    /// here and reused across opens, so their handlers need to know who they are
+    /// pointed at — and must go inert rather than retime the wrong caption when
+    /// the selection moves out from under an open panel.
+    private var timingPanelOverlayID: UUID?
 
     // MARK: - Init
 
@@ -340,6 +349,8 @@ final class VideoEditorViewController: UIViewController {
         transitionDurationSlider.addTarget(self, action: #selector(transitionDurationChanged), for: .valueChanged)
         transitionDurationSlider.addTarget(self, action: #selector(transitionDurationReleased),
                                            for: [.touchUpInside, .touchUpOutside, .touchCancel])
+        textInStepper.addTarget(self, action: #selector(textInChanged), for: .valueChanged)
+        textOutStepper.addTarget(self, action: #selector(textOutChanged), for: .valueChanged)
 
         toolRail.setBaseTools([
             EditorTool(id: "layout", title: "Layout", systemImage: "square.grid.2x2",
@@ -395,9 +406,9 @@ final class VideoEditorViewController: UIViewController {
                 openPanel(makeTextStylePanel(for: textID), title: "Style", id: id)
             }
         case "timingText":
-            // Task 8 implements real numeric timing; this only proves the tool
-            // is wired (a real panel opens) without touching the overlay.
-            openPanel(TimingStubPanelView(), title: "Timing", id: id)
+            if let textID = selectedTextID {
+                openPanel(makeTextTimingPanel(for: textID), title: "Timing", id: id)
+            }
         case "deleteText":
             if let textID = selectedTextID {
                 viewModel.removeTextOverlay(id: textID)
@@ -525,6 +536,10 @@ final class VideoEditorViewController: UIViewController {
         if let openToolID, Self.selectionPanelToolIDs.contains(openToolID) {
             closePanel()
         }
+        // The Timing steppers are owned by this controller and reused across
+        // opens, so a stale id here would let them retime a caption the user is
+        // no longer looking at.
+        timingPanelOverlayID = nil
         // Fix 1: this used to retire the rail/panel chrome but leave
         // `viewModel.selectedIndex` dangling at the stale index — `refreshCanvas`
         // re-derives validity independently ("in range and filled"), so refilling
@@ -702,6 +717,91 @@ final class VideoEditorViewController: UIViewController {
     /// `GridEditorViewController.makeTextStylePanel`. Video has no single
     /// canvas background to read light/dark off (it's a video), so a fresh
     /// preset always applies white, matching `addTextTapped`'s own default.
+    /// The composition's length, which bounds every caption window. Falls back to
+    /// a nominal minute when nothing is loaded yet, so the steppers are still
+    /// usable rather than pinned at 0...0 on an empty document.
+    private var timingCeiling: Double {
+        let duration = viewModel.timelineModel().duration
+        return duration > 0 ? duration : 60
+    }
+
+    private func makeTextTimingPanel(for id: UUID) -> UIView {
+        timingPanelOverlayID = id
+        let overlay = viewModel.textOverlay(id: id)
+        let ceiling = timingCeiling
+        // An unbounded caption ("always visible") opens spanning everything
+        // rather than as a collapsed 0...0 window the user has to undo by hand.
+        let start = overlay?.startTime ?? 0
+        let end = overlay?.endTime ?? ceiling
+
+        for stepper in [textInStepper, textOutStepper] {
+            stepper.minimumValue = 0
+            stepper.maximumValue = ceiling
+            stepper.stepValue = 0.1
+            stepper.autorepeat = true
+        }
+        textInStepper.value = start
+        textOutStepper.value = end
+        textInStepper.accessibilityIdentifier = "textTimingInStepper"
+        textOutStepper.accessibilityIdentifier = "textTimingOutStepper"
+        textInStepper.accessibilityLabel = "Caption start"
+        textOutStepper.accessibilityLabel = "Caption end"
+        refreshTimingLabels()
+
+        let wholeVideo = ThemeButton(
+            style: .tertiary, title: "Whole Video",
+            image: UIImage(systemName: "arrow.left.and.right"),
+            action: UIAction { [weak self] _ in self?.clearTextTiming() })
+        wholeVideo.accessibilityIdentifier = "textTimingWholeVideoButton"
+
+        return TextTimingPanelView(
+            inStepper: textInStepper, inValue: textInValueLabel,
+            outStepper: textOutStepper, outValue: textOutValueLabel,
+            wholeVideoButton: wholeVideo)
+    }
+
+    private func refreshTimingLabels() {
+        textInValueLabel.text = String(format: "%.1fs", textInStepper.value)
+        textOutValueLabel.text = String(format: "%.1fs", textOutStepper.value)
+        textInValueLabel.accessibilityValue = textInValueLabel.text
+        textOutValueLabel.accessibilityValue = textOutValueLabel.text
+    }
+
+    /// Both handlers clamp so the window can never invert. That matters more than
+    /// it looks: `TextOverlay.isVisible(at:)` treats an inverted window as ALWAYS
+    /// VISIBLE (fail-open, so a corrupt project can't hide a caption with nothing
+    /// on screen to explain why) — so an inverted window typed in here would
+    /// silently turn a timed caption back into a permanent one. Clamped rather
+    /// than rejected, so the control still responds to the press.
+    @objc private func textInChanged() {
+        guard let id = timingPanelOverlayID else { return }
+        let clamped = min(textInStepper.value, textOutStepper.value - VideoTimeline.minimumTrimDuration)
+        textInStepper.value = max(0, clamped)
+        refreshTimingLabels()
+        viewModel.setTextTiming(id: id, start: textInStepper.value, end: textOutStepper.value)
+        Haptics.selectionChanged()
+    }
+
+    @objc private func textOutChanged() {
+        guard let id = timingPanelOverlayID else { return }
+        let clamped = max(textOutStepper.value, textInStepper.value + VideoTimeline.minimumTrimDuration)
+        textOutStepper.value = min(clamped, textOutStepper.maximumValue)
+        refreshTimingLabels()
+        viewModel.setTextTiming(id: id, start: textInStepper.value, end: textOutStepper.value)
+        Haptics.selectionChanged()
+    }
+
+    /// Back to "always visible". `nil` is a real state a pill drag can never
+    /// reach, because a pill always has two edges — this is the only way back.
+    private func clearTextTiming() {
+        guard let id = timingPanelOverlayID else { return }
+        viewModel.setTextTiming(id: id, start: nil, end: nil)
+        textInStepper.value = 0
+        textOutStepper.value = timingCeiling
+        refreshTimingLabels()
+        Haptics.tap()
+    }
+
     private func makeTextStylePanel(for id: UUID) -> UIView {
         let row = UIStackView()
         row.axis = .horizontal

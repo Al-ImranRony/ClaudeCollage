@@ -138,29 +138,45 @@ final class ClipTransitionPanelView: UIView {
     required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
 }
 
-/// The selected text overlay's Timing tool. Numeric in/out entry is Task 8's
-/// job — this is a placeholder so the tool is genuinely wired (it opens a real
-/// panel with a real hit target) rather than a dead button, while touching
-/// nothing about the overlay's actual timing.
+/// The selected text overlay's Timing tool: numeric in/out refinement for the
+/// window the timeline's pill drag places roughly.
+///
+/// Steppers rather than text fields on purpose. A decimal keypad in a bottom
+/// panel has no return key to dismiss it and covers the very timeline the user
+/// is timing against; 0.1s steps refine a dragged window precisely without one.
+/// "Whole Video" is not a convenience — `nil` timing ("always visible") is a
+/// real state a pill drag can never reach, because a pill always has two edges.
 @MainActor
-final class TimingStubPanelView: UIView {
-    init() {
+final class TextTimingPanelView: UIView {
+    init(inStepper: UIStepper, inValue: UILabel,
+         outStepper: UIStepper, outValue: UILabel,
+         wholeVideoButton: UIButton) {
         super.init(frame: .zero)
-        let label = UILabel()
-        label.text = "Numeric in/out timing arrives in a future update."
-        label.font = Theme.Typography.caption
-        label.textColor = Theme.Color.textSecondary
-        label.numberOfLines = 0
-        label.textAlignment = .center
-        label.accessibilityIdentifier = "textTimingStubLabel"
-        label.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(label)
-        NSLayoutConstraint.activate([
-            label.topAnchor.constraint(equalTo: topAnchor, constant: Theme.Spacing.sm),
-            label.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -Theme.Spacing.sm),
-            label.leadingAnchor.constraint(equalTo: leadingAnchor, constant: Theme.Spacing.md),
-            label.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -Theme.Spacing.md),
-        ])
+        fill(self, with: wrapVideoPanelRows([
+            makeVideoPanelRow(title: "In", systemImage: "arrow.right.to.line",
+                              trailing: pair(inValue, inStepper)),
+            makeVideoPanelRow(title: "Out", systemImage: "arrow.left.to.line",
+                              trailing: pair(outValue, outStepper)),
+            wholeVideoButton,
+        ]))
+    }
+
+    /// A stepper reads as a bare pair of chevrons without its value beside it.
+    private func pair(_ label: UILabel, _ stepper: UIStepper) -> UIStackView {
+        // `CarouselFrameCell`'s idiom — `UIFont` has no `monospacedDigit()`, so the
+        // face is built at the token font's own size and weight.
+        label.font = .monospacedDigitSystemFont(
+            ofSize: Theme.Typography.caption.pointSize, weight: .semibold)
+        label.textColor = Theme.Color.textPrimary
+        // Monospaced digits alone don't stop the row twitching as the width goes
+        // 1.0 → 10.0, so the label holds a floor width instead.
+        label.textAlignment = .right
+        label.widthAnchor.constraint(greaterThanOrEqualToConstant: 44).isActive = true
+        let row = UIStackView(arrangedSubviews: [label, stepper])
+        row.axis = .horizontal
+        row.spacing = Theme.Spacing.xs
+        row.alignment = .center
+        return row
     }
 
     @available(*, unavailable)

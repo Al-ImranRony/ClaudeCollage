@@ -202,7 +202,11 @@ public final class VideoTimeline: UIView {
     private static let edgeTolerance: CGFloat = Theme.Spacing.sm
     /// A clip/pill can never be trimmed narrower than this, so a fast drag past
     /// the opposite edge can't invert start/end or produce a zero/negative span.
-    private static let minimumTrimDuration: Double = 0.1
+    /// The shortest window any surface will produce, for a clip's trim or a
+    /// caption's in/out. `internal` rather than `private` because the Timing
+    /// panel clamps to the same value — if the two disagreed, a window typed in
+    /// the panel could be one a drag can never reproduce.
+    static let minimumTrimDuration: Double = 0.1
 
     public private(set) var state: State = .collapsed
 

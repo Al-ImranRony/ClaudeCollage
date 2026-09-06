@@ -429,24 +429,174 @@ final class VideoEditorRailTests: XCTestCase {
         XCTAssertEqual(buttons.count, TextStyle.Kind.allCases.count)
     }
 
-    func testTheTimingToolOpensAPanelWithoutTouchingTheOverlay() throws {
-        // Task 8 implements real numeric timing; here the tool must merely be
-        // wired (a real panel opens with a real hit target) rather than inert —
-        // and it must not silently mutate startTime/endTime.
+    func testTappingEveryStylePresetActuallyAppliesIt() throws {
+        // Counting buttons proves nothing — a Plan 1 review found exactly that
+        // gap, and Plan 1 Task 9 shipped a whole panel of controls wired to
+        // nothing. Every preset gets tapped and checked.
         let editor = makeEditor()
+        let vm = editor.viewModelForTesting
         let id = editor.addTextOverlayForTesting()
         editor.selectTextOverlayForTesting(id)
-        try rail(in: editor).simulateTap(toolID: "timingText")
+        try rail(in: editor).simulateTap(toolID: "styleText")
 
-        let panel = try panel(in: editor)
-        XCTAssertTrue(panel.isPresenting)
-        XCTAssertEqual(panel.currentTitle, "Timing")
+        for kind in TextStyle.Kind.allCases {
+            let button = try XCTUnwrap(
+                panel(in: editor).recursiveSubviews.compactMap { $0 as? UIControl }
+                    .first { $0.accessibilityIdentifier == "textStyle_\(kind.rawValue)" },
+                "the \(kind) preset button")
+            button.sendActions(for: .touchUpInside)
+
+            XCTAssertEqual(vm.textOverlay(id: id)?.style.kind, kind,
+                           "tapping the \(kind) preset must actually apply it")
+        }
+    }
+
+    // MARK: - The Timing panel (Task 8)
+    //
+    // Steppers rather than text fields: a decimal keypad in a bottom panel has
+    // no return key to dismiss it, and the timeline drag already does coarse
+    // placement — this panel is for refining it, which 0.1s steps do exactly.
+
+    /// The panel's two steppers, in row order: In, then Out.
+    private func timingSteppers(in editor: VideoEditorViewController) throws -> (UIStepper, UIStepper) {
+        let steppers = try panel(in: editor).recursiveSubviews.compactMap { $0 as? UIStepper }
+        guard steppers.count == 2 else {
+            throw XCTSkip("expected an In and an Out stepper, found \(steppers.count)")
+        }
+        return (steppers[0], steppers[1])
+    }
+
+    private func openTiming(_ editor: VideoEditorViewController, _ id: UUID) throws {
+        editor.selectTextOverlayForTesting(id)
+        try rail(in: editor).simulateTap(toolID: "timingText")
+    }
+
+    func testTheTimingPanelOpensOnTheSelectedOverlaysWindow() throws {
+        let editor = makeEditor()
+        let id = editor.addTextOverlayForTesting()
+        editor.viewModelForTesting.setTextTiming(id: id, start: 2, end: 5)
+        try openTiming(editor, id)
+
+        XCTAssertEqual(try panel(in: editor).currentTitle, "Timing")
+        let (inStepper, outStepper) = try timingSteppers(in: editor)
+        XCTAssertEqual(inStepper.value, 2, accuracy: 0.001)
+        XCTAssertEqual(outStepper.value, 5, accuracy: 0.001)
+    }
+
+    func testAnUnboundedOverlayOpensSpanningTheWholeComposition() throws {
+        // `nil` timing means "always visible", so the panel must offer the whole
+        // composition rather than a collapsed 0...0 window the user then has to
+        // undo by hand.
+        let editor = makeEditor()
+        editor.viewModelForTesting.setTrim(VideoTrim(start: 0, end: 6), forCellAt: 0)
+        let id = editor.addTextOverlayForTesting()
+        try openTiming(editor, id)
+
+        let (inStepper, outStepper) = try timingSteppers(in: editor)
+        XCTAssertEqual(inStepper.value, 0, accuracy: 0.001)
+        XCTAssertEqual(outStepper.value, 6, accuracy: 0.001)
+    }
+
+    func testSteppingTheInPointRetimesTheOverlay() throws {
+        let editor = makeEditor()
+        let id = editor.addTextOverlayForTesting()
+        editor.viewModelForTesting.setTextTiming(id: id, start: 1, end: 5)
+        try openTiming(editor, id)
+
+        let (inStepper, _) = try timingSteppers(in: editor)
+        inStepper.value = 2.5
+        inStepper.sendActions(for: .valueChanged)
+
+        XCTAssertEqual(editor.viewModelForTesting.textOverlay(id: id)?.startTime ?? -1, 2.5,
+                       accuracy: 0.001)
+    }
+
+    func testSteppingTheOutPointRetimesTheOverlay() throws {
+        let editor = makeEditor()
+        let id = editor.addTextOverlayForTesting()
+        editor.viewModelForTesting.setTextTiming(id: id, start: 1, end: 5)
+        try openTiming(editor, id)
+
+        let (_, outStepper) = try timingSteppers(in: editor)
+        outStepper.value = 4
+        outStepper.sendActions(for: .valueChanged)
+
+        XCTAssertEqual(editor.viewModelForTesting.textOverlay(id: id)?.endTime ?? -1, 4,
+                       accuracy: 0.001)
+    }
+
+    func testTheInPointCannotBePushedPastTheOutPoint() throws {
+        // An inverted window is treated as ALWAYS VISIBLE by `isVisible(at:)`
+        // (fail-open, deliberately), so letting one be typed in would silently
+        // turn a timed caption back into a permanent one.
+        let editor = makeEditor()
+        let id = editor.addTextOverlayForTesting()
+        editor.viewModelForTesting.setTextTiming(id: id, start: 1, end: 5)
+        try openTiming(editor, id)
+
+        let (inStepper, _) = try timingSteppers(in: editor)
+        inStepper.value = 9
+        inStepper.sendActions(for: .valueChanged)
+
         let overlay = try XCTUnwrap(editor.viewModelForTesting.textOverlay(id: id))
+        let start = try XCTUnwrap(overlay.startTime)
+        let end = try XCTUnwrap(overlay.endTime)
+        XCTAssertLessThan(start, end, "the window must never invert")
+        XCTAssertEqual(end, 5, accuracy: 0.001, "clamping the in-point must not move the out-point")
+        XCTAssertEqual(inStepper.value, start, accuracy: 0.001,
+                       "the control must show the clamped value, not the rejected one")
+    }
+
+    func testTheOutPointCannotBePulledBeforeTheInPoint() throws {
+        let editor = makeEditor()
+        let id = editor.addTextOverlayForTesting()
+        editor.viewModelForTesting.setTextTiming(id: id, start: 3, end: 8)
+        try openTiming(editor, id)
+
+        let (_, outStepper) = try timingSteppers(in: editor)
+        outStepper.value = 0
+        outStepper.sendActions(for: .valueChanged)
+
+        let overlay = try XCTUnwrap(editor.viewModelForTesting.textOverlay(id: id))
+        XCTAssertGreaterThan(try XCTUnwrap(overlay.endTime), try XCTUnwrap(overlay.startTime))
+        XCTAssertEqual(overlay.startTime ?? -1, 3, accuracy: 0.001)
+    }
+
+    func testTimingChangesAreUndoable() throws {
+        let editor = makeEditor()
+        let vm = editor.viewModelForTesting
+        let id = editor.addTextOverlayForTesting()
+        vm.setTextTiming(id: id, start: 1, end: 5)
+        try openTiming(editor, id)
+
+        let (inStepper, _) = try timingSteppers(in: editor)
+        inStepper.value = 2
+        inStepper.sendActions(for: .valueChanged)
+
+        vm.undo()
+        XCTAssertEqual(vm.textOverlay(id: id)?.startTime ?? -1, 1, accuracy: 0.001)
+    }
+
+    func testWholeVideoReturnsTheCaptionToUnbounded() throws {
+        // `nil` is a real state a drag cannot reach — the pill always has two
+        // edges — so the panel has to be the way back to "show it throughout".
+        let editor = makeEditor()
+        let vm = editor.viewModelForTesting
+        let id = editor.addTextOverlayForTesting()
+        vm.setTextTiming(id: id, start: 2, end: 4)
+        try openTiming(editor, id)
+
+        let button = try XCTUnwrap(
+            panel(in: editor).recursiveSubviews.compactMap { $0 as? UIControl }
+                .first { $0.accessibilityIdentifier == "textTimingWholeVideoButton" },
+            "the Timing panel's Whole Video control")
+        button.sendActions(for: .touchUpInside)
+
+        let overlay = try XCTUnwrap(vm.textOverlay(id: id))
         XCTAssertNil(overlay.startTime)
         XCTAssertNil(overlay.endTime)
-
-        let stubLabel = panel.recursiveSubviews.first { $0.accessibilityIdentifier == "textTimingStubLabel" }
-        XCTAssertNotNil(stubLabel, "The tool must produce real, hit-testable content, not a dead button")
+        XCTAssertTrue(overlay.isVisible(at: 0))
+        XCTAssertTrue(overlay.isVisible(at: 9_999))
     }
 
     func testSelectingATextOverlayMarksItsCanvasViewSelected() throws {
