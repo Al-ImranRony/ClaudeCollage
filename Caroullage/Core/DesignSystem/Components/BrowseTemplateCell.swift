@@ -20,7 +20,9 @@
 //  you compare — how many of your photos it wants, how many pages it makes —
 //  have to be readable at a glance, and type over photography is not readable at
 //  a glance. So the artwork is full-bleed and the facts sit under it on the app
-//  surface.
+//  surface, and the only things over the artwork are the two chips that have
+//  nowhere else to go: the page dots and the premium lock, both in the top band
+//  where no template draws.
 //
 //  The card's own frame carries the template's aspect ratio, CLAMPED — see
 //  `MasonryLayout`, which bounds height to 0.68–1.55x width so a panorama does
@@ -31,6 +33,39 @@
 //
 
 import UIKit
+
+/// A view that keeps itself a capsule.
+///
+/// Exists because the radius arithmetic was in the wrong place and the pill came
+/// out a rectangle. The cell used to round it from its OWN `layoutSubviews`:
+///
+///     override func layoutSubviews() {
+///         super.layoutSubviews()
+///         dotsPill.layer.cornerRadius = dotsPill.bounds.height / 2
+///     }
+///
+/// which reads a bounds that has not been set yet. A view's `layoutSubviews`
+/// positions its immediate subviews; `dotsPill` is a subview of `contentView`,
+/// so its frame is applied one level further down the recursion — after the
+/// cell's override has already run and rounded a zero-height box to zero.
+///
+/// It came out a rectangle only SOMETIMES, which is what made it read as random.
+/// A recycled cell still carries the previous card's 15pt pill, so it rounds off
+/// bounds that are stale but the right size; and any second layout pass fixes it
+/// too — the async preview landing invalidates the image view and usually
+/// supplies one. What was left square was the first screenful: cells built from
+/// nothing whose artwork happened to arrive before their first layout.
+///
+/// So the arithmetic moves to the only place the bounds are certainly current —
+/// the view's own `layoutSubviews`, which is where `ProBadgeButton` already does
+/// this and what this type exists to make the default.
+@MainActor
+final class PillView: UIView {
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        layer.cornerRadius = bounds.height / 2
+    }
+}
 
 @MainActor
 final class BrowseTemplateCell: UICollectionViewCell {
@@ -69,7 +104,7 @@ final class BrowseTemplateCell: UICollectionViewCell {
     private static let dotSize: CGFloat = 5
 
     private let imageView = UIImageView()
-    private let dotsPill = UIView()
+    private let dotsPill = PillView()
     private let dotsRow = UIStackView()
     private let lockBadge = UIImageView()
     private let nameLabel = UILabel()
@@ -170,9 +205,23 @@ final class BrowseTemplateCell: UICollectionViewCell {
             imageView.bottomAnchor.constraint(
                 equalTo: nameLabel.topAnchor, constant: -Theme.Spacing.xxs),
 
-            dotsPill.centerXAnchor.constraint(equalTo: imageView.centerXAnchor),
-            dotsPill.bottomAnchor.constraint(
-                equalTo: imageView.bottomAnchor, constant: -Theme.Spacing.xs),
+            // Top-leading, opposite the lock — NOT bottom-centre, where these
+            // sat until they were seen against the real catalog. Better than
+            // half the bundled carousels burn a page label into the bottom of
+            // their first frame ("Step 1", "Day 1", "Lesson 1", "Phase 1"), and
+            // a cover thumbnail renders that label exactly where a bottom-centre
+            // pill lands: the dots and the template's own typography came out on
+            // top of each other. Nudging sideways does not fix it either — the
+            // labels are variously centred and trailing, and one template puts
+            // "Phase 2" in the bottom-right corner — but every one of them is in
+            // the bottom band, so the top of the card is the only region that
+            // clears all twenty. Vertically centred on the lock rather than
+            // sharing its top inset, so the two chips read as a pair despite
+            // being 15 and 24pt tall; the lock's own frame is fixed and valid
+            // whether or not it is hidden.
+            dotsPill.leadingAnchor.constraint(
+                equalTo: imageView.leadingAnchor, constant: Theme.Spacing.xs),
+            dotsPill.centerYAnchor.constraint(equalTo: lockBadge.centerYAnchor),
 
             dotsRow.topAnchor.constraint(equalTo: dotsPill.topAnchor, constant: 5),
             dotsRow.bottomAnchor.constraint(equalTo: dotsPill.bottomAnchor, constant: -5),
@@ -212,13 +261,6 @@ final class BrowseTemplateCell: UICollectionViewCell {
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
-
-    override func layoutSubviews() {
-        super.layoutSubviews()
-        dotsPill.layer.cornerRadius = dotsPill.bounds.height / 2
-    }
-
-
 
     /// The same press feel as every other card in the app.
     override var isHighlighted: Bool {
