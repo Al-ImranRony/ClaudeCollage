@@ -15,6 +15,14 @@
 //  three strips and (next task) the hero card are all the same card at different
 //  sizes — so it lives in the design system rather than inside HomeViewController.
 //
+//  It carried a text badge in its top-right corner for a while — "5 frames" over
+//  a carousel's artwork. That was the wrong register for a strip whose whole
+//  argument is the photograph: a card selling a picture does not want a sentence
+//  stapled to it, and the fact it was stating is one every carousel UI in the
+//  world states with dots. So the badge became a `UIPageControl` down beside the
+//  name, which is exactly where the hero puts its own, and the type came off the
+//  artwork entirely.
+//
 
 import UIKit
 
@@ -79,8 +87,8 @@ extension UILabel {
     }
 }
 
-/// A full-bleed showcase card: photo-real preview, name over a bottom scrim, an
-/// optional top-right badge and an optional premium lock.
+/// A showcase card: photo-real preview, name over a bottom scrim, optional page
+/// dots beside the name and an optional premium lock.
 @MainActor
 final class ShowcaseTemplateCell: UICollectionViewCell {
     static let reuseID = "ShowcaseTemplateCell"
@@ -94,23 +102,57 @@ final class ShowcaseTemplateCell: UICollectionViewCell {
     /// `Theme.Radius.pill`'s documented "callers use height/2" contract.
     private static let lockBadgeSide: CGFloat = 24
 
+    /// How a card seats its artwork — the same choice `HeroPageCell` makes, in
+    /// the same words, because it is the same choice.
+    enum Presentation {
+        /// Edge to edge, cropped to the card. Right for a single canvas, whose
+        /// shape is near enough the card's that the crop costs nothing.
+        case fill
+        /// Whole, in the band ABOVE the caption, on a blurred blow-up of itself.
+        ///
+        /// A carousel's preview is three pages laid side by side — a ~2.4:1
+        /// strip on a 1.2:1 card — so `fill` scales it to the card's height and
+        /// then throws away half its width. A five-page template arrived as one
+        /// page and two slivers, which is the card failing at the one thing it
+        /// is for: you cannot tell a carousel from a collage by looking at it.
+        /// Fitting makes the pages small (~69 x 87pt at the current card width)
+        /// but shows all three of them dressed in their sample photography, so
+        /// the strip can be judged without opening it.
+        case fitOnBlurredBed
+    }
+
+    private let bedImageView = UIImageView()
+    // Ultra-thin, not thick, for the reason the hero documents: the bed has to
+    // read as a soft out-of-focus blow-up OF THE ARTWORK, and anything heavier
+    // buries it — the card comes out a dark box with a small picture in it.
+    private let bedBlur = UIVisualEffectView(
+        effect: UIBlurEffect(style: .systemUltraThinMaterialDark))
     private let imageView = UIImageView()
     private let scrim = ShowcaseScrimView()
     private let nameLabel = UILabel()
-    private let badgePill = UIView()
-    private let badgeLabel = UILabel()
+    /// Bottom-trailing, opposite the name — the hero's own arrangement.
+    ///
+    /// A `UIPageControl` rather than the hand-rolled dot row `BrowseTemplateCell`
+    /// draws: that one needs a smoked-glass pill under it because it sits on raw
+    /// photography, and these dots sit on the scrim, which already IS the dark
+    /// ground such a pill would have had to supply. It also shrinks its own dots
+    /// past eight pages, which the hand-rolled row answers by truncating.
+    private let pageControl = UIPageControl()
     private let lockBadge = UIImageView()
 
     private var previewTask: Task<Void, Never>?
+    /// The artwork's two geometries, swapped by `apply(_:)`.
+    private var edgeConstraints: [NSLayoutConstraint] = []
+    private var aboveCaptionConstraints: [NSLayoutConstraint] = []
 
     override init(frame: CGRect) {
         super.init(frame: frame)
 
-        // The card clips, not the image view: the scrim and the badges all have
-        // to be trimmed by the same rounded rectangle, and one clipping ancestor
-        // is cheaper and less error-prone than rounding each of them.
+        // The card clips, not the image view: the bed, the scrim and the badges
+        // all have to be trimmed by the same rounded rectangle, and one clipping
+        // ancestor is cheaper and less error-prone than rounding each of them.
         //
-        // Fill, not fit. Unlike the schematic strip — where letterboxing is what
+        // Fill by default. Unlike the schematic strip — where letterboxing is what
         // keeps a template's zones symmetrical — a showcase card is selling the
         // photograph, and a photograph floating in a well does not sell.
         contentView.backgroundColor = Theme.Color.cellWell
@@ -118,10 +160,22 @@ final class ShowcaseTemplateCell: UICollectionViewCell {
         contentView.layer.cornerCurve = .continuous
         contentView.clipsToBounds = true
 
+        // The bed is the same picture, blown up and blurred, so a fitted preview
+        // sits on something that belongs to it instead of on a flat grey box.
+        // Hidden until a `.fitOnBlurredBed` card asks for it.
+        bedImageView.contentMode = .scaleAspectFill
+        bedImageView.clipsToBounds = true
+        bedImageView.isHidden = true
+        bedImageView.translatesAutoresizingMaskIntoConstraints = false
+        bedBlur.isHidden = true
+        bedBlur.translatesAutoresizingMaskIntoConstraints = false
+
         imageView.contentMode = .scaleAspectFill
         imageView.clipsToBounds = true
         // The same well the canvas and the exporter paint, so a card whose
         // preview has not landed yet still looks intentional rather than blank.
+        // `apply(_:)` clears it for a fitted card, where an opaque image view
+        // would letterbox the artwork in grey and hide the bed it is sitting on.
         imageView.backgroundColor = Theme.Color.cellWell
         imageView.translatesAutoresizingMaskIntoConstraints = false
 
@@ -139,24 +193,26 @@ final class ShowcaseTemplateCell: UICollectionViewCell {
         nameLabel.numberOfLines = 1
         nameLabel.lineBreakMode = .byTruncatingTail
         nameLabel.applyShowcaseCaptionShadow()
+        // The name yields to the dots rather than pushing them off the card: at
+        // a 212pt width a seven-page control and a long template name cannot
+        // both have what they want, and a truncated name still identifies the
+        // template where four of five dots does not identify the carousel.
+        nameLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         nameLabel.translatesAutoresizingMaskIntoConstraints = false
 
-        // "4 frames", a play glyph — a fact about the card that the picture
-        // itself cannot state. Dark and translucent so it belongs to the photo
-        // rather than sitting on top of it as a UI chip; `toast` is again the
-        // right family (fixed dark ground, white ink, floats over anything),
-        // re-alpha'd because a badge over photography wants to let the image
-        // through where a toast does not.
-        badgePill.backgroundColor = Theme.Color.toast.withAlphaComponent(0.55)
-        badgePill.layer.cornerCurve = .continuous
-        badgePill.clipsToBounds = true
-        badgePill.isHidden = true
-        badgePill.translatesAutoresizingMaskIntoConstraints = false
-
-        badgeLabel.font = Theme.Typography.caption
-        badgeLabel.textColor = Theme.Color.textOnToast
-        badgeLabel.adjustsFontForContentSizeCategory = true
-        badgeLabel.translatesAutoresizingMaskIntoConstraints = false
+        // The same dots the hero wears, configured the same way: white at full
+        // strength for the current page and at 40% for the rest, which is legible
+        // over the scrim in both appearances. Not interactive — these state a
+        // count, they do not page anything, and a control that swallowed the
+        // touch would put a dead strip across the bottom of the card.
+        pageControl.currentPageIndicatorTintColor = Theme.Color.textOnToast
+        pageControl.pageIndicatorTintColor = Theme.Color.textOnToast.withAlphaComponent(0.4)
+        pageControl.hidesForSinglePage = true
+        pageControl.isUserInteractionEnabled = false
+        pageControl.isHidden = true
+        pageControl.setContentCompressionResistancePriority(.required, for: .horizontal)
+        pageControl.setContentHuggingPriority(.required, for: .horizontal)
+        pageControl.translatesAutoresizingMaskIntoConstraints = false
 
         // Premium. Accent-on-accent rather than the badge's smoked glass,
         // because this one is a *state* the user can act on, not a caption.
@@ -172,18 +228,26 @@ final class ShowcaseTemplateCell: UICollectionViewCell {
             withConfiguration: UIImage.SymbolConfiguration(pointSize: 11, weight: .semibold))
         lockBadge.translatesAutoresizingMaskIntoConstraints = false
 
-        badgePill.addSubview(badgeLabel)
+        // Order is z-order: the bed under the artwork, the scrim over both, the
+        // caption and the chips over the scrim.
+        contentView.addSubview(bedImageView)
+        contentView.addSubview(bedBlur)
         contentView.addSubview(imageView)
         contentView.addSubview(scrim)
         contentView.addSubview(nameLabel)
-        contentView.addSubview(badgePill)
+        contentView.addSubview(pageControl)
         contentView.addSubview(lockBadge)
 
         NSLayoutConstraint.activate([
-            imageView.topAnchor.constraint(equalTo: contentView.topAnchor),
-            imageView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
-            imageView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
-            imageView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
+            bedImageView.topAnchor.constraint(equalTo: contentView.topAnchor),
+            bedImageView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            bedImageView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            bedImageView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
+
+            bedBlur.topAnchor.constraint(equalTo: contentView.topAnchor),
+            bedBlur.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            bedBlur.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            bedBlur.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
 
             scrim.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
             scrim.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
@@ -193,24 +257,22 @@ final class ShowcaseTemplateCell: UICollectionViewCell {
 
             nameLabel.leadingAnchor.constraint(
                 equalTo: contentView.leadingAnchor, constant: Theme.Spacing.sm),
+            // Both caps, not one. The label stops at the dots when there are
+            // dots, and at the card's edge when there are not — a hidden
+            // `UIPageControl` still holds a frame, and with no pages that frame
+            // is not reliably zero-width.
             nameLabel.trailingAnchor.constraint(
-                equalTo: contentView.trailingAnchor, constant: -Theme.Spacing.sm),
+                lessThanOrEqualTo: pageControl.leadingAnchor, constant: -Theme.Spacing.xxs),
+            nameLabel.trailingAnchor.constraint(
+                lessThanOrEqualTo: contentView.trailingAnchor, constant: -Theme.Spacing.sm),
             nameLabel.bottomAnchor.constraint(
                 equalTo: contentView.bottomAnchor, constant: -Theme.Spacing.sm),
 
-            badgePill.topAnchor.constraint(
-                equalTo: contentView.topAnchor, constant: Theme.Spacing.xs),
-            badgePill.trailingAnchor.constraint(
-                equalTo: contentView.trailingAnchor, constant: -Theme.Spacing.xs),
-
-            badgeLabel.topAnchor.constraint(
-                equalTo: badgePill.topAnchor, constant: Theme.Spacing.xxs),
-            badgeLabel.bottomAnchor.constraint(
-                equalTo: badgePill.bottomAnchor, constant: -Theme.Spacing.xxs),
-            badgeLabel.leadingAnchor.constraint(
-                equalTo: badgePill.leadingAnchor, constant: Theme.Spacing.xs),
-            badgeLabel.trailingAnchor.constraint(
-                equalTo: badgePill.trailingAnchor, constant: -Theme.Spacing.xs),
+            // `UIPageControl` carries its own touch padding, so it is inset by
+            // less than the name and still lines up optically with it.
+            pageControl.trailingAnchor.constraint(
+                equalTo: contentView.trailingAnchor, constant: -Theme.Spacing.xxs),
+            pageControl.centerYAnchor.constraint(equalTo: nameLabel.centerYAnchor),
 
             lockBadge.topAnchor.constraint(
                 equalTo: contentView.topAnchor, constant: Theme.Spacing.xs),
@@ -220,20 +282,31 @@ final class ShowcaseTemplateCell: UICollectionViewCell {
             lockBadge.heightAnchor.constraint(equalToConstant: Self.lockBadgeSide),
         ])
 
+        // Two geometries for one image view — the hero's own pair. The fitted
+        // one hangs off the caption rather than off a share of the card's
+        // height, so the artwork still clears the type at the accessibility text
+        // sizes instead of sliding under a name that has grown into it.
+        edgeConstraints = [
+            imageView.topAnchor.constraint(equalTo: contentView.topAnchor),
+            imageView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            imageView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            imageView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
+        ]
+        aboveCaptionConstraints = [
+            imageView.topAnchor.constraint(equalTo: contentView.topAnchor),
+            imageView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            imageView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            imageView.bottomAnchor.constraint(
+                equalTo: nameLabel.topAnchor, constant: -Theme.Spacing.xs),
+        ]
+        NSLayoutConstraint.activate(edgeConstraints)
+
         isAccessibilityElement = true
         accessibilityTraits = .button
     }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
-
-    override func layoutSubviews() {
-        super.layoutSubviews()
-        // The badge grows with Dynamic Type, so its radius cannot be a constant
-        // if it is to stay a pill rather than becoming a rounded rectangle at
-        // the accessibility sizes.
-        badgePill.layer.cornerRadius = badgePill.bounds.height / 2
-    }
 
     /// A subtle scale-down while the card is pressed, springing back on release.
     /// The same gesture the gallery's cards use — one press feel across the app.
@@ -256,7 +329,10 @@ final class ShowcaseTemplateCell: UICollectionViewCell {
     /// - Parameters:
     ///   - name: shown over the scrim, and used as the accessibility label.
     ///   - identifier: the cell's `accessibilityIdentifier`, for UI tests.
-    ///   - badge: an optional, already-localized top-right caption ("4 frames").
+    ///   - pages: how many pages the template makes, as dots beside the name.
+    ///     `nil` for a single canvas — a collage is one image, and one dot on it
+    ///     would be answering a question nobody asked.
+    ///   - presentation: how the artwork is seated. See `Presentation`.
     ///   - locked: shows the premium lock.
     ///   - preview: the render, invoked off the first layout pass. The caller
     ///     supplies a closure rather than an image so a cold showcase render —
@@ -266,38 +342,71 @@ final class ShowcaseTemplateCell: UICollectionViewCell {
     func configure(
         name: String,
         identifier: String,
-        badge: String? = nil,
+        pages: Int? = nil,
+        presentation: Presentation = .fill,
         locked: Bool = false,
         preview: @escaping () -> CGImage?
     ) {
         nameLabel.text = name
-        badgeLabel.text = badge
-        badgePill.isHidden = badge == nil
         lockBadge.isHidden = !locked
+
+        // One page is not a carousel and `nil` is not a carousel at all, so in
+        // neither case is there anything for dots to say. `hidesForSinglePage`
+        // covers the first; this covers the second.
+        let shown = pages ?? 0
+        pageControl.numberOfPages = shown
+        pageControl.currentPage = 0
+        pageControl.isHidden = shown < 2
+
+        apply(presentation)
 
         accessibilityIdentifier = identifier
         accessibilityLabel = name
-        // The badge is a fact stated only in pixels; without this, "4 frames"
-        // and the play glyph reach nobody using VoiceOver.
-        accessibilityValue = badge
+        // The page count is stated only in pixels; without this the dots reach
+        // nobody using VoiceOver.
+        accessibilityValue = shown >= 2 ? String(localized: "\(shown) pages") : nil
 
         previewTask?.cancel()
         previewTask = Task { @MainActor [weak self] in
             guard !Task.isCancelled else { return }
             let rendered = preview()
             guard !Task.isCancelled, let self else { return }
+            let image = rendered.map { UIImage(cgImage: $0) }
             // Cross-dissolve rather than a hard swap: the well → photograph pop
             // is very visible on a card this size. Reduce Motion shortens it
             // through `Theme.Motion.duration` rather than removing it, since a
             // fade is not motion.
+            //
+            // Transitioned on the contentView rather than the image view alone,
+            // because a fitted card puts the same picture on the bed behind it
+            // and the two have to arrive together.
             UIView.transition(
-                with: self.imageView,
+                with: self.contentView,
                 duration: Theme.Motion.duration(Theme.Motion.quick),
                 options: [.transitionCrossDissolve, .allowUserInteraction]
             ) {
-                self.imageView.image = rendered.map { UIImage(cgImage: $0) }
+                self.imageView.image = image
+                self.bedImageView.image = presentation == .fill ? nil : image
             }
         }
+    }
+
+    /// Puts the artwork into one of the two geometries and shows or hides the
+    /// blurred bed to match.
+    private func apply(_ presentation: Presentation) {
+        let fits = presentation == .fitOnBlurredBed
+        imageView.contentMode = fits ? .scaleAspectFit : .scaleAspectFill
+        // A fitted image view must not paint its own ground, or the letterbox
+        // either side of the artwork comes out flat grey and the bed — the whole
+        // point of the treatment — never shows.
+        imageView.backgroundColor = fits ? .clear : Theme.Color.cellWell
+        bedImageView.isHidden = !fits
+        bedBlur.isHidden = !fits
+
+        // Deactivate first: the two sets contradict each other, and activating
+        // into a still-live set is how a card ends up with broken constraints.
+        NSLayoutConstraint.deactivate(fits ? edgeConstraints : aboveCaptionConstraints)
+        NSLayoutConstraint.activate(fits ? aboveCaptionConstraints : edgeConstraints)
     }
 
     override func prepareForReuse() {
@@ -307,9 +416,10 @@ final class ShowcaseTemplateCell: UICollectionViewCell {
         previewTask?.cancel()
         previewTask = nil
         imageView.image = nil
+        bedImageView.image = nil
         nameLabel.text = nil
-        badgeLabel.text = nil
-        badgePill.isHidden = true
+        pageControl.numberOfPages = 0
+        pageControl.isHidden = true
         lockBadge.isHidden = true
         accessibilityValue = nil
     }

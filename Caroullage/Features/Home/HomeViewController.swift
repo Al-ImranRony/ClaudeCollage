@@ -121,8 +121,10 @@ final class HomeViewController: UIViewController {
     /// catches it if they do.
     private static let suggestionsContentHeight: CGFloat = 83
     /// A carousel's preview is three pages laid side by side, so its card is
-    /// half again as wide: at photo-card width the centre crop shows one page and
-    /// the strip stops saying the only thing it exists to say.
+    /// half again as wide — width is what a fitted strip turns into page size.
+    /// The card seats that strip whole on a blurred bed (`.fitOnBlurredBed`)
+    /// rather than cropping to its middle, so 212 buys three ~69pt-wide pages
+    /// instead of one page and two slivers.
     private static let carouselCardWidth: CGFloat = 212
 
     /// The hero's height as a share of its width.
@@ -893,8 +895,16 @@ extension HomeViewController: UICollectionViewDataSource, UICollectionViewDelega
             name: template.name,
             identifier: "showcaseCarousel-\(template.id)",
             // How many pages the post has is the one fact the picture cannot
-            // state, and the one a user comparing carousels wants first.
-            badge: String(localized: "\(template.frameCount) frames"),
+            // state, and the one a user comparing carousels wants first. Stated
+            // as dots rather than as the "5 frames" caption this used to carry:
+            // the strips sell a photograph, and a sentence stapled to the corner
+            // of one is the register of a spec sheet.
+            pages: template.frameCount,
+            // Fitted, not cropped. `showcasePreview` composites three pages side
+            // by side into a ~2.4:1 strip; filling a 1.2:1 card with it scales it
+            // to the card's height and then discards half its width, so a
+            // five-page template arrived as one page and two slivers.
+            presentation: .fitOnBlurredBed,
             // Until Step 07 there was no `canOpen` overload to ask, so four
             // premium carousels wore no lock and opened free.
             locked: !TemplateService.shared.canOpen(template),
