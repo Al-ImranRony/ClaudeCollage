@@ -11,6 +11,12 @@
 //  inside the safe area, which is what keeps the old "no dead band" behaviour
 //  without the full-height scroll view that behaviour was originally built around.
 //
+//  The active tool's icon ANIMATES — a repeating SF Symbol effect chosen per tool
+//  (see `EditorTool.Emphasis`) — and no other icon in the rail does. That is the
+//  rail's answer to "which tool am I in": colour alone has to be read, where the
+//  one moving thing on the strip is found without looking for it. Both editors
+//  get it from here; there is no second copy of this rail to keep in step.
+//
 
 import UIKit
 
@@ -231,12 +237,32 @@ public final class EditorToolRail: UIView {
 @MainActor
 private final class ToolButton: UIControl {
 
+    /// How far the icon overshoots when a tool becomes the active one.
+    ///
+    /// The pop is what makes the selection feel like it landed. It is deliberately
+    /// bigger than the press scale below — the press is a response to the finger
+    /// and should stay under it, the pop is the app answering and should read
+    /// from across the strip.
+    private static let selectionPopScale: CGFloat = 1.22
+
+    /// The press scale. Slightly deeper than the 0.96 the cards use because a
+    /// 58pt-wide control has less area for the same proportion to register in.
+    private static let pressScale: CGFloat = 0.92
+
     let toolID: EditorTool.ID
+    private let emphasis: EditorTool.Emphasis
     private let icon = UIImageView()
     private let label = UILabel()
 
+    /// Optional so the first `setActive` always applies, however it is called.
+    /// The rail calls `setActiveTool` on every rebuild, including rebuilds that
+    /// change nothing, and restarting a running symbol effect on each of those
+    /// makes the icon stutter.
+    private var isActiveState: Bool?
+
     init(tool: EditorTool) {
         self.toolID = tool.id
+        self.emphasis = tool.emphasis
         super.init(frame: .zero)
 
         isAccessibilityElement = true
@@ -278,6 +304,15 @@ private final class ToolButton: UIControl {
             widthAnchor.constraint(greaterThanOrEqualToConstant: 58),
         ])
         setActive(false)
+
+        // Reduce Motion is a setting, not a trait, so it does not arrive through
+        // `registerForTraitChanges` like light/dark does. Target/selector rather
+        // than a block observer: the block form would have to capture this
+        // MainActor-isolated, non-Sendable view inside a `@Sendable` closure,
+        // which Swift 6 rejects outright.
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(reduceMotionChanged),
+            name: UIAccessibility.reduceMotionStatusDidChangeNotification, object: nil)
     }
 
     @available(*, unavailable)
@@ -285,13 +320,99 @@ private final class ToolButton: UIControl {
 
     /// Indigo marks *which thing is chosen*; ink is ordinary chrome.
     func setActive(_ isActive: Bool) {
+        let wasActive = isActiveState
+        guard wasActive != isActive else { return }
+        isActiveState = isActive
+
         let colour = isActive ? Theme.Color.accent : Theme.Color.textSecondary
         icon.tintColor = colour
         label.textColor = colour
+
+        // The pop only plays on a real transition into "chosen" — never on the
+        // `setActive(false)` in init, and never on a rebuild that re-asserts a
+        // selection the button already had.
+        if isActive, wasActive != nil { playSelectionPop() }
+        updateSymbolEffect()
     }
 
+    /// A spring-settled overshoot: the icon appears a fifth larger and rides back
+    /// down. Skipped entirely under Reduce Motion — the colour change alone still
+    /// says which tool is chosen, and the repeating effect is suppressed there
+    /// too, so nothing in the rail moves.
+    private func playSelectionPop() {
+        guard !Theme.Motion.isReduced else { return }
+        icon.transform = CGAffineTransform(
+            scaleX: Self.selectionPopScale, y: Self.selectionPopScale)
+        UIView.animate(
+            withDuration: Theme.Motion.duration(Theme.Motion.standard),
+            delay: 0,
+            usingSpringWithDamping: Theme.Motion.effectiveSpringDamping,
+            initialSpringVelocity: Theme.Motion.effectiveSpringVelocity,
+            options: [.allowUserInteraction, .beginFromCurrentState]
+        ) {
+            self.icon.transform = .identity
+        }
+    }
+
+    /// Starts the active tool's repeating symbol effect, or takes it away.
+    ///
+    /// Exactly one button in the rail runs an effect at a time, because exactly
+    /// one tool is active. A strip where every icon moved would be a strip that
+    /// pointed at nothing.
+    private func updateSymbolEffect() {
+        icon.removeAllSymbolEffects(options: .speed(2), animated: true)
+        // A loop that never stops is the one animation a user who has asked for
+        // less motion cannot look away from, so Reduce Motion removes it rather
+        // than shortening it — the accent colour is already carrying the state.
+        guard isActiveState == true, !Theme.Motion.isReduced else { return }
+
+        switch emphasis {
+        case .pulse:
+            // Indefinite: runs until removed, no repeat option needed.
+            icon.addSymbolEffect(.pulse, options: .repeating, animated: true)
+        case .variableColor:
+            icon.addSymbolEffect(
+                .variableColor.iterative.hideInactiveLayers, options: .repeating, animated: true)
+        case .bounce:
+            icon.addSymbolEffect(.bounce, options: .repeating, animated: true)
+        case .wiggle:
+            if #available(iOS 18.0, *) {
+                icon.addSymbolEffect(.wiggle, options: .repeating, animated: true)
+            } else {
+                icon.addSymbolEffect(.bounce, options: .repeating, animated: true)
+            }
+        case .rotate:
+            if #available(iOS 18.0, *) {
+                icon.addSymbolEffect(.rotate, options: .repeating, animated: true)
+            } else {
+                icon.addSymbolEffect(.bounce, options: .repeating, animated: true)
+            }
+        }
+    }
+
+    @objc private func reduceMotionChanged() {
+        updateSymbolEffect()
+    }
+
+    /// The same press spring the cards use, rather than the flat alpha dip this
+    /// had before. A rail button is the most-tapped control in the editor, so it
+    /// is the one that most wants to feel like it is being pushed.
     override var isHighlighted: Bool {
-        didSet { alpha = isHighlighted ? 0.55 : 1 }
+        didSet {
+            guard isHighlighted != oldValue else { return }
+            UIView.animate(
+                withDuration: Theme.Motion.duration(Theme.Motion.quick),
+                delay: 0,
+                usingSpringWithDamping: Theme.Motion.effectiveSpringDamping,
+                initialSpringVelocity: Theme.Motion.effectiveSpringVelocity,
+                options: [.allowUserInteraction, .beginFromCurrentState]
+            ) {
+                self.transform = self.isHighlighted
+                    ? CGAffineTransform(scaleX: Self.pressScale, y: Self.pressScale)
+                    : .identity
+                self.alpha = self.isHighlighted ? 0.75 : 1
+            }
+        }
     }
 }
 

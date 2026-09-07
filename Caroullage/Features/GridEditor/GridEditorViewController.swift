@@ -256,7 +256,9 @@ final class GridEditorViewController: UIViewController {
         if viewModel.state.layout.offersLayoutAlternatives {
             tools.append(EditorTool(id: "layout", title: "Layout",
                                     systemImage: "square.grid.2x2",
-                                    accessibilityIdentifier: "layoutTool"))
+                                    accessibilityIdentifier: "layoutTool",
+                                    // Discrete cells, so a discrete hop.
+                                    emphasis: .bounce))
         }
         tools.append(contentsOf: [
             EditorTool(id: "frame", title: "Frame",
@@ -269,7 +271,9 @@ final class GridEditorViewController: UIViewController {
             EditorTool(id: "text", title: "Text",
                        systemImage: "textformat", accessibilityIdentifier: "addTextButton"),
             EditorTool(id: "sticker", title: "Sticker",
-                       systemImage: "face.smiling", accessibilityIdentifier: "addStickerButton"),
+                       systemImage: "face.smiling", accessibilityIdentifier: "addStickerButton",
+                       // A sticker is a thing you press on; the icon presses back.
+                       emphasis: .bounce),
         ])
         toolRail.setBaseTools(tools)
 
@@ -332,16 +336,22 @@ final class GridEditorViewController: UIViewController {
 
     private static let photoTools: [EditorTool] = [
         EditorTool(id: "replace", title: "Replace", systemImage: "arrow.left.arrow.right",
-                   accessibilityIdentifier: "replacePhotoTool"),
+                   accessibilityIdentifier: "replacePhotoTool",
+                   // The arrows slide, which is the gesture the tool performs.
+                   emphasis: .wiggle),
         EditorTool(id: "adjust", title: "Adjust", systemImage: "circle.lefthalf.filled",
                    accessibilityIdentifier: "adjustPhotoTool"),
         // Identifiers preserved from the retired action sheet.
         EditorTool(id: "lift", title: "Lift", systemImage: "person.and.background.dotted",
                    accessibilityIdentifier: "liftSubjectAction"),
         EditorTool(id: "erase", title: "Erase", systemImage: "eraser",
-                   accessibilityIdentifier: "magicEraserAction"),
+                   accessibilityIdentifier: "magicEraserAction",
+                   // The rubbing motion an eraser makes.
+                   emphasis: .wiggle),
         EditorTool(id: "clear", title: "Clear", systemImage: "trash",
-                   accessibilityIdentifier: "clearCellTool"),
+                   accessibilityIdentifier: "clearCellTool",
+                   // A shake, which is what a destructive tool should look like.
+                   emphasis: .wiggle),
     ]
 
     private static let textTools: [EditorTool] = [
@@ -350,9 +360,11 @@ final class GridEditorViewController: UIViewController {
         EditorTool(id: "styleText", title: "Style", systemImage: "textformat",
                    accessibilityIdentifier: "styleTextTool"),
         EditorTool(id: "duplicateText", title: "Duplicate", systemImage: "plus.square.on.square",
-                   accessibilityIdentifier: "duplicateTextTool"),
+                   accessibilityIdentifier: "duplicateTextTool",
+                   emphasis: .bounce),
         EditorTool(id: "deleteText", title: "Delete", systemImage: "trash",
-                   accessibilityIdentifier: "deleteTextTool"),
+                   accessibilityIdentifier: "deleteTextTool",
+                   emphasis: .wiggle),
     ]
 
     private func selectCell(_ index: Int?) {

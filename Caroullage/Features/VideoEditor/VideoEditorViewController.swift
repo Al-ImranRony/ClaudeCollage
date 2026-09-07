@@ -131,15 +131,24 @@ final class VideoEditorViewController: UIViewController {
 
     private static let clipTools: [EditorTool] = [
         EditorTool(id: "swap", title: "Swap", systemImage: "arrow.left.arrow.right",
-                   accessibilityIdentifier: "swapClipTool"),
+                   accessibilityIdentifier: "swapClipTool",
+                   // The arrows slide, which is the gesture the tool performs.
+                   emphasis: .wiggle),
         EditorTool(id: "trim", title: "Trim", systemImage: "scissors",
-                   accessibilityIdentifier: "trimClipTool"),
+                   accessibilityIdentifier: "trimClipTool",
+                   // Snipping.
+                   emphasis: .wiggle),
         EditorTool(id: "volume", title: "Volume", systemImage: "speaker.wave.2",
-                   accessibilityIdentifier: "volumeClipTool"),
+                   accessibilityIdentifier: "volumeClipTool",
+                   // The waves are layers that mean something in order.
+                   emphasis: .variableColor),
         EditorTool(id: "transition", title: "Transition", systemImage: "wand.and.rays",
-                   accessibilityIdentifier: "transitionClipTool"),
+                   accessibilityIdentifier: "transitionClipTool",
+                   // The rays fire outward in turn.
+                   emphasis: .variableColor),
         EditorTool(id: "clear", title: "Clear", systemImage: "trash",
-                   accessibilityIdentifier: "clearClipTool"),
+                   accessibilityIdentifier: "clearClipTool",
+                   emphasis: .wiggle),
     ]
 
     private static let textTools: [EditorTool] = [
@@ -148,9 +157,12 @@ final class VideoEditorViewController: UIViewController {
         EditorTool(id: "styleText", title: "Style", systemImage: "textformat",
                    accessibilityIdentifier: "styleTextTool"),
         EditorTool(id: "timingText", title: "Timing", systemImage: "clock",
-                   accessibilityIdentifier: "timingTextTool"),
+                   accessibilityIdentifier: "timingTextTool",
+                   // A clock's hands go round.
+                   emphasis: .rotate),
         EditorTool(id: "deleteText", title: "Delete", systemImage: "trash",
-                   accessibilityIdentifier: "deleteTextTool"),
+                   accessibilityIdentifier: "deleteTextTool",
+                   emphasis: .wiggle),
     ]
 
     // Owned here (not recreated per panel-open) so `setupRail` can wire each
@@ -343,7 +355,8 @@ final class VideoEditorViewController: UIViewController {
 
         toolRail.setBaseTools([
             EditorTool(id: "layout", title: "Layout", systemImage: "square.grid.2x2",
-                       accessibilityIdentifier: "videoLayoutButton"),
+                       accessibilityIdentifier: "videoLayoutButton",
+                       emphasis: .bounce),
             EditorTool(id: "frame", title: "Frame", systemImage: "square.dashed",
                        accessibilityIdentifier: "videoFrameTool"),
             // Identifiers preserved from the old pill buttons / toolbar so
@@ -351,9 +364,12 @@ final class VideoEditorViewController: UIViewController {
             EditorTool(id: "text", title: "Text", systemImage: "textformat",
                        accessibilityIdentifier: "videoAddTextButton"),
             EditorTool(id: "sticker", title: "Sticker", systemImage: "face.smiling",
-                       accessibilityIdentifier: "videoAddStickerButton"),
+                       accessibilityIdentifier: "videoAddStickerButton",
+                       emphasis: .bounce),
             EditorTool(id: "audio", title: "Audio", systemImage: "music.note",
-                       accessibilityIdentifier: "videoMusicButton"),
+                       accessibilityIdentifier: "videoMusicButton",
+                       // A note keeping time.
+                       emphasis: .bounce),
         ])
 
         toolRail.onSelect = { [weak self] in self?.toolTapped($0) }
