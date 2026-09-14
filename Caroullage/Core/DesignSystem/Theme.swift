@@ -352,6 +352,16 @@ public enum Theme {
         }
     }
 
+    // MARK: - Layout
+
+    public enum Layout {
+        /// The smallest region a finger is expected to hit — Apple's 44pt.
+        /// A control may draw smaller than this; it may not *be* smaller than
+        /// this. See `HitTargetButton` for the way a small glyph keeps a full
+        /// target.
+        public static let minimumHitTarget: CGFloat = 44
+    }
+
     // MARK: - Spacing
 
     /// A 4-pt spacing scale. Use these instead of literal constants so layout
