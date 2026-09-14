@@ -8,62 +8,11 @@
 //
 //  Every slider/switch here is created and owned by the view controller (so its
 //  target/action is wired exactly once in `setupRail`, not re-added on every
-//  panel open) and simply handed in — these types are pure layout.
+//  panel open) and simply handed in — these types are pure layout, built from
+//  `EditorPanelRow`, the row both editors share.
 //
 
 import UIKit
-
-/// A labeled control row: icon + caption + trailing control. Matches
-/// `GridEditorPanels.swift`'s `FramePanelView.row` layout so the two editors'
-/// inline panels read the same way.
-@MainActor
-func makeVideoPanelRow(title: String, systemImage: String, trailing: UIView) -> UIStackView {
-    let icon = UIImageView(image: UIImage(systemName: systemImage))
-    icon.tintColor = Theme.Color.textSecondary
-    icon.contentMode = .scaleAspectFit
-
-    let label = UILabel()
-    label.text = title
-    label.font = Theme.Typography.caption
-    label.textColor = Theme.Color.textSecondary
-
-    let row = UIStackView(arrangedSubviews: [icon, label, trailing])
-    row.axis = .horizontal
-    row.spacing = Theme.Spacing.xs
-    row.alignment = .center
-    NSLayoutConstraint.activate([
-        icon.widthAnchor.constraint(equalToConstant: 18),
-        icon.heightAnchor.constraint(equalToConstant: 18),
-        label.widthAnchor.constraint(equalToConstant: 62),
-    ])
-    return row
-}
-
-/// Vertically stacks a panel's rows with the shared left/right margin — mirrors
-/// `FramePanelView`'s outer `rows` stack in `GridEditorPanels.swift`.
-@MainActor
-func wrapVideoPanelRows(_ rows: [UIView]) -> UIView {
-    let stack = UIStackView(arrangedSubviews: rows)
-    stack.axis = .vertical
-    stack.spacing = Theme.Spacing.xs
-    stack.isLayoutMarginsRelativeArrangement = true
-    stack.layoutMargins = UIEdgeInsets(
-        top: 0, left: Theme.Spacing.md, bottom: 0, right: Theme.Spacing.md)
-    stack.translatesAutoresizingMaskIntoConstraints = false
-    return stack
-}
-
-/// Pins `content` to fill `container`'s edges. Shared by every panel view below.
-@MainActor
-private func fill(_ container: UIView, with content: UIView) {
-    container.addSubview(content)
-    NSLayoutConstraint.activate([
-        content.topAnchor.constraint(equalTo: container.topAnchor),
-        content.bottomAnchor.constraint(equalTo: container.bottomAnchor),
-        content.leadingAnchor.constraint(equalTo: container.leadingAnchor),
-        content.trailingAnchor.constraint(equalTo: container.trailingAnchor),
-    ])
-}
 
 /// The single Border slider for the video collage's Frame tool.
 ///
@@ -75,8 +24,8 @@ private func fill(_ container: UIView, with content: UIView) {
 final class VideoFramePanelView: UIView {
     init(borderSlider: UISlider) {
         super.init(frame: .zero)
-        fill(self, with: wrapVideoPanelRows([
-            makeVideoPanelRow(title: "Border", systemImage: "square.dashed", trailing: borderSlider),
+        EditorPanelRow.fill(self, with: EditorPanelRow.stack([
+            EditorPanelRow.make(title: "Border", systemImage: "square.dashed", trailing: borderSlider),
         ]))
     }
 
@@ -92,10 +41,10 @@ final class VideoFramePanelView: UIView {
 final class ClipTrimPanelView: UIView {
     init(startSlider: UISlider, endSlider: UISlider, loopSwitch: UISwitch, moreButton: UIButton) {
         super.init(frame: .zero)
-        fill(self, with: wrapVideoPanelRows([
-            makeVideoPanelRow(title: "In", systemImage: "arrow.right.to.line", trailing: startSlider),
-            makeVideoPanelRow(title: "Out", systemImage: "arrow.left.to.line", trailing: endSlider),
-            makeVideoPanelRow(title: "Loop", systemImage: "repeat", trailing: loopSwitch),
+        EditorPanelRow.fill(self, with: EditorPanelRow.stack([
+            EditorPanelRow.make(title: "In", systemImage: "arrow.right.to.line", trailing: startSlider),
+            EditorPanelRow.make(title: "Out", systemImage: "arrow.left.to.line", trailing: endSlider),
+            EditorPanelRow.make(title: "Loop", systemImage: "repeat", trailing: loopSwitch),
             moreButton,
         ]))
     }
@@ -111,9 +60,9 @@ final class ClipTrimPanelView: UIView {
 final class ClipVolumePanelView: UIView {
     init(volumeSlider: UISlider, muteSwitch: UISwitch) {
         super.init(frame: .zero)
-        fill(self, with: wrapVideoPanelRows([
-            makeVideoPanelRow(title: "Mute", systemImage: "speaker.slash", trailing: muteSwitch),
-            makeVideoPanelRow(title: "Volume", systemImage: "speaker.wave.2", trailing: volumeSlider),
+        EditorPanelRow.fill(self, with: EditorPanelRow.stack([
+            EditorPanelRow.make(title: "Mute", systemImage: "speaker.slash", trailing: muteSwitch),
+            EditorPanelRow.make(title: "Volume", systemImage: "speaker.wave.2", trailing: volumeSlider),
         ]))
     }
 
@@ -128,9 +77,9 @@ final class ClipVolumePanelView: UIView {
 final class ClipTransitionPanelView: UIView {
     init(styleRow: UIView, durationSlider: UISlider) {
         super.init(frame: .zero)
-        fill(self, with: wrapVideoPanelRows([
+        EditorPanelRow.fill(self, with: EditorPanelRow.stack([
             styleRow,
-            makeVideoPanelRow(title: "Duration", systemImage: "timer", trailing: durationSlider),
+            EditorPanelRow.make(title: "Duration", systemImage: "timer", trailing: durationSlider),
         ]))
     }
 
@@ -152,10 +101,10 @@ final class TextTimingPanelView: UIView {
          outStepper: UIStepper, outValue: UILabel,
          wholeVideoButton: UIButton) {
         super.init(frame: .zero)
-        fill(self, with: wrapVideoPanelRows([
-            makeVideoPanelRow(title: "In", systemImage: "arrow.right.to.line",
+        EditorPanelRow.fill(self, with: EditorPanelRow.stack([
+            EditorPanelRow.make(title: "In", systemImage: "arrow.right.to.line",
                               trailing: pair(inValue, inStepper)),
-            makeVideoPanelRow(title: "Out", systemImage: "arrow.left.to.line",
+            EditorPanelRow.make(title: "Out", systemImage: "arrow.left.to.line",
                               trailing: pair(outValue, outStepper)),
             wholeVideoButton,
         ]))

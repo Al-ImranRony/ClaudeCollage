@@ -13,16 +13,19 @@ import Foundation
 public struct EditorTool: Equatable, Identifiable, Sendable {
     public typealias ID = String
 
-    /// How a tool's icon moves while that tool is the selected one.
+    /// How a tool's icon moves at the moment that tool becomes the selected one.
     ///
-    /// The rail plays a REPEATING SF Symbol effect on the active tool and on
-    /// nothing else, so the strip always has exactly one thing moving in it and
-    /// that thing is the answer to "where am I". Which effect is per tool
-    /// because the symbols are not interchangeable: a symbol whose meaning lives
-    /// in its secondary layers (the dots behind `person.and.background.dotted`,
-    /// the rays of `wand.and.rays`) says something when those layers cycle,
-    /// where a solid glyph like `trash` has no layers to cycle and has to move
-    /// as a whole instead.
+    /// The rail plays the effect ONCE, on the transition into "chosen", the way
+    /// a hover state acknowledges a pointer — and then the icon rests. It used
+    /// to repeat for as long as the tool stayed selected, and a loop that never
+    /// stops is the one thing in the editor a user cannot look away from; the
+    /// accent colour and the capsule behind the icon carry the state after the
+    /// effect has landed. Which effect is per tool because the symbols are not
+    /// interchangeable: a symbol whose meaning lives in its secondary layers
+    /// (the dots behind `person.and.background.dotted`, the rays of
+    /// `wand.and.rays`) says something when those layers cycle, where a solid
+    /// glyph like `trash` has no layers to cycle and has to move as a whole
+    /// instead.
     ///
     /// Named for the intent rather than for the UIKit effect so this file stays
     /// what its header claims — a value type with no UIKit in it. `ToolButton`
@@ -33,18 +36,18 @@ public struct EditorTool: Equatable, Identifiable, Sendable {
         /// particular structure from the symbol, so it is never wrong, and it is
         /// quiet enough to sit under a label without competing with it.
         case pulse
-        /// A discrete hop, repeated. For symbols that read as an object being
+        /// A single discrete hop. For symbols that read as an object being
         /// acted on rather than as a process.
         case bounce
         /// The glyph slides back and forth. For tools that ARE a motion —
         /// swapping, trimming, erasing — where the icon miming the gesture is
         /// the whole point. iOS 18+; falls back to `bounce`.
         case wiggle
-        /// The symbol's layers fill in sequence. Only for symbols built in
-        /// layers that mean something in order: waves, rays, bars.
+        /// The symbol's layers fill in sequence, one pass. Only for symbols
+        /// built in layers that mean something in order: waves, rays, bars.
         case variableColor
-        /// The glyph spins about its own centre. For symbols with a natural
-        /// axis. iOS 18+; falls back to `bounce`.
+        /// The glyph makes one turn about its own centre. For symbols with a
+        /// natural axis. iOS 18+; falls back to `bounce`.
         case rotate
     }
 
@@ -54,7 +57,7 @@ public struct EditorTool: Equatable, Identifiable, Sendable {
     public let systemImage: String
     /// Preserved across the redesign so existing XCUITests keep matching.
     public let accessibilityIdentifier: String
-    /// How this tool's icon animates while it is the active tool.
+    /// How this tool's icon moves at the moment it becomes the active tool.
     public let emphasis: Emphasis
 
     /// `emphasis` defaults to `.pulse` rather than being required at every call

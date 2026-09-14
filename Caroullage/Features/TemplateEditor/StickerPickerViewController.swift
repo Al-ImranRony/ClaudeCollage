@@ -239,10 +239,7 @@ private final class StickerCell: UICollectionViewCell {
     override var isHighlighted: Bool {
         didSet {
             guard isHighlighted != oldValue else { return }
-            UIView.animate(withDuration: Theme.Motion.quick) {
-                self.transform = self.isHighlighted
-                    ? CGAffineTransform(scaleX: 0.92, y: 0.92) : .identity
-            }
+            setPressed(isHighlighted, scale: 0.92)
         }
     }
 }

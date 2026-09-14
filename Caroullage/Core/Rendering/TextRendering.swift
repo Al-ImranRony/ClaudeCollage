@@ -67,7 +67,7 @@ public enum TextRendering {
         if overlay.isUnderlined {
             attributes[.underlineStyle] = NSUnderlineStyle.single.rawValue
         }
-        applyStyle(overlay.style, fontScale: fontScale, to: &attributes)
+        applyStyle(overlay.style, font: font, fontScale: fontScale, to: &attributes)
         return NSAttributedString(string: overlay.text, attributes: attributes)
     }
 
@@ -96,6 +96,7 @@ public enum TextRendering {
     /// export paths, with no separate painting step needed anywhere.
     private static func applyStyle(
         _ style: TextStyle,
+        font: UIFont,
         fontScale: CGFloat,
         to attributes: inout [NSAttributedString.Key: Any]
     ) {
@@ -111,8 +112,17 @@ public enum TextRendering {
 
         case .stroke:
             // NEGATIVE means stroke AND fill. A positive value hollows the glyph out.
+            //
+            // `.strokeWidth` is a PERCENTAGE of the font's point size, not a
+            // length — the one attribute in this switch that is. `width` is
+            // points on the reference canvas, so it is converted against the
+            // font at the same scale, which makes `fontScale` cancel: a stroke
+            // is the same fraction of its glyph in the export, on the live
+            // canvas and in a thumbnail. Feeding the scaled points in directly,
+            // as this used to, made the fraction shrink with the canvas — a
+            // stroke a third as heavy on screen as in the file it exported to.
             attributes[.strokeColor] = colour
-            attributes[.strokeWidth] = -width
+            attributes[.strokeWidth] = -(width / max(font.pointSize, 1)) * 100
 
         case .shadow:
             let shadow = NSShadow()
@@ -163,6 +173,27 @@ public enum TextRendering {
                         options: [.usesLineFragmentOrigin, .usesFontLeading],
                         context: nil)
         cg.restoreGState()
+    }
+
+    /// Paints (or hides) a `.pill` background on a layer from the rect
+    /// `backgroundRect` returned. The one place the canvas's live pill and any
+    /// preview of it are drawn, so a change to how the pill looks reaches both.
+    public static func paintBackground(
+        _ background: (rect: CGRect, cornerRadius: CGFloat)?,
+        colorHex: String,
+        on layer: CALayer
+    ) {
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        defer { CATransaction.commit() }
+        guard let background else {
+            layer.isHidden = true
+            return
+        }
+        layer.isHidden = false
+        layer.frame = background.rect
+        layer.cornerRadius = background.cornerRadius
+        layer.backgroundColor = UIColor(hex: colorHex).cgColor
     }
 
     /// The pill background rect for an overlay, in the same coordinate space as

@@ -120,9 +120,8 @@ final class QuickStartTile: UIControl {
     override var isHighlighted: Bool {
         didSet {
             guard isHighlighted != oldValue else { return }
+            setPressed(isHighlighted, scale: 0.98)
             UIView.animate(withDuration: Theme.Motion.duration(Theme.Motion.quick)) {
-                self.transform = self.isHighlighted
-                    ? CGAffineTransform(scaleX: 0.98, y: 0.98) : .identity
                 self.backgroundColor = self.isHighlighted
                     ? Theme.Color.controlFill : Theme.Color.surface
             }

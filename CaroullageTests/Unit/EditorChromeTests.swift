@@ -302,6 +302,99 @@ final class EditorChromeTests: XCTestCase {
                      "not a parent stack view")
     }
 
+    func testTheBaseToolsDivideTheRailsWidthEqually() {
+        // Five tools bunched at the leading edge with dead space after them is
+        // what the rail used to draw. With no context inserted the tools are
+        // equal columns across the whole strip — a tab bar's rule.
+        let rail = EditorToolRail()
+        rail.frame = CGRect(x: 0, y: 0, width: 402, height: EditorToolRail.contentHeight)
+        rail.setBaseTools(makeBaseTools())
+        rail.layoutIfNeeded()
+
+        let buttons = ["layout", "frame", "background"].compactMap { rail.toolButton(for: $0) }
+        XCTAssertEqual(buttons.count, 3)
+        let widths = buttons.map(\.bounds.width)
+        XCTAssertEqual(widths[0], widths[1], accuracy: 0.5)
+        XCTAssertEqual(widths[1], widths[2], accuracy: 0.5)
+
+        // The three columns together span the strip's content width, so the
+        // middle tool sits on the rail's centre line.
+        let middle = buttons[1].convert(CGPoint(x: buttons[1].bounds.midX, y: 0), to: rail)
+        XCTAssertEqual(middle.x, rail.bounds.midX, accuracy: 0.5,
+                       "the middle of an odd tool set must sit on the rail's centre")
+    }
+
+    func testAContextReturnsTheToolsToTheirNaturalWidths() {
+        // Once a context is inserted the strip overflows and scrolls; a chip and
+        // a divider given a tool's width each would be the wrong symmetry.
+        let rail = EditorToolRail()
+        rail.frame = CGRect(x: 0, y: 0, width: 402, height: EditorToolRail.contentHeight)
+        rail.setBaseTools(makeBaseTools())
+        rail.setContext(makePhotoContext())
+        rail.layoutIfNeeded()
+
+        let equalColumn = (402 - 2 * 16) / 5.0
+        let frame = rail.toolButton(for: "frame")!
+        XCTAssertLessThan(frame.bounds.width, equalColumn,
+                          "a scrolling strip must not stretch its tools into columns")
+    }
+
+    func testAWideRailKeepsAContextGroupPackedRatherThanSpread() {
+        // iPad: the whole context fits, so the old `.equalSpacing` spread chip,
+        // tools and divider across the width with ~50pt gaps. The group must
+        // stay packed at the leading edge with its 4pt gap.
+        let rail = EditorToolRail()
+        rail.frame = CGRect(x: 0, y: 0, width: 1180, height: EditorToolRail.contentHeight)
+        rail.setBaseTools(makeBaseTools())
+        rail.setContext(makePhotoContext())
+        rail.layoutIfNeeded()
+
+        let chip = rail.contextChipForLayout()!
+        let replace = rail.toolButton(for: "replace")!
+        let chipEnd = chip.convert(CGPoint(x: chip.bounds.maxX, y: 0), to: rail).x
+        let toolStart = replace.convert(CGPoint(x: 0, y: 0), to: rail).x
+        XCTAssertEqual(toolStart - chipEnd, 4, accuracy: 0.5,
+                       "the chip sits beside its tools, not across the rail from them")
+    }
+
+    func testTheEmphasisPlaysOncePerSelectionAndNotOnARebuild() {
+        // The owner's complaint was an effect that never stopped. `UIImageView`
+        // has no getter for running effects, so the button counts its selection
+        // moments: one per real selection, none for a rebuild that re-asserts
+        // a selection the tool already had, none for re-selecting the active tool.
+        let rail = EditorToolRail()
+        rail.frame = CGRect(x: 0, y: 0, width: 402, height: EditorToolRail.contentHeight)
+        rail.setBaseTools(makeBaseTools())
+        rail.layoutIfNeeded()
+
+        rail.setActiveTool("frame")
+        XCTAssertEqual(rail.toolButton(for: "frame")?.emphasisPlayCount, 1)
+
+        rail.setActiveTool("frame")
+        XCTAssertEqual(rail.toolButton(for: "frame")?.emphasisPlayCount, 1,
+                       "re-asserting the active tool must not replay it")
+
+        // A context change rebuilds every button; the new Frame button shows the
+        // existing selection without playing it again.
+        rail.setContext(makePhotoContext())
+        XCTAssertEqual(rail.activeToolID, "frame")
+        XCTAssertEqual(rail.toolButton(for: "frame")?.emphasisPlayCount, 0,
+                       "a rebuilt button shows the selection; it does not celebrate it")
+
+        rail.setActiveTool(nil)
+        rail.setActiveTool("frame")
+        XCTAssertEqual(rail.toolButton(for: "frame")?.emphasisPlayCount, 1)
+    }
+
+    func testTheActiveToolReadsAsSelectedToVoiceOver() {
+        let rail = EditorToolRail()
+        rail.setBaseTools(makeBaseTools())
+        rail.setActiveTool("frame")
+
+        XCTAssertTrue(rail.toolButton(for: "frame")!.accessibilityTraits.contains(.selected))
+        XCTAssertFalse(rail.toolButton(for: "layout")!.accessibilityTraits.contains(.selected))
+    }
+
     func testSwappingContextClearsAStaleActiveHighlight() {
         // Regression test: setContext never touched activeToolID and rebuild()
         // unconditionally reapplied it, so an active tool from the old context
@@ -362,6 +455,24 @@ final class EditorChromeTests: XCTestCase {
         XCTAssertFalse(panel.isPresenting)
         XCTAssertTrue(panel.isHidden)
         XCTAssertNil(content.superview)
+    }
+
+    func testThePanelTitleIsCentredOnThePanel() {
+        // Centred on the panel, not on the space beside the close chip: a title a
+        // half-chip off centre is felt before it is seen.
+        let panel = EditorPanel()
+        panel.frame = CGRect(x: 0, y: 0, width: 402, height: 120)
+        panel.show(UIView(), title: "Background", animated: false)
+        panel.layoutIfNeeded()
+
+        let title = panel.titleLabelForLayout
+        XCTAssertEqual(title.text, "Background", "the title is shown as given, not shouted")
+        XCTAssertEqual(title.center.x, panel.bounds.midX, accuracy: 0.5)
+
+        let close = panel.closeButtonForHitTesting
+        XCTAssertEqual(close.center.y, title.center.y, accuracy: 0.5,
+                       "the close chip sits on the title's line")
+        XCTAssertEqual(close.frame.maxX, panel.bounds.maxX - 16, accuracy: 0.5)
     }
 
     func testTheCloseControlReportsThrough() {

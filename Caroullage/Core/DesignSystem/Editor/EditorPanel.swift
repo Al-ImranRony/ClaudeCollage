@@ -6,6 +6,12 @@
 //  tool's controls at a time — the collage editor previously stacked every control
 //  it had into one long scroll, which reads as a settings form rather than an editor.
 //
+//  It paints the same surface as the rail beneath it, so panel and rail read as one
+//  sheet with a single hairline along its top edge; the rail's own hairline is
+//  inset and reads as a divider between the sheet's two tiers. The header is a
+//  centred title with a round close chip at the trailing margin — the grammar the
+//  reference editors share — rather than an uppercased caption with a bare ✕.
+//
 //  Hiding sets `isHidden` rather than removing the view, so the stage's height
 //  animation has something stable to animate against.
 //
@@ -40,8 +46,13 @@ public final class EditorPanel: UIView {
     /// as of iOS 26 and would misreport the scale on an external display anyway.
     private static let separatorHeight: CGFloat = 1
 
+    /// The close chip's diameter. A 28pt circle is the smallest that still reads
+    /// as a button rather than a glyph, and it is what the header's height is
+    /// built from.
+    private static let closeDiameter: CGFloat = 28
+
     private let titleLabel = UILabel()
-    private let closeButton = UIButton(type: .system)
+    private let closeButton = CloseChip()
     private let contentContainer = UIView()
     private var content: UIView?
 
@@ -54,7 +65,7 @@ public final class EditorPanel: UIView {
 
     public override init(frame: CGRect) {
         super.init(frame: frame)
-        backgroundColor = Theme.Color.surfaceRaised
+        backgroundColor = Theme.Color.surface
         isHidden = true
         // Task 8's content isn't ours to trust the height of; without this,
         // anything taller than the panel bleeds past its edge over the rail
@@ -72,13 +83,12 @@ public final class EditorPanel: UIView {
         separator.translatesAutoresizingMaskIntoConstraints = false
         addSubview(separator)
 
-        titleLabel.font = Theme.Typography.tabLabel
-        titleLabel.textColor = Theme.Color.textSecondary
+        titleLabel.font = Theme.Typography.subheadline
+        titleLabel.textColor = Theme.Color.textPrimary
+        titleLabel.textAlignment = .center
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
         addSubview(titleLabel)
 
-        closeButton.setImage(UIImage(systemName: "xmark"), for: .normal)
-        closeButton.tintColor = Theme.Color.textSecondary
         closeButton.accessibilityIdentifier = "editorPanelCloseButton"
         closeButton.accessibilityLabel = "Close"
         closeButton.addAction(UIAction { [weak self] _ in
@@ -97,26 +107,35 @@ public final class EditorPanel: UIView {
             separator.trailingAnchor.constraint(equalTo: trailingAnchor),
             separator.heightAnchor.constraint(equalToConstant: Self.separatorHeight),
 
-            titleLabel.topAnchor.constraint(equalTo: topAnchor, constant: Theme.Spacing.xs),
-            titleLabel.leadingAnchor.constraint(equalTo: leadingAnchor, constant: Theme.Spacing.md),
-
             // Explicit width/height, not just a center pin: a control sized only
             // by centerX/centerY constraints (with no intrinsic content driving
             // its bounds) resolves to a zero frame — it still draws via its
             // image view, but hit-testing at that point falls through to the
             // panel underneath. See EditorToolRail.ToolButton's regression test
             // for the same trap on a bare UIControl.
-            closeButton.centerYAnchor.constraint(equalTo: titleLabel.centerYAnchor),
+            closeButton.topAnchor.constraint(equalTo: topAnchor, constant: Theme.Spacing.sm),
             closeButton.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -Theme.Spacing.md),
-            closeButton.widthAnchor.constraint(equalToConstant: 28),
-            closeButton.heightAnchor.constraint(equalToConstant: 28),
+            closeButton.widthAnchor.constraint(equalToConstant: Self.closeDiameter),
+            closeButton.heightAnchor.constraint(equalToConstant: Self.closeDiameter),
 
-            contentContainer.topAnchor.constraint(equalTo: titleLabel.bottomAnchor,
-                                                  constant: Theme.Spacing.xs),
+            // Centred on the PANEL, not on the space left beside the chip — a
+            // title that sits a half-chip off centre is the kind of thing that
+            // is felt before it is seen. The chip keeps its own clear zone on
+            // both sides so a long title stops short of it symmetrically.
+            titleLabel.centerXAnchor.constraint(equalTo: centerXAnchor),
+            titleLabel.centerYAnchor.constraint(equalTo: closeButton.centerYAnchor),
+            titleLabel.leadingAnchor.constraint(
+                greaterThanOrEqualTo: leadingAnchor,
+                constant: Theme.Spacing.md + Self.closeDiameter + Theme.Spacing.xs),
+            titleLabel.trailingAnchor.constraint(
+                lessThanOrEqualTo: closeButton.leadingAnchor, constant: -Theme.Spacing.xs),
+
+            contentContainer.topAnchor.constraint(equalTo: closeButton.bottomAnchor,
+                                                  constant: Theme.Spacing.sm),
             contentContainer.leadingAnchor.constraint(equalTo: leadingAnchor),
             contentContainer.trailingAnchor.constraint(equalTo: trailingAnchor),
             contentContainer.bottomAnchor.constraint(equalTo: bottomAnchor,
-                                                     constant: -Theme.Spacing.xs),
+                                                     constant: -Theme.Spacing.sm),
         ])
 
         // Defensive only: every internal constraint above consumes height,
@@ -137,7 +156,7 @@ public final class EditorPanel: UIView {
         content?.removeFromSuperview()
         content = view
 
-        titleLabel.text = title.uppercased()
+        titleLabel.text = title
         currentTitle = title
 
         view.translatesAutoresizingMaskIntoConstraints = false
@@ -205,4 +224,39 @@ public final class EditorPanel: UIView {
     /// geometry/hit-testing; production code has no need to reach past `onClose`.
     /// Mirrors `EditorToolRail.toolButton(for:)`.
     var closeButtonForHitTesting: UIButton { closeButton }
+
+    /// The title label, for tests that assert the header's geometry.
+    var titleLabelForLayout: UILabel { titleLabel }
+}
+
+// MARK: - Close chip
+
+/// A round `controlFill` chip with a bold ✕ — the same close every reference
+/// editor draws in its sheet header. A configured button so the circle is the
+/// button's own background (never `layer.cornerRadius` on a configured button).
+@MainActor
+private final class CloseChip: UIButton {
+
+    init() {
+        super.init(frame: .zero)
+        var config = UIButton.Configuration.filled()
+        config.cornerStyle = .capsule
+        config.baseBackgroundColor = Theme.Color.controlFill
+        config.baseForegroundColor = Theme.Color.textPrimary
+        config.image = UIImage(
+            systemName: "xmark",
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: 11, weight: .bold))
+        config.contentInsets = .zero
+        configuration = config
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
+
+    override var isHighlighted: Bool {
+        didSet {
+            guard isHighlighted != oldValue else { return }
+            setPressed(isHighlighted, scale: 0.9)
+        }
+    }
 }

@@ -67,51 +67,14 @@ final class FramePanelView: UIView {
 
     init(borderSlider: UISlider, cornerSlider: UISlider) {
         super.init(frame: .zero)
-
-        let rows = UIStackView(arrangedSubviews: [
-            Self.row(title: "Border", systemImage: "square.dashed", slider: borderSlider),
-            Self.row(title: "Corners", systemImage: "rotate.left", slider: cornerSlider),
-        ])
-        rows.axis = .vertical
-        rows.spacing = Theme.Spacing.xs
-        rows.isLayoutMarginsRelativeArrangement = true
-        rows.layoutMargins = UIEdgeInsets(
-            top: 0, left: Theme.Spacing.md, bottom: 0, right: Theme.Spacing.md)
-        rows.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(rows)
-
-        NSLayoutConstraint.activate([
-            rows.topAnchor.constraint(equalTo: topAnchor),
-            rows.bottomAnchor.constraint(equalTo: bottomAnchor),
-            rows.leadingAnchor.constraint(equalTo: leadingAnchor),
-            rows.trailingAnchor.constraint(equalTo: trailingAnchor),
-        ])
+        EditorPanelRow.fill(self, with: EditorPanelRow.stack([
+            EditorPanelRow.make(title: "Border", systemImage: "square.dashed", trailing: borderSlider),
+            EditorPanelRow.make(title: "Corners", systemImage: "rotate.left", trailing: cornerSlider),
+        ]))
     }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
-
-    private static func row(title: String, systemImage: String, slider: UISlider) -> UIView {
-        let icon = UIImageView(image: UIImage(systemName: systemImage))
-        icon.tintColor = Theme.Color.textSecondary
-        icon.contentMode = .scaleAspectFit
-
-        let label = UILabel()
-        label.text = title
-        label.font = Theme.Typography.caption
-        label.textColor = Theme.Color.textSecondary
-
-        let row = UIStackView(arrangedSubviews: [icon, label, slider])
-        row.axis = .horizontal
-        row.spacing = Theme.Spacing.xs
-        row.alignment = .center
-        NSLayoutConstraint.activate([
-            icon.widthAnchor.constraint(equalToConstant: 18),
-            icon.heightAnchor.constraint(equalToConstant: 18),
-            label.widthAnchor.constraint(equalToConstant: 62),
-        ])
-        return row
-    }
 }
 
 /// The background swatches, with the AI generative entry as the trailing chip.

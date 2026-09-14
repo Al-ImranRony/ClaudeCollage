@@ -109,9 +109,12 @@ final class TextStyleTests: XCTestCase {
         XCTAssertNotNil(attributes(for: TextStyle(kind: .glow))[.shadow])
     }
 
-    func testStrokeWidthScalesWithTheCanvas() {
-        // Reference-canvas points must scale like fontSize does, or a thumbnail
-        // gets a stroke as thick as the full-resolution export.
+    func testStrokeStaysTheSameFractionOfItsGlyphAtEveryCanvasScale() {
+        // `.strokeWidth` is a percentage of the font size, not points. A stroke
+        // of 8 reference points on a 64pt face is 12.5% of the glyph, and it
+        // must still be 12.5% in a half-scale thumbnail — the old assertion
+        // that the attribute halves with the canvas was pinning a stroke that
+        // got relatively thinner the smaller the canvas drew it.
         var overlay = TextOverlay(text: "Hello", fontSize: 64)
         overlay.style = TextStyle(kind: .stroke, colorHex: "#000000", width: 8)
 
@@ -120,9 +123,8 @@ final class TextStyleTests: XCTestCase {
         let half = TextRendering.attributedString(for: overlay, fontScale: 0.5)
             .attributes(at: 0, effectiveRange: nil)[.strokeWidth] as? CGFloat
 
-        XCTAssertNotNil(full)
-        XCTAssertNotNil(half)
-        XCTAssertEqual(abs(half ?? 0), abs(full ?? 0) / 2, accuracy: 0.01)
+        XCTAssertEqual(full ?? 0, -12.5, accuracy: 0.01, "negative: stroke AND fill")
+        XCTAssertEqual(half ?? 0, full ?? 0, accuracy: 0.01)
     }
 
     /// Reads back the RGB of one pixel from a rendered `CGImage` (established

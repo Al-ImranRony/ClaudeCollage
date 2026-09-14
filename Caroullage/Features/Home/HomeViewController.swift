@@ -1032,16 +1032,7 @@ private final class QuickStartChip: UIControl {
     override var isHighlighted: Bool {
         didSet {
             guard isHighlighted != oldValue else { return }
-            UIView.animate(
-                withDuration: Theme.Motion.duration(Theme.Motion.quick),
-                delay: 0,
-                usingSpringWithDamping: Theme.Motion.effectiveSpringDamping,
-                initialSpringVelocity: Theme.Motion.effectiveSpringVelocity,
-                options: [.allowUserInteraction, .beginFromCurrentState]
-            ) {
-                self.transform = self.isHighlighted
-                    ? CGAffineTransform(scaleX: 0.94, y: 0.94) : .identity
-            }
+            setPressed(isHighlighted, scale: 0.94)
         }
     }
 
@@ -1231,16 +1222,7 @@ final class ProjectCardCell: UICollectionViewCell {
     override var isHighlighted: Bool {
         didSet {
             guard isHighlighted != oldValue else { return }
-            UIView.animate(
-                withDuration: Theme.Motion.duration(Theme.Motion.quick),
-                delay: 0,
-                usingSpringWithDamping: Theme.Motion.effectiveSpringDamping,
-                initialSpringVelocity: Theme.Motion.effectiveSpringVelocity,
-                options: [.allowUserInteraction, .beginFromCurrentState]
-            ) {
-                self.transform = self.isHighlighted
-                    ? CGAffineTransform(scaleX: 0.96, y: 0.96) : .identity
-            }
+            setPressed(isHighlighted, scale: 0.96)
         }
     }
 

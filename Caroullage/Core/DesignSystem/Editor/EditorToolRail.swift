@@ -11,11 +11,19 @@
 //  inside the safe area, which is what keeps the old "no dead band" behaviour
 //  without the full-height scroll view that behaviour was originally built around.
 //
-//  The active tool's icon ANIMATES — a repeating SF Symbol effect chosen per tool
-//  (see `EditorTool.Emphasis`) — and no other icon in the rail does. That is the
-//  rail's answer to "which tool am I in": colour alone has to be read, where the
-//  one moving thing on the strip is found without looking for it. Both editors
-//  get it from here; there is no second copy of this rail to keep in step.
+//  With no context inserted the base tools divide the rail's width equally — the
+//  rule a tab bar uses — so five tools are five columns, not a cluster at the
+//  leading edge with dead space after it. Once a context is inserted the tools
+//  keep their natural widths and a 4pt gap: on a phone the strip overflows and
+//  scrolls, and on a rail wide enough to hold everything the group stays packed
+//  at the leading edge rather than being spread thin across an iPad.
+//
+//  The active tool is marked three ways at once, and only one of them moves. The
+//  accent colour and a soft capsule behind the icon carry the state for as long as
+//  the tool is chosen. On the transition INTO chosen, the icon pops and plays one
+//  pass of its per-tool SF Symbol effect (see `EditorTool.Emphasis`), the way a
+//  hover state acknowledges a pointer — and then it rests. Both editors get it
+//  from here; there is no second copy of this rail to keep in step.
 //
 
 import UIKit
@@ -29,10 +37,15 @@ public final class EditorToolRail: UIView {
     /// Content height above the safe-area inset.
     public static let contentHeight: CGFloat = 52
 
-    private let scrollView = UIScrollView()
+    private let scrollView = EditorControlScrollView()
     private let stack = UIStackView()
     private var baseTools: [EditorTool] = []
     private var context: EditorRailContext?
+
+    /// Stretches the strip to the rail's width so the base tools can share it
+    /// as equal columns. Active only while there is no context: with one, the
+    /// tools sit at their natural widths and this would spread them apart.
+    private var fillWidthConstraint: NSLayoutConstraint?
 
     /// The setter is private: only `setActiveTool` and the stale-highlight guard
     /// in `rebuild()` may change this. The getter is left at the default
@@ -44,6 +57,14 @@ public final class EditorToolRail: UIView {
     /// than a `UIScreen.main.scale`-derived value. `UIScreen.main` is deprecated
     /// as of iOS 26 and would misreport the scale on an external display anyway.
     private static let separatorHeight: CGFloat = 1
+
+    /// The rail's horizontal content inset. Also the inset of its top hairline,
+    /// which stops short of the edges so it reads as the divider between two
+    /// tiers of one sheet rather than as the top edge of a second bar.
+    private static let horizontalInset: CGFloat = Theme.Spacing.md
+
+    /// The gap between tools while the strip is scrolling (a context inserted).
+    private static let scrollingSpacing: CGFloat = Theme.Spacing.xxs
 
     /// The accessibility identifiers of every tool button currently in the rail,
     /// in leading-to-trailing order. The chip and the divider are not tools.
@@ -70,7 +91,6 @@ public final class EditorToolRail: UIView {
         separator.translatesAutoresizingMaskIntoConstraints = false
         addSubview(separator)
 
-        scrollView.showsHorizontalScrollIndicator = false
         // The rail reaches the screen edge, so the automatic behaviour would hand
         // the home-indicator inset straight back as content inset.
         scrollView.contentInsetAdjustmentBehavior = .never
@@ -79,14 +99,14 @@ public final class EditorToolRail: UIView {
 
         stack.axis = .horizontal
         stack.alignment = .center
-        stack.spacing = Theme.Spacing.xxs
+        stack.spacing = Self.scrollingSpacing
         stack.translatesAutoresizingMaskIntoConstraints = false
         scrollView.addSubview(stack)
 
         NSLayoutConstraint.activate([
             separator.topAnchor.constraint(equalTo: topAnchor),
-            separator.leadingAnchor.constraint(equalTo: leadingAnchor),
-            separator.trailingAnchor.constraint(equalTo: trailingAnchor),
+            separator.leadingAnchor.constraint(equalTo: leadingAnchor, constant: Self.horizontalInset),
+            separator.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -Self.horizontalInset),
             separator.heightAnchor.constraint(equalToConstant: Self.separatorHeight),
 
             // Content sits inside the safe area; the view's background does not.
@@ -99,11 +119,19 @@ public final class EditorToolRail: UIView {
             stack.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor),
             stack.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor),
             stack.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor,
-                                           constant: Theme.Spacing.xs),
+                                           constant: Self.horizontalInset),
             stack.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor,
-                                            constant: -Theme.Spacing.xs),
+                                            constant: -Self.horizontalInset),
             stack.heightAnchor.constraint(equalTo: scrollView.frameLayoutGuide.heightAnchor),
         ])
+
+        // At least as wide as the rail, so a base tool set that fits is spread
+        // across the whole strip; a wider set simply overflows and scrolls.
+        let fill = stack.widthAnchor.constraint(
+            greaterThanOrEqualTo: scrollView.frameLayoutGuide.widthAnchor,
+            constant: -2 * Self.horizontalInset)
+        fill.isActive = true
+        fillWidthConstraint = fill
     }
 
     // MARK: - Content
@@ -123,6 +151,10 @@ public final class EditorToolRail: UIView {
     /// a selection can never survive a context change and mislabel an unrelated
     /// tool as chosen.
     public func setContext(_ context: EditorRailContext?) {
+        // The video editor re-selects a clip into the same Clip context on every
+        // tap; rebuilding a dozen buttons for a strip that is not changing is
+        // wasted work, and it would replay the scroll-to-start below.
+        guard context != self.context else { return }
         self.context = context
         rebuild()
         if context != nil {
@@ -132,8 +164,12 @@ public final class EditorToolRail: UIView {
 
     public func setActiveTool(_ id: EditorTool.ID?) {
         activeToolID = id
+        applyActiveTool(animated: true)
+    }
+
+    private func applyActiveTool(animated: Bool) {
         for case let button as ToolButton in stack.arrangedSubviews {
-            button.setActive(button.toolID == id)
+            button.setActive(button.toolID == activeToolID, animated: animated)
         }
     }
 
@@ -142,6 +178,13 @@ public final class EditorToolRail: UIView {
             stack.removeArrangedSubview(view)
             view.removeFromSuperview()
         }
+
+        // Equal columns while the base tools have the strip to themselves. With
+        // a context inserted the chip and the divider share the stack, so equal
+        // columns would hand each of them a tool's width; the strip hugs its
+        // content instead, scrolling on a phone and leading-aligned on an iPad.
+        stack.distribution = context == nil ? .fillEqually : .fill
+        fillWidthConstraint?.isActive = context == nil
 
         if let context {
             stack.addArrangedSubview(makeChip(context))
@@ -161,7 +204,10 @@ public final class EditorToolRail: UIView {
         if let activeToolID, !presentToolIDs.contains(activeToolID) {
             self.activeToolID = nil
         }
-        setActiveTool(activeToolID)
+        // Un-animated: these are fresh buttons showing a selection that already
+        // existed, not a tool being chosen. A context change that leaves a base
+        // panel open must not replay that panel's tool pop.
+        applyActiveTool(animated: false)
     }
 
     // MARK: - Subview factories
@@ -225,17 +271,24 @@ public final class EditorToolRail: UIView {
     /// The tool button currently in the rail for a given tool identifier, if any.
     /// Exposed only so tests can inspect real geometry/hit-testing; production
     /// code has no need to reach into an individual button.
-    func toolButton(for id: EditorTool.ID) -> UIControl? {
+    func toolButton(for id: EditorTool.ID) -> ToolButton? {
         stack.arrangedSubviews
             .compactMap { $0 as? ToolButton }
             .first(where: { $0.toolID == id })
+    }
+
+    /// The context chip, if one is showing. A test seam, like `toolButton(for:)`.
+    func contextChipForLayout() -> UIControl? {
+        stack.arrangedSubviews
+            .compactMap { $0 as? UIControl }
+            .first(where: { $0.accessibilityIdentifier == Self.chipIdentifier })
     }
 }
 
 // MARK: - Tool button
 
 @MainActor
-private final class ToolButton: UIControl {
+final class ToolButton: UIControl {
 
     /// How far the icon overshoots when a tool becomes the active one.
     ///
@@ -249,16 +302,24 @@ private final class ToolButton: UIControl {
     /// 58pt-wide control has less area for the same proportion to register in.
     private static let pressScale: CGFloat = 0.92
 
+    /// The soft capsule behind the active icon. Wide enough to read as a well
+    /// the icon sits in rather than a halo hugging it.
+    private static let wellSize = CGSize(width: 44, height: 28)
+
     let toolID: EditorTool.ID
     private let emphasis: EditorTool.Emphasis
+    private let well = UIView()
     private let icon = UIImageView()
     private let label = UILabel()
 
     /// Optional so the first `setActive` always applies, however it is called.
-    /// The rail calls `setActiveTool` on every rebuild, including rebuilds that
-    /// change nothing, and restarting a running symbol effect on each of those
-    /// makes the icon stutter.
     private var isActiveState: Bool?
+
+    /// How many times this button has played its selection moment. A test
+    /// seam: `UIImageView` has no getter for the effects it is running, and the
+    /// owner's complaint was an effect that never stopped, so the count is what
+    /// pins "once per selection, and not again on a rebuild".
+    private(set) var emphasisPlayCount = 0
 
     init(tool: EditorTool) {
         self.toolID = tool.id
@@ -267,6 +328,13 @@ private final class ToolButton: UIControl {
 
         isAccessibilityElement = true
         accessibilityTraits = .button
+
+        well.backgroundColor = Theme.Color.accentSoft
+        well.layer.cornerRadius = Self.wellSize.height / 2
+        well.layer.cornerCurve = .continuous
+        well.isUserInteractionEnabled = false
+        well.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(well)
 
         icon.image = UIImage(systemName: tool.systemImage)
         icon.contentMode = .scaleAspectFit
@@ -302,45 +370,74 @@ private final class ToolButton: UIControl {
             stack.bottomAnchor.constraint(equalTo: bottomAnchor),
             icon.heightAnchor.constraint(equalToConstant: 22),
             widthAnchor.constraint(greaterThanOrEqualToConstant: 58),
-        ])
-        setActive(false)
 
-        // Reduce Motion is a setting, not a trait, so it does not arrive through
-        // `registerForTraitChanges` like light/dark does. Target/selector rather
-        // than a block observer: the block form would have to capture this
-        // MainActor-isolated, non-Sendable view inside a `@Sendable` closure,
-        // which Swift 6 rejects outright.
-        NotificationCenter.default.addObserver(
-            self, selector: #selector(reduceMotionChanged),
-            name: UIAccessibility.reduceMotionStatusDidChangeNotification, object: nil)
+            well.centerXAnchor.constraint(equalTo: icon.centerXAnchor),
+            well.centerYAnchor.constraint(equalTo: icon.centerYAnchor),
+            well.widthAnchor.constraint(equalToConstant: Self.wellSize.width),
+            well.heightAnchor.constraint(equalToConstant: Self.wellSize.height),
+        ])
+        setActive(false, animated: false)
     }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
 
     /// Indigo marks *which thing is chosen*; ink is ordinary chrome.
-    func setActive(_ isActive: Bool) {
-        let wasActive = isActiveState
-        guard wasActive != isActive else { return }
+    ///
+    /// `animated` is the difference between a tool being chosen and a fresh
+    /// button showing a choice that already existed: only the former earns the
+    /// pop and the one-shot symbol effect.
+    func setActive(_ isActive: Bool, animated: Bool) {
+        guard isActiveState != isActive else { return }
         isActiveState = isActive
 
         let colour = isActive ? Theme.Color.accent : Theme.Color.textSecondary
         icon.tintColor = colour
         label.textColor = colour
+        label.font = isActive
+            ? Theme.Typography.rounded(10, .bold, .caption2)
+            : Theme.Typography.tabLabel
+        if isActive {
+            accessibilityTraits.insert(.selected)
+        } else {
+            accessibilityTraits.remove(.selected)
+        }
 
-        // The pop only plays on a real transition into "chosen" — never on the
-        // `setActive(false)` in init, and never on a rebuild that re-asserts a
-        // selection the button already had.
-        if isActive, wasActive != nil { playSelectionPop() }
-        updateSymbolEffect()
+        // A one-shot effect stays on the image view after its single pass, so
+        // deselection is where it is taken off — eased out, in case the user
+        // moved on before it finished. Selection removes it un-animated instead:
+        // the new effect is added in the same turn and must not stack on a
+        // removal that is still fading.
+        icon.removeAllSymbolEffects(animated: !isActive)
+
+        guard animated, !Theme.Motion.isReduced else {
+            well.alpha = isActive ? 1 : 0
+            well.transform = .identity
+            return
+        }
+        if isActive {
+            playSelection()
+        } else {
+            // From the presentation value, not the model's: a tool deselected
+            // mid-bloom fades from wherever its well had got to, rather than
+            // snapping to full opacity first.
+            UIView.animate(
+                withDuration: Theme.Motion.duration(Theme.Motion.quick),
+                delay: 0,
+                options: [.beginFromCurrentState]
+            ) {
+                self.well.alpha = 0
+                self.well.transform = .identity
+            }
+        }
     }
 
-    /// A spring-settled overshoot: the icon appears a fifth larger and rides back
-    /// down. Skipped entirely under Reduce Motion — the colour change alone still
-    /// says which tool is chosen, and the repeating effect is suppressed there
-    /// too, so nothing in the rail moves.
-    private func playSelectionPop() {
-        guard !Theme.Motion.isReduced else { return }
+    /// The moment of selection: the well blooms, the icon springs in from a
+    /// fifth larger, and the tool's own symbol effect plays through once. None
+    /// of it repeats — the colour and the well are what say "chosen" afterwards.
+    private func playSelection() {
+        well.alpha = 0
+        well.transform = CGAffineTransform(scaleX: 0.6, y: 0.6)
         icon.transform = CGAffineTransform(
             scaleX: Self.selectionPopScale, y: Self.selectionPopScale)
         UIView.animate(
@@ -350,68 +447,47 @@ private final class ToolButton: UIControl {
             initialSpringVelocity: Theme.Motion.effectiveSpringVelocity,
             options: [.allowUserInteraction, .beginFromCurrentState]
         ) {
+            self.well.alpha = 1
+            self.well.transform = .identity
             self.icon.transform = .identity
         }
+        emphasisPlayCount += 1
+        playEmphasis()
     }
 
-    /// Starts the active tool's repeating symbol effect, or takes it away.
-    ///
-    /// Exactly one button in the rail runs an effect at a time, because exactly
-    /// one tool is active. A strip where every icon moved would be a strip that
-    /// pointed at nothing.
-    private func updateSymbolEffect() {
-        icon.removeAllSymbolEffects(options: .speed(2), animated: true)
-        // A loop that never stops is the one animation a user who has asked for
-        // less motion cannot look away from, so Reduce Motion removes it rather
-        // than shortening it — the accent colour is already carrying the state.
-        guard isActiveState == true, !Theme.Motion.isReduced else { return }
-
+    /// One pass of the per-tool effect. Every effect is added `.nonRepeating`:
+    /// `pulse` and `variableColor` are indefinite by default and would otherwise
+    /// loop, and `bounce` used to be added `.repeating` on purpose.
+    private func playEmphasis() {
         switch emphasis {
         case .pulse:
-            // Indefinite: runs until removed, no repeat option needed.
-            icon.addSymbolEffect(.pulse, options: .repeating, animated: true)
+            icon.addSymbolEffect(.pulse, options: .nonRepeating)
         case .variableColor:
-            icon.addSymbolEffect(
-                .variableColor.iterative.hideInactiveLayers, options: .repeating, animated: true)
+            icon.addSymbolEffect(.variableColor.iterative.hideInactiveLayers, options: .nonRepeating)
         case .bounce:
-            icon.addSymbolEffect(.bounce, options: .repeating, animated: true)
+            icon.addSymbolEffect(.bounce, options: .nonRepeating)
         case .wiggle:
             if #available(iOS 18.0, *) {
-                icon.addSymbolEffect(.wiggle, options: .repeating, animated: true)
+                icon.addSymbolEffect(.wiggle, options: .nonRepeating)
             } else {
-                icon.addSymbolEffect(.bounce, options: .repeating, animated: true)
+                icon.addSymbolEffect(.bounce, options: .nonRepeating)
             }
         case .rotate:
             if #available(iOS 18.0, *) {
-                icon.addSymbolEffect(.rotate, options: .repeating, animated: true)
+                icon.addSymbolEffect(.rotate, options: .nonRepeating)
             } else {
-                icon.addSymbolEffect(.bounce, options: .repeating, animated: true)
+                icon.addSymbolEffect(.bounce, options: .nonRepeating)
             }
         }
     }
 
-    @objc private func reduceMotionChanged() {
-        updateSymbolEffect()
-    }
-
-    /// The same press spring the cards use, rather than the flat alpha dip this
-    /// had before. A rail button is the most-tapped control in the editor, so it
-    /// is the one that most wants to feel like it is being pushed.
+    /// The same press spring every editor control uses. A rail button is the
+    /// most-tapped control in the editor, so it is the one that most wants to
+    /// feel like it is being pushed; it goes a touch deeper than the cards.
     override var isHighlighted: Bool {
         didSet {
             guard isHighlighted != oldValue else { return }
-            UIView.animate(
-                withDuration: Theme.Motion.duration(Theme.Motion.quick),
-                delay: 0,
-                usingSpringWithDamping: Theme.Motion.effectiveSpringDamping,
-                initialSpringVelocity: Theme.Motion.effectiveSpringVelocity,
-                options: [.allowUserInteraction, .beginFromCurrentState]
-            ) {
-                self.transform = self.isHighlighted
-                    ? CGAffineTransform(scaleX: Self.pressScale, y: Self.pressScale)
-                    : .identity
-                self.alpha = self.isHighlighted ? 0.75 : 1
-            }
+            setPressed(isHighlighted, scale: Self.pressScale)
         }
     }
 }
@@ -464,6 +540,9 @@ private final class ContextChip: UIControl {
     required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
 
     override var isHighlighted: Bool {
-        didSet { alpha = isHighlighted ? 0.55 : 1 }
+        didSet {
+            guard isHighlighted != oldValue else { return }
+            setPressed(isHighlighted)
+        }
     }
 }

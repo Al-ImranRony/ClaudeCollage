@@ -59,3 +59,19 @@ public struct TextStyle: Codable, Sendable, Equatable {
         self.width = max(0, try c.decodeIfPresent(Double.self, forKey: .width) ?? fallback.width)
     }
 }
+
+public extension TextStyle.Kind {
+    /// The name a user sees for the preset. Kept apart from `rawValue`, which is
+    /// the persisted form: copy can be translated or reworded without touching
+    /// what is on disk, and a persistence rename never rewrites the UI.
+    var displayName: String {
+        switch self {
+        case .plain: String(localized: "Plain")
+        case .shadow: String(localized: "Shadow")
+        case .stroke: String(localized: "Stroke")
+        case .pill: String(localized: "Pill")
+        case .highlight: String(localized: "Highlight")
+        case .glow: String(localized: "Glow")
+        }
+    }
+}

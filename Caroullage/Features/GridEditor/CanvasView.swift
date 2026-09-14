@@ -821,19 +821,14 @@ final class TextOverlayView: UIView {
     /// coordinate space (origin zero, matching how `label.frame = bounds` already
     /// works), so the canvas and the export agree by construction.
     private func refreshBackground() {
-        guard let overlay,
-              let background = TextRendering.backgroundRect(for: overlay, in: bounds, fontScale: fontScale)
-        else {
+        guard let overlay else {
             backgroundLayer.isHidden = true
             return
         }
-        CATransaction.begin()
-        CATransaction.setDisableActions(true)
-        backgroundLayer.isHidden = false
-        backgroundLayer.frame = background.rect
-        backgroundLayer.cornerRadius = background.cornerRadius
-        backgroundLayer.backgroundColor = UIColor(hex: overlay.style.colorHex).cgColor
-        CATransaction.commit()
+        TextRendering.paintBackground(
+            TextRendering.backgroundRect(for: overlay, in: bounds, fontScale: fontScale),
+            colorHex: overlay.style.colorHex,
+            on: backgroundLayer)
     }
 
     // MARK: - Gestures

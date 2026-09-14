@@ -438,4 +438,28 @@ public extension UIView {
         layer.shadowRadius = Theme.Elevation.cardRadius
         layer.shadowOffset = Theme.Elevation.cardOffset
     }
+
+    /// The press spring every tappable editor control shares: the view rides
+    /// down to `scale` while the finger is on it and springs back when it lifts.
+    ///
+    /// One implementation rather than one per control, because a press that is
+    /// 0.92 on the rail, 0.96 on a card and a flat alpha dip on a chip is three
+    /// different answers to the same finger. Under Reduce Motion the press
+    /// answers with opacity instead of scale — less movement, not no feedback.
+    @MainActor
+    func setPressed(_ isPressed: Bool, scale: CGFloat = 0.94) {
+        UIView.animate(
+            withDuration: Theme.Motion.duration(Theme.Motion.quick),
+            delay: 0,
+            usingSpringWithDamping: Theme.Motion.effectiveSpringDamping,
+            initialSpringVelocity: Theme.Motion.effectiveSpringVelocity,
+            options: [.allowUserInteraction, .beginFromCurrentState]
+        ) {
+            if Theme.Motion.isReduced {
+                self.alpha = isPressed ? 0.7 : 1
+            } else {
+                self.transform = isPressed ? CGAffineTransform(scaleX: scale, y: scale) : .identity
+            }
+        }
+    }
 }

@@ -196,6 +196,49 @@ final class GridEditorRailTests: XCTestCase {
         XCTAssertEqual(buttons.count, TextStyle.Kind.allCases.count)
     }
 
+    func testTheTextStylePanelOpensOnTheOverlaysOwnStyle() throws {
+        // A row that opened with nothing outlined would ask the user to guess
+        // which of six presets the text already has.
+        let editor = makeEditor()
+        let id = editor.addTextOverlayForTesting()
+        editor.selectTextOverlayForTesting(id)
+        let rail = try rail(in: editor)
+        rail.simulateTap(toolID: "styleText")
+
+        let panel = try panel(in: editor)
+        let row = try XCTUnwrap(panel.recursiveSubviews.compactMap { $0 as? TextStylePresetRow }.first)
+        XCTAssertEqual(row.selectedKind, .plain, "a fresh overlay is plain")
+
+        let glow = try XCTUnwrap(panel.recursiveSubviews.compactMap { $0 as? UIControl }
+            .first { $0.accessibilityIdentifier == "textStyle_glow" })
+        glow.sendActions(for: .touchUpInside)
+
+        XCTAssertEqual(row.selectedKind, .glow, "the tapped card takes the outline")
+        XCTAssertEqual(editor.viewModelForTesting.textOverlay(id: id)?.style.kind, .glow)
+    }
+
+    func testUndoingAStyleChangeMovesTheOutlineBack() throws {
+        // The row is a view of the document, not a record of the last tap: an
+        // undo that reverts the style must move the outline with the canvas.
+        let editor = makeEditor()
+        let id = editor.addTextOverlayForTesting()
+        editor.selectTextOverlayForTesting(id)
+        try rail(in: editor).simulateTap(toolID: "styleText")
+
+        let panel = try panel(in: editor)
+        let row = try XCTUnwrap(panel.recursiveSubviews.compactMap { $0 as? TextStylePresetRow }.first)
+        try XCTUnwrap(panel.recursiveSubviews.compactMap { $0 as? UIControl }
+            .first { $0.accessibilityIdentifier == "textStyle_glow" })
+            .sendActions(for: .touchUpInside)
+        XCTAssertEqual(row.selectedKind, .glow)
+
+        editor.viewModelForTesting.undo()
+
+        XCTAssertEqual(editor.viewModelForTesting.textOverlay(id: id)?.style.kind, .plain)
+        XCTAssertEqual(row.selectedKind, .plain, "the outline follows the document")
+        XCTAssertTrue(panel.isPresenting, "a style-only undo leaves the panel open")
+    }
+
     // MARK: - State coherence (rail highlight / panel / openToolID must agree)
 
     func testClosingThePanelClearsTheRailsActiveTool() throws {

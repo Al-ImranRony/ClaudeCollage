@@ -30,6 +30,9 @@ final class GridEditorViewController: UIViewController {
     /// The currently-shown Layout panel, if any — kept so `layoutModeChanged()`
     /// can toggle its picker without the panel being re-created.
     private weak var layoutPanel: LayoutPanelView?
+    /// The open Style panel's preset strip, if any — re-synced from the document
+    /// on every change so an undo that reverts the style moves its outline too.
+    private weak var textStylePresetRow: TextStylePresetRow?
     private lazy var layoutModeControl = UISegmentedControl(items: ["Grid", "Shapes"])
     private lazy var layoutPicker = LayoutPickerView(selected: viewModel.state.layout.gridTemplate)
     private lazy var shapePicker = ShapePickerView(selected: viewModel.state.layout.polygonTemplate)
@@ -545,6 +548,7 @@ final class GridEditorViewController: UIViewController {
             // After the canvas model is rebuilt, so a stale index/id is checked
             // against the fresh document rather than the one it just replaced.
             self?.revalidateSelection()
+            self?.syncTextStylePresetRow()
         }
         viewModel.onCellImageChanged = { [weak self] index in
             guard let self else { return }
@@ -844,36 +848,29 @@ final class GridEditorViewController: UIViewController {
         present(host, animated: true)
     }
 
-    /// The tier-2 presets as one tappable row. Tapping one applies it immediately —
-    /// the canvas is visible behind the panel, so the preview IS the confirmation.
+    /// The tier-2 presets as one strip of preview cards. Tapping one applies it
+    /// immediately — the canvas is visible behind the panel, so the preview IS
+    /// the confirmation.
     private func makeTextStylePanel(for id: UUID) -> UIView {
-        let row = UIStackView()
-        row.axis = .horizontal
-        row.spacing = Theme.Spacing.xs
-        row.alignment = .center
-        row.isLayoutMarginsRelativeArrangement = true
-        row.layoutMargins = UIEdgeInsets(
-            top: 0, left: Theme.Spacing.md, bottom: 0, right: Theme.Spacing.md)
-
-        for kind in TextStyle.Kind.allCases {
-            let button = UIButton(type: .system)
-            button.setTitle("Aa", for: .normal)
-            button.titleLabel?.font = Theme.Typography.headline
-            button.accessibilityIdentifier = "textStyle_\(kind.rawValue)"
-            button.accessibilityLabel = kind.rawValue.capitalized
-            button.addAction(UIAction { [weak self] _ in
-                guard let self, var overlay = self.viewModel.textOverlay(id: id) else { return }
-                overlay.style = TextStyle(
-                    kind: kind,
-                    colorHex: self.onLightBackground ? "#FFFFFF" : "#000000",
-                    width: 6)
-                self.viewModel.previewTextOverlay(overlay)
-                self.viewModel.commitInteractiveChange()
-                Haptics.selectionChanged()
-            }, for: .touchUpInside)
-            row.addArrangedSubview(button)
+        let row = TextStylePresetRow(selected: viewModel.textOverlay(id: id)?.style.kind) { [weak self] kind in
+            guard let self, var overlay = self.viewModel.textOverlay(id: id) else { return }
+            overlay.style = TextStyle(
+                kind: kind,
+                colorHex: self.onLightBackground ? "#FFFFFF" : "#000000",
+                width: 6)
+            self.viewModel.previewTextOverlay(overlay)
+            self.viewModel.commitInteractiveChange()
         }
+        textStylePresetRow = row
         return row
+    }
+
+    /// Keeps the Style panel's outline on the selected overlay's ACTUAL style.
+    /// The row is rebuilt on open, so this only matters for changes that arrive
+    /// while it is up — undo and redo, chiefly.
+    private func syncTextStylePresetRow() {
+        guard let row = textStylePresetRow, let id = selectedTextID else { return }
+        row.setSelected(viewModel.textOverlay(id: id)?.style.kind)
     }
 
     private func duplicateTextOverlay(_ id: UUID) {

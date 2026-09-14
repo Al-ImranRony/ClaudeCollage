@@ -184,6 +184,9 @@ final class VideoEditorViewController: UIViewController {
     /// pointed at — and must go inert rather than retime the wrong caption when
     /// the selection moves out from under an open panel.
     private var timingPanelOverlayID: UUID?
+    /// The open Style panel's preset strip, if any — re-synced from the document
+    /// on every change so an undo that reverts the style moves its outline too.
+    private weak var textStylePresetRow: TextStylePresetRow?
 
     // MARK: - Init
 
@@ -785,29 +788,20 @@ final class VideoEditorViewController: UIViewController {
     }
 
     private func makeTextStylePanel(for id: UUID) -> UIView {
-        let row = UIStackView()
-        row.axis = .horizontal
-        row.spacing = Theme.Spacing.xs
-        row.alignment = .center
-        row.isLayoutMarginsRelativeArrangement = true
-        row.layoutMargins = UIEdgeInsets(
-            top: 0, left: Theme.Spacing.md, bottom: 0, right: Theme.Spacing.md)
-
-        for kind in TextStyle.Kind.allCases {
-            let button = UIButton(type: .system)
-            button.setTitle("Aa", for: .normal)
-            button.titleLabel?.font = Theme.Typography.headline
-            button.accessibilityIdentifier = "textStyle_\(kind.rawValue)"
-            button.accessibilityLabel = kind.rawValue.capitalized
-            button.addAction(UIAction { [weak self] _ in
-                guard let self, var overlay = self.viewModel.textOverlay(id: id) else { return }
-                overlay.style = TextStyle(kind: kind, colorHex: "#FFFFFF", width: 6)
-                self.viewModel.updateTextOverlay(overlay)
-                Haptics.selectionChanged()
-            }, for: .touchUpInside)
-            row.addArrangedSubview(button)
+        let row = TextStylePresetRow(selected: viewModel.textOverlay(id: id)?.style.kind) { [weak self] kind in
+            guard let self, var overlay = self.viewModel.textOverlay(id: id) else { return }
+            overlay.style = TextStyle(kind: kind, colorHex: "#FFFFFF", width: 6)
+            self.viewModel.updateTextOverlay(overlay)
         }
+        textStylePresetRow = row
         return row
+    }
+
+    /// Keeps the Style panel's outline on the selected overlay's ACTUAL style —
+    /// mirrors `GridEditorViewController.syncTextStylePresetRow`.
+    private func syncTextStylePresetRow() {
+        guard let row = textStylePresetRow, let id = selectedTextID else { return }
+        row.setSelected(viewModel.textOverlay(id: id)?.style.kind)
     }
 
     private func bindViewModel() {
@@ -818,6 +812,7 @@ final class VideoEditorViewController: UIViewController {
             // checked against the fresh document rather than the one it just
             // replaced.
             self?.revalidateSelection()
+            self?.syncTextStylePresetRow()
         }
         // Interactive overlay gestures → the view model (coalesced into one undo step).
         canvasView.onTextChanged = { [weak self] in self?.viewModel.updateTextOverlayInteractive($0) }

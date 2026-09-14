@@ -109,22 +109,7 @@ public final class ThemeButton: GradientLayerButton {
     public override var isHighlighted: Bool {
         didSet {
             guard isHighlighted != oldValue else { return }
-            let scale: CGFloat = isHighlighted ? 0.96 : 1
-            UIView.animate(
-                withDuration: Theme.Motion.duration(Theme.Motion.quick),
-                delay: 0,
-                usingSpringWithDamping: Theme.Motion.effectiveSpringDamping,
-                initialSpringVelocity: Theme.Motion.effectiveSpringVelocity,
-                options: [.allowUserInteraction, .beginFromCurrentState]
-            ) {
-                // Reduce Motion asks for less movement, so the press answers
-                // with opacity instead of scale rather than with nothing.
-                if Theme.Motion.isReduced {
-                    self.alpha = self.isHighlighted ? 0.7 : 1
-                } else {
-                    self.transform = CGAffineTransform(scaleX: scale, y: scale)
-                }
-            }
+            setPressed(isHighlighted, scale: 0.96)
         }
     }
 }

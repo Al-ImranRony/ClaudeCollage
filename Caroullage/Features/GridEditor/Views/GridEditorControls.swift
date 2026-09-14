@@ -9,6 +9,32 @@
 
 import UIKit
 
+// MARK: - Press feedback
+
+/// A collection cell that answers a press with the shared editor spring.
+///
+/// The spring animates the cell itself, and a cell is recycled: every picker
+/// below reloads on selection, which hands a cell whose release spring is still
+/// running to a different index. `prepareForReuse` therefore strips the
+/// animation and the state it was animating, so a card the user never touched
+/// cannot be seen settling.
+class PressFeedbackCell: UICollectionViewCell {
+
+    override var isHighlighted: Bool {
+        didSet {
+            guard isHighlighted != oldValue else { return }
+            setPressed(isHighlighted)
+        }
+    }
+
+    override func prepareForReuse() {
+        super.prepareForReuse()
+        layer.removeAllAnimations()
+        transform = .identity
+        alpha = 1
+    }
+}
+
 // MARK: - Layout picker
 
 final class LayoutPickerView: UIView {
@@ -107,7 +133,7 @@ extension LayoutPickerView: UICollectionViewDataSource, UICollectionViewDelegate
 
 /// Draws a small schematic of the grid layout. Rendering happens in
 /// `draw(rect:)` — no per-layout subview churn during scrolling.
-final class LayoutSchematicCell: UICollectionViewCell {
+final class LayoutSchematicCell: PressFeedbackCell {
     static let reuseID = "LayoutSchematicCell"
 
     private let schematic = SchematicView()
@@ -257,7 +283,7 @@ extension ShapePickerView: UICollectionViewDataSource, UICollectionViewDelegate 
 }
 
 /// A rounded thumbnail showing a polygon layout's SF Symbol.
-final class ShapeThumbnailCell: UICollectionViewCell {
+final class ShapeThumbnailCell: PressFeedbackCell {
     static let reuseID = "ShapeThumbnailCell"
 
     private let imageView = UIImageView()
@@ -377,7 +403,7 @@ extension BackgroundPickerView: UICollectionViewDataSource, UICollectionViewDele
     }
 }
 
-final class SwatchCell: UICollectionViewCell {
+final class SwatchCell: PressFeedbackCell {
     static let reuseID = "SwatchCell"
 
     override init(frame: CGRect) {
