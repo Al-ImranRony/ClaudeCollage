@@ -226,7 +226,7 @@ public final class EditorToolRail: UIView {
     private func makeChip(_ context: EditorRailContext) -> UIControl {
         let chip = ContextChip(title: context.chipTitle, systemImage: context.chipSystemImage)
         chip.accessibilityIdentifier = Self.chipIdentifier
-        chip.accessibilityLabel = "\(context.chipTitle) selected. Double tap to deselect."
+        chip.accessibilityLabel = String(localized: "\(context.chipTitle) selected. Double tap to deselect.")
         chip.addAction(UIAction { [weak self] _ in
             Haptics.tap()
             self?.setContext(nil)

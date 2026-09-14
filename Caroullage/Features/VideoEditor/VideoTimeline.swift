@@ -483,7 +483,8 @@ public final class VideoTimeline: UIView {
     private func updateChevron() {
         let symbol = state == .collapsed ? "chevron.down" : "chevron.up"
         chevronImageView.image = UIImage(systemName: symbol)
-        chevronButton.accessibilityLabel = state == .collapsed ? "Expand timeline" : "Collapse timeline"
+        chevronButton.accessibilityLabel = state == .collapsed
+            ? String(localized: "Expand timeline") : String(localized: "Collapse timeline")
     }
 
     /// Only ever reports the tap — like `chevronTapped` above, this view never
@@ -498,7 +499,7 @@ public final class VideoTimeline: UIView {
     private func updatePlaybackIcon() {
         let symbol = model.isPlaying ? "pause.fill" : "play.fill"
         playbackImageView.image = UIImage(systemName: symbol)
-        playbackButton.accessibilityLabel = model.isPlaying ? "Pause" : "Play"
+        playbackButton.accessibilityLabel = model.isPlaying ? String(localized: "Pause") : String(localized: "Play")
     }
 
     private func updateReadouts() {
@@ -1066,7 +1067,8 @@ private final class ClipRowView: UIView {
         }
         block.layer.borderWidth = videoTimelineHairline
         block.isAccessibilityElement = true
-        block.accessibilityLabel = clip.isFilled ? "Clip \(clip.index + 1)" : "Clip \(clip.index + 1), empty"
+        block.accessibilityLabel = clip.isFilled
+            ? String(localized: "Clip \(clip.index + 1)") : String(localized: "Clip \(clip.index + 1), empty")
 
         setNeedsLayout()
     }

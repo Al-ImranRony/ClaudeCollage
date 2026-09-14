@@ -166,19 +166,19 @@ final class GridEditorViewController: UIViewController {
             style: .plain, target: self, action: #selector(undoTapped)
         )
         undo.accessibilityIdentifier = "undoButton"
-        undo.accessibilityLabel = "Undo"
+        undo.accessibilityLabel = String(localized: "Undo")
         let redo = UIBarButtonItem(
             image: UIImage(systemName: "arrow.uturn.forward"),
             style: .plain, target: self, action: #selector(redoTapped)
         )
         redo.accessibilityIdentifier = "redoButton"
-        redo.accessibilityLabel = "Redo"
+        redo.accessibilityLabel = String(localized: "Redo")
         let export = UIBarButtonItem(
             image: UIImage(systemName: "square.and.arrow.up"),
             style: .plain, target: self, action: #selector(exportTapped)
         )
         export.accessibilityIdentifier = "exportButton"
-        export.accessibilityLabel = "Export"
+        export.accessibilityLabel = String(localized: "Export")
         undoItem = undo
         redoItem = redo
         navigationItem.rightBarButtonItems = [export, redo, undo]
@@ -500,7 +500,7 @@ final class GridEditorViewController: UIViewController {
             self?.presentGenerativeBackground()
         })
         button.accessibilityIdentifier = "generateBackgroundButton"
-        button.accessibilityLabel = "Generate background"
+        button.accessibilityLabel = String(localized: "Generate background")
         return button
     }
 

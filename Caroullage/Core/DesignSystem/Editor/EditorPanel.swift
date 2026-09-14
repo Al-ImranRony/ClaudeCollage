@@ -90,7 +90,7 @@ public final class EditorPanel: UIView {
         addSubview(titleLabel)
 
         closeButton.accessibilityIdentifier = "editorPanelCloseButton"
-        closeButton.accessibilityLabel = "Close"
+        closeButton.accessibilityLabel = String(localized: "Close")
         closeButton.addAction(UIAction { [weak self] _ in
             Haptics.tap()
             self?.onClose?()

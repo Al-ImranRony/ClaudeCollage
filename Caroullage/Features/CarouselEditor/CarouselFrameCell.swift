@@ -170,7 +170,7 @@ final class CarouselFrameCell: UICollectionViewCell {
         bottomSeam.isHidden = seam != .bottom
 
         isAccessibilityElement = true
-        accessibilityLabel = "Frame \(number)"
+        accessibilityLabel = String(localized: "Frame \(number)")
         accessibilityTraits = isSelected ? [.button, .selected] : .button
     }
 }

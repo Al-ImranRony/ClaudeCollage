@@ -120,11 +120,11 @@ final class CarouselEditorViewController: UIViewController {
             image: UIImage(systemName: "square.and.arrow.up"),
             style: .plain, target: self, action: #selector(exportTapped))
         export.accessibilityIdentifier = "carouselExportButton"
-        export.accessibilityLabel = "Export"
+        export.accessibilityLabel = String(localized: "Export")
         undoItem.accessibilityIdentifier = "carouselUndoButton"
-        undoItem.accessibilityLabel = "Undo"
+        undoItem.accessibilityLabel = String(localized: "Undo")
         redoItem.accessibilityIdentifier = "carouselRedoButton"
-        redoItem.accessibilityLabel = "Redo"
+        redoItem.accessibilityLabel = String(localized: "Redo")
         navigationItem.rightBarButtonItems = [export, redoItem, undoItem]
     }
 
@@ -155,7 +155,7 @@ final class CarouselEditorViewController: UIViewController {
 
     private func setupToolbar() {
         directionItem.accessibilityIdentifier = "carouselDirectionButton"
-        directionItem.accessibilityLabel = "Direction"
+        directionItem.accessibilityLabel = String(localized: "Direction")
         refreshDirectionMenu()
 
         let preview = UIBarButtonItem(
@@ -166,7 +166,7 @@ final class CarouselEditorViewController: UIViewController {
             image: UIImage(systemName: "plus.circle.fill"),
             style: .plain, target: self, action: #selector(addFrameTapped))
         add.accessibilityIdentifier = "addFrameButton"
-        add.accessibilityLabel = "Add Frame"
+        add.accessibilityLabel = String(localized: "Add Frame")
 
         let flex = UIBarButtonItem(systemItem: .flexibleSpace)
         toolbarItems = [directionItem, flex, add, flex, preview]
@@ -251,7 +251,7 @@ final class CarouselEditorViewController: UIViewController {
         // How many frames the carousel has, which nothing else on screen says:
         // only a panel and a half is visible at a time, and VoiceOver reaches the
         // cells one at a time with no sense of how many are left.
-        collectionView.accessibilityLabel = "Carousel frames"
+        collectionView.accessibilityLabel = String(localized: "Carousel frames")
         collectionView.accessibilityValue = "\(viewModel.frameCount)"
         updateUndoRedoState()
     }
