@@ -50,7 +50,11 @@ final class VideoCanvasView: UIView {
     }
 
     /// One chrome view per layout slot (placeholder + selection outline).
-    private var cellViews: [UIView] = []
+    private var cellViews: [VideoCellChromeView] = []
+
+    /// VoiceOver/Switch Control activated a slot — the same thing a tap on it
+    /// means. Wired by the view controller (phase 6.5).
+    var onCellActivated: ((Int) -> Void)?
 
     private var canvasSize: CGSize = CGSize(width: 1, height: 1)
     private var cellFrames: [CGRect] = []
@@ -108,13 +112,23 @@ final class VideoCanvasView: UIView {
         // Rebuild the chrome views when the slot count changes (layout switch).
         if cellViews.count != frames.count {
             cellViews.forEach { $0.removeFromSuperview() }
-            cellViews = frames.map { _ in makeCellView() }
+            cellViews = frames.indices.map { index in
+                let view = makeCellView()
+                view.onActivate = { [weak self] in self?.onCellActivated?(index) }
+                return view
+            }
             cellViews.forEach { addSubview($0) }
+            refreshAccessibilityElements()
         }
 
         for (index, cellView) in cellViews.enumerated() {
             let isFilled = filled.indices.contains(index) ? filled[index] : false
             let isSelected = (index == selectedIndex)
+            cellView.isAccessibilityElement = true
+            cellView.accessibilityLabel = CanvasAccessibility.videoCellLabel(
+                index: index, count: frames.count, isFilled: isFilled)
+            cellView.accessibilityHint = CanvasAccessibility.videoCellHint(isFilled: isFilled)
+            cellView.accessibilityTraits = isSelected ? [.button, .selected] : .button
             // A filled cell shows the video through it — only its outline matters.
             cellView.backgroundColor = isFilled ? .clear : Theme.Color.controlFill
             cellView.layer.borderWidth = isSelected ? 3 : 1
@@ -160,6 +174,7 @@ final class VideoCanvasView: UIView {
         // A freshly pooled view defaults to visible — refresh immediately so a
         // timed-out caption doesn't flash on screen before the next player tick.
         refreshTextVisibility()
+        refreshAccessibilityElements()
     }
 
     func updateStickerOverlays(_ overlays: [StickerOverlay], selected: UUID?) {
@@ -176,6 +191,16 @@ final class VideoCanvasView: UIView {
             return view
         }
         setNeedsLayout()
+        refreshAccessibilityElements()
+    }
+
+    // MARK: - Accessibility (phase 6.5)
+
+    /// Slots in layout order, then captions, then stickers — the order the photo
+    /// canvas uses. A caption hidden by its timing is skipped by VoiceOver on its
+    /// own (`isHidden`), so the list need not track the playhead.
+    private func refreshAccessibilityElements() {
+        accessibilityElements = (cellViews as [UIView]) + (textViews as [UIView]) + (stickerViews as [UIView])
     }
 
     /// True when an interactive text/sticker view sits under the point — the VC uses
@@ -258,8 +283,8 @@ final class VideoCanvasView: UIView {
 
     // MARK: - Private
 
-    private func makeCellView() -> UIView {
-        let cellView = UIView()
+    private func makeCellView() -> VideoCellChromeView {
+        let cellView = VideoCellChromeView()
         cellView.isUserInteractionEnabled = false   // the VC owns the tap gesture
         // Cells render with sharp rectangular edges — no per-cell corner-radius
         // concept exists in the video composition — so the selection chrome must
@@ -279,5 +304,16 @@ final class VideoCanvasView: UIView {
             chip.bottomAnchor.constraint(equalTo: cellView.bottomAnchor),
         ])
         return cellView
+    }
+}
+
+/// A slot's chrome view, and its accessibility element. Activation routes out
+/// through the canvas exactly as a tap on the slot does (phase 6.5).
+final class VideoCellChromeView: UIView {
+    var onActivate: (() -> Void)?
+
+    override func accessibilityActivate() -> Bool {
+        onActivate?()
+        return true
     }
 }

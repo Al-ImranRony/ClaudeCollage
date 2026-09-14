@@ -316,6 +316,8 @@ final class VideoEditorViewController: UIViewController {
 
         let tap = UITapGestureRecognizer(target: self, action: #selector(canvasTapped(_:)))
         canvasView.addGestureRecognizer(tap)
+        // A slot reached by voice or switch does what a tapped slot does.
+        canvasView.onCellActivated = { [weak self] index in self?.activateCell(index) }
 
         // Pinch/two-finger-pan to adjust the SELECTED filled cell's framing
         // within its slot (a single tap selects the cell instead).
@@ -1183,6 +1185,14 @@ final class VideoEditorViewController: UIViewController {
         // Tapping empty canvas deselects any selected sticker.
         if selectedStickerID != nil { selectedStickerID = nil; refreshCanvas() }
         guard let index = canvasView.cellIndex(at: point) else { return }
+        activateCell(index)
+    }
+
+    /// What a tap on slot `index` means — and what VoiceOver's double-tap and
+    /// Switch Control's select mean: the picker for an empty slot, selection
+    /// for a filled one.
+    private func activateCell(_ index: Int) {
+        guard viewModel.cells.indices.contains(index) else { return }
         Haptics.tap()
         if viewModel.cells[index].videoID == nil {
             presentVideoPicker(for: index)
