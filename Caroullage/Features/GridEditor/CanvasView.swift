@@ -60,6 +60,13 @@ final class CanvasView: UIView {
     private var selectedTextID: UUID?
     private var model: CanvasModel?
 
+    // MARK: - Cell accessibility callbacks (wired by the view controller)
+
+    /// VoiceOver/Switch Control activated a cell — the same thing a tap on it means.
+    var onCellActivated: ((Int) -> Void)?
+    /// The "Swap with another cell" action on a filled cell.
+    var onCellSwapRequested: ((Int) -> Void)?
+
     // MARK: - Sticker callbacks (wired by the view controller)
 
     /// A sticker moved/resized/rotated mid-gesture (live, no undo snapshot yet).
@@ -148,8 +155,10 @@ final class CanvasView: UIView {
 
         if countChanged {
             cellViews.forEach { $0.removeFromSuperview() }
-            cellViews = model.cells.map { _ in
+            cellViews = model.cells.indices.map { index in
                 let view = CellContentView()
+                view.onActivate = { [weak self] in self?.onCellActivated?(index) }
+                view.onSwapRequested = { [weak self] in self?.onCellSwapRequested?(index) }
                 contentContainer.addSubview(view)
                 return view
             }
@@ -159,6 +168,7 @@ final class CanvasView: UIView {
         // needed to convert the corner radius to screen points is known.
         for (index, cell) in model.cells.enumerated() where cellViews.indices.contains(index) {
             cellViews[index].setImage(cell.image)
+            cellViews[index].setAccessibilityPosition(index: index, count: model.cells.count)
         }
         rebuildOverlayViewsIfNeeded(count: model.textOverlays.count)
         rebuildStickerViews(model.stickerOverlays)
@@ -329,9 +339,17 @@ final class CanvasView: UIView {
         updateCellSelection()
     }
 
+    /// Mirrors the selection outline into each cell's `.selected` trait.
+    private func updateCellSelectionTraits() {
+        for (index, view) in cellViews.enumerated() {
+            view.setSelected(index == selectedCellIndex)
+        }
+    }
+
     /// Redraws the selection outline to trace the selected cell's actual boundary,
     /// including its corner radius and any non-rectangular clip shape.
     private func updateCellSelection() {
+        updateCellSelectionTraits()
         guard let model, let index = selectedCellIndex,
               model.cells.indices.contains(index), referenceScaleFactor > 0 else {
             cellSelectionLayer.isHidden = true
@@ -574,6 +592,57 @@ final class CellContentView: UIView {
     private var clipShape: CellClipShape = .rectangle
     /// Vertex-rounding radius for the masked path, in on-screen points.
     private var shapeCornerRadius: CGFloat = 0
+
+    // MARK: Accessibility (phase 6.5)
+
+    /// 0-based position in the layout and the layout's cell count, set by the
+    /// canvas so the spoken label can say "2 of 4".
+    private var accessibilityIndex = 0
+    private var accessibilityCount = 1
+    private var hasImage = false
+    private var isSelectedForAccessibility = false
+
+    /// VoiceOver's activate (double-tap) and Switch Control's select. The canvas
+    /// routes it to the view controller, which runs the same code as a tap.
+    var onActivate: (() -> Void)?
+    /// The "Swap with another cell" custom action — the long-press swap, without
+    /// the long press. Offered only when the cell holds a photo.
+    var onSwapRequested: (() -> Void)?
+
+    func setAccessibilityPosition(index: Int, count: Int) {
+        accessibilityIndex = index
+        accessibilityCount = count
+        refreshAccessibility()
+    }
+
+    func setSelected(_ selected: Bool) {
+        guard selected != isSelectedForAccessibility else { return }
+        isSelectedForAccessibility = selected
+        refreshAccessibility()
+    }
+
+    private func refreshAccessibility() {
+        isAccessibilityElement = true
+        accessibilityLabel = CanvasAccessibility.cellLabel(
+            index: accessibilityIndex, count: accessibilityCount, hasImage: hasImage)
+        accessibilityHint = CanvasAccessibility.cellHint(hasImage: hasImage)
+        var traits: UIAccessibilityTraits = .button
+        if hasImage { traits.insert(.image) }
+        if isSelectedForAccessibility { traits.insert(.selected) }
+        accessibilityTraits = traits
+        accessibilityCustomActions = hasImage
+            ? [UIAccessibilityCustomAction(name: CanvasAccessibility.swapAction) { [weak self] _ in
+                self?.onSwapRequested?()
+                return true
+              }]
+            : nil
+    }
+
+    override func accessibilityActivate() -> Bool {
+        onActivate?()
+        return true
+    }
+
     private lazy var shapeMask: CAShapeLayer = {
         let mask = CAShapeLayer()
         mask.fillColor = UIColor.white.cgColor
@@ -600,6 +669,8 @@ final class CellContentView: UIView {
         plusLayer.strokeColor = Theme.Color.cellWellChipInk.cgColor
         plusLayer.lineCap = .round
         layer.addSublayer(plusLayer)
+
+        refreshAccessibility()
     }
 
     @available(*, unavailable)
@@ -684,6 +755,8 @@ final class CellContentView: UIView {
     }
 
     func setImage(_ image: CGImage?) {
+        hasImage = image != nil
+        defer { refreshAccessibility() }
         if let image {
             imageView.image = UIImage(cgImage: image)
             imageView.isHidden = false
