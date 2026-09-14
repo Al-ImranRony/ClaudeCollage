@@ -59,14 +59,18 @@ final class StickerPickerViewController: UIViewController {
         ThemeSegmentedControl.apply(to: packControl)
         packControl.setTitleTextAttributes([.foregroundColor: Theme.Color.textOnAccent], for: .selected)
         if showsPersonalTab {
-            packControl.insertSegment(
-                with: UIImage(systemName: "person.crop.square") ?? UIImage(),
-                at: 0, animated: false)
+            // A segment made from an image is announced by the image's own
+            // label — the SF Symbol's name, unless one is set here.
+            let personal = (UIImage(systemName: "person.crop.square") ?? UIImage())
+                .withRenderingMode(.alwaysTemplate)   // a fresh instance, not the system cache's
+            personal.accessibilityLabel = String(localized: "Your stickers")
+            packControl.insertSegment(with: personal, at: 0, animated: false)
         }
         let packOffset = showsPersonalTab ? 1 : 0
         for (index, pack) in packs.enumerated() {
-            let image = UIImage(systemName: pack.symbol)
+            let image = UIImage(systemName: pack.symbol)?.withRenderingMode(.alwaysTemplate)
             if let image {
+                image.accessibilityLabel = pack.name
                 packControl.insertSegment(with: image, at: index + packOffset, animated: false)
             } else {
                 packControl.insertSegment(withTitle: pack.name, at: index + packOffset, animated: false)

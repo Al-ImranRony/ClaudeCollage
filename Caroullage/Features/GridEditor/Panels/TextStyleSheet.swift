@@ -74,7 +74,11 @@ struct TextStyleSheet: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { onDone() }
+                        .accessibilityIdentifier("textStyleDoneButton")
                         .fontWeight(.semibold)
+                        // Text, not a control: the stack's `accent` tint is
+                        // 3.1:1 at this size (see `accentFill`); ink it instead.
+                        .tint(Color.themeAccentStrong)
                 }
             }
             .tint(accent)

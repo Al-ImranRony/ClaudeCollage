@@ -144,6 +144,9 @@ struct PaywallView: View {
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(Color.themeAccentStrong)
                         .frame(width: 20)
+                        // Decorative beside its text; without this VoiceOver
+                        // reads the symbol's name ("4k.tv.fill").
+                        .accessibilityHidden(true)
                     // A `String` in a variable is not a localizable literal, so
                     // the key is made explicit.
                     Text(LocalizedStringKey(text))
@@ -364,18 +367,22 @@ struct PaywallView: View {
 
     private var footer: some View {
         HStack(spacing: Theme.Spacing.md) {
-            Button("Restore Purchase") {
+            // Caption-sized text, so each gets a 44pt tall hit region of its
+            // own; the `contentShape` makes the empty part of it tappable.
+            Button {
                 Task {
                     if await model.restore() {
                         Haptics.success()
                         onUnlocked()
                     }
                 }
+            } label: {
+                Text("Restore Purchase").hitTargetPadded()
             }
             .accessibilityIdentifier("paywallRestoreButton")
 
-            Link("Terms", destination: PaywallView.termsURL)
-            Link("Privacy", destination: PaywallView.privacyURL)
+            Link(destination: PaywallView.termsURL) { Text("Terms").hitTargetPadded() }
+            Link(destination: PaywallView.privacyURL) { Text("Privacy").hitTargetPadded() }
         }
         .font(.themeCaption)
         .foregroundStyle(Color.themeTextSecondary)

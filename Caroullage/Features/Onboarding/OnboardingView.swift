@@ -43,9 +43,11 @@ struct OnboardingView: View {
             }
 
             if model.step.showsSkip {
-                Button("Skip") {
+                Button {
                     Haptics.tap()
                     model.skip()
+                } label: {
+                    Text("Skip").hitTargetPadded()
                 }
                 .font(.themeSubheadline)
                 .foregroundStyle(Color.themeTextSecondary)
@@ -111,6 +113,7 @@ struct OnboardingView: View {
                 Image(systemName: symbol)
                     .font(.system(size: 68, weight: .semibold))
                     .foregroundStyle(Color.themeTextOnAccent)
+                    .accessibilityHidden(true)   // decorative; the title says it
             }
             Text(LocalizedStringKey(title))
                 .font(.themeLargeTitle)
@@ -149,6 +152,7 @@ struct OnboardingView: View {
                                 .font(.system(size: 17, weight: .semibold))
                                 .foregroundStyle(Color.themeAccentStrong)
                                 .frame(width: 28)
+                                .accessibilityHidden(true)
                             Text(kind.title)
                                 .font(.themeHeadline)
                                 .foregroundStyle(Color.themeTextPrimary)

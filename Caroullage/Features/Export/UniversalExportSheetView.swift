@@ -125,7 +125,7 @@ struct UniversalExportSheetView: View {
 
     private var header: some View {
         HStack {
-            Button("Cancel", action: onCancel)
+            Button(action: onCancel) { Text("Cancel").hitTargetPadded() }
                 .accessibilityIdentifier("exportCancelButton")
             Spacer()
             Text("Export").font(.themeHeadline).foregroundStyle(Color.themeTextPrimary)

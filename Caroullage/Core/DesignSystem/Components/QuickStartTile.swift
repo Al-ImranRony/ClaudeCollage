@@ -39,7 +39,9 @@ final class QuickStartTile: UIControl {
         super.init(frame: .zero)
 
         accessibilityIdentifier = identifier
-        accessibilityLabel = title
+        // The subtitle is on screen, so it is spoken: a tile that said only
+        // "Camera" left "Shoot one now, with a filter" visible but silent.
+        accessibilityLabel = subtitle.isEmpty ? title : "\(title). \(subtitle)"
         isAccessibilityElement = true
         accessibilityTraits = .button
 

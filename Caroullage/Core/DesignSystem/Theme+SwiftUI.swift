@@ -102,3 +102,15 @@ public extension LinearGradient {
         )
     }
 }
+
+// MARK: - Hit targets
+
+public extension View {
+    /// Grows a text-only control's label to at least `Theme.Layout.minimumHitTarget`
+    /// on both axes and makes the whole of it tappable. A caption-sized "Skip"
+    /// or "Terms" keeps its size and gains a finger-sized target.
+    func hitTargetPadded() -> some View {
+        frame(minWidth: Theme.Layout.minimumHitTarget, minHeight: Theme.Layout.minimumHitTarget)
+            .contentShape(Rectangle())
+    }
+}

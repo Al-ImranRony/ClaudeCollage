@@ -23,7 +23,9 @@
 import UIKit
 
 @MainActor
-public class GradientLayerButton: UIButton {
+/// A `HitTargetButton`, so a text-only tertiary ("See All") that draws under
+/// 44pt still hits 44 (phase 6.5).
+public class GradientLayerButton: HitTargetButton {
 
     public override class var layerClass: AnyClass { CAGradientLayer.self }
 
