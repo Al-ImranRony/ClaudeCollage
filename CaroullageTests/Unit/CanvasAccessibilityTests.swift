@@ -31,6 +31,12 @@ final class CanvasAccessibilityTextTests: XCTestCase {
         XCTAssertEqual(CanvasAccessibility.stickerLabel(name: "whatever", isPersonal: true), "Personal sticker")
     }
 
+    func testAStickersNameComesFromTheLastPartOfItsCatalogID() {
+        XCTAssertEqual(CanvasAccessibility.stickerName(fromID: "basic.heart"), "Heart")
+        XCTAssertEqual(CanvasAccessibility.stickerName(fromID: "celebration.party_popper"), "Party popper")
+        XCTAssertEqual(CanvasAccessibility.stickerName(fromID: ""), "")
+    }
+
     func testAVideoCellNamesItsPositionAndWhetherItHoldsAClip() {
         XCTAssertEqual(CanvasAccessibility.videoCellLabel(index: 0, count: 2, isFilled: true), "Video cell 1 of 2")
         XCTAssertEqual(CanvasAccessibility.videoCellLabel(index: 1, count: 2, isFilled: false), "Empty video cell 2 of 2")
@@ -162,6 +168,107 @@ final class TextOverlayViewAccessibilityTests: XCTestCase {
             _ = actions[0].actionHandler!(actions[0])   // up
             XCTAssertEqual(changes.last?.frameY ?? 0, 0.38, accuracy: 0.001)
             XCTAssertEqual(commits, 2, "one undo snapshot per nudge")
+        }
+    }
+}
+
+// MARK: - Stickers
+
+@MainActor
+final class StickerOverlayViewAccessibilityTests: XCTestCase {
+
+    private func makeOverlay(sizeNorm: Double = 0.2) -> StickerOverlay {
+        StickerOverlay(stickerID: "basic.heart", symbolName: "heart.fill",
+                       center: CGPoint(x: 0.5, y: 0.5), sizeNorm: sizeNorm, rotation: 0)
+    }
+
+    private func makeView(_ overlay: StickerOverlay) -> (StickerOverlayView, UIView) {
+        let container = UIView(frame: CGRect(x: 0, y: 0, width: 300, height: 300))
+        let view = StickerOverlayView(overlay: overlay)
+        container.addSubview(view)
+        view.apply(overlay: overlay, in: container.bounds.size)
+        return (view, container)
+    }
+
+    func testAStickerNamesItself() {
+        let (view, container) = makeView(makeOverlay())
+        withExtendedLifetime(container) {
+            XCTAssertTrue(view.isAccessibilityElement)
+            XCTAssertEqual(view.accessibilityLabel, "Sticker: Heart")
+            XCTAssertEqual(view.accessibilityHint, "Double-tap to select.")
+            XCTAssertTrue(view.accessibilityTraits.contains(.button))
+        }
+    }
+
+    func testAPersonalStickerSaysSo() {
+        var overlay = makeOverlay()
+        overlay.imageID = UUID()
+        let (view, container) = makeView(overlay)
+        withExtendedLifetime(container) {
+            XCTAssertEqual(view.accessibilityLabel, "Personal sticker")
+        }
+    }
+
+    func testActivatingSelects() {
+        let overlay = makeOverlay()
+        let (view, container) = makeView(overlay)
+        withExtendedLifetime(container) {
+            var selected: UUID?
+            view.onSelected = { selected = $0 }
+            XCTAssertTrue(view.accessibilityActivate())
+            XCTAssertEqual(selected, overlay.id)
+        }
+    }
+
+    func testTheActionSetInOrder() {
+        let (view, container) = makeView(makeOverlay())
+        withExtendedLifetime(container) {
+            XCTAssertEqual(view.accessibilityCustomActions?.map(\.name),
+                           ["Delete", "Larger", "Smaller", "Rotate left", "Rotate right",
+                            "Move up", "Move down", "Move left", "Move right"])
+        }
+    }
+
+    func testDeleteReportsTheStickersID() {
+        let overlay = makeOverlay()
+        let (view, container) = makeView(overlay)
+        withExtendedLifetime(container) {
+            var deleted: UUID?
+            view.onDeleted = { deleted = $0 }
+            let delete = view.accessibilityCustomActions![0]
+            _ = delete.actionHandler!(delete)
+            XCTAssertEqual(deleted, overlay.id)
+        }
+    }
+
+    func testLargerSmallerRotateAndNudgeChangeTheModelAndCommitOnceEach() {
+        let (view, container) = makeView(makeOverlay())
+        withExtendedLifetime(container) {
+            var changes: [StickerOverlay] = []
+            var commits = 0
+            view.onChanged = { changes.append($0) }
+            view.onCommitted = { commits += 1 }
+            let actions = view.accessibilityCustomActions!
+            let run: (Int) -> Void = { i in _ = actions[i].actionHandler!(actions[i]) }
+
+            run(1); XCTAssertEqual(changes.last!.sizeNorm, 0.22, accuracy: 0.001)      // larger ×1.1
+            run(2); XCTAssertEqual(changes.last!.sizeNorm, 0.2, accuracy: 0.001)       // smaller ÷1.1
+            run(4); XCTAssertEqual(changes.last!.rotation, .pi / 12, accuracy: 0.001)  // rotate right +15°
+            run(3); XCTAssertEqual(changes.last!.rotation, 0, accuracy: 0.001)         // rotate left −15°
+            run(8); XCTAssertEqual(changes.last!.centerX, 0.52, accuracy: 0.001)       // move right
+            run(5); XCTAssertEqual(changes.last!.centerY, 0.48, accuracy: 0.001)       // move up
+            XCTAssertEqual(commits, 6)
+        }
+    }
+
+    func testSizeIsClampedToThePinchGesturesRange() {
+        let (view, container) = makeView(makeOverlay(sizeNorm: 1.58))
+        withExtendedLifetime(container) {
+            var last: StickerOverlay?
+            view.onChanged = { last = $0 }
+            let larger = view.accessibilityCustomActions![1]
+            _ = larger.actionHandler!(larger)
+            XCTAssertEqual(last!.sizeNorm, 1.6, accuracy: 0.001, "the pinch's ceiling")
         }
     }
 }

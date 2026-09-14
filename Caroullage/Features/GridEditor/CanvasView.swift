@@ -1054,7 +1054,10 @@ final class StickerOverlayView: UIView {
     private var dragRawCenter: CGPoint = .zero
 
     var isSelected: Bool = false {
-        didSet { selectionLayer.isHidden = !isSelected }
+        didSet {
+            selectionLayer.isHidden = !isSelected
+            refreshAccessibility()
+        }
     }
 
     init(overlay: StickerOverlay) {
@@ -1075,10 +1078,68 @@ final class StickerOverlayView: UIView {
         layer.addSublayer(selectionLayer)
 
         installGestures()
+        refreshAccessibility()
     }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
+
+    // MARK: - Accessibility (phase 6.5)
+
+    /// Every gesture, as an action: pinch (×1.1 / ÷1.1), rotate (±15°), drag
+    /// (2% of the canvas) and the double-tap delete. Each one ends the way the
+    /// gesture ends — geometry applied, `onChanged`, then one `onCommitted`.
+    static let scaleStep: Double = 1.1
+    static let rotationStep: Double = .pi / 12
+    static let nudgeStep: Double = 0.02
+    /// The pinch gesture's clamp, as fractions of the container width.
+    static let sizeRange: ClosedRange<Double> = 0.06...1.6
+
+    private func refreshAccessibility() {
+        isAccessibilityElement = true
+        accessibilityLabel = CanvasAccessibility.stickerLabel(
+            name: CanvasAccessibility.stickerName(fromID: overlay.stickerID),
+            isPersonal: overlay.imageID != nil)
+        accessibilityHint = CanvasAccessibility.stickerHint
+        accessibilityTraits = isSelected ? [.button, .selected] : .button
+        accessibilityCustomActions = [
+            UIAccessibilityCustomAction(name: CanvasAccessibility.deleteAction) { [weak self] _ in
+                guard let self else { return false }
+                self.onDeleted?(self.stickerID)
+                return true
+            },
+            action(CanvasAccessibility.largerAction) {
+                $0.sizeNorm = min(Self.sizeRange.upperBound, $0.sizeNorm * Self.scaleStep)
+            },
+            action(CanvasAccessibility.smallerAction) {
+                $0.sizeNorm = max(Self.sizeRange.lowerBound, $0.sizeNorm / Self.scaleStep)
+            },
+            action(CanvasAccessibility.rotateLeftAction) { $0.rotation -= Self.rotationStep },
+            action(CanvasAccessibility.rotateRightAction) { $0.rotation += Self.rotationStep },
+            action(CanvasAccessibility.moveUpAction) { $0.centerY -= Self.nudgeStep },
+            action(CanvasAccessibility.moveDownAction) { $0.centerY += Self.nudgeStep },
+            action(CanvasAccessibility.moveLeftAction) { $0.centerX -= Self.nudgeStep },
+            action(CanvasAccessibility.moveRightAction) { $0.centerX += Self.nudgeStep },
+        ]
+    }
+
+    private func action(_ name: String,
+                        _ mutate: @escaping (inout StickerOverlay) -> Void) -> UIAccessibilityCustomAction {
+        UIAccessibilityCustomAction(name: name) { [weak self] _ in
+            guard let self else { return false }
+            var updated = self.overlay
+            mutate(&updated)
+            self.apply(overlay: updated, in: self.containerSize, source: self.source)
+            self.onChanged?(updated)
+            self.onCommitted?()
+            return true
+        }
+    }
+
+    override func accessibilityActivate() -> Bool {
+        select()
+        return true
+    }
 
     /// Positions the view from its normalized model at the given container size and
     /// re-renders the symbol crisply at the resolved point side.

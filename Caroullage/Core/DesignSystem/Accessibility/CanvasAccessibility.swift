@@ -52,6 +52,17 @@ public enum CanvasAccessibility {
 
     public static var stickerHint: String { String(localized: "Double-tap to select.") }
 
+    /// A spoken name from a catalog id — "basic.heart" → "Heart",
+    /// "celebration.party_popper" → "Party popper". The catalog's own names
+    /// are exactly this shape, and deriving it keeps the view out of the
+    /// catalog service.
+    public static func stickerName(fromID id: String) -> String {
+        let last = id.split(separator: ".").last.map(String.init) ?? id
+        let spaced = last.replacingOccurrences(of: "_", with: " ").replacingOccurrences(of: "-", with: " ")
+        guard let first = spaced.first else { return spaced }
+        return first.uppercased() + spaced.dropFirst()
+    }
+
     // MARK: Shared actions
 
     public static var deleteAction: String { String(localized: "Delete") }
