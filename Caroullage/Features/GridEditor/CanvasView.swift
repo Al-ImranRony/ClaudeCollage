@@ -223,6 +223,7 @@ final class CanvasView: UIView {
     /// Rebuilds the overlay view pool when the overlay count changes, always
     /// keeping them layered above the photo cells.
     private func rebuildOverlayViewsIfNeeded(count: Int) {
+        defer { refreshAccessibilityElements() }
         guard count != overlayViews.count else {
             overlayViews.forEach { contentContainer.bringSubviewToFront($0) }
             return
@@ -262,6 +263,36 @@ final class CanvasView: UIView {
             view.isSelected = overlay.id == selectedStickerID
             contentContainer.addSubview(view)
             return view
+        }
+        refreshAccessibilityElements()
+    }
+
+    // MARK: - Accessibility (phase 6.5)
+
+    /// Cells in layout order, then text zones, then stickers — the z-order a
+    /// sighted user reads. Recomputed whenever a pool is rebuilt. Setting the
+    /// list on this view is what makes VoiceOver walk the canvas's objects
+    /// rather than its container views.
+    private func refreshAccessibilityElements() {
+        accessibilityElements = (cellViews as [UIView]) + (overlayViews as [UIView]) + (stickerViews as [UIView])
+        accessibilityCustomRotors = [cellsRotor()]
+    }
+
+    /// A rotor that walks the photo cells only, so a VoiceOver user can jump
+    /// cell to cell without passing every caption and sticker in between.
+    private func cellsRotor() -> UIAccessibilityCustomRotor {
+        UIAccessibilityCustomRotor(name: CanvasAccessibility.cellsRotor) { [weak self] predicate in
+            guard let self, !self.cellViews.isEmpty else { return nil }
+            let current = (predicate.currentItem.targetElement as? CellContentView)
+                .flatMap { self.cellViews.firstIndex(of: $0) }
+            let next: Int
+            switch predicate.searchDirection {
+            case .next: next = current.map { $0 + 1 } ?? 0
+            case .previous: next = current.map { $0 - 1 } ?? self.cellViews.count - 1
+            @unknown default: return nil
+            }
+            guard self.cellViews.indices.contains(next) else { return nil }
+            return UIAccessibilityCustomRotorItemResult(targetElement: self.cellViews[next], targetRange: nil)
         }
     }
 
@@ -337,6 +368,10 @@ final class CanvasView: UIView {
         guard index != selectedCellIndex else { return }
         selectedCellIndex = index
         updateCellSelection()
+        // Focus follows a selection made from the rail, so the change is heard.
+        if let index, cellViews.indices.contains(index) {
+            UIAccessibility.post(notification: .layoutChanged, argument: cellViews[index])
+        }
     }
 
     /// Mirrors the selection outline into each cell's `.selected` trait.

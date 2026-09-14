@@ -272,3 +272,84 @@ final class StickerOverlayViewAccessibilityTests: XCTestCase {
         }
     }
 }
+
+// MARK: - The canvas as a container
+
+@MainActor
+final class CanvasViewAccessibilityTests: XCTestCase {
+
+    private func makeCanvas(cells: Int = 2, texts: Int = 1, stickers: Int = 1) -> CanvasView {
+        let canvas = CanvasView(frame: CGRect(x: 0, y: 0, width: 300, height: 300))
+        let text = TextOverlay(text: "Hi", frame: CGRect(x: 0.1, y: 0.1, width: 0.3, height: 0.1))
+        let sticker = StickerOverlay(stickerID: "basic.star", symbolName: "star.fill",
+                                     center: CGPoint(x: 0.7, y: 0.7), sizeNorm: 0.2, rotation: 0)
+        let model = CanvasModel(
+            canvasSize: CGSize(width: 1080, height: 1080),
+            background: .white,
+            cells: (0..<cells).map { i in
+                CanvasCellModel(image: nil,
+                                frame: CGRect(x: CGFloat(i) * 1080 / CGFloat(cells), y: 0,
+                                              width: 1080 / CGFloat(cells), height: 1080),
+                                transform: CellTransform(), cornerRadius: 0)
+            },
+            textOverlays: (0..<texts).map { _ in text },
+            stickerOverlays: (0..<stickers).map { _ in sticker })
+        canvas.configure(with: model)
+        canvas.layoutIfNeeded()
+        return canvas
+    }
+
+    func testElementsAreCellsThenTextThenStickers() {
+        let canvas = makeCanvas()
+        let elements = canvas.accessibilityElements as! [UIView]
+        XCTAssertEqual(elements.count, 4)
+        XCTAssertTrue(elements[0] is CellContentView)
+        XCTAssertTrue(elements[1] is CellContentView)
+        XCTAssertTrue(elements[2] is TextOverlayView)
+        XCTAssertTrue(elements[3] is StickerOverlayView)
+        XCTAssertEqual(elements[1].accessibilityLabel, "Empty cell 2 of 2")
+    }
+
+    func testTheCellsRotorWalksTheCellsInOrderAndStopsAtTheEnds() {
+        let canvas = makeCanvas(cells: 3)
+        let rotor = canvas.accessibilityCustomRotors!.first { $0.name == "Cells" }!
+        let cells = canvas.accessibilityElements!.prefix(3).map { $0 as! CellContentView }
+
+        let predicate = UIAccessibilityCustomRotorSearchPredicate()
+        predicate.searchDirection = .next
+        predicate.currentItem = UIAccessibilityCustomRotorItemResult(targetElement: cells[0], targetRange: nil)
+        XCTAssertTrue((rotor.itemSearchBlock(predicate)?.targetElement as? CellContentView) === cells[1])
+
+        predicate.currentItem = UIAccessibilityCustomRotorItemResult(targetElement: cells[2], targetRange: nil)
+        XCTAssertNil(rotor.itemSearchBlock(predicate), "past the last cell")
+
+        predicate.searchDirection = .previous
+        predicate.currentItem = UIAccessibilityCustomRotorItemResult(targetElement: cells[1], targetRange: nil)
+        XCTAssertTrue((rotor.itemSearchBlock(predicate)?.targetElement as? CellContentView) === cells[0])
+    }
+
+    func testActivatingACellReportsItsIndex() {
+        let canvas = makeCanvas(cells: 3)
+        var activated: Int?
+        canvas.onCellActivated = { activated = $0 }
+        let second = canvas.accessibilityElements![1] as! CellContentView
+        _ = second.accessibilityActivate()
+        XCTAssertEqual(activated, 1)
+    }
+
+    func testSelectingACellMarksOnlyThatCellSelected() {
+        let canvas = makeCanvas(cells: 3)
+        canvas.setSelectedCell(2)
+        let cells = canvas.accessibilityElements!.prefix(3).map { $0 as! CellContentView }
+        XCTAssertEqual(cells.map { $0.accessibilityTraits.contains(.selected) }, [false, false, true])
+        canvas.setSelectedCell(nil)
+        XCTAssertFalse(cells[2].accessibilityTraits.contains(.selected))
+    }
+
+    func testTheElementListFollowsAStickerRebuild() {
+        let canvas = makeCanvas(cells: 1, texts: 0, stickers: 1)
+        XCTAssertEqual(canvas.accessibilityElements?.count, 2)
+        canvas.updateStickerOverlays([])
+        XCTAssertEqual(canvas.accessibilityElements?.count, 1, "a deleted sticker leaves the list")
+    }
+}
