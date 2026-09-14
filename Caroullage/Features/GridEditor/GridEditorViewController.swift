@@ -576,6 +576,10 @@ final class GridEditorViewController: UIViewController {
 
         // Stickers manage their own geometry on the GPU during a gesture; the view
         // model records it (no snapshot) and commits one on gesture end.
+        // A cell reached by voice or switch does what a tapped cell does.
+        canvasView.onCellActivated = { [weak self] index in self?.activateCell(index) }
+        canvasView.onCellSwapRequested = { [weak self] index in self?.beginSwap(from: index) }
+
         canvasView.onStickerChanged = { [weak self] overlay in
             self?.viewModel.previewStickerOverlay(overlay)
         }
@@ -584,7 +588,7 @@ final class GridEditorViewController: UIViewController {
         }
         canvasView.onStickerDeleted = { [weak self] id in
             self?.viewModel.removeSticker(id: id)
-            self?.showToast("Sticker removed")
+            self?.showToast(String(localized: "Sticker removed"))
         }
 
         // Text zones drag themselves on the GPU during a gesture (like stickers); the
@@ -763,13 +767,20 @@ final class GridEditorViewController: UIViewController {
         // Text zones own their own tap (→ styling sheet) and drag now, so a tap that
         // lands on one is handled by the overlay view, not here.
         guard let index = cellIndex(at: point) else { return }
+        activateCell(index)
+    }
 
+    /// What a tap on cell `index` means — and what VoiceOver's double-tap and
+    /// Switch Control's select mean, which is why it is not inside the gesture
+    /// handler: completes a pending swap, else selects a filled cell, else
+    /// opens the picker for an empty one.
+    private func activateCell(_ index: Int) {
         if let source = pendingSwapSource {
             pendingSwapSource = nil
             canvasView.setSelectedCell(nil)
             if source != index {
                 viewModel.swapCells(source, index)
-                showToast("Cells swapped")
+                showToast(String(localized: "Cells swapped"))
             }
             return
         }
@@ -789,14 +800,19 @@ final class GridEditorViewController: UIViewController {
 
     @objc private func canvasLongPressed(_ gesture: UILongPressGestureRecognizer) {
         guard gesture.state == .began else { return }
-        let point = gesture.location(in: canvasView)
-        guard let index = cellIndex(at: point),
-              viewModel.state.cells.indices.contains(index),
+        guard let index = cellIndex(at: gesture.location(in: canvasView)) else { return }
+        beginSwap(from: index)
+    }
+
+    /// Arms a swap from a filled cell: the next cell activated completes it.
+    /// Reached by long-press and by the cell's "Swap with another cell" action.
+    private func beginSwap(from index: Int) {
+        guard viewModel.state.cells.indices.contains(index),
               viewModel.state.cells[index].imageID != nil else { return }
         pendingSwapSource = index
         canvasView.setSelectedCell(index)
         Haptics.impact()
-        showToast("Tap another cell to swap")
+        showToast(String(localized: "Tap another cell to swap"))
     }
 
     private func presentFilterPanel(for index: Int) {
