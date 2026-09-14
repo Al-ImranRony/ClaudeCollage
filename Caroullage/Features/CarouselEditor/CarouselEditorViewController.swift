@@ -253,7 +253,29 @@ final class CarouselEditorViewController: UIViewController {
         // cells one at a time with no sense of how many are left.
         collectionView.accessibilityLabel = String(localized: "Carousel frames")
         collectionView.accessibilityValue = "\(viewModel.frameCount)"
+        collectionView.accessibilityCustomRotors = [framesRotor()]
         updateUndoRedoState()
+    }
+
+    /// A Frames rotor: frame to frame without passing the navigator's other
+    /// chrome. Walks the visible cells in index order (phase 6.5).
+    private func framesRotor() -> UIAccessibilityCustomRotor {
+        UIAccessibilityCustomRotor(name: CanvasAccessibility.framesRotor) { [weak collectionView] predicate in
+            guard let collectionView else { return nil }
+            let cells = collectionView.indexPathsForVisibleItems.sorted()
+                .compactMap { collectionView.cellForItem(at: $0) }
+            guard !cells.isEmpty else { return nil }
+            let current = (predicate.currentItem.targetElement as? UICollectionViewCell)
+                .flatMap { cells.firstIndex(of: $0) }
+            let next: Int
+            switch predicate.searchDirection {
+            case .next: next = current.map { $0 + 1 } ?? 0
+            case .previous: next = current.map { $0 - 1 } ?? cells.count - 1
+            @unknown default: return nil
+            }
+            guard cells.indices.contains(next) else { return nil }
+            return UIAccessibilityCustomRotorItemResult(targetElement: cells[next], targetRange: nil)
+        }
     }
 
     private func updateUndoRedoState() {
