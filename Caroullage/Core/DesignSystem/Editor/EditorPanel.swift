@@ -235,7 +235,10 @@ public final class EditorPanel: UIView {
 /// editor draws in its sheet header. A configured button so the circle is the
 /// button's own background (never `layer.cornerRadius` on a configured button).
 @MainActor
-private final class CloseChip: UIButton {
+/// Draws 28pt; hits 44 — see `HitTargetButton`. The chip sits `Spacing.sm`
+/// below the panel's top and `Spacing.md` from its trailing edge, which is
+/// exactly the room the grown region needs.
+private final class CloseChip: HitTargetButton {
 
     init() {
         super.init(frame: .zero)

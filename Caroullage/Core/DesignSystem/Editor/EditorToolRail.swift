@@ -288,7 +288,9 @@ public final class EditorToolRail: UIView {
 // MARK: - Tool button
 
 @MainActor
-final class ToolButton: UIControl {
+/// A `HitTargetControl`: the button draws 37pt tall inside the 52pt rail, and
+/// hits 44 (phase 6.5).
+final class ToolButton: HitTargetControl {
 
     /// How far the icon overshoots when a tool becomes the active one.
     ///
@@ -495,7 +497,9 @@ final class ToolButton: UIControl {
 // MARK: - Context chip
 
 @MainActor
-private final class ContextChip: UIControl {
+/// A `HitTargetControl` for the same reason as `ToolButton` — the chip is 25pt
+/// tall in a 52pt rail.
+private final class ContextChip: HitTargetControl {
 
     init(title: String, systemImage: String) {
         super.init(frame: .zero)

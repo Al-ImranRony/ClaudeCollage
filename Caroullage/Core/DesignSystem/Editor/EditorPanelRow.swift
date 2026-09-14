@@ -23,9 +23,9 @@ public enum EditorPanelRow {
     /// very different widths and the sliders under them must still line up.
     private static let titleWidth: CGFloat = 64
 
-    /// A minimum row height so a slider's thumb and a switch have room to be hit,
-    /// and so rows stack on a consistent rhythm however tall their control is.
-    private static let minimumHeight: CGFloat = 36
+    /// A minimum row height so the control on the row is a full hit target, and
+    /// so rows stack on a consistent rhythm however tall their control is.
+    private static let minimumHeight: CGFloat = Theme.Layout.minimumHitTarget
 
     /// One row: icon · title · control. The control takes whatever width is left.
     public static func make(title: String, systemImage: String, trailing: UIView) -> UIStackView {

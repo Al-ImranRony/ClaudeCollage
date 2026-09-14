@@ -4,7 +4,7 @@
 //
 //  Task 5 — the video editor's collapsible timeline. Two states, remembered per
 //  project by whoever owns this view (this file has no notion of "the project"):
-//  a 56pt collapsed strip that summarises the whole composition, and a 190pt
+//  a 76pt collapsed strip that summarises the whole composition, and a 210pt
 //  expanded view with one lane per cell, a text-pill lane and a music lane, all
 //  sharing one playhead.
 //
@@ -188,12 +188,15 @@ public final class VideoTimeline: UIView {
     public var onTrim: ((_ clipIndex: Int, _ start: Double, _ end: Double, _ phase: EditPhase) -> Void)?
     public var onRetimeText: ((_ id: UUID, _ start: Double, _ end: Double, _ phase: EditPhase) -> Void)?
 
-    public static let collapsedHeight: CGFloat = 56
-    public static let expandedHeight: CGFloat = 190
+    public static let collapsedHeight: CGFloat = 76
+    public static let expandedHeight: CGFloat = 210
 
-    private static let headerHeight: CGFloat = 24
-    private static let chevronWidth: CGFloat = 32
-    private static let playbackButtonWidth: CGFloat = 32
+    /// A full 44pt bar, not the 24pt strip it was: the play and chevron controls
+    /// are pinned to its height, and 24 is not a hit target (phase 6.5). Both
+    /// heights above grew by the same 20pt.
+    private static let headerHeight: CGFloat = Theme.Layout.minimumHitTarget
+    private static let chevronWidth: CGFloat = Theme.Layout.minimumHitTarget
+    private static let playbackButtonWidth: CGFloat = Theme.Layout.minimumHitTarget
     /// Touch slop for grabbing a clip/pill's edge to trim/retime rather than
     /// its middle to select. `Theme.Spacing.sm` rather than a bespoke literal.
     /// This is a ceiling, not a fixed value — `edgeTolerance(for:)` scales it

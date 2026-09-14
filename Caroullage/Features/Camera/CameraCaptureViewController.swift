@@ -101,7 +101,7 @@ final class CameraCaptureViewController: UIViewController {
                         UIImage.SymbolConfiguration(pointSize: 15, weight: .bold)), for: .normal)
         close.tintColor = .white
         close.backgroundColor = UIColor.black.withAlphaComponent(0.35)
-        close.layer.cornerRadius = 20
+        close.layer.cornerRadius = Theme.Layout.minimumHitTarget / 2
         close.accessibilityIdentifier = "cameraCloseButton"
         close.accessibilityLabel = String(localized: "Close")
         close.addAction(UIAction { [weak self] _ in
@@ -124,8 +124,8 @@ final class CameraCaptureViewController: UIViewController {
         NSLayoutConstraint.activate([
             close.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 8),
             close.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Theme.Spacing.md),
-            close.widthAnchor.constraint(equalToConstant: 40),
-            close.heightAnchor.constraint(equalToConstant: 40),
+            close.widthAnchor.constraint(equalToConstant: Theme.Layout.minimumHitTarget),
+            close.heightAnchor.constraint(equalToConstant: Theme.Layout.minimumHitTarget),
 
             shutter.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             shutter.bottomAnchor.constraint(

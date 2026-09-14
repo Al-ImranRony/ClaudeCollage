@@ -18,7 +18,9 @@
 
 import UIKit
 
-final class FilterMenuChip: UIButton {
+/// A `HitTargetButton`: the capsule is ~34pt tall and sits in a 44pt header
+/// row, so the grown hit region has the room it needs (phase 6.5).
+final class FilterMenuChip: HitTargetButton {
 
     /// - Parameters:
     ///   - symbolName: leading glyph, or `nil` for a title-only chip.
