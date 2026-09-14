@@ -34,8 +34,10 @@ final class VideoEditorUITests: XCTestCase {
         XCTAssertTrue(app.otherElements["videoCanvas"].waitForExistence(timeout: 5),
                       "The AVPlayerLayer canvas is shown")
         // The default layout is a 2-up vertical stack → two tappable slots.
-        XCTAssertTrue(app.otherElements["videoCell-0"].exists, "Slot 0 is present")
-        XCTAssertTrue(app.otherElements["videoCell-1"].exists, "Slot 1 is present")
+        // Slots are buttons since phase 6.5 — VoiceOver names and presses them —
+        // so they are queried as what they are, not as bare containers.
+        XCTAssertTrue(app.buttons["videoCell-0"].exists, "Slot 0 is present")
+        XCTAssertTrue(app.buttons["videoCell-1"].exists, "Slot 1 is present")
         // Export must be reachable at any point during editing (Step 04 done-criteria).
         XCTAssertTrue(app.buttons["videoExportButton"].exists, "Export is always visible")
         XCTAssertTrue(app.buttons["videoLayoutButton"].exists, "Layout control is present")
@@ -52,7 +54,7 @@ final class VideoEditorUITests: XCTestCase {
         let fourUp = app.buttons["4 · Grid"]
         XCTAssertTrue(fourUp.waitForExistence(timeout: 5))
         fourUp.tap()
-        XCTAssertTrue(app.otherElements["videoCell-3"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["videoCell-3"].waitForExistence(timeout: 5))
 
         // Back out of the editor, then over to the Projects tab: the saved gallery
         // lives there since Home became a discovery screen (Step 04.5 batch C).
@@ -66,7 +68,7 @@ final class VideoEditorUITests: XCTestCase {
 
         XCTAssertTrue(app.navigationBars["Video Collage"].waitForExistence(timeout: 8),
                       "Reopening resumes the video editor")
-        XCTAssertTrue(app.otherElements["videoCell-3"].waitForExistence(timeout: 5),
+        XCTAssertTrue(app.buttons["videoCell-3"].waitForExistence(timeout: 5),
                       "The 4-up layout resumed intact")
     }
 
@@ -164,15 +166,15 @@ final class VideoEditorUITests: XCTestCase {
     func testChangingLayoutChangesSlotCount() {
         let app = XCUIApplication.underTest()
         openVideoEditor(app)
-        XCTAssertTrue(app.otherElements["videoCell-1"].waitForExistence(timeout: 5))
-        XCTAssertFalse(app.otherElements["videoCell-3"].exists, "2-up starts with two slots")
+        XCTAssertTrue(app.buttons["videoCell-1"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["videoCell-3"].exists, "2-up starts with two slots")
 
         app.buttons["videoLayoutButton"].tap()
         let fourUp = app.buttons["4 · Grid"]
         XCTAssertTrue(fourUp.waitForExistence(timeout: 5), "Layout sheet lists the grids")
         fourUp.tap()
 
-        XCTAssertTrue(app.otherElements["videoCell-3"].waitForExistence(timeout: 5),
+        XCTAssertTrue(app.buttons["videoCell-3"].waitForExistence(timeout: 5),
                       "Switching to the 4-up grid adds slots")
     }
 }

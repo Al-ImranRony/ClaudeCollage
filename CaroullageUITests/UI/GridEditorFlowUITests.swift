@@ -55,6 +55,28 @@ final class GridEditorFlowUITests: XCTestCase {
         )
     }
 
+    /// Phase 6.5 — XCUITest reads the accessibility tree, so this is VoiceOver's
+    /// view of the canvas: an empty cell is a button that says so, and pressing
+    /// it opens the picker — with no coordinates involved.
+    @MainActor
+    func testAnEmptyCellIsAButtonVoiceOverCanPress() throws {
+        let app = XCUIApplication.underTest()
+        app.launchArguments += ["-UITestMode", "1"]
+        app.launch()
+        app.buttons["newProjectButton"].tap()
+        XCTAssertTrue(app.navigationBars["Grid Collage"].waitForExistence(timeout: 8))
+
+        let firstCell = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Empty cell 1 of'")).firstMatch
+        XCTAssertTrue(firstCell.waitForExistence(timeout: 5), "the first cell is an element with a spoken position")
+        XCTAssertTrue(firstCell.isHittable, "the cell has a real frame on screen")
+        firstCell.tap()
+
+        // PHPicker is out of process; its Cancel is what the press must produce.
+        let cancel = app.buttons["Cancel"].firstMatch
+        XCTAssertTrue(cancel.waitForExistence(timeout: 8), "pressing an empty cell opens the photo picker")
+        cancel.tap()
+    }
+
     /// Step 02 — switches the editor to Shapes mode and applies a polygon layout,
     /// capturing a screenshot of the masked canvas.
     @MainActor
