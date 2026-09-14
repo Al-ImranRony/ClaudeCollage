@@ -99,3 +99,69 @@ final class CellContentViewAccessibilityTests: XCTestCase {
         XCTAssertEqual(swaps, 1)
     }
 }
+
+// MARK: - Text zones
+
+@MainActor
+final class TextOverlayViewAccessibilityTests: XCTestCase {
+
+    private func makeOverlay(text: String = "Hello", x: Double = 0.4, y: Double = 0.4) -> TextOverlay {
+        TextOverlay(text: text, frame: CGRect(x: x, y: y, width: 0.2, height: 0.1))
+    }
+
+    private func makeView(_ overlay: TextOverlay) -> (TextOverlayView, UIView) {
+        let container = UIView(frame: CGRect(x: 0, y: 0, width: 300, height: 300))
+        let view = TextOverlayView()
+        container.addSubview(view)
+        view.frame = TextRendering.frame(for: overlay, in: container.bounds.size)
+        view.configure(with: overlay, fontScale: 1)
+        return (view, container)
+    }
+
+    func testATextZoneQuotesItsText() {
+        let (view, _) = makeView(makeOverlay(text: "Summer"))
+        XCTAssertTrue(view.isAccessibilityElement)
+        XCTAssertEqual(view.accessibilityLabel, "Text: “Summer”")
+        XCTAssertEqual(view.accessibilityHint, "Double-tap to edit the text.")
+        XCTAssertTrue(view.accessibilityTraits.contains(.button))
+    }
+
+    func testSelectionShowsInTheTraits() {
+        let (view, _) = makeView(makeOverlay())
+        view.isSelected = true
+        XCTAssertTrue(view.accessibilityTraits.contains(.selected))
+        view.isSelected = false
+        XCTAssertFalse(view.accessibilityTraits.contains(.selected))
+    }
+
+    func testActivatingReportsATap() {
+        let overlay = makeOverlay()
+        let (view, _) = makeView(overlay)
+        var tapped: UUID?
+        view.onTapped = { tapped = $0 }
+        XCTAssertTrue(view.accessibilityActivate())
+        XCTAssertEqual(tapped, overlay.id)
+    }
+
+    func testTheFourNudgeActionsMoveByTwoPercentAndCommitOnce() {
+        // A subview does not retain its superview; the nudge needs the
+        // container's size, so the container must outlive the actions.
+        let (view, container) = makeView(makeOverlay(x: 0.4, y: 0.4))
+        withExtendedLifetime(container) {
+            var changes: [TextOverlay] = []
+            var commits = 0
+            view.onChanged = { changes.append($0) }
+            view.onCommitted = { commits += 1 }
+
+            let actions = view.accessibilityCustomActions!
+            XCTAssertEqual(actions.map(\.name), ["Move up", "Move down", "Move left", "Move right"])
+
+            _ = actions[3].actionHandler!(actions[3])   // right
+            XCTAssertEqual(changes.last?.frameX ?? 0, 0.42, accuracy: 0.001)
+            XCTAssertEqual(changes.last?.frameY ?? 0, 0.40, accuracy: 0.001)
+            _ = actions[0].actionHandler!(actions[0])   // up
+            XCTAssertEqual(changes.last?.frameY ?? 0, 0.38, accuracy: 0.001)
+            XCTAssertEqual(commits, 2, "one undo snapshot per nudge")
+        }
+    }
+}

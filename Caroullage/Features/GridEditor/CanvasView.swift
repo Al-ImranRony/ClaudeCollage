@@ -832,7 +832,10 @@ final class TextOverlayView: UIView {
     /// canvas the same way a selected cell or sticker does, rather than relying
     /// on the rail chip as the only feedback.
     var isSelected: Bool = false {
-        didSet { updateSelectionLayerVisibility() }
+        didSet {
+            updateSelectionLayerVisibility()
+            refreshAccessibility()
+        }
     }
 
     /// Live drag also shows the selection outline (as it always has); the two
@@ -877,6 +880,48 @@ final class TextOverlayView: UIView {
         self.fontScale = fontScale
         label.attributedText = TextRendering.attributedString(for: overlay, fontScale: fontScale)
         refreshBackground()
+        refreshAccessibility()
+    }
+
+    // MARK: - Accessibility (phase 6.5)
+
+    /// A nudge moves the zone by this fraction of the canvas — a keyboard-arrow
+    /// step: fine enough to place, coarse enough that placing is not tedious.
+    static let nudgeStep: CGFloat = 0.02
+
+    private func refreshAccessibility() {
+        isAccessibilityElement = true
+        accessibilityLabel = CanvasAccessibility.textLabel(overlay?.text ?? "")
+        accessibilityHint = CanvasAccessibility.textHint
+        accessibilityTraits = isSelected ? [.button, .selected] : .button
+        let moves: [(String, CGVector)] = [
+            (CanvasAccessibility.moveUpAction, CGVector(dx: 0, dy: -1)),
+            (CanvasAccessibility.moveDownAction, CGVector(dx: 0, dy: 1)),
+            (CanvasAccessibility.moveLeftAction, CGVector(dx: -1, dy: 0)),
+            (CanvasAccessibility.moveRightAction, CGVector(dx: 1, dy: 0)),
+        ]
+        accessibilityCustomActions = moves.map { name, direction in
+            UIAccessibilityCustomAction(name: name) { [weak self] _ in
+                self?.nudge(direction)
+                return true
+            }
+        }
+    }
+
+    /// The drag gesture's end state without the drag: move the view, report the
+    /// new frame through `onChanged`, then commit one undo snapshot.
+    private func nudge(_ direction: CGVector) {
+        guard let container = superview else { return }
+        let size = container.bounds.size
+        center.x += direction.dx * Self.nudgeStep * size.width
+        center.y += direction.dy * Self.nudgeStep * size.height
+        emitChange(in: size)
+        onCommitted?()
+    }
+
+    override func accessibilityActivate() -> Bool {
+        handleTap()
+        return true
     }
 
     override func layoutSubviews() {
