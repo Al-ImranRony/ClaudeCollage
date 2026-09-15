@@ -43,8 +43,9 @@ final class AppStoreScreenshotUITests: XCTestCase {
     @MainActor
     func testCaptureEveryStoreScene() throws {
         let app = launch()
-        let tabBar = app.tabBars["mainTabBar"]
-        XCTAssertTrue(tabBar.waitForExistence(timeout: 10))
+        // Tab buttons are looked up app-wide: on iPadOS the tab controller
+        // renders as the top tab bar, which is not an XCUI `TabBar`.
+        XCTAssertTrue(app.buttons["startEditingButton"].waitForExistence(timeout: 10))
 
         // 1 — Carousel: the editor with its filled frames, then the preview.
         app.openCarouselTypePicker()
@@ -64,12 +65,13 @@ final class AppStoreScreenshotUITests: XCTestCase {
         app.navigationBars.buttons.firstMatch.tap()
 
         // 3 — The template gallery.
-        XCTAssertTrue(tabBar.buttons["templatesButton"].waitForExistence(timeout: 8))
-        tabBar.buttons["templatesButton"].tap()
+        // `firstMatch`: iPadOS lists a tab in both its top bar and its sidebar.
+        XCTAssertTrue(app.buttons["templatesButton"].firstMatch.waitForExistence(timeout: 8))
+        app.buttons["templatesButton"].firstMatch.tap()
         XCTAssertTrue(app.collectionViews["templateGalleryGrid"].waitForExistence(timeout: 10))
         sleep(1)
         capture(3, "templates", of: app)
-        tabBar.buttons["homeTab"].tap()
+        app.buttons["homeTab"].firstMatch.tap()
 
         // 4 — Video collage: the editor with its clips.
         XCTAssertTrue(app.buttons["videoCollageButton"].waitForExistence(timeout: 8))
