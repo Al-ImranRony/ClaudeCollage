@@ -341,7 +341,7 @@ The first cut recomposited the whole canvas on the CPU per gesture frame and hel
 
 | Step | File | Description | Est. Weeks | Status |
 |------|------|-------------|-----------|--------|
-| **06** | `Step_06_Deployment.md` | Monetization, paywall, onboarding, localization, accessibility, compliance, App Store assets, Featuring, submission, post-launch | 36–42 | 🟡 **In progress** — 6.1 StoreKit 2 ✅ · 6.2 paywall ✅ (+6.2b credits & special offer) · 6.3 onboarding ✅ · 6.4 localization ✅ · **6.5 accessibility ✅ (2026-09-15 → 09-16)** · 6.6+ pending. What needs the developer account is in `docs/step-06-account-gated.md`; the 6.5 record is below |
+| **06** | `Step_06_Deployment.md` | Monetization, paywall, onboarding, localization, accessibility, compliance, App Store assets, Featuring, submission, post-launch | 36–42 | 🟡 **In progress** — 6.1 StoreKit 2 ✅ · 6.2 paywall ✅ (+6.2b credits & special offer) · 6.3 onboarding ✅ · 6.4 localization ✅ · **6.5 accessibility ✅ (2026-09-15 → 09-16)** · **6.6 compliance ✅ repo side (2026-09-16)** · 6.7+ pending. What needs the developer account is in `docs/step-06-account-gated.md`; the 6.5 record is below |
 | **07** | `docs/superpowers/specs/2026-08-29-home-showcase-redesign-design.md` | Home showcase redesign (unplanned interstitial) — photo-real hero + three pillar strips (Photo Collage, Video Collage, Carousel) | — | 🟢 Core complete — bundled licensed sample photography + manifest/catalog, showcase previews rendered through the export renderer, auto-cycling hero, looping video cards, quick-start compressed to chips. See Step 07 notes below |
 
 **End of Part 2:** App is live on the App Store in 11 languages, monitored for 30 days, ready for v1.1 planning.
@@ -382,6 +382,17 @@ remaining exception carries its evidence in the test file.
 
 **Deferred (spec §10):** rotors for text zones and stickers; Button Shapes on custom chips;
 on-device VoiceOver and Switch Control passes (the owner's, like every hardware QA here).
+
+### Step 06 — phase 6.6 App Store compliance (2026-09-16)
+The repo side, in one commit: `PrivacyInfo.xcprivacy` (no tracking, no collected data, `UserDefaults`
+CA92.1 — the only Required Reason API in the code; `PrivacyManifestTests` reads the built bundle and
+scans the source so the two cannot drift); `ITSAppUsesNonExemptEncryption = false`; the three
+permission strings the app needs, localized in `InfoPlist.xcstrings` (the microphone string was
+removed — nothing records audio; `NSPhotoLibraryUsageDescription` stays because `RecentPhotoProvider`
+reads the library, contrary to the brief's picker-only assumption); `Licenses/README.md`;
+`Tools/audit_binary.sh` (otool: no private, ad or tracking framework). No third-party SDKs exist, so
+the brief's Crashlytics/TelemetryDeck rows are moot. The App Store Connect side — age rating
+questionnaire, DSA trader status — is in `docs/step-06-account-gated.md`.
 
 ### Step 07 — Home showcase redesign (2026-08-29)
 An unplanned interstitial, taken on after Step 06's shell work: Home was well organised but

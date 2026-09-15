@@ -170,11 +170,27 @@ Nothing in this phase needs the account. The audit runs as tests
 `docs/step-06-accessibility-signoff.md`, and the on-device VoiceOver /
 Switch Control passes need only a free-account install.
 
+## Phase 6.6 — App Store compliance
+
+The repo side is done (2026-09-16): `Caroullage/App/PrivacyInfo.xcprivacy`
+(no tracking, no collected data, `UserDefaults` → CA92.1 — the only Required
+Reason API the code uses, and `PrivacyManifestTests` fails if the code and
+the manifest ever disagree); `ITSAppUsesNonExemptEncryption = false` in the
+plist; the three permission strings the app actually needs, localized in
+`Caroullage/Resources/InfoPlist.xcstrings` (the microphone string was removed —
+nothing records audio); `Licenses/README.md`; `Tools/audit_binary.sh` (otool:
+no private, ad or tracking framework — run on the archive before submission).
+
+| Blocked | Stand-in until then |
+|---|---|
+| **Age Rating questionnaire** (the 2026 form, mandatory since 2026-01-31) | Target 4+: no user-generated content is shared, no objectionable content, the sample photography is model-released stock. Answer it in App Store Connect → App Information the day the record exists. |
+| **DSA trader status** (EU, required since 2025-02-17) | Selling subscriptions is commercial activity: declare as a trader in App Store Connect → Business, with the address and contact that will be shown on the EU storefront. |
+| **Export compliance** | Already answered per build by `ITSAppUsesNonExemptEncryption = false`; nothing to do in Connect. |
+| **Account deletion** (guideline 5.1.1) | Not applicable: there is no sign-in. If one is ever added, in-app deletion within one tap is a launch requirement, not a follow-up. |
+| **Third-party SDK manifests** | Not applicable: `project.yml` declares no packages. The checklist's Firebase Crashlytics / TelemetryDeck rows describe SDKs this app does not carry; adding either one later means auditing its manifest and signature. |
+
 ## Later phases (recorded now, not yet started)
 
-- **6.6** — the App Store Connect side: age-rating questionnaire, DSA trader
-  status, encryption export compliance. The repo-side work (privacy manifest,
-  permission strings, licence docs) is not blocked.
 - **6.11–6.15** — metadata and ASO, Featuring nomination, pre-orders, TestFlight
   cohorts, Apple Search Ads, submission, and post-launch monitoring are entirely
   App Store Connect work.

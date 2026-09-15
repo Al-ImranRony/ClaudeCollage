@@ -207,41 +207,38 @@ Pass Apple's accessibility quality bar — this is checked for Featuring nominat
 ### Privacy Manifest (`PrivacyInfo.xcprivacy`)
 Required since May 2024; enforced for all 2026 submissions.
 
-- [ ] Add `PrivacyInfo.xcprivacy` to main app bundle
-- [ ] Declare collected data types: `NSPrivacyCollectedDataTypes`
-  - None if no analytics PII; otherwise declare analytics events
-- [ ] Declare Required Reason API usage:
+- [x] Add `PrivacyInfo.xcprivacy` to main app bundle — `Caroullage/App/PrivacyInfo.xcprivacy`, verified in the built bundle by `PrivacyManifestTests`
+- [x] Declare collected data types: `NSPrivacyCollectedDataTypes` — none (no analytics, no account)
+- [x] Declare Required Reason API usage — `UserDefaults` → **CA92.1** only. The code uses no file-timestamp, disk-space or boot-time API (`PrivacyManifestTests` scans the source and fails if a family is used but undeclared, or declared but unused); the `fileTimestamp`/`diskSpace` rows below were the brief's assumptions, not the code's
   - `UserDefaults` → **CA92.1** (this app's own settings)
-  - `fileTimestamp` → **C617.1** (PhotoKit file timestamps)
-  - `diskSpace` → **E174.1** (checking space before video export)
-  - `systemBootTime` → only if you log uptime metrics
-- [ ] Confirm all third-party SDKs ship their own privacy manifests + signatures:
-  - Firebase Crashlytics ✓
-  - TelemetryDeck ✓
-  - Any others added → audit
+  - ~~`fileTimestamp` → **C617.1**~~ not used
+  - ~~`diskSpace` → **E174.1**~~ not used
+  - ~~`systemBootTime`~~ not used
+- [x] Confirm all third-party SDKs ship their own privacy manifests + signatures — **there are none** (`project.yml` declares no packages; Firebase Crashlytics and TelemetryDeck are not in this app)
 
 ### Age Rating (New 2026 System)
-- [ ] Complete the **new App Store Connect Age Rating questionnaire** (mandatory for all updates since Jan 31, 2026)
-- [ ] Target: 4+ (no UGC moderation needed; no objectionable content)
+- [ ] Complete the **new App Store Connect Age Rating questionnaire** (mandatory for all updates since Jan 31, 2026) — account-gated, see `docs/step-06-account-gated.md`
+- [x] Target: 4+ (no UGC moderation needed; no objectionable content) — decided; the sample photography is model-released stock
 
 ### DSA Trader Status (EU)
-- [ ] Declare trader status in App Store Connect → Business Information (required since Feb 17, 2025)
-- [ ] Solo developers: declare as trader if commercial activity (selling subscriptions counts)
+- [ ] Declare trader status in App Store Connect → Business Information (required since Feb 17, 2025) — account-gated
+- [x] Solo developers: declare as trader if commercial activity (selling subscriptions counts) — decided: trader
 
 ### Account Deletion (Guideline 5.1.1)
-- [ ] **Skip if no sign-in offered.** Caroullage doesn't require an account — all data is local + iCloud (user owns).
-- [ ] If sign-in is later added: provide in-app account deletion within 1 tap
+- [x] **Skip if no sign-in offered.** Caroullage doesn't require an account — all data is local + iCloud (user owns).
+- [ ] If sign-in is later added: provide in-app account deletion within 1 tap — recorded in the account-gated doc as a launch requirement, not a follow-up
 
 ### Permission Strings (`Info.plist`)
-- [ ] `NSPhotoLibraryAddUsageDescription` — "Save your collages directly to your photo library."
-- [ ] `NSMicrophoneUsageDescription` — only if recording is supported (skip otherwise)
-- [ ] No `NSPhotoLibraryUsageDescription` needed (we use `PhotosPicker`, not full library access)
+- [x] `NSPhotoLibraryAddUsageDescription` — "Caroullage saves your finished collages to your photo library." — localized in `InfoPlist.xcstrings` (11 languages)
+- [x] `NSMicrophoneUsageDescription` — only if recording is supported (skip otherwise) — **removed**: the camera door shoots stills; nothing captures audio
+- [x] `NSPhotoLibraryUsageDescription` **is** needed: `RecentPhotoProvider` reads the library (the "recent photos" intent and onboarding's photo priming), so the brief's picker-only assumption does not hold. Present and localized.
+- [x] `NSCameraUsageDescription` — present and localized
 
 ### Misc Compliance
-- [ ] No private API usage — verify via `otool -L $(find . -name *.app)` on the archive
-- [ ] IDFA / AdSupport framework NOT linked (no ad SDK)
-- [ ] Encryption export compliance: check **"Uses standard encryption only"** in App Store Connect
-- [ ] Content rights: confirm all fonts, stickers, and template art are licensed (keep license docs in `/Licenses/` in the repo)
+- [x] No private API usage — `Tools/audit_binary.sh <app>` (otool on every Mach-O in the bundle); clean on the Debug build 2026-09-16. Re-run on the archive before submission.
+- [x] IDFA / AdSupport framework NOT linked (no ad SDK) — the same script fails on AdSupport / AppTrackingTransparency
+- [x] Encryption export compliance — `ITSAppUsesNonExemptEncryption = false` in the plist answers it per build
+- [x] Content rights: `Licenses/README.md` — Pexels sample content (credits in `SampleContent/ATTRIBUTION.md`), SF Symbols stickers, platform fonts (nothing embedded), authored templates and icon
 
 ---
 

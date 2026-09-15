@@ -20,12 +20,12 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>Caroullage uses the camera when you shoot a photo for a collage.</string>
-	<key>NSMicrophoneUsageDescription</key>
-	<string>Caroullage uses the microphone when recording video for your collage.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Caroullage saves your finished collages to your photo library.</string>
 	<key>NSPhotoLibraryUsageDescription</key>

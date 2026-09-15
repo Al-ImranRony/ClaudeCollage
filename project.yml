@@ -109,10 +109,15 @@ targets:
           - UIInterfaceOrientationPortraitUpsideDown
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
+        # Permission strings. English here; the eleven languages live in
+        # Caroullage/Resources/InfoPlist.xcstrings. No microphone string: the
+        # camera door shoots stills and no audio is ever captured (phase 6.6).
         NSPhotoLibraryUsageDescription: "Caroullage needs access to your photos to create collages."
         NSPhotoLibraryAddUsageDescription: "Caroullage saves your finished collages to your photo library."
-        NSMicrophoneUsageDescription: "Caroullage uses the microphone when recording video for your collage."
         NSCameraUsageDescription: "Caroullage uses the camera when you shoot a photo for a collage."
+        # Standard encryption only (HTTPS, StoreKit): answers App Store Connect's
+        # export-compliance question per build instead of per upload.
+        ITSAppUsesNonExemptEncryption: false
         NSSupportsLiveActivities: true
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
