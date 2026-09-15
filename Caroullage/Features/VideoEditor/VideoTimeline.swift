@@ -385,9 +385,11 @@ public final class VideoTimeline: UIView {
         playbackButton.accessibilityTraits = .button
         playbackButton.addTarget(self, action: #selector(playbackTapped), for: .touchUpInside)
         playbackButton.translatesAutoresizingMaskIntoConstraints = false
+        playbackButton.showsLargeContentViewer = true
         headerRow.addSubview(playbackButton)
 
         timeLabel.font = Theme.Typography.caption
+        timeLabel.adjustsFontForContentSizeCategory = true
         timeLabel.textColor = Theme.Color.textSecondary
         timeLabel.translatesAutoresizingMaskIntoConstraints = false
         headerRow.addSubview(timeLabel)
@@ -404,7 +406,11 @@ public final class VideoTimeline: UIView {
         chevronButton.accessibilityTraits = .button
         chevronButton.addTarget(self, action: #selector(chevronTapped), for: .touchUpInside)
         chevronButton.translatesAutoresizingMaskIntoConstraints = false
+        chevronButton.showsLargeContentViewer = true
         headerRow.addSubview(chevronButton)
+        // The header's two glyph controls offer the large content viewer, as
+        // the tool rail's do (phase 6.5).
+        headerRow.addInteraction(UILargeContentViewerInteraction())
 
         // On the container itself so a UI test can measure the real laid-out
         // height. Plan 1 shipped a zero-height tool rail that every unit test
@@ -485,6 +491,8 @@ public final class VideoTimeline: UIView {
         chevronImageView.image = UIImage(systemName: symbol)
         chevronButton.accessibilityLabel = state == .collapsed
             ? String(localized: "Expand timeline") : String(localized: "Collapse timeline")
+        chevronButton.largeContentTitle = chevronButton.accessibilityLabel
+        chevronButton.largeContentImage = chevronImageView.image
     }
 
     /// Only ever reports the tap — like `chevronTapped` above, this view never
@@ -500,6 +508,8 @@ public final class VideoTimeline: UIView {
         let symbol = model.isPlaying ? "pause.fill" : "play.fill"
         playbackImageView.image = UIImage(systemName: symbol)
         playbackButton.accessibilityLabel = model.isPlaying ? String(localized: "Pause") : String(localized: "Play")
+        playbackButton.largeContentTitle = playbackButton.accessibilityLabel
+        playbackButton.largeContentImage = playbackImageView.image
     }
 
     private func updateReadouts() {
@@ -687,6 +697,9 @@ public final class VideoTimeline: UIView {
     /// The model this timeline was last given — so a test can assert what the
     /// OWNER built and handed over, not just what happened to render.
     var modelForTesting: VideoTimelineModel { model }
+
+    /// The header's two glyph controls, for the large-content-viewer test.
+    var headerControlsForTesting: (playback: UIControl, chevron: UIControl) { (playbackButton, chevronButton) }
 
     /// The playhead's time in seconds, as opposed to `playheadXForTesting`'s
     /// rendered position.
@@ -1153,6 +1166,7 @@ private final class MusicLaneRow: UIView {
         icon.contentMode = .scaleAspectFit
 
         label.font = Theme.Typography.caption
+        label.adjustsFontForContentSizeCategory = true
         label.textColor = Theme.Color.textSecondary
 
         let stack = UIStackView(arrangedSubviews: [icon, label])
@@ -1201,6 +1215,7 @@ private final class TimeRulerView: UIView {
         labels = (0..<Self.tickCount).map { _ in
             let label = UILabel()
             label.font = Theme.Typography.caption
+            label.adjustsFontForContentSizeCategory = true
             label.textColor = Theme.Color.textSecondary
             addSubview(label)
             return label

@@ -83,6 +83,7 @@ final class BezierEditorViewController: UIViewController {
     private func setupHint() {
         hint.text = "Tap to add points · drag to adjust · hold to delete"
         hint.font = Theme.Typography.caption
+        hint.adjustsFontForContentSizeCategory = true
         hint.textColor = UIColor(white: 1, alpha: 0.6)
         hint.textAlignment = .center
         hint.numberOfLines = 0

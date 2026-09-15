@@ -182,6 +182,7 @@ final class CameraCaptureViewController: UIViewController {
         detail.text = String(localized: "Pick a photo from your library instead.")
         label.adjustsFontForContentSizeCategory = true
         detail.font = Theme.Typography.subheadline
+        detail.adjustsFontForContentSizeCategory = true
         detail.textColor = .white.withAlphaComponent(0.75)
         detail.numberOfLines = 0
         detail.textAlignment = .center
@@ -279,6 +280,7 @@ private final class FilterChipCell: UICollectionViewCell {
     override init(frame: CGRect) {
         super.init(frame: frame)
         label.font = Theme.Typography.caption
+        label.adjustsFontForContentSizeCategory = true
         label.textAlignment = .center
         label.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(label)

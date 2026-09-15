@@ -16,15 +16,22 @@
 import SwiftUI
 
 public extension Font {
-    static var themeLargeTitle: Font { Font(Theme.Typography.largeTitle) }
-    static var themeTitle: Font { Font(Theme.Typography.title) }
-    static var themeTitle2: Font { Font(Theme.Typography.title2) }
-    static var themeHeadline: Font { Font(Theme.Typography.headline) }
-    static var themeBody: Font { Font(Theme.Typography.body) }
-    static var themeCallout: Font { Font(Theme.Typography.callout) }
-    static var themeSubheadline: Font { Font(Theme.Typography.subheadline) }
-    static var themeCaption: Font { Font(Theme.Typography.caption) }
-    static var themeButton: Font { Font(Theme.Typography.button) }
+    // The same scale as `Theme.Typography` — rounded design, the same weights,
+    // the system text style each token is built on — expressed natively rather
+    // than as `Font(UIFont)`. A `Font` wrapped around a `UIFont` carries no
+    // text style: SwiftUI treats it as fixed, so it neither follows a Dynamic
+    // Type change nor tells the accessibility audit that it could (phase 6.5).
+    static var themeLargeTitle: Font { .system(.largeTitle, design: .rounded, weight: .bold) }
+    static var themeTitle: Font { .system(.title, design: .rounded, weight: .bold) }
+    static var themeTitle2: Font { .system(.title2, design: .rounded, weight: .semibold) }
+    static var themeHeadline: Font { .system(.headline, design: .rounded, weight: .semibold) }
+    static var themeBody: Font { .system(.body, design: .rounded, weight: .regular) }
+    static var themeCallout: Font { .system(.callout, design: .rounded, weight: .medium) }
+    static var themeSubheadline: Font { .system(.subheadline, design: .rounded, weight: .medium) }
+    /// `Typography.caption` is 13pt, which is the system's footnote, not its
+    /// 12pt caption1.
+    static var themeCaption: Font { .system(.footnote, design: .rounded, weight: .medium) }
+    static var themeButton: Font { .system(.headline, design: .rounded, weight: .semibold) }
 }
 
 public extension Color {

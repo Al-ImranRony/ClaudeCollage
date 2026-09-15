@@ -130,6 +130,7 @@ final class TextStylePresetRow: UIView {
 
             caption.text = kind.displayName
             caption.font = Theme.Typography.tabLabel
+            caption.adjustsFontForContentSizeCategory = true
             caption.textColor = Theme.Color.textSecondary
             caption.textAlignment = .center
             caption.adjustsFontSizeToFitWidth = true
@@ -189,6 +190,11 @@ final class TextStylePresetRow: UIView {
         }
 
         private func renderSample() {
+            // The sample is the collage's own text, drawn through TextRendering
+            // at canvas scale — a preview of a style, not UI copy — so it does
+            // not follow Dynamic Type, by design. The identifier names it in the
+            // conventions walker's allow-list.
+            preview.accessibilityIdentifier = "textStylePreviewSample"
             let sample = Self.sample(for: kind, traits: traitCollection)
             preview.attributedText = TextRendering.attributedString(for: sample, fontScale: 1)
             // `.pill` paints its background from the measured text, the way the

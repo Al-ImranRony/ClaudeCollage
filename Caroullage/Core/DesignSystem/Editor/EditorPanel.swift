@@ -84,6 +84,7 @@ public final class EditorPanel: UIView {
         addSubview(separator)
 
         titleLabel.font = Theme.Typography.subheadline
+        titleLabel.adjustsFontForContentSizeCategory = true
         titleLabel.textColor = Theme.Color.textPrimary
         titleLabel.textAlignment = .center
         titleLabel.translatesAutoresizingMaskIntoConstraints = false

@@ -91,6 +91,7 @@ final class CarouselPreviewViewController: UIViewController {
 
         counterLabel.textColor = .white
         counterLabel.font = Theme.Typography.subheadline
+        counterLabel.adjustsFontForContentSizeCategory = true
         counterLabel.textAlignment = .center
         counterLabel.accessibilityIdentifier = "previewCounter"
         counterLabel.translatesAutoresizingMaskIntoConstraints = false

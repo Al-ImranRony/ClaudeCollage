@@ -27,6 +27,7 @@ final class CategoryChipCell: UICollectionViewCell {
         contentView.clipsToBounds = true
 
         label.font = Theme.Typography.subheadline
+        label.adjustsFontForContentSizeCategory = true
         label.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(label)
         NSLayoutConstraint.activate([

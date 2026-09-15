@@ -96,6 +96,15 @@ public final class EditorToolRail: UIView {
         scrollView.contentInsetAdjustmentBehavior = .never
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         addSubview(scrollView)
+        // At accessibility text sizes a rail this compact cannot grow; Apple's
+        // answer is the large content viewer — press and hold a tool to see its
+        // name and glyph full-screen. The interaction lives on the rail, the
+        // per-button title and image on each ToolButton (phase 6.5).
+        addInteraction(UILargeContentViewerInteraction())
+        // Five tools share one row; at accessibility sizes their labels would
+        // overlap. Like a tab bar, the rail caps its text at the largest
+        // standard size and hands the accessibility sizes to the viewer above.
+        maximumContentSizeCategory = .extraExtraExtraLarge
 
         stack.axis = .horizontal
         stack.alignment = .center
@@ -330,6 +339,9 @@ final class ToolButton: HitTargetControl {
 
         isAccessibilityElement = true
         accessibilityTraits = .button
+        showsLargeContentViewer = true
+        largeContentTitle = tool.title
+        largeContentImage = UIImage(systemName: tool.systemImage)
 
         well.backgroundColor = Theme.Color.accentSoft
         well.layer.cornerRadius = Self.wellSize.height / 2
@@ -344,6 +356,7 @@ final class ToolButton: HitTargetControl {
 
         label.text = tool.title
         label.font = Theme.Typography.tabLabel
+        label.adjustsFontForContentSizeCategory = true
         label.textAlignment = .center
         // The row is a flat 52pt that does not scale with Dynamic Type, so give
         // the label somewhere to go at the largest accessibility sizes instead
@@ -514,6 +527,7 @@ private final class ContextChip: HitTargetControl {
         let label = UILabel()
         label.text = title
         label.font = Theme.Typography.tabLabel
+        label.adjustsFontForContentSizeCategory = true
         label.textColor = Theme.Color.accent
 
         let close = UIImageView(image: UIImage(systemName: "xmark"))

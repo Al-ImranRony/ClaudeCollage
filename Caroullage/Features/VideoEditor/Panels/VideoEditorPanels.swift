@@ -112,10 +112,10 @@ final class TextTimingPanelView: UIView {
 
     /// A stepper reads as a bare pair of chevrons without its value beside it.
     private func pair(_ label: UILabel, _ stepper: UIStepper) -> UIStackView {
-        // `CarouselFrameCell`'s idiom — `UIFont` has no `monospacedDigit()`, so the
-        // face is built at the token font's own size and weight.
-        label.font = .monospacedDigitSystemFont(
-            ofSize: Theme.Typography.caption.pointSize, weight: .semibold)
+        // `CarouselFrameCell`'s idiom: monospaced digits at the caption token's
+        // size, scaled like the token.
+        label.font = Theme.Typography.monospacedDigits(13, .semibold, .footnote)
+        label.adjustsFontForContentSizeCategory = true
         label.textColor = Theme.Color.textPrimary
         // Monospaced digits alone don't stop the row twitching as the width goes
         // 1.0 → 10.0, so the label holds a floor width instead.

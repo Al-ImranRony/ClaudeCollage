@@ -103,6 +103,7 @@ final class EraserBrushViewController: UIViewController {
         let hint = UILabel()
         hint.text = "Paint over what you want gone. Works best on plain backgrounds."
         hint.font = Theme.Typography.caption
+        hint.adjustsFontForContentSizeCategory = true
         hint.textColor = Theme.Color.textSecondary
         hint.numberOfLines = 0
         hint.textAlignment = .center

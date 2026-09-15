@@ -324,6 +324,19 @@ public enum Theme {
         public static var tabLabel: UIFont { rounded(10, .semibold, .caption2) }
         public static var button: UIFont { rounded(17, .semibold, .headline) }
 
+        /// Monospaced digits at `size`/`weight`, scaled for `style` — for a
+        /// number that must not twitch as it changes (a frame index, a time).
+        /// `UIFont` has no `monospacedDigit()`, so the face is built directly
+        /// and then handed to `UIFontMetrics` like every other token.
+        public static func monospacedDigits(
+            _ size: CGFloat,
+            _ weight: UIFont.Weight,
+            _ style: UIFont.TextStyle
+        ) -> UIFont {
+            UIFontMetrics(forTextStyle: style)
+                .scaledFont(for: .monospacedDigitSystemFont(ofSize: size, weight: weight))
+        }
+
         /// A rounded system font at exactly `size`, with no Dynamic Type scaling.
         ///
         /// For type that is *drawn* rather than laid out — overlay labels whose

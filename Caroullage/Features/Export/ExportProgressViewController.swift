@@ -107,15 +107,18 @@ final class ExportProgressViewController: UIViewController {
 
         titleLabel.text = exportTitle
         titleLabel.font = Theme.Typography.headline
+        titleLabel.adjustsFontForContentSizeCategory = true
         titleLabel.textColor = Theme.Color.textPrimary
         titleLabel.textAlignment = .center
 
         statusLabel.font = Theme.Typography.caption
+        statusLabel.adjustsFontForContentSizeCategory = true
         statusLabel.textColor = Theme.Color.textSecondary
         statusLabel.textAlignment = .center
         statusLabel.accessibilityIdentifier = "exportProgressStatus"
 
         percentLabel.font = Theme.Typography.title2
+        percentLabel.adjustsFontForContentSizeCategory = true
         percentLabel.textColor = Theme.Color.textPrimary
         percentLabel.textAlignment = .center
         percentLabel.accessibilityIdentifier = "exportProgressPercent"

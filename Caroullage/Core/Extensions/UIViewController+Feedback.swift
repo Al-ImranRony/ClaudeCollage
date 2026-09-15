@@ -19,6 +19,7 @@ extension UIViewController {
         label.text = message
         label.textColor = Theme.Color.textOnToast
         label.font = Theme.Typography.subheadline
+        label.adjustsFontForContentSizeCategory = true
         label.numberOfLines = 0
         label.textAlignment = .center
         label.backgroundColor = Theme.Color.toast

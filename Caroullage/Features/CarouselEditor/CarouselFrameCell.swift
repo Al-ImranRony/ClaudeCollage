@@ -60,7 +60,8 @@ final class CarouselFrameCell: UICollectionViewCell {
             contentView.addSubview(seam)
         }
 
-        numberLabel.font = .monospacedDigitSystemFont(ofSize: 13, weight: .semibold)
+        numberLabel.font = Theme.Typography.monospacedDigits(13, .semibold, .footnote)
+        numberLabel.adjustsFontForContentSizeCategory = true
         numberLabel.textColor = .white
         numberLabel.textAlignment = .center
         numberLabel.translatesAutoresizingMaskIntoConstraints = false
