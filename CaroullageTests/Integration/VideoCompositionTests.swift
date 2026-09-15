@@ -173,6 +173,27 @@ final class VideoCompositionTests: XCTestCase {
         XCTAssertLessThan(bottom.g, 120)
     }
 
+    func testWatermarkBakesIntoTheExportWhenAsked() async throws {
+        // Phase 6.8: a dark video, exported with the free tier's mark. The mark's
+        // white lettering lands bottom-right; the rest of the frame stays dark.
+        let dark = try await makeSolidVideo(r: 20, g: 20, b: 60, seconds: 1)
+        let cell = VideoCompositionCell(asset: AVURLAsset(url: dark), frame: unit(240))
+        let bundle = try await VideoComposer().buildComposition(cells: [cell], canvasSize: sq(240))
+        let out = tempURL(ext: "mp4")
+        let mark = try XCTUnwrap(WatermarkRenderer.overlayImage(canvasPx: bundle.renderSize))
+        try await VideoComposer().export(bundle: bundle, to: out, watermark: mark)
+
+        let markFrame = WatermarkRenderer.frame(in: bundle.renderSize)
+        var brightest = 0
+        for x in stride(from: Int(markFrame.minX), to: Int(markFrame.maxX), by: 2) {
+            let p = try await filePixel(out, x: x, y: Int(markFrame.midY))
+            brightest = max(brightest, min(Int(p.r), Int(p.g), Int(p.b)))
+        }
+        XCTAssertGreaterThan(brightest, 150, "white lettering baked into the corner")
+        let elsewhere = try await filePixel(out, x: 40, y: 40)
+        XCTAssertLessThan(elsewhere.r, 80, "the frame itself is untouched")
+    }
+
     // MARK: - Transitions (layer-instruction ramps)
 
     func testCrossfadeAddsOpacityRamp() async throws {

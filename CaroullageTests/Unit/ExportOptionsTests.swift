@@ -99,3 +99,28 @@ final class ExportOptionsTests: XCTestCase {
         XCTAssertEqual(options.imageExporterFormat, .jpeg(quality: 0.7))
     }
 }
+
+// MARK: - Watermark (phase 6.8)
+
+final class ExportOptionsWatermarkTests: XCTestCase {
+
+    private func options() -> ExportOptions {
+        ExportOptions.makeDefault(platform: .instagramPost, supportsVideo: true, isPremium: true)
+    }
+
+    func testTheFreeTierCarriesTheWatermark() {
+        XCTAssertTrue(options().clampedForEntitlement(isPremium: false).includeWatermark)
+    }
+
+    func testPremiumAndACreditDoNot() {
+        // A spent credit lifts the clamp the same way Premium does — the sheet
+        // passes `unlocked`, which is either — so neither carries the mark.
+        XCTAssertFalse(options().clampedForEntitlement(isPremium: true).includeWatermark)
+    }
+
+    func testTheDefaultBeforeClampingIsNoWatermark() {
+        // The decision is the clamp's, made at export time from the entitlement;
+        // nothing upstream of it sets the flag.
+        XCTAssertFalse(options().includeWatermark)
+    }
+}

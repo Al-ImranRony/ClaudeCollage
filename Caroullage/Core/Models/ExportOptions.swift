@@ -41,6 +41,10 @@ public struct ExportOptions: Equatable, Sendable {
     public var videoContainer: ExportPreset.VideoContainer
     public var videoCodec: ExportSettings.VideoCodec
     public var videoResolution: VideoResolution
+    /// Whether the exported file carries the free tier's "Made with Caroullage".
+    /// Nothing upstream sets this; `clampedForEntitlement` decides it at export
+    /// time from the entitlement, so a credit lifts it the way Premium does.
+    public var includeWatermark: Bool = false
 
     public init(
         platform: ExportSettings.Platform,
@@ -92,6 +96,7 @@ public struct ExportOptions: Equatable, Sendable {
         copy.videoCodec = .h264
         copy.videoContainer = .mp4
         copy.videoResolution = .hd1080
+        copy.includeWatermark = true
         return copy
     }
 

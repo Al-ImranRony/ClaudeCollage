@@ -1201,7 +1201,10 @@ final class GridEditorViewController: UIViewController {
             let request = self.viewModel.exportRequest()
             let compositor = self.compositor
             DispatchQueue.global(qos: .userInitiated).async {
+                // The free tier's mark goes onto the file here, after the
+                // composite — the canvas never shows it.
                 let cgImage = compositor.render(request, scale: 1)
+                    .map { options.includeWatermark ? WatermarkRenderer.stamp($0) : $0 }
                 let data: Data? = cgImage.flatMap {
                     try? ImageExporter().encode($0, format: options.imageExporterFormat,
                                                resolution: options.imageResolution)

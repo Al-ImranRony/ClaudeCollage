@@ -428,7 +428,8 @@ extension VideoComposer {
         container: ExportPreset.VideoContainer = .mp4,
         to url: URL,
         progress: (@Sendable (Float) -> Void)? = nil,
-        cancellation: ExportCancellationToken? = nil
+        cancellation: ExportCancellationToken? = nil,
+        watermark: CGImage? = nil
     ) async throws {
         try? FileManager.default.removeItem(at: url)
         if cancellation?.isCancelled == true { throw ComposerError.cancelled }
@@ -488,6 +489,7 @@ extension VideoComposer {
                                     audioOutput: audioOutput, audioInput: audioInput,
                                     overlay: bundle.overlayImage,
                                     timedOverlays: bundle.timedOverlays,
+                                    watermark: watermark,
                                     width: width, height: height, duration: bundle.duration.seconds,
                                     outputURL: url, cancellation: cancellation)
         let exportQueue = DispatchQueue(label: "com.devron.caroullage.videoexport")
@@ -538,6 +540,8 @@ extension VideoComposer {
         let audioInput: AVAssetWriterInput?
         let overlay: CGImage?
         let timedOverlays: VideoCompositionBundle.TimedOverlayInputs?
+        /// The free tier's mark, drawn over every frame after the overlay.
+        let watermark: CGImage?
         let width: Int
         let height: Int
         let duration: Double
@@ -589,6 +593,12 @@ extension VideoComposer {
                     if let buffer = CMSampleBufferGetImageBuffer(sample) {
                         if let overlay = overlayForFrame(ctx, at: pts, cache: &overlayCache) {
                             drawOverlay(overlay, into: buffer, width: ctx.width, height: ctx.height)
+                        }
+                        // The free tier's mark, last, so it sits above every overlay.
+                        // Same draw as the overlay: the brief's Core Animation tool
+                        // crashes this reader pipeline (see the class header).
+                        if let watermark = ctx.watermark {
+                            drawOverlay(watermark, into: buffer, width: ctx.width, height: ctx.height)
                         }
                         if !ctx.adaptor.append(buffer, withPresentationTime: pts) {
                             ctx.reader.cancelReading(); ctx.writer.cancelWriting()

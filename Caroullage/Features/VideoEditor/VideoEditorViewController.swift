@@ -1572,7 +1572,9 @@ final class VideoEditorViewController: UIViewController {
                         progress: { [weak progressVC] value in
                             progressVC?.update(fraction: Double(value))
                         },
-                        cancellation: token)
+                        cancellation: token,
+                        watermark: options.includeWatermark
+                            ? WatermarkRenderer.overlayImage(canvasPx: bundle.renderSize) : nil)
                     if share {
                         creditSession.succeeded()
                         progressVC.dismiss(animated: true) { self.shareURL(url) }

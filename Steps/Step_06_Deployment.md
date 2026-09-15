@@ -274,12 +274,12 @@ Required since May 2024; enforced for all 2026 submissions.
 
 ## Phase 6.8 — Watermark System
 
-- [ ] Create `Core/Rendering/WatermarkRenderer.swift`
-- [ ] Composites "Made with Caroullage" in bottom-right corner of exported files
-- [ ] Watermark applied only when `PurchaseService.currentTier == .free`
-- [ ] Watermark baked into export file (not shown in in-app preview)
-- [ ] Watermark size: 4% of canvas height, white text with 50% opacity drop shadow
-- [ ] On video exports: watermark composited via `CALayer` in `AVVideoCompositionCoreAnimationTool`
+- [x] Create `Core/Rendering/WatermarkRenderer.swift`
+- [x] Composites "Made with Caroullage" in bottom-right corner of exported files — grid image export, carousel image set / share / slideshow, video collage
+- [x] Watermark applied only when the tier is free — decided in `ExportOptions.clampedForEntitlement`, the same clamp that lifts HEVC/4K, so a spent credit removes it exactly as Premium does (`ExportOptionsWatermarkTests`)
+- [x] Watermark baked into export file (not shown in in-app preview) — stamped after the composite, never on the canvas
+- [x] Watermark size: 4% of canvas height, white text with 50% opacity drop shadow — pinned by `WatermarkRendererTests` (pixel readback, and survival through JPEG at export quality)
+- [x] On video exports: composited per frame at write time by the exporter, the way the text/sticker overlay already is — **not** via `AVVideoCompositionCoreAnimationTool`, which crashes `AVAssetReaderVideoCompositionOutput` in this pipeline (Step 04's recorded finding). `VideoCompositionTests.testWatermarkBakesIntoTheExportWhenAsked` reads the mark back from the exported file
 
 ---
 

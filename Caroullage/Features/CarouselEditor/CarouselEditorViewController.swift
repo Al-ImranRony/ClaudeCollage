@@ -392,7 +392,11 @@ final class CarouselEditorViewController: UIViewController {
             ? viewModel.canvasSize.width / viewModel.canvasSize.height : 1
         let preview = CarouselPreviewViewController(
             images: images, aspectRatio: aspect, startIndex: viewModel.currentIndex)
-        preview.onExport = { [weak self] in self?.shareFrameImages() }
+        // The preview's own share door has no credit step, so it carries the
+        // mark unless Premium is on.
+        preview.onExport = { [weak self] in
+            self?.shareFrameImages(watermarked: !EntitlementStore.shared.isPremiumUnlocked)
+        }
         present(preview, animated: true)
     }
 
@@ -411,7 +415,7 @@ final class CarouselEditorViewController: UIViewController {
             },
             onQuickShare: { [weak self] options, payment in
                 if options.media == .video { self?.exportVideo(options, share: true, payment: payment) }
-                else { self?.dismiss(animated: true) { self?.shareFrameImages() } }
+                else { self?.dismiss(animated: true) { self?.shareFrameImages(watermarked: options.includeWatermark) } }
             },
             onCancel: { [weak self] in self?.dismiss(animated: true) },
             onBuyCredits: { [weak self] in
@@ -427,7 +431,13 @@ final class CarouselEditorViewController: UIViewController {
     }
 
     /// Renders every frame full-resolution via a throwaway grid VM (reusing the
-    /// editor's exact composite so preview == export).
+    /// editor's exact composite so preview == export). `watermarked` stamps the
+    /// free tier's mark onto each frame — the file, never the canvas.
+    private func renderFrames(watermarked: Bool) -> [CGImage] {
+        let frames = renderFrames()
+        return watermarked ? frames.map(WatermarkRenderer.stamp) : frames
+    }
+
     private func renderFrames() -> [CGImage] {
         viewModel.frames.compactMap { frame in
             let vm = GridEditorViewModel(canvasSize: viewModel.canvasSize, state: frame.state)
@@ -449,7 +459,7 @@ final class CarouselEditorViewController: UIViewController {
         }
         dismiss(animated: true) { [weak self] in
             guard let self else { return }
-            let frames = self.renderFrames()
+            let frames = self.renderFrames(watermarked: options.includeWatermark)
             guard !frames.isEmpty else {
                 creditSession.failed()
                 self.showComingSoon(title: "Export Failed", message: "There are no frames to export.")
@@ -509,7 +519,7 @@ final class CarouselEditorViewController: UIViewController {
         }
         dismiss(animated: true) { [weak self] in
             guard let self else { return }
-            let frames = self.renderFrames()
+            let frames = self.renderFrames(watermarked: options.includeWatermark)
             guard !frames.isEmpty else {
                 creditSession.failed()
                 self.showComingSoon(title: "Export Failed", message: "There are no frames to export.")
@@ -567,8 +577,8 @@ final class CarouselEditorViewController: UIViewController {
     /// downstream can unpack it, so the export was effectively a dead end. Sharing
     /// the individual JPEGs lets AirDrop, Messages, Files and the photo apps each
     /// take the frames directly.
-    private func shareFrameImages() {
-        let images = renderFrames()
+    private func shareFrameImages(watermarked: Bool) {
+        let images = renderFrames(watermarked: watermarked)
         guard !images.isEmpty else {
             showComingSoon(title: "Export Failed", message: "There are no frames to export.")
             return
