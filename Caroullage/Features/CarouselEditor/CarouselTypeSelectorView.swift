@@ -102,10 +102,11 @@ struct CarouselTypeSelectorView: View {
                     .frame(width: 44)
                     .foregroundStyle(Color(Theme.Color.accent))
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(info.title)
+                    // A `String` in `Text` is verbatim; the key is made explicit.
+                    Text(LocalizedStringKey(info.title))
                         .font(.themeHeadline)
                         .foregroundStyle(Color(Theme.Color.textPrimary))
-                    Text(info.subtitle)
+                    Text(LocalizedStringKey(info.subtitle))
                         .font(.themeSubheadline)
                         .foregroundStyle(Color(Theme.Color.textSecondary))
                 }

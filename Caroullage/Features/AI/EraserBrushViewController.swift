@@ -55,7 +55,7 @@ final class EraserBrushViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        title = "Magic Eraser"
+        title = String(localized: "Magic Eraser")
         view.backgroundColor = Theme.Color.background
         setupNavigationBar()
         setupLayout()
@@ -72,10 +72,10 @@ final class EraserBrushViewController: UIViewController {
 
     private func setupNavigationBar() {
         let cancel = UIBarButtonItem(
-            title: "Cancel", style: .plain, target: self, action: #selector(cancelTapped))
+            title: String(localized: "Cancel"), style: .plain, target: self, action: #selector(cancelTapped))
         cancel.accessibilityIdentifier = "eraserCancelButton"
         let done = UIBarButtonItem(
-            title: "Done", style: .done, target: self, action: #selector(doneTapped))
+            title: String(localized: "Done"), style: .done, target: self, action: #selector(doneTapped))
         done.accessibilityIdentifier = "eraserDoneButton"
         navigationItem.leftBarButtonItem = cancel
         navigationItem.rightBarButtonItems = [done, undoButton]
@@ -101,7 +101,7 @@ final class EraserBrushViewController: UIViewController {
         sizeSlider.addTarget(self, action: #selector(sizeChanged), for: .valueChanged)
 
         let hint = UILabel()
-        hint.text = "Paint over what you want gone. Works best on plain backgrounds."
+        hint.text = String(localized: "Paint over what you want gone. Works best on plain backgrounds.")
         hint.font = Theme.Typography.caption
         hint.adjustsFontForContentSizeCategory = true
         hint.textColor = Theme.Color.textSecondary
@@ -155,7 +155,7 @@ final class EraserBrushViewController: UIViewController {
             image: UIImage(systemName: "arrow.uturn.backward"),
             style: .plain, target: self, action: #selector(undoStroke))
         item.accessibilityIdentifier = "eraserUndoButton"
-        item.accessibilityLabel = "Undo stroke"
+        item.accessibilityLabel = String(localized: "Undo stroke")
         return item
     }
 
@@ -274,10 +274,10 @@ final class EraserBrushViewController: UIViewController {
         guard let erased = eraser.erase(sourceImage, strokes: strokes) else {
             Haptics.error()
             let alert = UIAlertController(
-                title: "Magic Eraser",
-                message: "Couldn't erase that area. Try painting over it again.",
+                title: String(localized: "Magic Eraser"),
+                message: String(localized: "Couldn't erase that area. Try painting over it again."),
                 preferredStyle: .alert)
-            alert.addAction(UIAlertAction(title: "OK", style: .default))
+            alert.addAction(UIAlertAction(title: String(localized: "OK"), style: .default))
             present(alert, animated: true)
             return
         }

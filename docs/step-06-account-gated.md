@@ -128,13 +128,19 @@ should be reviewed by a native speaker who has seen the screen:
 2. **Arabic and the CJK languages**, where register and line-breaking are easy to
    get subtly wrong.
 
-**What is not localized yet.** This pass covered the launch-critical, reviewer-
-facing surfaces: onboarding, the paywall, the special offer, the credits path,
-the widget, and the App Intents (already `LocalizedStringResource`). The older
-editor chrome — the export sheet's format and quality controls, the alert copy
-in the editors, template category names — is still English-only and needs the
-same treatment before submission. `Tools/` has no generator for the catalog; it
-is edited directly, in Xcode's String Catalog editor.
+**The pre-submission pass is done (2026-09-16).** Every user-facing UIKit
+literal — tool and panel names, tab titles, alerts and their messages, toasts,
+menu actions, the Start Editing rows, gallery counts, layout and shape names,
+safe-zone captions, the StoreKit error copy, the trial-reminder notification —
+is a `String(localized:)` with all eleven languages in the catalog (429 keys).
+Two traps closed along the way: a `String` handed to SwiftUI's `Text` renders
+verbatim (the carousel type picker and both sheets' section titles now use
+`LocalizedStringKey`), and a concatenated literal only half-localizes. The
+compiler's own extraction (`xcstringstool sync` on a scratch copy) reports
+nothing unextracted; `LocalizationTests` fails any key missing a language.
+`Tools/l10n_append.py` adds complete entries without re-serializing the file.
+Template names ("4-Up Square Grid") are catalog *data* in `Resources/Templates`
+and stay as authored.
 
 Verified on the simulator in Spanish, Arabic and Japanese: onboarding and the
 paywall render translated, and Arabic mirrors correctly (close button, feature

@@ -361,7 +361,7 @@ struct UniversalExportSheetView: View {
     }
 
     private func sectionTitle(_ text: String) -> some View {
-        Text(text.uppercased())
+        Text(LocalizedStringKey(text)).textCase(.uppercase)   // a `String` in `Text` is verbatim; the key is made explicit
             .font(.themeCaption).fontWeight(.semibold)
             .foregroundStyle(Color(Theme.Color.textSecondary))
     }

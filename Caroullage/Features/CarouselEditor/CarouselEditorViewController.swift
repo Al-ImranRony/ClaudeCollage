@@ -87,7 +87,7 @@ final class CarouselEditorViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        title = "Carousel"
+        title = String(localized: "Carousel")
         view.backgroundColor = Theme.Color.background
         navigationItem.largeTitleDisplayMode = .never
         setupNavigationBar()
@@ -144,7 +144,7 @@ final class CarouselEditorViewController: UIViewController {
     /// VoiceOver, which per-segment images cannot.
     private func refreshDirectionMenu() {
         directionItem.image = UIImage(systemName: viewModel.axis.symbolName)
-        directionItem.menu = UIMenu(title: "Direction", children: SplitAxis.allCases.map { axis in
+        directionItem.menu = UIMenu(title: String(localized: "Direction"), children: SplitAxis.allCases.map { axis in
             UIAction(
                 title: axis.displayName,
                 image: UIImage(systemName: axis.symbolName),
@@ -159,7 +159,7 @@ final class CarouselEditorViewController: UIViewController {
         refreshDirectionMenu()
 
         let preview = UIBarButtonItem(
-            title: "Preview", style: .plain, target: self, action: #selector(previewTapped))
+            title: String(localized: "Preview"), style: .plain, target: self, action: #selector(previewTapped))
         preview.accessibilityIdentifier = "carouselPreviewButton"
 
         let add = UIBarButtonItem(
@@ -357,7 +357,7 @@ final class CarouselEditorViewController: UIViewController {
 
     @objc private func addFrameTapped() {
         guard viewModel.addFrame() else {
-            showComingSoon(title: "Frame Limit", message: "A carousel can have up to 10 frames.")
+            showComingSoon(title: String(localized: "Frame Limit"), message: String(localized: "A carousel can have up to 10 frames."))
             return
         }
         Haptics.tap()
@@ -374,7 +374,7 @@ final class CarouselEditorViewController: UIViewController {
         viewModel.selectFrame(index)
         viewModel.applyStyleToAllFrames()
         Haptics.success()
-        showToast("Frame \(index + 1)'s style applied to all frames")
+        showToast(String(localized: "Frame \(index + 1)'s style applied to all frames"))
     }
 
     @objc private func undoTapped() { viewModel.undo() }
@@ -453,8 +453,8 @@ final class CarouselEditorViewController: UIViewController {
         let creditSession = ExportCreditSession()
         if payment == .credit, !creditSession.begin() {
             Haptics.error()
-            showComingSoon(title: "No Credits Left",
-                           message: "Buy a credit or start Premium to export at full quality.")
+            showComingSoon(title: String(localized: "No Credits Left"),
+                           message: String(localized: "Buy a credit or start Premium to export at full quality."))
             return
         }
         dismiss(animated: true) { [weak self] in
@@ -462,7 +462,7 @@ final class CarouselEditorViewController: UIViewController {
             let frames = self.renderFrames(watermarked: options.includeWatermark)
             guard !frames.isEmpty else {
                 creditSession.failed()
-                self.showComingSoon(title: "Export Failed", message: "There are no frames to export.")
+                self.showComingSoon(title: String(localized: "Export Failed"), message: String(localized: "There are no frames to export."))
                 return
             }
             let token = ExportCancellationToken()
@@ -490,19 +490,19 @@ final class CarouselEditorViewController: UIViewController {
                         try await PhotoLibrarySaver().saveVideo(at: url)
                         creditSession.succeeded()
                         progressVC.dismiss(animated: true) {
-                            self.showSuccess("Saved to Photos")
+                            self.showSuccess(String(localized: "Saved to Photos"))
                             RatingPrompt.exportSucceeded(in: self.view.window?.windowScene)
                         }
                     }
                 } catch VideoComposer.ComposerError.cancelled {
                     creditSession.cancelled()
-                    progressVC.dismiss(animated: true) { self.showToast("Export cancelled") }
+                    progressVC.dismiss(animated: true) { self.showToast(String(localized: "Export cancelled")) }
                 } catch {
                     creditSession.failed()
                     progressVC.dismiss(animated: true) {
                         Haptics.error()
-                        self.showComingSoon(title: "Export Failed",
-                                            message: "The video couldn't be created. Please try again.")
+                        self.showComingSoon(title: String(localized: "Export Failed"),
+                                            message: String(localized: "The video couldn't be created. Please try again."))
                     }
                 }
             }
@@ -514,8 +514,8 @@ final class CarouselEditorViewController: UIViewController {
         let creditSession = ExportCreditSession()
         if payment == .credit, !creditSession.begin() {
             Haptics.error()
-            showComingSoon(title: "No Credits Left",
-                           message: "Buy a credit or start Premium to export at full quality.")
+            showComingSoon(title: String(localized: "No Credits Left"),
+                           message: String(localized: "Buy a credit or start Premium to export at full quality."))
             return
         }
         dismiss(animated: true) { [weak self] in
@@ -523,7 +523,7 @@ final class CarouselEditorViewController: UIViewController {
             let frames = self.renderFrames(watermarked: options.includeWatermark)
             guard !frames.isEmpty else {
                 creditSession.failed()
-                self.showComingSoon(title: "Export Failed", message: "There are no frames to export.")
+                self.showComingSoon(title: String(localized: "Export Failed"), message: String(localized: "There are no frames to export."))
                 return
             }
             let spinner = self.presentSpinner("Saving…")
@@ -537,14 +537,14 @@ final class CarouselEditorViewController: UIViewController {
                     }
                     creditSession.succeeded()
                     spinner.dismiss(animated: true) {
-                        self.showSuccess("Saved \(frames.count) images")
+                        self.showSuccess(String(localized: "Saved \(frames.count) images"))
                         RatingPrompt.exportSucceeded(in: self.view.window?.windowScene)
                     }
                 } catch {
                     creditSession.failed()
                     spinner.dismiss(animated: true) {
                         Haptics.error()
-                        self.showComingSoon(title: "Save Failed", message: "Couldn't save to Photos.")
+                        self.showComingSoon(title: String(localized: "Save Failed"), message: String(localized: "Couldn't save to Photos."))
                     }
                 }
             }
@@ -582,7 +582,7 @@ final class CarouselEditorViewController: UIViewController {
     private func shareFrameImages(watermarked: Bool) {
         let images = renderFrames(watermarked: watermarked)
         guard !images.isEmpty else {
-            showComingSoon(title: "Export Failed", message: "There are no frames to export.")
+            showComingSoon(title: String(localized: "Export Failed"), message: String(localized: "There are no frames to export."))
             return
         }
         do {
@@ -595,14 +595,14 @@ final class CarouselEditorViewController: UIViewController {
             share.popoverPresentationController?.barButtonItem = navigationItem.rightBarButtonItems?.first
             present(share, animated: true)
         } catch {
-            showComingSoon(title: "Export Failed",
-                           message: "Couldn't create the image set. Please try again.")
+            showComingSoon(title: String(localized: "Export Failed"),
+                           message: String(localized: "Couldn't create the image set. Please try again."))
         }
     }
 
     private func showComingSoon(title: String, message: String) {
         let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "OK", style: .default))
+        alert.addAction(UIAlertAction(title: String(localized: "OK"), style: .default))
         present(alert, animated: true)
     }
 
@@ -619,12 +619,12 @@ final class CarouselEditorViewController: UIViewController {
     private func deleteFrame(at index: Int) {
         guard viewModel.frameCount > 1 else {
             Haptics.error()
-            showToast("A carousel needs at least one frame")
+            showToast(String(localized: "A carousel needs at least one frame"))
             return
         }
         viewModel.deleteFrame(at: index)
         Haptics.success()
-        showToast("Frame \(index + 1) deleted · Undo in the toolbar")
+        showToast(String(localized: "Frame \(index + 1) deleted · Undo in the toolbar"))
     }
 }
 
@@ -698,7 +698,7 @@ extension CarouselEditorViewController: UICollectionViewDataSource, UICollection
             var moves: [UIAction] = []
             if index > 0 {
                 moves.append(UIAction(
-                    title: isHorizontal ? "Move Left" : "Move Up",
+                    title: isHorizontal ? String(localized: "Move Left") : String(localized: "Move Up"),
                     image: UIImage(systemName: isHorizontal ? "arrow.left" : "arrow.up")
                 ) { _ in
                     self.perform { self.viewModel.moveFrame(from: index, to: index - 1) }
@@ -706,19 +706,19 @@ extension CarouselEditorViewController: UICollectionViewDataSource, UICollection
             }
             if index < self.viewModel.frameCount - 1 {
                 moves.append(UIAction(
-                    title: isHorizontal ? "Move Right" : "Move Down",
+                    title: isHorizontal ? String(localized: "Move Right") : String(localized: "Move Down"),
                     image: UIImage(systemName: isHorizontal ? "arrow.right" : "arrow.down")
                 ) { _ in
                     self.perform { self.viewModel.moveFrame(from: index, to: index + 1) }
                 })
             }
             let applyStyle = UIAction(
-                title: "Apply This Style to All Frames",
+                title: String(localized: "Apply This Style to All Frames"),
                 image: UIImage(systemName: "paintbrush")
             ) { _ in
                 self.perform { self.applyStyle(from: index) }
             }
-            let delete = UIAction(title: "Delete", image: UIImage(systemName: "trash"),
+            let delete = UIAction(title: String(localized: "Delete"), image: UIImage(systemName: "trash"),
                                   attributes: .destructive) { _ in
                 self.perform { self.deleteFrame(at: index) }
             }

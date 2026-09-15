@@ -24,8 +24,8 @@ extension SplitAxis {
     /// rather than only how a source photo is cut.
     var displayName: String {
         switch self {
-        case .horizontal: return "Horizontal"
-        case .vertical: return "Vertical"
+        case .horizontal: return String(localized: "Horizontal")
+        case .vertical: return String(localized: "Vertical")
         }
     }
 

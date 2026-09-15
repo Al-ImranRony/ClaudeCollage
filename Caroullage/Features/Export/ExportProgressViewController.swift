@@ -42,7 +42,7 @@ final class ExportProgressViewController: UIViewController {
 
     // MARK: - Init
 
-    init(title: String = "Exporting video…") {
+    init(title: String = String(localized: "Exporting video…")) {
         self.exportTitle = title
         super.init(nibName: nil, bundle: nil)
         modalPresentationStyle = .overFullScreen
@@ -131,7 +131,7 @@ final class ExportProgressViewController: UIViewController {
         progressView.accessibilityIdentifier = "exportProgressBar"
 
         var config = UIButton.Configuration.plain()
-        config.title = "Cancel"
+        config.title = String(localized: "Cancel")
         cancelButton.configuration = config
         cancelButton.tintColor = Theme.Color.accent
         cancelButton.titleLabel?.font = Theme.Typography.button

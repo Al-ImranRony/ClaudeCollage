@@ -20,9 +20,9 @@ enum GallerySortOrder: Int, CaseIterable {
 
     var title: String {
         switch self {
-        case .recent: return "Recent"
-        case .oldest: return "Oldest"
-        case .byMode: return "By type"
+        case .recent: return String(localized: "Recent")
+        case .oldest: return String(localized: "Oldest")
+        case .byMode: return String(localized: "By type")
         }
     }
 
@@ -102,10 +102,11 @@ enum GalleryFilter {
     /// Zero is named rather than counted: "0 Carousels" reads as something that
     /// failed, "No carousels" reads as a state you are in.
     static func countLabel(count: Int, singular: String, plural: String) -> String {
+        // Whole phrases, so a language can put the noun first.
         switch count {
-        case ..<1: return "No \(plural.lowercased())"
-        case 1: return "1 \(singular)"
-        default: return "\(count) \(plural)"
+        case ..<1: return String(localized: "No \(plural.lowercased())")
+        case 1: return String(localized: "1 \(singular)")
+        default: return String(localized: "\(count) \(plural)")
         }
     }
 }

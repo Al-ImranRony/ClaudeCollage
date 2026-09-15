@@ -1192,7 +1192,7 @@ private final class MusicLaneRow: UIView {
     override var intrinsicContentSize: CGSize { CGSize(width: UIView.noIntrinsicMetric, height: Self.rowHeight) }
 
     func configure(title: String?) {
-        label.text = title ?? "No music added"
+        label.text = title ?? String(localized: "No music added")
         label.textColor = title == nil ? Theme.Color.textSecondary : Theme.Color.textPrimary
     }
 

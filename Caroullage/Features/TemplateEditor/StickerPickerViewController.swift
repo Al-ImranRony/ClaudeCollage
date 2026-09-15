@@ -48,7 +48,7 @@ final class StickerPickerViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        title = "Stickers"
+        title = String(localized: "Stickers")
         view.backgroundColor = Theme.Color.background
 
         packs = catalog.loadPacks()
@@ -231,7 +231,7 @@ private final class StickerCell: UICollectionViewCell {
     /// out of the user's photo.
     func configure(withImage image: CGImage) {
         imageView.image = UIImage(cgImage: image)
-        accessibilityLabel = "Your sticker"
+        accessibilityLabel = String(localized: "Your sticker")
     }
 
     func configure(with entry: StickerEntry) {

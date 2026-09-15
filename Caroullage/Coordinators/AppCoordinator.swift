@@ -103,14 +103,14 @@ final class AppCoordinator {
             // Home is the one tab a user returns to rather than visits, so it
             // gets the outline-to-filled treatment: a plain house that fills in
             // when you are there. The rest stay filled — one moving part, not four.
-            (home, tabItem("Home", "house", selected: "house.fill", "homeTab")),
+            (home, tabItem(String(localized: "Home"), "house", selected: "house.fill", "homeTab")),
             // "Collage", not "Templates". The tab beside it is named for a
             // FORMAT while both of these are template galleries — named on two
             // different axes they cannot be read as a set, and nothing told a
             // user that "Templates" excluded carousel templates. The word
             // Templates moves into both galleries' nav titles, where it earns
-            // its place. A raw literal like its three siblings; localizing one
-            // of four would add an inconsistency rather than remove one.
+            // its place. All four titles are catalog keys (the pre-submission
+            // localization pass, 2026-09-16).
             // Weakest axis, acknowledged rather than dodged: the app also makes
             // VIDEO collages, and they live in neither middle tab — a Home
             // strip, the "Video" create chip, the floating "+" sheet's Video
@@ -122,12 +122,12 @@ final class AppCoordinator {
             // is not user-visible, and renaming it (plus the matching
             // `seeAllTemplatesButton` in HomeViewController.swift:563) would
             // touch roughly eight test files for no behavioural gain.
-            (templates, tabItem("Collage", "rectangle.3.group.fill", "templatesButton")),
+            (templates, tabItem(String(localized: "Collage"), "rectangle.3.group.fill", "templatesButton")),
             // Carousel sits mid-bar, where the thumb lands, because it is the
             // app's signature format. Projects is the archive you visit least, so
             // it takes the edge.
-            (carousels, tabItem("Carousel", "rectangle.stack.fill", "carouselButton")),
-            (projects, tabItem("Projects", "square.grid.2x2.fill", "projectsTab")),
+            (carousels, tabItem(String(localized: "Carousel"), "rectangle.stack.fill", "carouselButton")),
+            (projects, tabItem(String(localized: "Projects"), "square.grid.2x2.fill", "projectsTab")),
         ])
         tabBarController.onStartEditing = { [weak self] in self?.presentStartEditingSheet() }
 
@@ -357,24 +357,24 @@ final class AppCoordinator {
     /// Moved here from the old Home nav bar when "Custom Size" joined the "+" sheet.
     private func promptForCustomCanvas() {
         let alert = UIAlertController(
-            title: "Custom Canvas",
-            message: "Enter a size in pixels (100–4000).",
+            title: String(localized: "Custom Canvas"),
+            message: String(localized: "Enter a size in pixels (100–4000)."),
             preferredStyle: .alert
         )
         alert.addTextField { field in
-            field.placeholder = "Width"
+            field.placeholder = String(localized: "Width")
             field.text = "1080"
             field.keyboardType = .numberPad
             field.accessibilityIdentifier = "freeformWidthField"
         }
         alert.addTextField { field in
-            field.placeholder = "Height"
+            field.placeholder = String(localized: "Height")
             field.text = "1080"
             field.keyboardType = .numberPad
             field.accessibilityIdentifier = "freeformHeightField"
         }
-        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
-        alert.addAction(UIAlertAction(title: "Create", style: .default) { [weak self, weak alert] _ in
+        alert.addAction(UIAlertAction(title: String(localized: "Cancel"), style: .cancel))
+        alert.addAction(UIAlertAction(title: String(localized: "Create"), style: .default) { [weak self, weak alert] _ in
             let width = Double(alert?.textFields?[0].text ?? "") ?? 1080
             let height = Double(alert?.textFields?[1].text ?? "") ?? 1080
             self?.startFreeformProject(size: CGSize(width: width, height: height))
@@ -570,11 +570,11 @@ final class AppCoordinator {
                 // No photo zones at all (e.g. a text-only design) — nothing the
                 // editor can do with it until the text-zone slice lands.
                 let alert = UIAlertController(
-                    title: "Coming Soon",
-                    message: "This template has no photo areas yet supported by the editor. Text and sticker editing arrive in an upcoming update.",
+                    title: String(localized: "Coming Soon"),
+                    message: String(localized: "This template has no photo areas yet supported by the editor. Text and sticker editing arrive in an upcoming update."),
                     preferredStyle: .alert
                 )
-                alert.addAction(UIAlertAction(title: "OK", style: .default))
+                alert.addAction(UIAlertAction(title: String(localized: "OK"), style: .default))
                 navigationController.present(alert, animated: true)
                 return
             }

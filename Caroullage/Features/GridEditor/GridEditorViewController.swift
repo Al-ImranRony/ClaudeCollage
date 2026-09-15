@@ -90,7 +90,7 @@ final class GridEditorViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        title = "Grid Collage"
+        title = String(localized: "Grid Collage")
         // Editor screens use a compact inline bar — large titles belong on
         // browse/list screens (Home). This reclaims ~52pt for the controls area
         // and keeps the canvas visually front-and-center.
@@ -257,23 +257,23 @@ final class GridEditorViewController: UIViewController {
         // A template defines its own geometry — offering a layout picker would claim
         // a selection the document does not have.
         if viewModel.state.layout.offersLayoutAlternatives {
-            tools.append(EditorTool(id: "layout", title: "Layout",
+            tools.append(EditorTool(id: "layout", title: String(localized: "Layout"),
                                     systemImage: "square.grid.2x2",
                                     accessibilityIdentifier: "layoutTool",
                                     // Discrete cells, so a discrete hop.
                                     emphasis: .bounce))
         }
         tools.append(contentsOf: [
-            EditorTool(id: "frame", title: "Frame",
+            EditorTool(id: "frame", title: String(localized: "Frame"),
                        systemImage: "square.dashed", accessibilityIdentifier: "frameTool"),
-            EditorTool(id: "background", title: "Background",
+            EditorTool(id: "background", title: String(localized: "Background"),
                        systemImage: "circle.lefthalf.filled",
                        accessibilityIdentifier: "backgroundTool"),
             // Identifiers preserved from the old pill buttons so existing UI tests
             // keep matching.
-            EditorTool(id: "text", title: "Text",
+            EditorTool(id: "text", title: String(localized: "Text"),
                        systemImage: "textformat", accessibilityIdentifier: "addTextButton"),
-            EditorTool(id: "sticker", title: "Sticker",
+            EditorTool(id: "sticker", title: String(localized: "Sticker"),
                        systemImage: "face.smiling", accessibilityIdentifier: "addStickerButton",
                        // A sticker is a thing you press on; the icon presses back.
                        emphasis: .bounce),
@@ -291,9 +291,9 @@ final class GridEditorViewController: UIViewController {
         guard id != panels.openToolID else { return closePanel() }
 
         switch id {
-        case "layout":      openPanel(makeLayoutPanel(), title: "Layout", id: id)
-        case "frame":       openPanel(makeFramePanel(), title: "Frame", id: id)
-        case "background":  openPanel(makeBackgroundPanel(), title: "Background", id: id)
+        case "layout":      openPanel(makeLayoutPanel(), title: String(localized: "Layout"), id: id)
+        case "frame":       openPanel(makeFramePanel(), title: String(localized: "Frame"), id: id)
+        case "background":  openPanel(makeBackgroundPanel(), title: String(localized: "Background"), id: id)
         case "text":        addTextTapped()
         case "sticker":     addStickerTapped()
         case "replace":
@@ -313,7 +313,7 @@ final class GridEditorViewController: UIViewController {
             selectedTextID.map { presentTextStyleSheet(for: $0) }
         case "styleText":
             if let id = selectedTextID {
-                openPanel(makeTextStylePanel(for: id), title: "Text", id: "styleText")
+                openPanel(makeTextStylePanel(for: id), title: String(localized: "Text"), id: "styleText")
             }
         case "duplicateText":
             selectedTextID.map { duplicateTextOverlay($0) }
@@ -338,34 +338,34 @@ final class GridEditorViewController: UIViewController {
     private var selectedTextID: UUID?
 
     private static let photoTools: [EditorTool] = [
-        EditorTool(id: "replace", title: "Replace", systemImage: "arrow.left.arrow.right",
+        EditorTool(id: "replace", title: String(localized: "Replace"), systemImage: "arrow.left.arrow.right",
                    accessibilityIdentifier: "replacePhotoTool",
                    // The arrows slide, which is the gesture the tool performs.
                    emphasis: .wiggle),
-        EditorTool(id: "adjust", title: "Adjust", systemImage: "circle.lefthalf.filled",
+        EditorTool(id: "adjust", title: String(localized: "Adjust"), systemImage: "circle.lefthalf.filled",
                    accessibilityIdentifier: "adjustPhotoTool"),
         // Identifiers preserved from the retired action sheet.
-        EditorTool(id: "lift", title: "Lift", systemImage: "person.and.background.dotted",
+        EditorTool(id: "lift", title: String(localized: "Lift"), systemImage: "person.and.background.dotted",
                    accessibilityIdentifier: "liftSubjectAction"),
-        EditorTool(id: "erase", title: "Erase", systemImage: "eraser",
+        EditorTool(id: "erase", title: String(localized: "Erase"), systemImage: "eraser",
                    accessibilityIdentifier: "magicEraserAction",
                    // The rubbing motion an eraser makes.
                    emphasis: .wiggle),
-        EditorTool(id: "clear", title: "Clear", systemImage: "trash",
+        EditorTool(id: "clear", title: String(localized: "Clear"), systemImage: "trash",
                    accessibilityIdentifier: "clearCellTool",
                    // A shake, which is what a destructive tool should look like.
                    emphasis: .wiggle),
     ]
 
     private static let textTools: [EditorTool] = [
-        EditorTool(id: "editText", title: "Edit", systemImage: "keyboard",
+        EditorTool(id: "editText", title: String(localized: "Edit"), systemImage: "keyboard",
                    accessibilityIdentifier: "editTextTool"),
-        EditorTool(id: "styleText", title: "Style", systemImage: "textformat",
+        EditorTool(id: "styleText", title: String(localized: "Style"), systemImage: "textformat",
                    accessibilityIdentifier: "styleTextTool"),
-        EditorTool(id: "duplicateText", title: "Duplicate", systemImage: "plus.square.on.square",
+        EditorTool(id: "duplicateText", title: String(localized: "Duplicate"), systemImage: "plus.square.on.square",
                    accessibilityIdentifier: "duplicateTextTool",
                    emphasis: .bounce),
-        EditorTool(id: "deleteText", title: "Delete", systemImage: "trash",
+        EditorTool(id: "deleteText", title: String(localized: "Delete"), systemImage: "trash",
                    accessibilityIdentifier: "deleteTextTool",
                    emphasis: .wiggle),
     ]
@@ -389,7 +389,7 @@ final class GridEditorViewController: UIViewController {
         closePanel()
         Haptics.selectionChanged()
         toolRail.setContext(EditorRailContext(
-            chipTitle: "Photo", chipSystemImage: "photo", tools: Self.photoTools))
+            chipTitle: String(localized: "Photo"), chipSystemImage: "photo", tools: Self.photoTools))
     }
 
     private func selectTextOverlay(_ id: UUID?) {
@@ -403,7 +403,7 @@ final class GridEditorViewController: UIViewController {
         closePanel()
         Haptics.selectionChanged()
         toolRail.setContext(EditorRailContext(
-            chipTitle: "Text", chipSystemImage: "textformat", tools: Self.textTools))
+            chipTitle: String(localized: "Text"), chipSystemImage: "textformat", tools: Self.textTools))
     }
 
     private func clearSelection() {
@@ -715,7 +715,7 @@ final class GridEditorViewController: UIViewController {
 
     private func makeCustomShapeButton() -> UIButton {
         var config = UIButton.Configuration.tinted()
-        config.title = "Custom Shape"
+        config.title = String(localized: "Custom Shape")
         config.image = UIImage(systemName: "lasso")
         config.imagePadding = 6
         config.cornerStyle = .large
@@ -747,7 +747,7 @@ final class GridEditorViewController: UIViewController {
             // v1 applies the custom boundary to the first cell (the whole canvas
             // for a single-cell layout).
             self.viewModel.setCustomClip(clip, forCellAt: 0)
-            self.showToast("Custom shape applied")
+            self.showToast(String(localized: "Custom shape applied"))
         }
         let nav = UINavigationController(rootViewController: editor)
         nav.modalPresentationStyle = .fullScreen
@@ -928,7 +928,7 @@ final class GridEditorViewController: UIViewController {
     @objc private func addTextTapped() {
         Haptics.tap()
         let overlay = TextOverlay(
-            text: "Your text",
+            text: String(localized: "Your text"),
             colorHex: onLightBackground ? "#1A1A1C" : "#FFFFFF",
             frame: CGRect(x: 0.12, y: 0.42, width: 0.76, height: 0.16)
         )
@@ -954,7 +954,7 @@ final class GridEditorViewController: UIViewController {
         let index = cellIndex(at: point)
 
         guard let index, viewModel.state.cells.indices.contains(index) else {
-            showToast("Drop a photo onto a cell")
+            showToast(String(localized: "Drop a photo onto a cell"))
             return
         }
         guard let provider = session.items.first?.itemProvider else { return }
@@ -970,7 +970,7 @@ final class GridEditorViewController: UIViewController {
                 guard let self, self.viewModel.state.cells.indices.contains(index) else { return }
                 self.viewModel.setImage(image, forCellAt: index)
                 Haptics.success()
-                self.showToast("Photo added")
+                self.showToast(String(localized: "Photo added"))
             }
         }
     }
@@ -986,7 +986,7 @@ final class GridEditorViewController: UIViewController {
     /// read as an explanation rather than a crash.
     private func liftSubject(fromCellAt index: Int) {
         guard let photo = viewModel.displayImage(forCellAt: index) else {
-            showToast("Add a photo to this cell first")
+            showToast(String(localized: "Add a photo to this cell first"))
             return
         }
         canvasView.setSelectedCell(index)
@@ -1011,14 +1011,14 @@ final class GridEditorViewController: UIViewController {
         // Saved before it is placed, so the sticker exists in the library even if
         // the user immediately undoes the placement.
         guard let imageID = personalStickers?.save(subject) else {
-            showToast("Couldn't save that subject")
+            showToast(String(localized: "Couldn't save that subject"))
             return
         }
         let overlay = StickerOverlay(stickerID: "personal.\(imageID.uuidString)", imageID: imageID)
         let id = viewModel.addSticker(overlay)
         canvasView.setSelectedSticker(id)
         Haptics.success()
-        showToast("Subject lifted · saved to your stickers")
+        showToast(String(localized: "Subject lifted · saved to your stickers"))
     }
 
     private func reportLiftFailure(_ error: Error) {
@@ -1026,14 +1026,14 @@ final class GridEditorViewController: UIViewController {
         let message: String
         switch error {
         case AIService.AIError.noSubjectFound:
-            message = "No clear subject in this photo. Try one with a distinct person or object."
+            message = String(localized: "No clear subject in this photo. Try one with a distinct person or object.")
         case SegmentationError.visionUnavailable:
-            message = "Subject lifting needs a real device — it isn't available in the simulator."
+            message = String(localized: "Subject lifting needs a real device — it isn't available in the simulator.")
         default:
             message = "Couldn't lift the subject. Try a different photo."
         }
-        let alert = UIAlertController(title: "Lift Subject", message: message, preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "OK", style: .default))
+        let alert = UIAlertController(title: String(localized: "Lift Subject"), message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: String(localized: "OK"), style: .default))
         present(alert, animated: true)
     }
 
@@ -1047,10 +1047,10 @@ final class GridEditorViewController: UIViewController {
         // The paywall now exists; the Image Playground sheet behind it is still
         // outstanding Step 06 work (it needs an Apple Intelligence device).
         let alert = UIAlertController(
-            title: "Coming Soon",
-            message: "Background generation arrives with the Premium release.",
+            title: String(localized: "Coming Soon"),
+            message: String(localized: "Background generation arrives with the Premium release."),
             preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "OK", style: .default))
+        alert.addAction(UIAlertAction(title: String(localized: "OK"), style: .default))
         present(alert, animated: true)
     }
 
@@ -1059,7 +1059,7 @@ final class GridEditorViewController: UIViewController {
     /// entry for the whole erase rather than one per brush stroke.
     private func presentMagicEraser(forCellAt index: Int) {
         guard let photo = viewModel.displayImage(forCellAt: index) else {
-            showToast("Add a photo to this cell first")
+            showToast(String(localized: "Add a photo to this cell first"))
             return
         }
         canvasView.setSelectedCell(index)
@@ -1071,7 +1071,7 @@ final class GridEditorViewController: UIViewController {
                 self.canvasView.setSelectedCell(nil)
                 guard let erased else { return }     // cancelled or nothing painted
                 self.viewModel.setImage(erased, forCellAt: index)
-                self.showToast("Erased")
+                self.showToast(String(localized: "Erased"))
             }
         }
         let nav = UINavigationController(rootViewController: brush)
@@ -1083,7 +1083,7 @@ final class GridEditorViewController: UIViewController {
         // The brief asks AI operations to state their expected duration rather than
         // spin silently.
         let alert = UIAlertController(
-            title: nil, message: "Finding the subject…\nThis usually takes a second.",
+            title: nil, message: String(localized: "Finding the subject…\nThis usually takes a second."),
             preferredStyle: .alert)
         let spinner = UIActivityIndicatorView(style: .medium)
         spinner.translatesAutoresizingMaskIntoConstraints = false
@@ -1116,7 +1116,7 @@ final class GridEditorViewController: UIViewController {
         let id = viewModel.addSticker(overlay)
         canvasView.setSelectedSticker(id)
         Haptics.success()
-        showToast("Drag to position · double-tap to remove")
+        showToast(String(localized: "Drag to position · double-tap to remove"))
     }
 
     private func addSticker(from entry: StickerEntry) {
@@ -1128,7 +1128,7 @@ final class GridEditorViewController: UIViewController {
         let id = viewModel.addSticker(overlay)   // commits → canvas rebuilds
         canvasView.setSelectedSticker(id)        // highlight the freshly-added sticker
         Haptics.success()
-        showToast("Drag to position · double-tap to remove")
+        showToast(String(localized: "Drag to position · double-tap to remove"))
     }
 
     /// Whether the current canvas background is light (so a new text zone defaults
@@ -1190,7 +1190,7 @@ final class GridEditorViewController: UIViewController {
         let creditSession = ExportCreditSession()
         if payment == .credit, !creditSession.begin() {
             Haptics.error()
-            showAlert("No credits left", "Buy a credit or start Premium to export at full quality.")
+            showAlert(String(localized: "No credits left"), String(localized: "Buy a credit or start Premium to export at full quality."))
             return
         }
         dismiss(animated: true) { [weak self] in
@@ -1214,7 +1214,7 @@ final class GridEditorViewController: UIViewController {
                         guard let data else {
                             creditSession.failed()
                             Haptics.error()
-                            self.showAlert("Export failed", "Could not render the collage.")
+                            self.showAlert(String(localized: "Export failed"), String(localized: "Could not render the collage."))
                             return
                         }
                         creditSession.succeeded()
@@ -1237,7 +1237,7 @@ final class GridEditorViewController: UIViewController {
             try data.write(to: url)
         } catch {
             Haptics.error()
-            showAlert("Share failed", "Could not prepare the file to share.")
+            showAlert(String(localized: "Share failed"), String(localized: "Could not prepare the file to share."))
             return
         }
         let share = UIActivityViewController(activityItems: [url], applicationActivities: nil)
@@ -1259,7 +1259,7 @@ final class GridEditorViewController: UIViewController {
         PHPhotoLibrary.requestAuthorization(for: .addOnly) { @Sendable [weak self] status in
             guard status == .authorized || status == .limited else {
                 Task { @MainActor in
-                    self?.showAlert("No Photos Access", "Enable photo library access in Settings to save your collage.")
+                    self?.showAlert(String(localized: "No Photos Access"), String(localized: "Enable photo library access in Settings to save your collage."))
                 }
                 return
             }
@@ -1270,11 +1270,11 @@ final class GridEditorViewController: UIViewController {
                 Task { @MainActor in
                     guard let self else { return }
                     if success {
-                        self.showSuccess("Saved to Photos")
+                        self.showSuccess(String(localized: "Saved to Photos"))
                         RatingPrompt.exportSucceeded(in: self.view.window?.windowScene)
                     } else {
                         Haptics.error()
-                        self.showAlert("Save Failed", "The collage could not be saved to Photos.")
+                        self.showAlert(String(localized: "Save Failed"), String(localized: "The collage could not be saved to Photos."))
                     }
                 }
             }
@@ -1284,7 +1284,7 @@ final class GridEditorViewController: UIViewController {
     // MARK: - Helpers
 
     private func presentSpinner() -> UIAlertController {
-        let alert = UIAlertController(title: nil, message: "Exporting…", preferredStyle: .alert)
+        let alert = UIAlertController(title: nil, message: String(localized: "Exporting…"), preferredStyle: .alert)
         let indicator = UIActivityIndicatorView(style: .medium)
         indicator.translatesAutoresizingMaskIntoConstraints = false
         indicator.startAnimating()
@@ -1299,7 +1299,7 @@ final class GridEditorViewController: UIViewController {
 
     private func showAlert(_ title: String, _ message: String) {
         let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "OK", style: .default))
+        alert.addAction(UIAlertAction(title: String(localized: "OK"), style: .default))
         present(alert, animated: true)
     }
 

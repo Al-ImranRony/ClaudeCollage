@@ -32,11 +32,11 @@ final class BezierEditorViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = UIColor.black.withAlphaComponent(0.85)
-        title = "Custom Shape"
+        title = String(localized: "Custom Shape")
 
         navigationItem.leftBarButtonItem = UIBarButtonItem(
             barButtonSystemItem: .cancel, target: self, action: #selector(cancelTapped))
-        let done = UIBarButtonItem(title: "Done", style: .done, target: self, action: #selector(doneTapped))
+        let done = UIBarButtonItem(title: String(localized: "Done"), style: .done, target: self, action: #selector(doneTapped))
         navigationItem.rightBarButtonItems = [
             done,
             UIBarButtonItem(image: UIImage(systemName: "arrow.uturn.backward"), style: .plain,
@@ -81,7 +81,7 @@ final class BezierEditorViewController: UIViewController {
     }
 
     private func setupHint() {
-        hint.text = "Tap to add points · drag to adjust · hold to delete"
+        hint.text = String(localized: "Tap to add points · drag to adjust · hold to delete")
         hint.font = Theme.Typography.caption
         hint.adjustsFontForContentSizeCategory = true
         hint.textColor = UIColor(white: 1, alpha: 0.6)
@@ -154,10 +154,10 @@ final class BezierEditorViewController: UIViewController {
         guard points.count >= 3 else {
             Haptics.warning()
             let alert = UIAlertController(
-                title: "Add More Points",
-                message: "A custom shape needs at least three points.",
+                title: String(localized: "Add More Points"),
+                message: String(localized: "A custom shape needs at least three points."),
                 preferredStyle: .alert)
-            alert.addAction(UIAlertAction(title: "OK", style: .default))
+            alert.addAction(UIAlertAction(title: String(localized: "OK"), style: .default))
             present(alert, animated: true)
             return
         }

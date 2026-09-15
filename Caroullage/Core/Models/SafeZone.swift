@@ -13,7 +13,7 @@
 //     `coveredZones(forFrameAspect:)` projects each zone onto the frame's real aspect
 //     and drops chrome that lands in the letterbox — the bands then sit where the UI
 //     truly is for every aspect.
-//   • Each zone carries a LABEL ("Caption", "Actions", …) so the dimmed area reads as
+//   • Each zone carries a LABEL (String(localized: "Caption"), String(localized: "Actions"), …) so the dimmed area reads as
 //     an intentional platform-UI region, not a stray rectangle.
 //
 
@@ -42,11 +42,11 @@ public enum SafeZonePreset: String, CaseIterable, Sendable {
 
     public var displayName: String {
         switch self {
-        case .none:            return "Off"
-        case .instagramStory:  return "IG Story"
-        case .instagramReels:  return "IG Reels"
-        case .tiktok:          return "TikTok"
-        case .generic:         return "Generic"
+        case .none:            return String(localized: "Off")
+        case .instagramStory:  return String(localized: "IG Story")
+        case .instagramReels:  return String(localized: "IG Reels")
+        case .tiktok:          return String(localized: "TikTok")
+        case .generic:         return String(localized: "Generic")
         }
     }
 
@@ -59,27 +59,27 @@ public enum SafeZonePreset: String, CaseIterable, Sendable {
         case .instagramStory:
             // ~250px top (profile + close) and ~250px bottom (reply bar) on 1920.
             return [
-                SafeZoneRegion(rect: CGRect(x: 0, y: 0, width: 1, height: 0.13), label: "Profile"),
-                SafeZoneRegion(rect: CGRect(x: 0, y: 0.87, width: 1, height: 0.13), label: "Reply bar"),
+                SafeZoneRegion(rect: CGRect(x: 0, y: 0, width: 1, height: 0.13), label: String(localized: "Profile")),
+                SafeZoneRegion(rect: CGRect(x: 0, y: 0.87, width: 1, height: 0.13), label: String(localized: "Reply bar")),
             ]
         case .instagramReels:
             // ~220px right action rail; ~420px bottom (caption + audio + CTA). The
             // caption band stops at the rail so the two tile into a clean L.
             return [
-                SafeZoneRegion(rect: CGRect(x: 0.80, y: 0.42, width: 0.20, height: 0.46), label: "Actions"),
-                SafeZoneRegion(rect: CGRect(x: 0, y: 0.78, width: 0.80, height: 0.22), label: "Caption"),
+                SafeZoneRegion(rect: CGRect(x: 0.80, y: 0.42, width: 0.20, height: 0.46), label: String(localized: "Actions")),
+                SafeZoneRegion(rect: CGRect(x: 0, y: 0.78, width: 0.80, height: 0.22), label: String(localized: "Caption")),
             ]
         case .tiktok:
             // ~120px right rail (taller icon stack); ~483px bottom (username + caption).
             return [
-                SafeZoneRegion(rect: CGRect(x: 0.85, y: 0.38, width: 0.15, height: 0.50), label: "Actions"),
-                SafeZoneRegion(rect: CGRect(x: 0, y: 0.75, width: 0.85, height: 0.25), label: "Caption"),
+                SafeZoneRegion(rect: CGRect(x: 0.85, y: 0.38, width: 0.15, height: 0.50), label: String(localized: "Actions")),
+                SafeZoneRegion(rect: CGRect(x: 0, y: 0.75, width: 0.85, height: 0.25), label: String(localized: "Caption")),
             ]
         case .generic:
             // Conservative top + bottom bars covering most short-form platforms.
             return [
-                SafeZoneRegion(rect: CGRect(x: 0, y: 0, width: 1, height: 0.10), label: "Top UI"),
-                SafeZoneRegion(rect: CGRect(x: 0, y: 0.87, width: 1, height: 0.13), label: "Bottom UI"),
+                SafeZoneRegion(rect: CGRect(x: 0, y: 0, width: 1, height: 0.10), label: String(localized: "Top UI")),
+                SafeZoneRegion(rect: CGRect(x: 0, y: 0.87, width: 1, height: 0.13), label: String(localized: "Bottom UI")),
             ]
         }
     }

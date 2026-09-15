@@ -30,11 +30,11 @@ public enum CollageMode: String, Codable, Sendable, CaseIterable {
     /// Short user-facing label for a project card's subtitle.
     public var displayName: String {
         switch self {
-        case .grid: return "Grid"
-        case .polygon: return "Shapes"
-        case .template: return "Template"
-        case .carousel: return "Carousel"
-        case .video: return "Video"
+        case .grid: return String(localized: "Grid")
+        case .polygon: return String(localized: "Shapes")
+        case .template: return String(localized: "Template")
+        case .carousel: return String(localized: "Carousel")
+        case .video: return String(localized: "Video")
         }
     }
 }

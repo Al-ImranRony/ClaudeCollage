@@ -57,11 +57,22 @@ public final class TrialReminderScheduler {
         let lead = trialDays >= 2 ? 24 * 3600 : trialLength * 0.25
         let fireDate = start.addingTimeInterval(trialLength - lead)
 
-        let whenText = trialDays >= 2 ? "tomorrow" : "soon"
+        // Whole sentences per case rather than an assembled "per \(period)":
+        // assembling breaks the grammar in Japanese, Korean and Arabic.
+        let title = trialDays >= 2
+            ? String(localized: "Your free trial ends tomorrow")
+            : String(localized: "Your free trial ends soon")
+        let body: String
+        switch period {
+        case "month": body = String(localized: "You'll be charged \(price) per month unless you cancel in Settings before then.")
+        case "week": body = String(localized: "You'll be charged \(price) per week unless you cancel in Settings before then.")
+        case "once": body = String(localized: "You'll be charged \(price) unless you cancel in Settings before then.")
+        default: body = String(localized: "You'll be charged \(price) per year unless you cancel in Settings before then.")
+        }
         await notifications.schedule(TrialReminderRequest(
             identifier: Self.identifier,
-            title: "Your free trial ends \(whenText)",
-            body: "You'll be charged \(price) per \(period) unless you cancel in Settings before then.",
+            title: title,
+            body: body,
             fireDate: fireDate
         ))
     }

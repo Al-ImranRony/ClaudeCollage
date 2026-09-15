@@ -140,7 +140,7 @@ final class StartEditingSheetViewController: UIViewController {
             // Camera first: it is the only row that makes something that does not
             // exist yet, and it is the reason to open the app in the moment.
             QuickStartTile(
-                title: "Camera", subtitle: "Shoot one now, with a filter",
+                title: String(localized: "Camera"), subtitle: String(localized: "Shoot one now, with a filter"),
                 symbol: "camera.fill", identifier: "startEditingCamera"
             ) { [weak self] in self?.finish(self?.onCamera) },
             // "Photos", not "Image": every other row names an activity, and this
@@ -148,23 +148,23 @@ final class StartEditingSheetViewController: UIViewController {
             // for the same reason it survived the move off UIAlertController —
             // renaming it buys nothing and costs every test that keys on it.
             QuickStartTile(
-                title: "Photos", subtitle: "Pick photos, we'll fit a layout",
+                title: String(localized: "Photos"), subtitle: String(localized: "Pick photos, we'll fit a layout"),
                 symbol: "photo.on.rectangle.angled", identifier: "startEditingImage"
             ) { [weak self] in self?.finish(self?.onImage) },
             QuickStartTile(
-                title: "Video", subtitle: "A moving collage", symbol: "play.rectangle.fill",
+                title: String(localized: "Video"), subtitle: String(localized: "A moving collage"), symbol: "play.rectangle.fill",
                 identifier: "startEditingVideo"
             ) { [weak self] in self?.finish(self?.onVideo) },
             // Next to Video because both are multi-frame outputs. Its glyph is the
             // one the gallery badges a carousel card with, so the offer and the
             // result are visibly the same thing.
             QuickStartTile(
-                title: "Carousel", subtitle: "A multi-frame post for the feed",
+                title: String(localized: "Carousel"), subtitle: String(localized: "A multi-frame post for the feed"),
                 symbol: CollageMode.carousel.badgeSymbolName,
                 identifier: "startEditingCarousel"
             ) { [weak self] in self?.finish(self?.onCarousel) },
             QuickStartTile(
-                title: "Custom Canvas", subtitle: "Choose your own size",
+                title: String(localized: "Custom Canvas"), subtitle: String(localized: "Choose your own size"),
                 symbol: "square.resize", identifier: "startEditingCustomCanvas"
             ) { [weak self] in self?.finish(self?.onCustomCanvas) },
         ]

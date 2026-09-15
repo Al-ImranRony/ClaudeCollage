@@ -49,15 +49,15 @@ public enum PolygonTemplate: String, Codable, Sendable, CaseIterable {
 
     public var displayName: String {
         switch self {
-        case .diagonalLeft: return "Diag ↘"
-        case .diagonalRight: return "Diag ↙"
-        case .triangleTop: return "Peak"
-        case .triangleCenter: return "Fan"
-        case .hexagonGrid: return "Hive"
-        case .circleCenter: return "Halo"
-        case .doubleCircle: return "Duo"
-        case .arrowLeft: return "Arrow ◀"
-        case .arrowRight: return "Arrow ▶"
+        case .diagonalLeft: return String(localized: "Diag ↘")
+        case .diagonalRight: return String(localized: "Diag ↙")
+        case .triangleTop: return String(localized: "Peak")
+        case .triangleCenter: return String(localized: "Fan")
+        case .hexagonGrid: return String(localized: "Hive")
+        case .circleCenter: return String(localized: "Halo")
+        case .doubleCircle: return String(localized: "Duo")
+        case .arrowLeft: return String(localized: "Arrow ◀")
+        case .arrowRight: return String(localized: "Arrow ▶")
         }
     }
 

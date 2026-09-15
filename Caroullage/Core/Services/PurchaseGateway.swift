@@ -84,11 +84,11 @@ public enum PurchaseGatewayError: LocalizedError {
     public var errorDescription: String? {
         switch self {
         case .productUnavailable:
-            return "That plan isn't available right now. Please try again in a moment."
+            return String(localized: "That plan isn't available right now. Please try again in a moment.")
         case .unverifiedTransaction:
-            return "The App Store couldn't verify that purchase."
+            return String(localized: "The App Store couldn't verify that purchase.")
         case .storeUnreachable:
-            return "The App Store didn't respond. Check your connection and try again."
+            return String(localized: "The App Store didn't respond. Check your connection and try again.")
         }
     }
 }

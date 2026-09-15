@@ -33,10 +33,10 @@ public enum CanvasPreset: Sendable, Equatable, CaseIterable {
 
     public var displayName: String {
         switch self {
-        case .square: return "Square"
-        case .portrait: return "Portrait"
-        case .story: return "Story"
-        case .landscape: return "Landscape"
+        case .square: return String(localized: "Square")
+        case .portrait: return String(localized: "Portrait")
+        case .story: return String(localized: "Story")
+        case .landscape: return String(localized: "Landscape")
         }
     }
 

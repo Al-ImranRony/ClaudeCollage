@@ -85,7 +85,7 @@ final class CarouselPreviewViewController: UIViewController {
         close.setImage(UIImage(systemName: "xmark"), for: .normal)
         close.tintColor = .white
         close.accessibilityIdentifier = "previewCloseButton"
-        close.accessibilityLabel = "Close"
+        close.accessibilityLabel = String(localized: "Close")
         close.addTarget(self, action: #selector(closeTapped), for: .touchUpInside)
         close.translatesAutoresizingMaskIntoConstraints = false
 
@@ -99,7 +99,7 @@ final class CarouselPreviewViewController: UIViewController {
         safeZoneButton.setImage(UIImage(systemName: "rectangle.dashed"), for: .normal)
         safeZoneButton.tintColor = .white
         safeZoneButton.accessibilityIdentifier = "previewSafeZoneButton"
-        safeZoneButton.accessibilityLabel = "Safe Zone"
+        safeZoneButton.accessibilityLabel = String(localized: "Safe Zone")
         safeZoneButton.showsMenuAsPrimaryAction = true
         safeZoneButton.menu = makeSafeZoneMenu()
         safeZoneButton.translatesAutoresizingMaskIntoConstraints = false
@@ -108,7 +108,7 @@ final class CarouselPreviewViewController: UIViewController {
         export.setImage(UIImage(systemName: "square.and.arrow.up"), for: .normal)
         export.tintColor = .white
         export.accessibilityIdentifier = "previewExportButton"
-        export.accessibilityLabel = "Export"
+        export.accessibilityLabel = String(localized: "Export")
         export.addTarget(self, action: #selector(exportTapped), for: .touchUpInside)
         export.translatesAutoresizingMaskIntoConstraints = false
 
@@ -155,7 +155,7 @@ final class CarouselPreviewViewController: UIViewController {
                 self?.applySafeZone(preset)
             }
         }
-        return UIMenu(title: "Safe Zone", children: actions)
+        return UIMenu(title: String(localized: "Safe Zone"), children: actions)
     }
 
     // MARK: - Pages
@@ -186,8 +186,8 @@ final class CarouselPreviewViewController: UIViewController {
     @objc private func exportTapped() {
         guard let onExport else {
             let alert = UIAlertController(
-                title: "Export", message: "Export isn't available here.", preferredStyle: .alert)
-            alert.addAction(UIAlertAction(title: "OK", style: .default))
+                title: "Export", message: String(localized: "Export isn't available here."), preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: String(localized: "OK"), style: .default))
             present(alert, animated: true)
             return
         }

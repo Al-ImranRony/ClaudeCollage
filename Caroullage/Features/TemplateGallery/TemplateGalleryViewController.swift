@@ -208,7 +208,7 @@ final class TemplateGalleryViewController: UIViewController {
 
     /// Rebuilt on every change so the checkmark follows the selection.
     private func makeRatioMenu() -> UIMenu {
-        UIMenu(title: "Canvas Ratio", children: CanvasPreset.allCases.map { preset in
+        UIMenu(title: String(localized: "Canvas Ratio"), children: CanvasPreset.allCases.map { preset in
             // The subtitle is the aspect itself, which the old segmented control
             // never showed — "Story" told you nothing about 9:16.
             UIAction(

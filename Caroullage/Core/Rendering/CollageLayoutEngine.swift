@@ -51,14 +51,14 @@ public enum GridTemplate: String, Codable, Sendable, CaseIterable {
     /// Human-facing short name for the layout picker.
     public var displayName: String {
         switch self {
-        case .oneCell: return "Single"
-        case .twoUpHorizontal: return "2 · Side"
-        case .twoUpVertical: return "2 · Stack"
-        case .threeLeft: return "3 · Left"
-        case .threeRight: return "3 · Right"
-        case .fourSquare: return "4 · Grid"
-        case .sixGrid: return "6 · Grid"
-        case .nineGrid: return "9 · Grid"
+        case .oneCell: return String(localized: "Single")
+        case .twoUpHorizontal: return String(localized: "2 · Side")
+        case .twoUpVertical: return String(localized: "2 · Stack")
+        case .threeLeft: return String(localized: "3 · Left")
+        case .threeRight: return String(localized: "3 · Right")
+        case .fourSquare: return String(localized: "4 · Grid")
+        case .sixGrid: return String(localized: "6 · Grid")
+        case .nineGrid: return String(localized: "9 · Grid")
         }
     }
 

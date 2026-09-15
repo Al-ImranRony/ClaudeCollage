@@ -419,6 +419,16 @@ device. Output is gitignored (~200 MB). The icon was Step 05b's. App Previews no
 **6.10 performance:** `PerformanceUITests` — cold launch and memory through the video editor as XCTest
 metrics with baselines; the Instruments pass is the owner's on hardware, recorded in the account-gated doc.
 
+### Step 06 — the pre-submission localization pass (2026-09-16)
+The ~130 UIKit literals the 6.4 note owed, plus the ones the survey found beyond them: 200 sites
+wrapped in `String(localized:)` (tools, panels, tabs, alerts, toasts, menus, sheet rows, gallery
+counts, layout/shape names, safe-zone captions, StoreKit errors, the trial reminder as whole
+sentences per period), 196 new catalog keys in eleven languages — 429 keys total. Two SwiftUI
+traps fixed (a `String` in `Text` is verbatim; a concatenated literal half-localizes). Verified by
+the compiler's own extraction on a scratch catalog (nothing unextracted), `LocalizationTests`, the
+UI suite, and the regenerated Japanese screenshots. Still owed: a native-speaker review of the
+in-house translations before submission (the price and renewal sentences first).
+
 ### Step 07 — Home showcase redesign (2026-08-29)
 An unplanned interstitial, taken on after Step 06's shell work: Home was well organised but
 schematic — every template previewed as empty "+" chips, so the screen never showed what the app

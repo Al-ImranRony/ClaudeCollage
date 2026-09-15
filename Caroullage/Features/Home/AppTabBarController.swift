@@ -253,7 +253,7 @@ final class AppTabBarController: UITabBarController {
         config.cornerStyle = .capsule
         plusButton.configuration = config
         plusButton.accessibilityIdentifier = "startEditingButton"
-        plusButton.accessibilityLabel = "Start Editing"
+        plusButton.accessibilityLabel = String(localized: "Start Editing")
         // A capsule's ends are semicircles; `.continuous` at that radius renders a
         // squircle instead, which is the shape the pill must never drift toward.
         plusButton.layer.cornerCurve = .circular

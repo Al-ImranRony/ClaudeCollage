@@ -50,15 +50,15 @@ final class ProjectsViewController: UIViewController {
 
         static let allProjects = Configuration(
             modeFilter: nil,
-            navigationTitle: "Projects",
-            searchPlaceholder: "Search your collages",
+            navigationTitle: String(localized: "Projects"),
+            searchPlaceholder: String(localized: "Search your collages"),
             gridIdentifier: "projectsGrid",
             searchIdentifier: "projectsSearchField",
             sortIdentifier: "projectsSortControl",
             sortOrders: GallerySortOrder.allCases,
             emptyState: .projects,
-            itemSingular: "Collage",
-            itemPlural: "Collages")
+            itemSingular: String(localized: "Collage"),
+            itemPlural: String(localized: "Collages"))
     }
 
     private let configuration: Configuration
@@ -213,7 +213,7 @@ final class ProjectsViewController: UIViewController {
         let chip = FilterMenuChip(
             symbolName: "arrow.up.arrow.down",
             identifier: configuration.sortIdentifier,
-            accessibilityLabel: "Sort")
+            accessibilityLabel: String(localized: "Sort"))
         chip.setValue(sortOrder.title)
         chip.menu = makeSortMenu()
         return chip
@@ -221,7 +221,7 @@ final class ProjectsViewController: UIViewController {
 
     /// Rebuilt on every change so the checkmark follows the selection.
     private func makeSortMenu() -> UIMenu {
-        UIMenu(title: "Sort by", children: configuration.sortOrders.map { order in
+        UIMenu(title: String(localized: "Sort by"), children: configuration.sortOrders.map { order in
             UIAction(
                 title: order.title,
                 image: UIImage(systemName: order.symbolName),
@@ -339,23 +339,23 @@ extension ProjectsViewController: UICollectionViewDataSource, UICollectionViewDe
 
         return UIContextMenuConfiguration(identifier: nil, previewProvider: nil) { [weak self] _ in
             guard let self else { return UIMenu(children: []) }
-            let rename = UIAction(title: "Rename", image: UIImage(systemName: "pencil")) { _ in
+            let rename = UIAction(title: String(localized: "Rename"), image: UIImage(systemName: "pencil")) { _ in
                 self.promptRename(for: summary)
             }
             let duplicate = UIAction(
-                title: "Duplicate", image: UIImage(systemName: "plus.square.on.square")
+                title: String(localized: "Duplicate"), image: UIImage(systemName: "plus.square.on.square")
             ) { _ in
                 Haptics.success()
                 self.onDuplicateProject?(summary.id)
                 self.reload()
             }
             let export = UIAction(
-                title: "Export", image: UIImage(systemName: "square.and.arrow.up")
+                title: String(localized: "Export"), image: UIImage(systemName: "square.and.arrow.up")
             ) { _ in
                 self.onExportProject?(summary.id)
             }
             let delete = UIAction(
-                title: "Delete", image: UIImage(systemName: "trash"), attributes: .destructive
+                title: String(localized: "Delete"), image: UIImage(systemName: "trash"), attributes: .destructive
             ) { _ in
                 self.confirmDelete(summary)
             }
@@ -367,11 +367,11 @@ extension ProjectsViewController: UICollectionViewDataSource, UICollectionViewDe
     /// and names the project, so there is no doubt which one is about to go.
     private func confirmDelete(_ summary: ProjectSummary) {
         let alert = UIAlertController(
-            title: "Delete \u{201C}\(summary.displayName)\u{201D}?",
-            message: "This can't be undone.",
+            title: String(localized: "Delete \u{201C}\(summary.displayName)\u{201D}?"),
+            message: String(localized: "This can't be undone."),
             preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
-        alert.addAction(UIAlertAction(title: "Delete", style: .destructive) { [weak self] _ in
+        alert.addAction(UIAlertAction(title: String(localized: "Cancel"), style: .cancel))
+        alert.addAction(UIAlertAction(title: String(localized: "Delete"), style: .destructive) { [weak self] _ in
             Haptics.error()
             self?.onDeleteProject?(summary.id)
             self?.reload()
@@ -380,15 +380,15 @@ extension ProjectsViewController: UICollectionViewDataSource, UICollectionViewDe
     }
 
     private func promptRename(for summary: ProjectSummary) {
-        let alert = UIAlertController(title: "Rename", message: nil, preferredStyle: .alert)
+        let alert = UIAlertController(title: String(localized: "Rename"), message: nil, preferredStyle: .alert)
         alert.addTextField { field in
             field.text = summary.name
             field.placeholder = summary.displayName
             field.autocapitalizationType = .sentences
             field.accessibilityIdentifier = "renameField"
         }
-        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
-        alert.addAction(UIAlertAction(title: "Save", style: .default) { [weak self, weak alert] _ in
+        alert.addAction(UIAlertAction(title: String(localized: "Cancel"), style: .cancel))
+        alert.addAction(UIAlertAction(title: String(localized: "Save"), style: .default) { [weak self, weak alert] _ in
             let name = alert?.textFields?.first?.text ?? ""
             self?.onRenameProject?(summary.id, name)
             self?.reload()

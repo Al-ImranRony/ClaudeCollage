@@ -265,7 +265,7 @@ public final class PurchaseService: ObservableObject {
 
     private static func message(for error: Error) -> String {
         (error as? LocalizedError)?.errorDescription
-            ?? "Something went wrong with the App Store. Please try again."
+            ?? String(localized: "Something went wrong with the App Store. Please try again.")
     }
 
     /// Export credits the user currently holds.

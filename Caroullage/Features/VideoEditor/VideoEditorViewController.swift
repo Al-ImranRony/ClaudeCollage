@@ -130,37 +130,37 @@ final class VideoEditorViewController: UIViewController {
         ["trim", "volume", "transition", "styleText", "timingText"]
 
     private static let clipTools: [EditorTool] = [
-        EditorTool(id: "swap", title: "Swap", systemImage: "arrow.left.arrow.right",
+        EditorTool(id: "swap", title: String(localized: "Swap"), systemImage: "arrow.left.arrow.right",
                    accessibilityIdentifier: "swapClipTool",
                    // The arrows slide, which is the gesture the tool performs.
                    emphasis: .wiggle),
-        EditorTool(id: "trim", title: "Trim", systemImage: "scissors",
+        EditorTool(id: "trim", title: String(localized: "Trim"), systemImage: "scissors",
                    accessibilityIdentifier: "trimClipTool",
                    // Snipping.
                    emphasis: .wiggle),
-        EditorTool(id: "volume", title: "Volume", systemImage: "speaker.wave.2",
+        EditorTool(id: "volume", title: String(localized: "Volume"), systemImage: "speaker.wave.2",
                    accessibilityIdentifier: "volumeClipTool",
                    // The waves are layers that mean something in order.
                    emphasis: .variableColor),
-        EditorTool(id: "transition", title: "Transition", systemImage: "wand.and.rays",
+        EditorTool(id: "transition", title: String(localized: "Transition"), systemImage: "wand.and.rays",
                    accessibilityIdentifier: "transitionClipTool",
                    // The rays fire outward in turn.
                    emphasis: .variableColor),
-        EditorTool(id: "clear", title: "Clear", systemImage: "trash",
+        EditorTool(id: "clear", title: String(localized: "Clear"), systemImage: "trash",
                    accessibilityIdentifier: "clearClipTool",
                    emphasis: .wiggle),
     ]
 
     private static let textTools: [EditorTool] = [
-        EditorTool(id: "editText", title: "Edit", systemImage: "keyboard",
+        EditorTool(id: "editText", title: String(localized: "Edit"), systemImage: "keyboard",
                    accessibilityIdentifier: "editTextTool"),
-        EditorTool(id: "styleText", title: "Style", systemImage: "textformat",
+        EditorTool(id: "styleText", title: String(localized: "Style"), systemImage: "textformat",
                    accessibilityIdentifier: "styleTextTool"),
-        EditorTool(id: "timingText", title: "Timing", systemImage: "clock",
+        EditorTool(id: "timingText", title: String(localized: "Timing"), systemImage: "clock",
                    accessibilityIdentifier: "timingTextTool",
                    // A clock's hands go round.
                    emphasis: .rotate),
-        EditorTool(id: "deleteText", title: "Delete", systemImage: "trash",
+        EditorTool(id: "deleteText", title: String(localized: "Delete"), systemImage: "trash",
                    accessibilityIdentifier: "deleteTextTool",
                    emphasis: .wiggle),
     ]
@@ -206,7 +206,7 @@ final class VideoEditorViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        title = "Video Collage"
+        title = String(localized: "Video Collage")
         view.backgroundColor = Theme.Color.background
         navigationItem.largeTitleDisplayMode = .never
         setupNavigationBar()
@@ -251,11 +251,11 @@ final class VideoEditorViewController: UIViewController {
             image: UIImage(systemName: "square.and.arrow.up"),
             style: .plain, target: self, action: #selector(exportTapped))
         export.accessibilityIdentifier = "videoExportButton"
-        export.accessibilityLabel = "Export"
+        export.accessibilityLabel = String(localized: "Export")
         undoItem.accessibilityIdentifier = "videoUndoButton"
-        undoItem.accessibilityLabel = "Undo"
+        undoItem.accessibilityLabel = String(localized: "Undo")
         redoItem.accessibilityIdentifier = "videoRedoButton"
-        redoItem.accessibilityLabel = "Redo"
+        redoItem.accessibilityLabel = String(localized: "Redo")
         navigationItem.rightBarButtonItems = [export, redoItem, undoItem]
     }
 
@@ -359,19 +359,19 @@ final class VideoEditorViewController: UIViewController {
         textOutStepper.addTarget(self, action: #selector(textOutChanged), for: .valueChanged)
 
         toolRail.setBaseTools([
-            EditorTool(id: "layout", title: "Layout", systemImage: "square.grid.2x2",
+            EditorTool(id: "layout", title: String(localized: "Layout"), systemImage: "square.grid.2x2",
                        accessibilityIdentifier: "videoLayoutButton",
                        emphasis: .bounce),
-            EditorTool(id: "frame", title: "Frame", systemImage: "square.dashed",
+            EditorTool(id: "frame", title: String(localized: "Frame"), systemImage: "square.dashed",
                        accessibilityIdentifier: "videoFrameTool"),
             // Identifiers preserved from the old pill buttons / toolbar so
             // VideoEditorUITests keeps matching.
-            EditorTool(id: "text", title: "Text", systemImage: "textformat",
+            EditorTool(id: "text", title: String(localized: "Text"), systemImage: "textformat",
                        accessibilityIdentifier: "videoAddTextButton"),
-            EditorTool(id: "sticker", title: "Sticker", systemImage: "face.smiling",
+            EditorTool(id: "sticker", title: String(localized: "Sticker"), systemImage: "face.smiling",
                        accessibilityIdentifier: "videoAddStickerButton",
                        emphasis: .bounce),
-            EditorTool(id: "audio", title: "Audio", systemImage: "music.note",
+            EditorTool(id: "audio", title: String(localized: "Audio"), systemImage: "music.note",
                        accessibilityIdentifier: "videoMusicButton",
                        // A note keeping time.
                        emphasis: .bounce),
@@ -397,7 +397,7 @@ final class VideoEditorViewController: UIViewController {
 
         switch id {
         case "layout":      layoutTapped()
-        case "frame":       openPanel(makeFramePanel(), title: "Frame", id: id)
+        case "frame":       openPanel(makeFramePanel(), title: String(localized: "Frame"), id: id)
         case "text":        addTextTapped()
         case "sticker":     addStickerTapped()
         case "audio":       musicTapped()
@@ -407,11 +407,11 @@ final class VideoEditorViewController: UIViewController {
             viewModel.selectedIndex.map { presentTrimPanel(for: $0) }
         case "volume":
             if let index = viewModel.selectedIndex {
-                openPanel(makeVolumePanel(for: index), title: "Volume", id: id)
+                openPanel(makeVolumePanel(for: index), title: String(localized: "Volume"), id: id)
             }
         case "transition":
             if let index = viewModel.selectedIndex {
-                openPanel(makeTransitionPanel(for: index), title: "Transition", id: id)
+                openPanel(makeTransitionPanel(for: index), title: String(localized: "Transition"), id: id)
             }
         case "clear":
             if let index = viewModel.selectedIndex {
@@ -422,11 +422,11 @@ final class VideoEditorViewController: UIViewController {
             selectedTextID.map { presentTextStyleSheet(for: $0) }
         case "styleText":
             if let textID = selectedTextID {
-                openPanel(makeTextStylePanel(for: textID), title: "Style", id: id)
+                openPanel(makeTextStylePanel(for: textID), title: String(localized: "Style"), id: id)
             }
         case "timingText":
             if let textID = selectedTextID {
-                openPanel(makeTextTimingPanel(for: textID), title: "Timing", id: id)
+                openPanel(makeTextTimingPanel(for: textID), title: String(localized: "Timing"), id: id)
             }
         case "deleteText":
             if let textID = selectedTextID {
@@ -458,7 +458,7 @@ final class VideoEditorViewController: UIViewController {
         viewModel.selectCell(at: index)
         Haptics.selectionChanged()
         toolRail.setContext(EditorRailContext(
-            chipTitle: "Clip", chipSystemImage: "film", tools: Self.clipTools))
+            chipTitle: String(localized: "Clip"), chipSystemImage: "film", tools: Self.clipTools))
     }
 
     private func selectTextOverlay(_ id: UUID) {
@@ -473,7 +473,7 @@ final class VideoEditorViewController: UIViewController {
         viewModel.selectCell(at: nil)
         Haptics.selectionChanged()
         toolRail.setContext(EditorRailContext(
-            chipTitle: "Text", chipSystemImage: "textformat", tools: Self.textTools))
+            chipTitle: String(localized: "Text"), chipSystemImage: "textformat", tools: Self.textTools))
     }
 
     private func clearSelection() {
@@ -644,7 +644,7 @@ final class VideoEditorViewController: UIViewController {
         loopSwitch.isOn = isLooping
 
         let more = ThemeButton(
-            style: .tertiary, title: "More Options…",
+            style: .tertiary, title: String(localized: "More Options…"),
             image: UIImage(systemName: "slider.horizontal.3"),
             action: UIAction { [weak self] _ in
                 guard let self, let index = self.viewModel.selectedIndex else { return }
@@ -672,7 +672,7 @@ final class VideoEditorViewController: UIViewController {
             let resolved = cell.trim.clamped(toAssetDuration: max(0.1, duration))
             let panel = self.makeTrimPanel(for: index, duration: max(0.1, duration),
                                            trim: resolved, isLooping: cell.isLooping)
-            self.openPanel(panel, title: "Trim", id: "trim")
+            self.openPanel(panel, title: String(localized: "Trim"), id: "trim")
         }
     }
 
@@ -731,12 +731,12 @@ final class VideoEditorViewController: UIViewController {
         textOutStepper.value = end
         textInStepper.accessibilityIdentifier = "textTimingInStepper"
         textOutStepper.accessibilityIdentifier = "textTimingOutStepper"
-        textInStepper.accessibilityLabel = "Caption start"
-        textOutStepper.accessibilityLabel = "Caption end"
+        textInStepper.accessibilityLabel = String(localized: "Caption start")
+        textOutStepper.accessibilityLabel = String(localized: "Caption end")
         refreshTimingLabels()
 
         let wholeVideo = ThemeButton(
-            style: .tertiary, title: "Whole Video",
+            style: .tertiary, title: String(localized: "Whole Video"),
             image: UIImage(systemName: "arrow.left.and.right"),
             action: UIAction { [weak self] _ in self?.clearTextTiming() })
         wholeVideo.accessibilityIdentifier = "textTimingWholeVideoButton"
@@ -1006,7 +1006,7 @@ final class VideoEditorViewController: UIViewController {
     /// actual play/pause decision is made.
     private func toggleTimelinePlayback() {
         guard viewModel.hasContent else {
-            showInfo(title: "Nothing to Play", message: "Add a video to a slot first.")
+            showInfo(title: String(localized: "Nothing to Play"), message: String(localized: "Add a video to a slot first."))
             return
         }
         setPlaying(!isPlayingIntent)
@@ -1263,25 +1263,25 @@ final class VideoEditorViewController: UIViewController {
     }
 
     private func musicTapped() {
-        let sheet = UIAlertController(title: "Background Music", message: nil, preferredStyle: .actionSheet)
-        sheet.addAction(UIAlertAction(title: viewModel.music == nil ? "Add Music…" : "Replace Music…",
+        let sheet = UIAlertController(title: String(localized: "Background Music"), message: nil, preferredStyle: .actionSheet)
+        sheet.addAction(UIAlertAction(title: viewModel.music == nil ? String(localized: "Add Music…") : String(localized: "Replace Music…"),
                                       style: .default) { [weak self] _ in
             self?.presentMusicPicker()
         })
         if viewModel.music != nil {
-            sheet.addAction(UIAlertAction(title: "Music Volume…", style: .default) { [weak self] _ in
+            sheet.addAction(UIAlertAction(title: String(localized: "Music Volume…"), style: .default) { [weak self] _ in
                 self?.presentMusicVolume()
             })
-            sheet.addAction(UIAlertAction(title: "✨ Sync Cells to Beat", style: .default) { [weak self] _ in
+            sheet.addAction(UIAlertAction(title: String(localized: "✨ Sync Cells to Beat"), style: .default) { [weak self] _ in
                 self?.syncToBeat()
             })
-            sheet.addAction(UIAlertAction(title: "Remove Music", style: .destructive) { [weak self] _ in
+            sheet.addAction(UIAlertAction(title: String(localized: "Remove Music"), style: .destructive) { [weak self] _ in
                 self?.viewModel.removeMusic()
                 Haptics.tap()
-                self?.showToast("Music removed")
+                self?.showToast(String(localized: "Music removed"))
             })
         }
-        sheet.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        sheet.addAction(UIAlertAction(title: String(localized: "Cancel"), style: .cancel))
         anchorPopover(sheet) { popover in
             popover.sourceView = self.toolRail
         }
@@ -1299,7 +1299,7 @@ final class VideoEditorViewController: UIViewController {
         let picker = VideoSourcePicker(
             willTranscode: { [weak self] in
                 guard let self else { return }
-                let progressVC = ExportProgressViewController(title: "Importing clip…")
+                let progressVC = ExportProgressViewController(title: String(localized: "Importing clip…"))
                 importProgress = progressVC
                 self.present(progressVC, animated: true)
             },
@@ -1419,7 +1419,7 @@ final class VideoEditorViewController: UIViewController {
     private func addTextTapped() {
         Haptics.tap()
         let overlay = TextOverlay(
-            text: "Your text", colorHex: "#FFFFFF",
+            text: String(localized: "Your text"), colorHex: "#FFFFFF",
             frame: CGRect(x: 0.12, y: 0.44, width: 0.76, height: 0.14))
         let id = viewModel.addTextOverlay(overlay)
         presentTextStyleSheet(for: id)
@@ -1433,7 +1433,7 @@ final class VideoEditorViewController: UIViewController {
                 stickerID: entry.id, symbolName: entry.symbol, colorHex: entry.colorHex)
             self.selectedStickerID = self.viewModel.addSticker(overlay)
             Haptics.success()
-            self.showToast("Drag to position · double-tap to remove")
+            self.showToast(String(localized: "Drag to position · double-tap to remove"))
         }
         present(picker, animated: true)
     }
@@ -1470,34 +1470,34 @@ final class VideoEditorViewController: UIViewController {
     /// them (the plan's CapCut-style auto-beat-sync). Analysis is off the main
     /// thread and shows the shared progress modal, since a long track takes a moment.
     private func syncToBeat() {
-        let progressVC = ExportProgressViewController(title: "Finding the beat…")
+        let progressVC = ExportProgressViewController(title: String(localized: "Finding the beat…"))
         present(progressVC, animated: true)
         Task { @MainActor in
             let synced = (try? await self.viewModel.detectAndSyncBeats()) ?? false
             progressVC.dismiss(animated: true) {
                 if synced {
                     Haptics.success()
-                    self.showToast("Cells synced to the beat")
+                    self.showToast(String(localized: "Cells synced to the beat"))
                 } else {
-                    self.showInfo(title: "Couldn't Sync",
-                                  message: "The music couldn't be analyzed. Try a different track.")
+                    self.showInfo(title: String(localized: "Couldn't Sync"),
+                                  message: String(localized: "The music couldn't be analyzed. Try a different track."))
                 }
             }
         }
     }
 
     private func presentMusicVolume() {
-        let alert = UIAlertController(title: "Music Volume", message: "\n\n", preferredStyle: .alert)
+        let alert = UIAlertController(title: String(localized: "Music Volume"), message: "\n\n", preferredStyle: .alert)
         let slider = UISlider(frame: CGRect(x: 20, y: 60, width: 230, height: 20))
         slider.minimumValue = 0
         slider.maximumValue = 1
         slider.value = Float(viewModel.music?.volume ?? 1)
         slider.accessibilityIdentifier = "musicVolumeSlider"
         alert.view.addSubview(slider)
-        alert.addAction(UIAlertAction(title: "Done", style: .default) { [weak self] _ in
+        alert.addAction(UIAlertAction(title: String(localized: "Done"), style: .default) { [weak self] _ in
             self?.viewModel.setMusicVolume(Double(slider.value))
         })
-        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        alert.addAction(UIAlertAction(title: String(localized: "Cancel"), style: .cancel))
         present(alert, animated: true)
     }
 
@@ -1537,14 +1537,14 @@ final class VideoEditorViewController: UIViewController {
         let creditSession = ExportCreditSession()
         if payment == .credit, !creditSession.begin() {
             Haptics.error()
-            showInfo(title: "No Credits Left", message: "Buy a credit or start Premium to export at full quality.")
+            showInfo(title: String(localized: "No Credits Left"), message: String(localized: "Buy a credit or start Premium to export at full quality."))
             return
         }
         dismiss(animated: true) { [weak self] in
             guard let self else { return }
             guard self.viewModel.hasContent else {
                 creditSession.failed()
-                self.showInfo(title: "Nothing to Export", message: "Add a video to a slot first.")
+                self.showInfo(title: String(localized: "Nothing to Export"), message: String(localized: "Add a video to a slot first."))
                 return
             }
             self.setPlaying(false)
@@ -1582,7 +1582,7 @@ final class VideoEditorViewController: UIViewController {
                         try await PhotoLibrarySaver().saveVideo(at: url)
                         creditSession.succeeded()
                         progressVC.dismiss(animated: true) {
-                            self.showSuccess("Saved to Photos")
+                            self.showSuccess(String(localized: "Saved to Photos"))
                             RatingPrompt.exportSucceeded(in: self.view.window?.windowScene)
                         }
                     }
@@ -1590,13 +1590,13 @@ final class VideoEditorViewController: UIViewController {
                     // A deliberate cancel isn't a failure — no error alert, and
                     // the credit goes back: they got no file.
                     creditSession.cancelled()
-                    progressVC.dismiss(animated: true) { self.showToast("Export cancelled") }
+                    progressVC.dismiss(animated: true) { self.showToast(String(localized: "Export cancelled")) }
                 } catch {
                     creditSession.failed()
                     progressVC.dismiss(animated: true) {
                         Haptics.error()
-                        self.showInfo(title: "Export Failed",
-                                      message: "The video couldn't be created. Please try again.")
+                        self.showInfo(title: String(localized: "Export Failed"),
+                                      message: String(localized: "The video couldn't be created. Please try again."))
                     }
                 }
             }
@@ -1629,7 +1629,7 @@ final class VideoEditorViewController: UIViewController {
 
     private func showInfo(title: String, message: String) {
         let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "OK", style: .default))
+        alert.addAction(UIAlertAction(title: String(localized: "OK"), style: .default))
         present(alert, animated: true)
     }
 
@@ -1708,6 +1708,6 @@ extension VideoEditorViewController: UIDocumentPickerDelegate {
         // security-scoped bookmark dance is needed.
         viewModel.setMusic(assetID: UUID(), asset: AVURLAsset(url: url))
         Haptics.tap()
-        showToast("Music added")
+        showToast(String(localized: "Music added"))
     }
 }

@@ -516,7 +516,7 @@ final class HomeViewController: UIViewController {
     }
 
     private func makeSuggestionsSection() -> UIStackView {
-        let header = sectionHeader("Suggested For You")
+        let header = sectionHeader(String(localized: "Suggested For You"))
         let section = UIStackView(arrangedSubviews: [
             header, enableSuggestionsButton, suggestionsStrip,
         ])
@@ -532,8 +532,8 @@ final class HomeViewController: UIViewController {
 
     private func makeEnableSuggestionsButton() -> UIView {
         var config = UIButton.Configuration.tinted()
-        config.title = "Suggest layouts from my photos"
-        config.subtitle = "Reads your recent photos on this device to pick a layout."
+        config.title = String(localized: "Suggest layouts from my photos")
+        config.subtitle = String(localized: "Reads your recent photos on this device to pick a layout.")
         config.image = UIImage(systemName: "wand.and.stars")
         config.imagePadding = 8
         config.cornerStyle = .large
@@ -569,12 +569,11 @@ final class HomeViewController: UIViewController {
 
     private func showAccessDeniedNote() {
         let alert = UIAlertController(
-            title: "Photo access is off",
-            message: "Suggestions need permission to read your recent photos. "
-                + "You can turn it on in Settings — everything else keeps working without it.",
+            title: String(localized: "Photo access is off"),
+            message: String(localized: "Suggestions need permission to read your recent photos. You can turn it on in Settings — everything else keeps working without it."),
             preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "Not Now", style: .cancel))
-        alert.addAction(UIAlertAction(title: "Open Settings", style: .default) { _ in
+        alert.addAction(UIAlertAction(title: String(localized: "Not Now"), style: .cancel))
+        alert.addAction(UIAlertAction(title: String(localized: "Open Settings"), style: .default) { _ in
             guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
             UIApplication.shared.open(url)
         })
@@ -1070,9 +1069,9 @@ final class HomeEmptyStateView: UIView {
 
         static let projects = Content(
             symbol: "square.grid.2x2.fill",
-            title: "No collages yet",
-            subtitle: "Create your first grid collage to get started.",
-            buttonTitle: "New Collage",
+            title: String(localized: "No collages yet"),
+            subtitle: String(localized: "Create your first grid collage to get started."),
+            buttonTitle: String(localized: "New Collage"),
             buttonIdentifier: "emptyStateCreateButton")
     }
 
