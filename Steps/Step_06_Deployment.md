@@ -285,10 +285,10 @@ Required since May 2024; enforced for all 2026 submissions.
 
 ## Phase 6.9 — Rating Prompt Trigger Logic
 
-- [ ] Call `SKStoreReviewRequest.requestReview(in:)` after the user's **first successful export**
-- [ ] Guarded by: `PurchaseService.totalExportCount == 1` (track in UserDefaults)
-- [ ] Never on first launch, never after an error
-- [ ] Apple enforces the once-per-365-days rule; add your own guard as well to be safe
+- [x] Call `AppStore.requestReview(in:)` (StoreKit's current API; `SKStoreReviewController` is deprecated) after the user's **first successful export** — `RatingPrompt.exportSucceeded(in:)` at all four success moments (grid, video, carousel video, carousel image set), 2.5s after the success overlay so the sheet does not land on the celebration
+- [x] Guarded by: `RatingPromptPolicy.exportCount == 1` (UserDefaults, `rating.exportCount`) — `RatingPromptPolicyTests`
+- [x] Never on first launch, never after an error — only the success path records an export; the policy has no other entry point
+- [x] Apple enforces the once-per-365-days rule; our own guard records `rating.lastRequestedAt` and refuses inside a year. Silent under `-UITestMode` (now passed by every UI test), since a development build shows the sheet on every request
 
 ---
 

@@ -25,6 +25,10 @@ extension XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments += ["-hasSeenOnboarding", hasSeenOnboarding ? "YES" : "NO"]
         app.launchArguments += ["-AppleLanguages", "(en)"]
+        // Phase 6.9: the rating prompt stays silent under this flag. On a
+        // development build the system's review sheet appears on every request,
+        // which would land on top of ExportSaveUITests' success moment.
+        app.launchArguments += ["-UITestMode", "1"]
         return app
     }
 }

@@ -1271,6 +1271,7 @@ final class GridEditorViewController: UIViewController {
                     guard let self else { return }
                     if success {
                         self.showSuccess("Saved to Photos")
+                        RatingPrompt.exportSucceeded(in: self.view.window?.windowScene)
                     } else {
                         Haptics.error()
                         self.showAlert("Save Failed", "The collage could not be saved to Photos.")

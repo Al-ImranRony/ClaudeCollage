@@ -1583,6 +1583,7 @@ final class VideoEditorViewController: UIViewController {
                         creditSession.succeeded()
                         progressVC.dismiss(animated: true) {
                             self.showSuccess("Saved to Photos")
+                            RatingPrompt.exportSucceeded(in: self.view.window?.windowScene)
                         }
                     }
                 } catch VideoComposer.ComposerError.cancelled {

@@ -491,6 +491,7 @@ final class CarouselEditorViewController: UIViewController {
                         creditSession.succeeded()
                         progressVC.dismiss(animated: true) {
                             self.showSuccess("Saved to Photos")
+                            RatingPrompt.exportSucceeded(in: self.view.window?.windowScene)
                         }
                     }
                 } catch VideoComposer.ComposerError.cancelled {
@@ -537,6 +538,7 @@ final class CarouselEditorViewController: UIViewController {
                     creditSession.succeeded()
                     spinner.dismiss(animated: true) {
                         self.showSuccess("Saved \(frames.count) images")
+                        RatingPrompt.exportSucceeded(in: self.view.window?.windowScene)
                     }
                 } catch {
                     creditSession.failed()
