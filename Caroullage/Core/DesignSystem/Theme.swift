@@ -48,7 +48,10 @@ public enum Theme {
         /// Because it now covers a few percent of the screen rather than most
         /// of the chrome, it can be fully saturated without shouting.
         public static var accent: UIColor {
-            dynamic(light: 0x5B54E8, dark: 0x8B85F5)
+            // Under Increase Contrast the indigo deepens (light) or lightens
+            // (dark) until it clears 4.5:1 on the app surfaces — a selection
+            // stroke that reads as body text would.
+            dynamic(light: 0x5B54E8, dark: 0x8B85F5, lightHigh: 0x3B34C0, darkHigh: 0xB4B0FF)
         }
 
         /// The far end of the spark ramp — `accent` → `accentFar`.
@@ -147,7 +150,9 @@ public enum Theme {
         /// Supporting ink. Two steps up the same grey, and a little darker than
         /// the slate it replaces, which was scraping 4.83:1 on white.
         public static var textSecondary: UIColor {
-            dynamic(light: 0x6E6E77, dark: 0xA1A1AA)
+            // 5.6:1 on white normally; the high-contrast step is AAA (7:1) on
+            // every surface, in both appearances.
+            dynamic(light: 0x6E6E77, dark: 0xA1A1AA, lightHigh: 0x4B4B53, darkHigh: 0xC4C4CC)
         }
 
         /// Ink for anything sitting on `accentStrong`.
@@ -208,7 +213,9 @@ public enum Theme {
         /// The palette's #E5E7EB moved onto the neutral axis as #E4E4E7; the
         /// two are indistinguishable side by side.
         public static var separator: UIColor {
-            dynamic(light: 0xE4E4E7, dark: 0x2B2B31)
+            // A hairline is 1.3:1 by design; under Increase Contrast it becomes
+            // a line you can see (≥ 4.5:1 on the surfaces).
+            dynamic(light: 0xE4E4E7, dark: 0x2B2B31, lightHigh: 0x6B6B73, darkHigh: 0x9A9AA3)
         }
 
         /// Secondary Background from the palette, #F7F7F8, doing the job it is
@@ -287,9 +294,20 @@ public enum Theme {
 
         // MARK: helpers
 
-        private static func dynamic(light: UInt32, dark: UInt32) -> UIColor {
+        /// A colour that follows the appearance, and — when a token names them —
+        /// Settings → Accessibility → Increase Contrast (`accessibilityContrast
+        /// == .high`). Tokens without high-contrast values keep their normal
+        /// ones under the setting, which is right for anything already at AAA.
+        private static func dynamic(light: UInt32, dark: UInt32,
+                                    lightHigh: UInt32? = nil, darkHigh: UInt32? = nil) -> UIColor {
             UIColor { traits in
-                traits.userInterfaceStyle == .dark ? rgb(dark) : rgb(light)
+                let high = traits.accessibilityContrast == .high
+                switch (traits.userInterfaceStyle == .dark, high) {
+                case (true, true): return rgb(darkHigh ?? dark)
+                case (true, false): return rgb(dark)
+                case (false, true): return rgb(lightHigh ?? light)
+                case (false, false): return rgb(light)
+                }
             }
         }
 

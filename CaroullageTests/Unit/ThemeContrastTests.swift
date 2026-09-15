@@ -17,6 +17,7 @@ import UIKit
 import XCTest
 @testable import Caroullage
 
+@MainActor
 final class ThemeContrastTests: XCTestCase {
 
     private let body: CGFloat = 4.5
@@ -112,10 +113,14 @@ final class ThemeContrastTests: XCTestCase {
         on background: UIColor,
         atLeast threshold: CGFloat,
         style: UIUserInterfaceStyle,
+        contrast: UIAccessibilityContrast = .normal,
         file: StaticString = #filePath,
         line: UInt = #line
     ) {
-        let traits = UITraitCollection(userInterfaceStyle: style)
+        let traits = UITraitCollection { mutable in
+            mutable.userInterfaceStyle = style
+            mutable.accessibilityContrast = contrast
+        }
         let ratio = contrastRatio(
             foreground.resolvedColor(with: traits),
             background.resolvedColor(with: traits)
@@ -123,11 +128,53 @@ final class ThemeContrastTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(
             ratio, threshold,
             String(
-                format: "%@: contrast %.2f:1 is below %.1f:1",
-                style == .light ? "light" : "dark", ratio, threshold
+                format: "%@%@: contrast %.2f:1 is below %.1f:1",
+                style == .light ? "light" : "dark",
+                contrast == .high ? " · increase contrast" : "",
+                ratio, threshold
             ),
             file: file, line: line
         )
+    }
+
+    // MARK: - Increase Contrast (phase 6.5)
+
+    /// Under Settings → Accessibility → Increase Contrast, both inks clear AAA
+    /// (7:1) on every surface — the secondary ink is 5.6:1 in light mode
+    /// otherwise — and the hairlines that are 3:1 UI components clear the
+    /// body-text level, so a separator or an accent stroke is unmistakable.
+    func testUnderIncreaseContrastTextClearsAAAOnEverySurface() {
+        for style in [UIUserInterfaceStyle.light, .dark] {
+            for surface in [Theme.Color.background, Theme.Color.surface, Theme.Color.surfaceRaised] {
+                assertContrast(Theme.Color.textPrimary, on: surface, atLeast: 7, style: style, contrast: .high)
+                assertContrast(Theme.Color.textSecondary, on: surface, atLeast: 7, style: style, contrast: .high)
+            }
+        }
+    }
+
+    func testUnderIncreaseContrastHairlinesAndAccentClearBodyLevel() {
+        for style in [UIUserInterfaceStyle.light, .dark] {
+            assertContrast(Theme.Color.separator, on: Theme.Color.background, atLeast: 4.5, style: style, contrast: .high)
+            assertContrast(Theme.Color.separator, on: Theme.Color.surface, atLeast: 4.5, style: style, contrast: .high)
+            assertContrast(Theme.Color.accent, on: Theme.Color.background, atLeast: 4.5, style: style, contrast: .high)
+            assertContrast(Theme.Color.accent, on: Theme.Color.surface, atLeast: 4.5, style: style, contrast: .high)
+        }
+    }
+
+    /// The normal-contrast values are untouched by the variants: what every
+    /// other test in this file pins still holds with the trait explicitly
+    /// `.normal`.
+    func testNormalContrastValuesAreUnchangedByTheVariants() {
+        for style in [UIUserInterfaceStyle.light, .dark] {
+            let normal = UITraitCollection { mutable in
+                mutable.userInterfaceStyle = style
+                mutable.accessibilityContrast = .normal
+            }
+            let plain = UITraitCollection(userInterfaceStyle: style)
+            for token in [Theme.Color.textSecondary, Theme.Color.separator, Theme.Color.accent] {
+                XCTAssertEqual(token.resolvedColor(with: normal), token.resolvedColor(with: plain))
+            }
+        }
     }
 
     private func contrastRatio(_ a: UIColor, _ b: UIColor) -> CGFloat {
