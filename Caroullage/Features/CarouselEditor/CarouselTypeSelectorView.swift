@@ -18,6 +18,8 @@ struct CarouselTypeSelectorView: View {
     let onCancel: (() -> Void)?
 
     @State private var type: CarouselType = .matched
+    /// The type card's glyph, scaled with Dynamic Type against title.
+    @ScaledMetric(relativeTo: .title) private var glyphSize: CGFloat = 28
     @State private var frameCount = 3
     @State private var splitAxis: SplitAxis = .horizontal
     @State private var aspect = "4:5"
@@ -96,7 +98,7 @@ struct CarouselTypeSelectorView: View {
         } label: {
             HStack(spacing: 16) {
                 Image(systemName: info.symbol)
-                    .font(.system(size: 28))
+                    .font(.system(size: glyphSize))
                     .frame(width: 44)
                     .foregroundStyle(Color(Theme.Color.accent))
                 VStack(alignment: .leading, spacing: 4) {

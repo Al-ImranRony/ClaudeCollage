@@ -16,6 +16,10 @@
 import SwiftUI
 
 struct OnboardingView: View {
+    /// The hero glyphs, scaled with Dynamic Type against large title. One size
+    /// for both beats (the welcome's 68 and the priming beat's 64 were one
+    /// glyph apart for no reason).
+    @ScaledMetric(relativeTo: .largeTitle) private var heroGlyphSize: CGFloat = 64
 
     @ObservedObject var model: OnboardingViewModel
 
@@ -111,7 +115,7 @@ struct OnboardingView: View {
                     .fill(LinearGradient.themeSpark())
                     .frame(width: 168, height: 168)
                 Image(systemName: symbol)
-                    .font(.system(size: 68, weight: .semibold))
+                    .font(.themeDisplay(heroGlyphSize, weight: .semibold))
                     .foregroundStyle(Color.themeTextOnAccent)
                     .accessibilityHidden(true)   // decorative; the title says it
             }
@@ -149,7 +153,7 @@ struct OnboardingView: View {
                     } label: {
                         HStack(spacing: Theme.Spacing.sm) {
                             Image(systemName: kind.symbol)
-                                .font(.system(size: 17, weight: .semibold))
+                                .font(.themeHeadline)
                                 .foregroundStyle(Color.themeAccentStrong)
                                 .frame(width: 28)
                                 .accessibilityHidden(true)
@@ -175,7 +179,7 @@ struct OnboardingView: View {
         VStack(spacing: Theme.Spacing.lg) {
             Spacer(minLength: 0)
             Image(systemName: "photo.on.rectangle.angled")
-                .font(.system(size: 64, weight: .semibold))
+                .font(.themeDisplay(heroGlyphSize, weight: .semibold))
                 .foregroundStyle(Color.themeAccentStrong)
             Text("Let's use your photos")
                 .font(.themeTitle)

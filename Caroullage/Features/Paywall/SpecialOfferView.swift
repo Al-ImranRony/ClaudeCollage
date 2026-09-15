@@ -15,6 +15,9 @@
 import SwiftUI
 
 struct SpecialOfferView: View {
+    /// Display sizes, scaled with Dynamic Type against large title.
+    @ScaledMetric(relativeTo: .largeTitle) private var headlineSize: CGFloat = 44
+    @ScaledMetric(relativeTo: .largeTitle) private var priceSize: CGFloat = 40
 
     @ObservedObject var model: SpecialOfferViewModel
 
@@ -71,7 +74,7 @@ struct SpecialOfferView: View {
             onClose()
         }) {
             Image(systemName: "xmark")
-                .font(.system(size: 16, weight: .bold))
+                .font(.themeRounded(.callout, weight: .bold))
                 .foregroundStyle(.white)
                 .frame(width: 40, height: 40)
                 .background(.white.opacity(0.18), in: Circle())
@@ -93,7 +96,7 @@ struct SpecialOfferView: View {
                 .foregroundStyle(Color.themeAccent)
             Spacer(minLength: 0)
         }
-        .font(.system(size: 44, weight: .heavy, design: .rounded))
+        .font(.themeDisplay(headlineSize))
         .minimumScaleFactor(0.6)
         .lineLimit(1)
         .padding(.horizontal, Theme.Spacing.xl)
@@ -111,17 +114,17 @@ struct SpecialOfferView: View {
                 .foregroundStyle(.white)
 
             Text(model.regularPriceText)
-                .font(.system(size: 40, weight: .heavy, design: .rounded))
+                .font(.themeDisplay(priceSize))
                 .foregroundStyle(Color.themeCritical)
                 .strikethrough(true, color: Color.themeCritical)
                 .accessibilityLabel("Standard price \(model.regularPriceText) per year")
 
             Image(systemName: "chevron.down")
-                .font(.system(size: 18, weight: .bold))
+                .font(.themeRounded(.headline, weight: .bold))
                 .foregroundStyle(.white.opacity(0.7))
 
             Text("only \(model.offerPriceText)")
-                .font(.system(size: 40, weight: .heavy, design: .rounded))
+                .font(.themeDisplay(priceSize))
                 .foregroundStyle(Color.themeAccent)
                 .minimumScaleFactor(0.6)
                 .lineLimit(1)
@@ -131,7 +134,7 @@ struct SpecialOfferView: View {
 
             // Required on the screen where the user commits.
             Text(model.termsText)
-                .font(.system(size: 11))
+                .font(.caption2)
                 .foregroundStyle(.white.opacity(0.55))
                 .multilineTextAlignment(.center)
                 .accessibilityIdentifier("specialOfferTerms")
@@ -169,7 +172,7 @@ struct SpecialOfferView: View {
                     ProgressView().tint(.black)
                 } else {
                     Text("Continue")
-                        .font(.system(size: 20, weight: .bold, design: .rounded))
+                        .font(.themeRounded(.title2, weight: .bold))
                         .foregroundStyle(.black)
                 }
             }
@@ -197,7 +200,7 @@ struct SpecialOfferView: View {
             }
             .accessibilityIdentifier("specialOfferRestoreButton")
         }
-        .font(.system(size: 13))
+        .font(.themeCaption)
         .foregroundStyle(.white.opacity(0.65))
         .buttonStyle(.plain)
         .padding(.top, 2)

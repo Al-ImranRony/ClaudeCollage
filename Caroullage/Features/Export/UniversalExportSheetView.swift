@@ -161,7 +161,7 @@ struct UniversalExportSheetView: View {
         } label: {
             VStack(spacing: 6) {
                 Image(systemName: info.symbol)
-                    .font(.system(size: 22))
+                    .font(.themeTitle2)
                     .frame(width: 54, height: 40)
                 Text(info.title).font(.themeCaption)
             }

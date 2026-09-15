@@ -25,6 +25,8 @@ struct PaywallView: View {
     var onClose: () -> Void
 
     @State private var heroIndex = 0
+    /// The hero card's glyph, scaled with Dynamic Type against large title.
+    @ScaledMetric(relativeTo: .largeTitle) private var heroGlyphSize: CGFloat = 46
 
     private static let features = [
         ("square.grid.3x3.fill", "200+ templates"),
@@ -65,7 +67,7 @@ struct PaywallView: View {
             onClose()
         }) {
             Image(systemName: "xmark")
-                .font(.system(size: 15, weight: .bold))
+                .font(.themeRounded(.subheadline, weight: .bold))
                 .foregroundStyle(Color.themeTextSecondary)
                 .frame(width: 32, height: 32)
                 .background(Color.themeControlFill, in: Circle())
@@ -86,7 +88,7 @@ struct PaywallView: View {
                         .fill(LinearGradient.themeSpark())
                     VStack(spacing: Theme.Spacing.xs) {
                         Image(systemName: card.symbol)
-                            .font(.system(size: 46, weight: .semibold))
+                            .font(.themeDisplay(heroGlyphSize, weight: .semibold))
                         Text(LocalizedStringKey(card.caption))
                             .font(.themeCallout)
                     }
@@ -141,7 +143,7 @@ struct PaywallView: View {
             ForEach(Self.features, id: \.1) { symbol, text in
                 HStack(spacing: 6) {
                     Image(systemName: symbol)
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.themeRounded(.caption, weight: .semibold))
                         .foregroundStyle(Color.themeAccentStrong)
                         .frame(width: 20)
                         // Decorative beside its text; without this VoiceOver
@@ -203,7 +205,7 @@ struct PaywallView: View {
                             .foregroundStyle(Color.themeTextPrimary)
                         if let badge = plan.badge {
                             Text(badge.uppercased())
-                                .font(.system(size: 10, weight: .heavy))
+                                .font(.themeRounded(.caption2, weight: .heavy))
                                 .foregroundStyle(Color.themeTextOnAccent)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 3)
@@ -225,7 +227,7 @@ struct PaywallView: View {
                 }
 
                 Image(systemName: isSelected ? "largecircle.fill.circle" : "circle")
-                    .font(.system(size: 20))
+                    .font(.themeTitle2)
                     .foregroundStyle(isSelected ? Color.themeAccentStrong : Color.themeSeparator)
             }
             .padding(Theme.Spacing.md)
@@ -278,7 +280,7 @@ struct PaywallView: View {
             }
 
             Text(model.termsText)
-                .font(.system(size: 11))
+                .font(.caption2)
                 .foregroundStyle(Color.themeTextSecondary)
                 .multilineTextAlignment(.center)
                 .accessibilityIdentifier("paywallTerms")
@@ -351,7 +353,7 @@ struct PaywallView: View {
                     .font(.themeHeadline)
                     .foregroundStyle(Color.themeTextPrimary)
                 Text(pack.unitPriceText ?? " ")
-                    .font(.system(size: 10))
+                    .font(.caption2)
                     .foregroundStyle(Color.themeAccentStrong)
             }
             .frame(maxWidth: .infinity)

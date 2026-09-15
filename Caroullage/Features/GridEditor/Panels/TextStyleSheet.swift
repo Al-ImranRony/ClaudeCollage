@@ -192,7 +192,9 @@ struct TextStyleSheet: View {
     }
 
     private func fontPreview(_ name: String) -> Font {
-        UIFont(name: name, size: 16) != nil ? Font.custom(name, size: 16) : Font.system(size: 16, design: .rounded)
+        UIFont(name: name, size: 16) != nil
+            ? Font.custom(name, size: 16, relativeTo: .callout)
+            : .themeCallout
     }
 
     // MARK: - Bindings

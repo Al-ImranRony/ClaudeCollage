@@ -103,6 +103,26 @@ public extension LinearGradient {
     }
 }
 
+// MARK: - Dynamic Type bridges (phase 6.5)
+
+public extension Font {
+    /// A rounded semantic style with a weight — the SwiftUI-native way to say
+    /// "callout, bold" and still scale with Dynamic Type. `Font(UIFont)` does
+    /// not take `.weight()`, so the weighted variants come through here.
+    static func themeRounded(_ style: Font.TextStyle, weight: Font.Weight) -> Font {
+        .system(style, design: .rounded, weight: weight)
+    }
+
+    /// A display size — the paywall's price, onboarding's hero numeral — that
+    /// still follows Dynamic Type. `@ScaledMetric` is the SwiftUI way to say
+    /// "this size, relative to large title"; a bare `.system(size:)` never grows.
+    /// Usage: `@ScaledMetric(relativeTo: .largeTitle) private var heroSize = 64`
+    /// then `.font(.themeDisplay(heroSize))`.
+    static func themeDisplay(_ size: CGFloat, weight: Font.Weight = .heavy) -> Font {
+        .system(size: size, weight: weight, design: .rounded)
+    }
+}
+
 // MARK: - Hit targets
 
 public extension View {
