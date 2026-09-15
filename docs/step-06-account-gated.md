@@ -162,6 +162,14 @@ provisioning, but cannot enable any of the above.
 
 ---
 
+## Phase 6.5 — Accessibility
+
+Nothing in this phase needs the account. The audit runs as tests
+(`AccessibilityAuditUITests`, `AccessibilityConventionsTests`,
+`AccessibilityWalkthroughUITests`), the manual passes are recorded in
+`docs/step-06-accessibility-signoff.md`, and the on-device VoiceOver /
+Switch Control passes need only a free-account install.
+
 ## Later phases (recorded now, not yet started)
 
 - **6.6** — the App Store Connect side: age-rating questionnaire, DSA trader

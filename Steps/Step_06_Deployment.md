@@ -190,15 +190,15 @@ English (base) + Spanish, French, German, Portuguese (Brazil), Japanese, Korean,
 Pass Apple's accessibility quality bar — this is checked for Featuring nominations and reviewed at App Review.
 
 ### Checklist
-- [ ] **VoiceOver:** every interactive element has a `.accessibilityLabel` and (where helpful) `.accessibilityHint`
-- [ ] **Dynamic Type:** all text uses semantic font styles (`Font.body`, `.headline`, `.title`) — zero hardcoded `.system(size:)`
-- [ ] **Minimum tap targets:** 44×44pt for every button (verify with Accessibility Inspector)
-- [ ] **Color contrast:** body text ≥ 4.5:1, large text ≥ 3:1 (Accessibility Inspector → Audit)
-- [ ] **Reduce Motion:** disable spring animations + auto-scrolling paywall when `UIAccessibility.isReduceMotionEnabled`
-- [ ] **VoiceOver canvas:** allow VoiceOver users to inspect each cell ("Cell 1, photo of beach, double-tap to edit")
-- [ ] **Switch Control:** verify entire onboarding + first export flow is reachable via Switch Control
-- [ ] **Bold Text / Increase Contrast:** test both settings; no layout breakage
-- [ ] **VoiceOver rotor:** add custom rotor entries for "Cells" and "Frames" in editors
+- [x] **VoiceOver:** every interactive element has a `.accessibilityLabel` and (where helpful) `.accessibilityHint` — `AccessibilityAuditUITests` + `AccessibilityConventionsTests`
+- [x] **Dynamic Type:** all text uses semantic font styles (`Font.body`, `.headline`, `.title`) — zero hardcoded `.system(size:)` — and `AccessibilityWalkthroughUITests` at AX-XXXL
+- [x] **Minimum tap targets:** 44×44pt for every button (verify with Accessibility Inspector) — `HitTargetButton`, the walker, the audit's `hitRegion`
+- [x] **Color contrast:** body text ≥ 4.5:1, large text ≥ 3:1 (Accessibility Inspector → Audit) — `ThemeContrastTests` (+ Increase Contrast at AAA)
+- [x] **Reduce Motion:** disable spring animations + auto-scrolling paywall when `UIAccessibility.isReduceMotionEnabled` — `Theme.Motion` at every site; see the sign-off
+- [x] **VoiceOver canvas:** allow VoiceOver users to inspect each cell ("Cell 1, photo of beach, double-tap to edit") — "Photo cell 1 of 4, double-tap to edit" + custom actions
+- [ ] **Switch Control:** verify entire onboarding + first export flow is reachable via Switch Control — every element is focusable and every gesture has an action; the on-device pass is the owner's (sign-off doc)
+- [x] **Bold Text / Increase Contrast:** test both settings; no layout breakage — Increase Contrast on the simulator (sign-off); Bold Text is the system's on system fonts, on-device confirmation the owner's
+- [x] **VoiceOver rotor:** add custom rotor entries for "Cells" and "Frames" in editors
 
 ---
 

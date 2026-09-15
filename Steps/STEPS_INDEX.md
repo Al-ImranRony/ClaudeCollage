@@ -341,11 +341,47 @@ The first cut recomposited the whole canvas on the CPU per gesture frame and hel
 
 | Step | File | Description | Est. Weeks | Status |
 |------|------|-------------|-----------|--------|
-| **06** | `Step_06_Deployment.md` | Monetization, paywall, onboarding, localization, accessibility, compliance, App Store assets, Featuring, submission, post-launch | 36–42 | ⬜ Not started |
+| **06** | `Step_06_Deployment.md` | Monetization, paywall, onboarding, localization, accessibility, compliance, App Store assets, Featuring, submission, post-launch | 36–42 | 🟡 **In progress** — 6.1 StoreKit 2 ✅ · 6.2 paywall ✅ (+6.2b credits & special offer) · 6.3 onboarding ✅ · 6.4 localization ✅ · **6.5 accessibility ✅ (2026-09-15 → 09-16)** · 6.6+ pending. What needs the developer account is in `docs/step-06-account-gated.md`; the 6.5 record is below |
 | **07** | `docs/superpowers/specs/2026-08-29-home-showcase-redesign-design.md` | Home showcase redesign (unplanned interstitial) — photo-real hero + three pillar strips (Photo Collage, Video Collage, Carousel) | — | 🟢 Core complete — bundled licensed sample photography + manifest/catalog, showcase previews rendered through the export renderer, auto-cycling hero, looping video cards, quick-start compressed to chips. See Step 07 notes below |
 
 **End of Part 2:** App is live on the App Store in 11 languages, monitored for 30 days, ready for v1.1 planning.
 
+
+### Step 06 — phase 6.5 accessibility audit (2026-09-15 → 09-16)
+Spec `docs/superpowers/specs/2026-09-15-step-06-phase-6.5-accessibility-audit-design.md`; plan
+`docs/superpowers/plans/2026-09-15-step-06-phase-6.5-accessibility-audit.md`, whose **Execution
+log** carries every batch's commits, findings and deviations. Four batches, each a set of commits
+on `dev`:
+
+- **A — the audit is a test.** `AccessibilityAuditUITests` runs Xcode's `performAccessibilityAudit`
+  on 14 surfaces; `AccessibilityConventionsTests` walks every design-system component headless
+  (label, 44pt hit region, Dynamic Type flag). The red run found 126 issues; the walker found
+  under-sized targets the grep audit had missed (rail tools 58×37, context chip 78×25, filter chip).
+  `HitTargetButton`/`HitTargetControl` grow a small glyph's hit region to 44pt; the timeline's
+  header became a 44pt bar (+20pt on both timeline heights).
+- **B — the canvas under VoiceOver.** Cells, text zones and stickers are elements with
+  position-aware labels ("Empty cell 2 of 4"), explicit activation routing, and custom actions
+  standing in for every gesture (swap; nudge; delete/larger/smaller/rotate); a Cells rotor on the
+  canvas and a Frames rotor on the carousel navigator; the video canvas mirrors it.
+  `CanvasAccessibility` holds the words; 29 keys × 11 languages.
+- **C — Dynamic Type.** The 21 hardcoded SwiftUI sizes went semantic or `@ScaledMetric`; the
+  `Font.theme*` bridge was rewritten natively (`Font(UIFont)` carries no text style); 27 UIKit
+  labels gained the live re-scale flag. The AX-XXXL walkthrough (`AccessibilityWalkthroughUITests`,
+  screenshots attached) found what the audit cannot: overlapping rail labels, mid-word breaks in
+  panel rows and headers, a sheet that could not scroll, truncated primary buttons. Fixed with
+  Apple's own patterns — rows that stack at accessibility sizes, sheets that open large, one gallery
+  column, a rail capped like a tab bar with the large content viewer.
+- **D — contrast, motion, sign-off.** `Theme.Color` tokens gained Increase Contrast variants
+  pinned to AAA by `ThemeContrastTests`; the last hand-rolled press animations answer Reduce Motion
+  through `setPressed`; `docs/step-06-accessibility-signoff.md` records what was checked and how.
+
+**Deliberate:** `textClipped` is a typed audit exception — it fires on any single-line text, Apple's
+own search field included — and real clipping is checked by eye at AX-XXXL instead. The audit's
+contrast check is skipped for elements not hittable and wholly on screen (it samples pixels). Every
+remaining exception carries its evidence in the test file.
+
+**Deferred (spec §10):** rotors for text zones and stickers; Button Shapes on custom chips;
+on-device VoiceOver and Switch Control passes (the owner's, like every hardware QA here).
 
 ### Step 07 — Home showcase redesign (2026-08-29)
 An unplanned interstitial, taken on after Step 06's shell work: Home was well organised but
