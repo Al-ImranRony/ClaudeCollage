@@ -277,21 +277,11 @@ final class AppTabBarController: UITabBarController {
         onStartEditing?()
     }
 
-    @objc private func plusPressed() {
-        UIView.animate(withDuration: Theme.Motion.duration(Theme.Motion.quick)) {
-            self.plusButton.transform = CGAffineTransform(scaleX: 0.92, y: 0.92)
-        }
-    }
+    // Both through `setPressed`, so the "+" answers Reduce Motion the way every
+    // other pressed card does — with opacity rather than scale (phase 6.5).
+    @objc private func plusPressed() { plusButton.setPressed(true, scale: 0.92) }
 
-    @objc private func plusReleased() {
-        UIView.animate(
-            withDuration: Theme.Motion.duration(Theme.Motion.standard), delay: 0,
-            usingSpringWithDamping: Theme.Motion.effectiveSpringDamping,
-            initialSpringVelocity: Theme.Motion.effectiveSpringVelocity
-        ) {
-            self.plusButton.transform = .identity
-        }
-    }
+    @objc private func plusReleased() { plusButton.setPressed(false, scale: 0.92) }
 }
 
 // MARK: - Delegate

@@ -203,27 +203,10 @@ final class ProBadgeButton: GradientLayerButton {
         layer.cornerRadius = bounds.height / 2
     }
 
-    /// The same press spring every card in the app uses, so the header answers
-    /// the touch the way the content does.
-    @objc private func pressDown() {
-        UIView.animate(
-            withDuration: Theme.Motion.duration(Theme.Motion.quick), delay: 0,
-            usingSpringWithDamping: Theme.Motion.effectiveSpringDamping,
-            initialSpringVelocity: Theme.Motion.effectiveSpringVelocity,
-            options: [.allowUserInteraction, .beginFromCurrentState]
-        ) {
-            self.transform = CGAffineTransform(scaleX: 0.94, y: 0.94)
-        }
-    }
+    /// The same press every card in the app uses (`setPressed`), so the header
+    /// answers the touch the way the content does — and answers Reduce Motion
+    /// with opacity, as they do.
+    @objc private func pressDown() { setPressed(true, scale: 0.94) }
 
-    @objc private func pressUp() {
-        UIView.animate(
-            withDuration: Theme.Motion.duration(Theme.Motion.quick), delay: 0,
-            usingSpringWithDamping: Theme.Motion.effectiveSpringDamping,
-            initialSpringVelocity: Theme.Motion.effectiveSpringVelocity,
-            options: [.allowUserInteraction, .beginFromCurrentState]
-        ) {
-            self.transform = .identity
-        }
-    }
+    @objc private func pressUp() { setPressed(false, scale: 0.94) }
 }
