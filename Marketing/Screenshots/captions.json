@@ -1,0 +1,80 @@
+{
+  "1-carousel": {
+    "en": "Create stunning Instagram carousels",
+    "es": "Crea carruseles de Instagram impresionantes",
+    "fr": "Créez des carrousels Instagram éblouissants",
+    "de": "Erstelle beeindruckende Instagram-Karussells",
+    "pt-BR": "Crie carrosséis incríveis para o Instagram",
+    "ja": "目を引く Instagram\nカルーセルを作ろう",
+    "ko": "멋진 Instagram 캐러셀을\n만들어 보세요",
+    "zh-Hans": "创建令人惊艳的\nInstagram 轮播",
+    "hi": "शानदार Instagram कैरोसेल बनाएँ",
+    "it": "Crea caroselli Instagram straordinari",
+    "ar": "أنشئ كاروسيل Instagram مذهلاً"
+  },
+  "2-shapes": {
+    "en": "Geometric layouts that stand out",
+    "es": "Diseños geométricos que destacan",
+    "fr": "Des mises en page géométriques qui se démarquent",
+    "de": "Geometrische Layouts, die auffallen",
+    "pt-BR": "Layouts geométricos que se destacam",
+    "ja": "目立つ\n幾何学レイアウト",
+    "ko": "눈에 띄는 기하학 레이아웃",
+    "zh-Hans": "与众不同的几何版式",
+    "hi": "अलग दिखने वाले ज्यामितीय लेआउट",
+    "it": "Layout geometrici che si fanno notare",
+    "ar": "تخطيطات هندسية تلفت الأنظار"
+  },
+  "3-templates": {
+    "en": "200+ hand-crafted templates",
+    "es": "Más de 200 plantillas hechas a mano",
+    "fr": "Plus de 200 modèles faits main",
+    "de": "Über 200 handgemachte Vorlagen",
+    "pt-BR": "Mais de 200 modelos feitos à mão",
+    "ja": "手作りテンプレート\n200点以上",
+    "ko": "200개 이상의 정성껏 만든 템플릿",
+    "zh-Hans": "精心打造的\n200+ 模板",
+    "hi": "200+ हाथ से बनाए टेम्पलेट",
+    "it": "Oltre 200 modelli fatti a mano",
+    "ar": "أكثر من 200 قالب مصنوع بعناية"
+  },
+  "4-video": {
+    "en": "Mix photos and videos seamlessly",
+    "es": "Mezcla fotos y vídeos sin esfuerzo",
+    "fr": "Mélangez photos et vidéos en toute fluidité",
+    "de": "Fotos und Videos nahtlos mischen",
+    "pt-BR": "Misture fotos e vídeos com perfeição",
+    "ja": "写真と動画を\nなめらかに合成",
+    "ko": "사진과 동영상을 매끄럽게 섞어 보세요",
+    "zh-Hans": "照片与视频无缝混排",
+    "hi": "फ़ोटो और वीडियो को सहजता से मिलाएँ",
+    "it": "Unisci foto e video senza soluzione di continuità",
+    "ar": "امزج الصور والفيديو بسلاسة"
+  },
+  "5-video-timeline": {
+    "en": "Trim, time and beat-sync every clip",
+    "es": "Recorta, sincroniza y ajusta cada clip al ritmo",
+    "fr": "Coupez, calez et synchronisez chaque clip au rythme",
+    "de": "Jeden Clip trimmen, timen und zum Beat schneiden",
+    "pt-BR": "Corte, ajuste e sincronize cada clipe com a batida",
+    "ja": "クリップをトリムして\nビートに同期",
+    "ko": "모든 클립을 자르고 맞추고\n비트에 동기화",
+    "zh-Hans": "修剪、定时\n每段片段卡上节拍",
+    "hi": "हर क्लिप को ट्रिम करें, समय दें और बीट से मिलाएँ",
+    "it": "Taglia, sincronizza e allinea al ritmo ogni clip",
+    "ar": "قصّ كل مقطع وحدّد توقيته وزامنه مع الإيقاع"
+  },
+  "6-home": {
+    "en": "Collages, carousels and video in one place",
+    "es": "Collages, carruseles y vídeo en un solo lugar",
+    "fr": "Collages, carrousels et vidéo au même endroit",
+    "de": "Collagen, Karussells und Video an einem Ort",
+    "pt-BR": "Colagens, carrosséis e vídeo em um só lugar",
+    "ja": "作品はすべて\nこのアプリひとつで",
+    "ko": "콜라주, 캐러셀, 동영상을 한곳에서",
+    "zh-Hans": "拼贴、轮播、视频\n尽在一处",
+    "hi": "कोलाज, कैरोसेल और वीडियो — सब एक जगह",
+    "it": "Collage, caroselli e video in un unico posto",
+    "ar": "المجمّعات والكاروسيل والفيديو في مكان واحد"
+  }
+}

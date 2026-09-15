@@ -418,6 +418,11 @@ final class AppCoordinator {
     // MARK: - Routing
 
     private func startNewGridProject() {
+        // `-ScreenshotMode`: a filled 4-up instead of empty wells (phase 6.7).
+        if ScreenshotStaging.isActive {
+            return openGridProject(with: ScreenshotStaging.samplePhotos(count: 4),
+                                   template: .bestFit(forPhotoCount: 4))
+        }
         let viewModel = GridEditorViewModel()
         attachAutosave(to: viewModel)
         // Persist immediately so the project appears in the gallery on return.
@@ -428,8 +433,9 @@ final class AppCoordinator {
     /// Home's "Shapes" quick-start: a blank collage already on a polygon layout, so
     /// the editor opens in Shapes mode rather than needing the segment flipped.
     private func startNewPolygonProject() {
-        let state = GridEditorState(layout: .polygon(.diagonalLeft))
+        let state = GridEditorState(layout: .polygon(ScreenshotStaging.isActive ? .hexagonGrid : .diagonalLeft))
         let viewModel = GridEditorViewModel(state: state)
+        if ScreenshotStaging.isActive { ScreenshotStaging.seed(viewModel) }
         attachAutosave(to: viewModel)
         store.save(viewModel)
         pushEditor(with: viewModel)
@@ -504,6 +510,7 @@ final class AppCoordinator {
     ) {
         let viewModel = CarouselEditorViewModel(
             frames: frames, images: images, canvasSize: canvasSize, carouselType: type, axis: axis)
+        if ScreenshotStaging.isActive { ScreenshotStaging.seed(viewModel) }
         attachCarouselAutosave(to: viewModel)
         store.saveCarousel(viewModel)   // persist immediately so it lands on Home
         presentCarouselEditor(viewModel: viewModel)
@@ -531,6 +538,7 @@ final class AppCoordinator {
     private func startVideoCollage() {
         let canvasSize = CanvasSize.size(forAspectRatio: "4:5")
         let viewModel = VideoEditorViewModel(canvasSize: canvasSize, layout: .grid(.twoUpVertical))
+        if ScreenshotStaging.isActive { ScreenshotStaging.seed(viewModel) }
         attachVideoAutosave(to: viewModel)
         store.saveVideo(viewModel)
         pushVideoEditor(viewModel)

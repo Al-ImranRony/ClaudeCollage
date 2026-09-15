@@ -341,7 +341,7 @@ The first cut recomposited the whole canvas on the CPU per gesture frame and hel
 
 | Step | File | Description | Est. Weeks | Status |
 |------|------|-------------|-----------|--------|
-| **06** | `Step_06_Deployment.md` | Monetization, paywall, onboarding, localization, accessibility, compliance, App Store assets, Featuring, submission, post-launch | 36–42 | 🟡 **In progress** — 6.1 StoreKit 2 ✅ · 6.2 paywall ✅ (+6.2b credits & special offer) · 6.3 onboarding ✅ · 6.4 localization ✅ · **6.5 accessibility ✅ (2026-09-15 → 09-16)** · **6.6 compliance ✅ repo side (2026-09-16)** · **6.8 watermark ✅** · **6.9 rating prompt ✅ (2026-09-16)** · 6.7 and 6.10 next. What needs the developer account is in `docs/step-06-account-gated.md`; the 6.5 record is below |
+| **06** | `Step_06_Deployment.md` | Monetization, paywall, onboarding, localization, accessibility, compliance, App Store assets, Featuring, submission, post-launch | 36–42 | 🟡 **In progress** — 6.1 StoreKit 2 ✅ · 6.2 paywall ✅ (+6.2b credits & special offer) · 6.3 onboarding ✅ · 6.4 localization ✅ · **6.5 accessibility ✅ (2026-09-15 → 09-16)** · **6.6 compliance ✅ repo side (2026-09-16)** · **6.7 screenshots ✅ (pipeline; the AI scene is a device capture)** · **6.8 watermark ✅** · **6.9 rating prompt ✅** · **6.10 perf: suite metrics in place, Instruments pass owed on hardware** (2026-09-16) · 6.11+ are App Store Connect work. What needs the developer account is in `docs/step-06-account-gated.md`; the 6.5 record is below |
 | **07** | `docs/superpowers/specs/2026-08-29-home-showcase-redesign-design.md` | Home showcase redesign (unplanned interstitial) — photo-real hero + three pillar strips (Photo Collage, Video Collage, Carousel) | — | 🟢 Core complete — bundled licensed sample photography + manifest/catalog, showcase previews rendered through the export renderer, auto-cycling hero, looping video cards, quick-start compressed to chips. See Step 07 notes below |
 
 **End of Part 2:** App is live on the App Store in 11 languages, monitored for 30 days, ready for v1.1 planning.
@@ -408,6 +408,16 @@ video file. The line is a brand mark, not UI copy, and is not localized.
 365-day guard of our own beside Apple's; `RatingPrompt.exportSucceeded(in:)` fires at the four success
 moments, 2.5s after the celebration, via `AppStore.requestReview(in:)`, and stays silent under
 `-UITestMode` — which `XCUIApplication.underTest()` now always passes.
+
+### Step 06 — phases 6.7 and 6.10 (2026-09-16)
+**6.7 screenshots:** `Tools/screenshots.sh` runs `AppStoreScreenshotUITests` per device and language;
+`-ScreenshotMode` makes the quick-start doors open editors already filled with the bundled Pexels
+photography (`ScreenshotStaging`, coordinator hooks); `Tools/ScreenshotFramer` sets each capture under
+its caption from `Marketing/Screenshots/captions.json` at the device's exact pixel size (1320×2868 on
+the iPhone 16 Pro Max). Six scenes; the brief's subject-lift scene needs Vision and is captured on a
+device. Output is gitignored (~200 MB). The icon was Step 05b's. App Previews not started.
+**6.10 performance:** `PerformanceUITests` — cold launch and memory through the video editor as XCTest
+metrics with baselines; the Instruments pass is the owner's on hardware, recorded in the account-gated doc.
 
 ### Step 07 — Home showcase redesign (2026-08-29)
 An unplanned interstitial, taken on after Step 06's shell work: Home was well organised but

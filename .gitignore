@@ -74,3 +74,8 @@ coverage/
 
 # Superpowers brainstorming session artifacts
 .superpowers/
+
+# Phase 6.7: generated App Store screenshots (regenerate with Tools/screenshots.sh)
+Marketing/Screenshots/*/
+!Marketing/Screenshots/captions.json
+!Marketing/Screenshots/README.md

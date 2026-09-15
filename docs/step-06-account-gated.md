@@ -189,6 +189,17 @@ no private, ad or tracking framework — run on the archive before submission).
 | **Account deletion** (guideline 5.1.1) | Not applicable: there is no sign-in. If one is ever added, in-app deletion within one tap is a launch requirement, not a follow-up. |
 | **Third-party SDK manifests** | Not applicable: `project.yml` declares no packages. The checklist's Firebase Crashlytics / TelemetryDeck rows describe SDKs this app does not carry; adding either one later means auditing its manifest and signature. |
 
+## Phases 6.7–6.10 — assets, watermark, rating, performance
+
+None of these needs the account. What waits for hardware rather than for
+Connect:
+
+| Owed | Why | How |
+|---|---|---|
+| The subject-lift screenshot (6.7, screen 5) | Vision does not run on the simulator | Run `AppStoreScreenshotUITests` from Xcode on an iPhone, lift a subject by hand, screenshot; `Tools/ScreenshotFramer` frames any PNG |
+| The Instruments pass (6.10) | No GPU budget, thermal state or real allocator on the simulator | Instruments on an iPhone 13+; `PerformanceUITests` gives launch and memory numbers from Xcode on the device. Simulator baselines (2026-09-16, iPhone 17, host Mac): cold launch to the tab shell **1.39 s** (σ 1%); video editor with three loops playing, peak physical memory **113 MB**, average 96 MB — the brief's ceilings are 2.0 s and 200 MB on hardware. |
+| App Preview videos (6.7, optional) | Recorded on a device | Not started |
+
 ## Later phases (recorded now, not yet started)
 
 - **6.11–6.15** — metadata and ASO, Featuring nomination, pre-orders, TestFlight
