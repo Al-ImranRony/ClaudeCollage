@@ -74,11 +74,15 @@ final class QuickStartTile: UIControl {
         let titleLabel = UILabel()
         titleLabel.text = title
         titleLabel.font = Theme.Typography.headline
+        titleLabel.adjustsFontForContentSizeCategory = true
+        titleLabel.numberOfLines = 0
         titleLabel.textColor = Theme.Color.textPrimary
 
         let subtitleLabel = UILabel()
         subtitleLabel.text = subtitle
         subtitleLabel.font = Theme.Typography.caption
+        subtitleLabel.adjustsFontForContentSizeCategory = true
+        subtitleLabel.numberOfLines = 0
         subtitleLabel.textColor = Theme.Color.textSecondary
 
         let labels = UIStackView(arrangedSubviews: [titleLabel, subtitleLabel])

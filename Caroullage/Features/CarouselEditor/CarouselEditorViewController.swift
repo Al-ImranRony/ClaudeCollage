@@ -420,7 +420,7 @@ final class CarouselEditorViewController: UIViewController {
         let host = UIHostingController(rootView: sheet)
         host.modalPresentationStyle = .pageSheet
         if let presentation = host.sheetPresentationController {
-            presentation.detents = [.medium(), .large()]
+            presentation.detents = Theme.Layout.sheetDetents(for: traitCollection)
             presentation.prefersGrabberVisible = true
         }
         present(host, animated: true)

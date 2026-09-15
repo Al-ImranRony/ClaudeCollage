@@ -198,13 +198,14 @@ final class ProjectsViewController: UIViewController {
         countLabel.font = Theme.Typography.caption
         countLabel.textColor = Theme.Color.textSecondary
         countLabel.adjustsFontForContentSizeCategory = true
+        countLabel.numberOfLines = 0
         countLabel.accessibilityIdentifier = "\(configuration.gridIdentifier)Count"
         countLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
         let row = UIStackView(arrangedSubviews: [countLabel, UIView(), sortChip])
-        row.axis = .horizontal
-        row.alignment = .center
         row.spacing = Theme.Spacing.sm
+        // Count and sort side by side; under each other at accessibility sizes.
+        row.stackVerticallyAtAccessibilitySizes()
         return row
     }
 
@@ -281,7 +282,7 @@ final class ProjectsViewController: UIViewController {
 
         let placement = MasonryLayout.frames(
             aspectRatios: visibleSummaries.map(\.thumbnailAspectRatio),
-            columns: 2,
+            columns: Theme.Layout.galleryColumns(for: environment.traitCollection),
             containerWidth: width,
             spacing: Self.cardSpacing,
             captionHeight: Self.captionHeight

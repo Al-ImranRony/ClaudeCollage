@@ -26,6 +26,7 @@ public final class SectionHeaderView: UIStackView {
         titleLabel.font = Theme.Typography.title2
         titleLabel.textColor = Theme.Color.textPrimary
         titleLabel.adjustsFontForContentSizeCategory = true
+        titleLabel.numberOfLines = 0   // wraps at accessibility sizes rather than clipping
         addArrangedSubview(titleLabel)
 
         if let actionTitle, let action {
@@ -49,9 +50,10 @@ public final class SectionHeaderView: UIStackView {
             addArrangedSubview(button)
         }
 
-        axis = .horizontal
-        alignment = .firstBaseline
         distribution = arrangedSubviews.count > 1 ? .equalSpacing : .fill
+        // Title and action side by side; at accessibility sizes the action
+        // drops under the title so neither squeezes the other mid-word.
+        stackVerticallyAtAccessibilitySizes(verticalAlignment: .leading, horizontalAlignment: .firstBaseline)
         isLayoutMarginsRelativeArrangement = true
         layoutMargins = UIEdgeInsets(
             top: 0, left: Theme.Spacing.md, bottom: 0, right: Theme.Spacing.md

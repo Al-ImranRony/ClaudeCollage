@@ -102,6 +102,7 @@ final class CarouselGalleryViewController: UIViewController {
         definesPresentationContext = true
 
         emptyLabel.font = Theme.Typography.body
+        emptyLabel.adjustsFontForContentSizeCategory = true
         emptyLabel.textColor = Theme.Color.textSecondary
         emptyLabel.textAlignment = .center
         emptyLabel.numberOfLines = 0
@@ -348,7 +349,7 @@ final class CarouselGalleryViewController: UIViewController {
                 let size = CanvasSize.size(forAspectRatio: template.canvasAspectRatio)
                 return size.width / max(size.height, 1)
             },
-            columns: 2,
+            columns: Theme.Layout.galleryColumns(for: environment.traitCollection),
             containerWidth: width,
             spacing: Self.cardSpacing,
             captionHeight: BrowseTemplateCell.captionHeight)

@@ -39,19 +39,72 @@ final class AccessibilityAuditUITests: XCTestCase {
 
     /// Empty is the goal. Add an entry only with a reason a reviewer would accept.
     private static let knownIssues: [KnownIssue] = [
-        // Phase 6.5 Batch C is the Dynamic Type sweep; until it lands these two
-        // audits report the 21 hardcoded SwiftUI sizes and the UIKit labels
-        // that do not re-scale. Removed in Batch C (plan Task 17).
-        KnownIssue(audit: .dynamicType, elementLabel: "*", reason: "Batch C — Dynamic Type sweep"),
-        KnownIssue(audit: .textClipped, elementLabel: "*", reason: "Batch C — Dynamic Type sweep"),
-        // A system `Form` section header. Its siblings "Text" and "Font", in the
-        // same style, pass; this one sits on the boundary of the section card
-        // beneath it and the sample straddles two backgrounds.
-        KnownIssue(audit: .contrast, elementLabel: "Style", reason: "system Form header; sampling straddles the section boundary"),
+        // `textClipped` fires for any single-line text — Apple's own
+        // `UISearchBarTextField` and a SwiftUI `Text` with no line limit
+        // included — so it cannot distinguish a caption that truncates by
+        // design (category chips, gallery card captions, the timeline's ruler)
+        // from a label that would actually cut a word. Everything that can
+        // sensibly wrap does (section headers, panel row titles, the paywall's
+        // feature list, the project count); whether anything really clips is
+        // checked by eye at the largest accessibility size, with screenshots,
+        // in AccessibilityWalkthroughUITests.
+        KnownIssue(audit: .textClipped, elementLabel: "*",
+                   reason: "single-line by design; real clipping is checked visually at AX-XXXL"),
+        // The text style sheet's system `Form` section headers, sampled where
+        // the header meets the section card beneath it: the sample straddles two
+        // backgrounds. Which of the three fails varies run to run.
+        KnownIssue(audit: .contrast, elementLabel: "Text", surface: "Text style sheet",
+                   reason: "system Form header; sampling straddles the section boundary"),
+        KnownIssue(audit: .contrast, elementLabel: "Font", surface: "Text style sheet",
+                   reason: "system Form header; sampling straddles the section boundary"),
+        KnownIssue(audit: .contrast, elementLabel: "Style", surface: "Text style sheet",
+                   reason: "system Form header; sampling straddles the section boundary"),
+        // The last font chip in the strip: its centre is hittable but its
+        // trailing edge is under the card's rounded clip, and the sample lands
+        // on the edge.
+        KnownIssue(audit: .contrast, elementLabel: "Georgia", surface: "Text style sheet",
+                   reason: "font chip clipped by the strip's edge; sampling lands on the clip"),
         // The text style sheet's Done: black ink (accentStrong) on the toolbar's
         // glass pill. Sampled from the audited screenshot at #1A1A1A on #EFEFEF,
         // about 15:1; the audit misreads iOS 26's Liquid Glass toolbar buttons.
         KnownIssue(audit: .contrast, elementLabel: "Done", reason: "glass toolbar button; sampled ≈15:1"),
+
+        // Dynamic Type exceptions, each checked against the AX-XXXL screenshots
+        // AccessibilityWalkthroughUITests attaches.
+        // An image-only UIButton (the panel's close chip, the sparkles button)
+        // owns an internal title label with no text and no frame — UIKit's own,
+        // displaying nothing.
+        KnownIssue(audit: .dynamicType, elementLabel: "",
+                   reason: "an image-only UIButton's empty internal title label; displays nothing"),
+        // The text style sheet is a system navigation stack: its title and Done
+        // are capped by the navigation bar, as every iOS navigation bar caps
+        // them (visible in the AX-XXXL screenshot). "Bold" is a Form toggle's
+        // system label; the Form's rows scale in the same screenshot.
+        KnownIssue(audit: .dynamicType, elementLabel: "Done", surface: "Text style sheet",
+                   reason: "system navigation bar caps its bar buttons"),
+        KnownIssue(audit: .dynamicType, elementLabel: "Bold", surface: "Text style sheet",
+                   reason: "system Form toggle label; the Form scales at AX-XXXL"),
+        // The export sheet's header is capped at the largest standard size on
+        // purpose (`.dynamicTypeSize(...xxxLarge)`), the way a navigation bar
+        // caps its title, so "Cancel · Export" stays one line; the content
+        // beneath it scales fully.
+        KnownIssue(audit: .dynamicType, elementLabel: "Cancel", surface: "Export sheet",
+                   reason: "header capped like a navigation bar"),
+        KnownIssue(audit: .dynamicType, elementLabel: "Export", surface: "Export sheet",
+                   reason: "header capped like a navigation bar"),
+        // The paywall's feature list and terms use native semantic fonts
+        // (.subheadline / .caption2) and are visibly scaled in the AX-XXXL
+        // screenshot; the audit measures the LazyVGrid before it re-lays out.
+        KnownIssue(audit: .dynamicType, elementLabel: "200+ templates", surface: "Paywall",
+                   reason: "native semantic font; scaled in the AX-XXXL screenshot"),
+        KnownIssue(audit: .dynamicType, elementLabel: "Every shape", surface: "Paywall",
+                   reason: "native semantic font; scaled in the AX-XXXL screenshot"),
+        KnownIssue(audit: .dynamicType, elementLabel: "4K, no watermark", surface: "Paywall",
+                   reason: "native semantic font; scaled in the AX-XXXL screenshot"),
+        KnownIssue(audit: .dynamicType, elementLabel: "AI backgrounds", surface: "Paywall",
+                   reason: "native semantic font; scaled in the AX-XXXL screenshot"),
+        KnownIssue(audit: .dynamicType, elementLabel: "Prices are shown in your local currency at checkout.", surface: "Paywall",
+                   reason: "native semantic font (.caption2); scaled in the AX-XXXL screenshot"),
         // Home's chips and headings stay visible behind the half-height Start
         // Editing sheet. Modal presentation removes them from the tree — a
         // VoiceOver user navigates the sheet, not what is behind it — but the

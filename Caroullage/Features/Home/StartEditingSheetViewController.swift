@@ -90,6 +90,10 @@ final class StartEditingSheetViewController: UIViewController {
 
     /// The title-plus-rows stack, held so the detent can measure it.
     private let contentStack = UIStackView()
+    /// Hosts the stack so that, at accessibility text sizes, rows the sheet's
+    /// maximum detent cannot hold are reached by scrolling rather than lost
+    /// below the fold (phase 6.5).
+    private let scrollView = UIScrollView()
     /// Guards `invalidateDetents` against re-entering its own layout pass.
     private var lastMeasuredHeight: CGFloat = 0
 
@@ -170,15 +174,27 @@ final class StartEditingSheetViewController: UIViewController {
         contentStack.spacing = Theme.Spacing.sm
         contentStack.setCustomSpacing(Theme.Spacing.lg, after: title)
         contentStack.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(contentStack)
+        scrollView.translatesAutoresizingMaskIntoConstraints = false
+        scrollView.alwaysBounceVertical = false
+        scrollView.addSubview(contentStack)
+        view.addSubview(scrollView)
 
         NSLayoutConstraint.activate([
+            scrollView.topAnchor.constraint(equalTo: view.topAnchor),
+            scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+
             contentStack.topAnchor.constraint(
-                equalTo: view.topAnchor, constant: Theme.Spacing.xl),
+                equalTo: scrollView.contentLayoutGuide.topAnchor, constant: Theme.Spacing.xl),
             contentStack.leadingAnchor.constraint(
-                equalTo: view.leadingAnchor, constant: Theme.Spacing.md),
+                equalTo: scrollView.contentLayoutGuide.leadingAnchor, constant: Theme.Spacing.md),
             contentStack.trailingAnchor.constraint(
-                equalTo: view.trailingAnchor, constant: -Theme.Spacing.md),
+                equalTo: scrollView.contentLayoutGuide.trailingAnchor, constant: -Theme.Spacing.md),
+            contentStack.bottomAnchor.constraint(
+                equalTo: scrollView.contentLayoutGuide.bottomAnchor, constant: -Theme.Spacing.lg),
+            contentStack.widthAnchor.constraint(
+                equalTo: scrollView.frameLayoutGuide.widthAnchor, constant: -2 * Theme.Spacing.md),
         ])
     }
 

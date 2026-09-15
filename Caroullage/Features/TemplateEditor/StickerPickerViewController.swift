@@ -147,7 +147,9 @@ final class StickerPickerViewController: UIViewController {
         picker.onPickPersonal = onPickPersonal
         let nav = UINavigationController(rootViewController: picker)
         if let sheet = nav.sheetPresentationController {
-            sheet.detents = [.medium(), .large()]
+            // A static factory has no presenter's traits; the picker's own are
+            // the current ones once it is in a window, and the system's until then.
+            sheet.detents = Theme.Layout.sheetDetents(for: picker.traitCollection)
             sheet.prefersGrabberVisible = true
         }
         return nav

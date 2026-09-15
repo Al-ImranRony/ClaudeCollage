@@ -37,20 +37,30 @@ public enum EditorPanelRow {
         let label = UILabel()
         label.text = title
         label.font = Theme.Typography.caption
+        label.adjustsFontForContentSizeCategory = true
         label.textColor = Theme.Color.textPrimary
-        label.adjustsFontSizeToFitWidth = true
-        label.minimumScaleFactor = 0.8
+        label.numberOfLines = 0
 
-        let row = UIStackView(arrangedSubviews: [icon, label, trailing])
-        row.axis = .horizontal
+        // Icon and title travel together; the control follows on the same line
+        // at standard sizes and on its own line at accessibility sizes, where
+        // a fixed 64pt title column would break "Border" mid-word.
+        let header = UIStackView(arrangedSubviews: [icon, label])
+        header.axis = .horizontal
+        header.spacing = Theme.Spacing.xs
+        header.alignment = .center
+
+        let titleWidthConstraint = label.widthAnchor.constraint(equalToConstant: titleWidth)
+        let row = UIStackView(arrangedSubviews: [header, trailing])
         row.spacing = Theme.Spacing.xs
-        row.alignment = .center
         NSLayoutConstraint.activate([
             icon.widthAnchor.constraint(equalToConstant: 20),
             icon.heightAnchor.constraint(equalToConstant: 20),
-            label.widthAnchor.constraint(equalToConstant: titleWidth),
+            titleWidthConstraint,
             row.heightAnchor.constraint(greaterThanOrEqualToConstant: minimumHeight),
         ])
+        row.stackVerticallyAtAccessibilitySizes(verticalAlignment: .fill) { accessible in
+            titleWidthConstraint.isActive = !accessible   // the title takes the full width when stacked
+        }
         return row
     }
 

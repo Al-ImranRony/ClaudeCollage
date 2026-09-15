@@ -765,14 +765,24 @@ final class HomeViewController: UIViewController {
         // where a user has no reason to look for it and where a tap cannot land.
         // Everything on this screen scrolls sideways already; the one section
         // that is a fixed set of four choices should not.
-        let row = UIStackView(arrangedSubviews: chips)
-        row.axis = .horizontal
+        // One row of four at standard text sizes; two rows of two at
+        // accessibility sizes, where four chips abreast truncate every title.
+        // The pairs stack vertically and each pair stays a row.
+        let pairs = [UIStackView(arrangedSubviews: Array(chips[0..<2])),
+                     UIStackView(arrangedSubviews: Array(chips[2..<4]))]
+        for pair in pairs {
+            pair.axis = .horizontal
+            pair.spacing = Theme.Spacing.sm
+            pair.distribution = .fillEqually
+        }
+        let row = UIStackView(arrangedSubviews: pairs)
         row.spacing = Theme.Spacing.sm
         row.distribution = .fillEqually
         row.isLayoutMarginsRelativeArrangement = true
         row.layoutMargins = UIEdgeInsets(
             top: 0, left: Theme.Spacing.md, bottom: 0, right: Theme.Spacing.md)
         row.accessibilityIdentifier = "quickStartChipRow"
+        row.stackVerticallyAtAccessibilitySizes(verticalAlignment: .fill, horizontalAlignment: .fill)
 
         let section = UIStackView(arrangedSubviews: [header, row])
         section.axis = .vertical
@@ -1080,12 +1090,14 @@ final class HomeEmptyStateView: UIView {
         let title = UILabel()
         title.text = content.title
         title.font = Theme.Typography.title2
+        title.adjustsFontForContentSizeCategory = true
         title.textColor = Theme.Color.textPrimary
         title.textAlignment = .center
 
         let subtitle = UILabel()
         subtitle.text = content.subtitle
         subtitle.font = Theme.Typography.body
+        subtitle.adjustsFontForContentSizeCategory = true
         subtitle.textColor = Theme.Color.textSecondary
         subtitle.numberOfLines = 0
         subtitle.textAlignment = .center
@@ -1164,11 +1176,13 @@ final class ProjectCardCell: UICollectionViewCell {
         contentView.applyCardShadow()
 
         nameLabel.font = Theme.Typography.subheadline
+        nameLabel.adjustsFontForContentSizeCategory = true
         nameLabel.textColor = Theme.Color.textPrimary
         nameLabel.lineBreakMode = .byTruncatingTail
         nameLabel.translatesAutoresizingMaskIntoConstraints = false
 
         dateLabel.font = Theme.Typography.caption
+        dateLabel.adjustsFontForContentSizeCategory = true
         dateLabel.textColor = Theme.Color.textSecondary
         dateLabel.translatesAutoresizingMaskIntoConstraints = false
 

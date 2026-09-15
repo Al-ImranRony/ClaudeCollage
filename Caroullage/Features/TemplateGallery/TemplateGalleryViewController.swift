@@ -91,6 +91,7 @@ final class TemplateGalleryViewController: UIViewController {
         definesPresentationContext = true
 
         emptyLabel.font = Theme.Typography.body
+        emptyLabel.adjustsFontForContentSizeCategory = true
         emptyLabel.textColor = Theme.Color.textSecondary
         emptyLabel.textAlignment = .center
         emptyLabel.numberOfLines = 0
@@ -253,18 +254,19 @@ final class TemplateGalleryViewController: UIViewController {
             let spacing = Theme.Spacing.sm
             let inset = Theme.Spacing.md
             let containerWidth = environment.container.effectiveContentSize.width
-            let columnWidth = max(1, (containerWidth - inset * 2 - spacing) / 2)
+            let columns = Theme.Layout.galleryColumns(for: environment.traitCollection)
+            let columnWidth = max(1, (containerWidth - inset * 2 - spacing * CGFloat(columns - 1)) / CGFloat(columns))
             let aspect = preset.size.height / max(preset.size.width, 1)
             let cardHeight = columnWidth * aspect + BrowseTemplateCell.captionHeight
 
             let item = NSCollectionLayoutItem(
                 layoutSize: NSCollectionLayoutSize(
-                    widthDimension: .fractionalWidth(0.5), heightDimension: .fractionalHeight(1))
+                    widthDimension: .fractionalWidth(1 / CGFloat(columns)), heightDimension: .fractionalHeight(1))
             )
             let group = NSCollectionLayoutGroup.horizontal(
                 layoutSize: NSCollectionLayoutSize(
                     widthDimension: .fractionalWidth(1), heightDimension: .absolute(cardHeight)),
-                subitems: [item, item]
+                subitems: Array(repeating: item, count: columns)
             )
             group.interItemSpacing = .fixed(spacing)
             let section = NSCollectionLayoutSection(group: group)

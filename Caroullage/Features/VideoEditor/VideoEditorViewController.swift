@@ -1256,7 +1256,7 @@ final class VideoEditorViewController: UIViewController {
         let host = UIHostingController(rootView: sheet)
         host.modalPresentationStyle = .pageSheet
         if let presentation = host.sheetPresentationController {
-            presentation.detents = [.medium(), .large()]
+            presentation.detents = Theme.Layout.sheetDetents(for: traitCollection)
             presentation.prefersGrabberVisible = true
         }
         present(host, animated: true)
@@ -1366,7 +1366,7 @@ final class VideoEditorViewController: UIViewController {
             let host = UIHostingController(rootView: sheet)
             host.modalPresentationStyle = .pageSheet
             if let presentation = host.sheetPresentationController {
-                presentation.detents = [.medium(), .large()]
+                presentation.detents = Theme.Layout.sheetDetents(for: traitCollection)
                 presentation.prefersGrabberVisible = true
             }
             self.present(host, animated: true)
@@ -1450,7 +1450,7 @@ final class VideoEditorViewController: UIViewController {
         let host = UIHostingController(rootView: panel)
         host.modalPresentationStyle = .pageSheet
         if let sheet = host.sheetPresentationController {
-            sheet.detents = [.medium(), .large()]
+            sheet.detents = Theme.Layout.sheetDetents(for: traitCollection)
             sheet.prefersGrabberVisible = true
             sheet.prefersScrollingExpandsWhenScrolledToEdge = false
         }
@@ -1525,7 +1525,7 @@ final class VideoEditorViewController: UIViewController {
         let host = UIHostingController(rootView: sheet)
         host.modalPresentationStyle = .pageSheet
         if let presentation = host.sheetPresentationController {
-            presentation.detents = [.medium(), .large()]
+            presentation.detents = Theme.Layout.sheetDetents(for: traitCollection)
             presentation.prefersGrabberVisible = true
         }
         present(host, animated: true)

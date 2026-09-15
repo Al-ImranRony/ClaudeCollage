@@ -27,6 +27,8 @@ struct PaywallView: View {
     @State private var heroIndex = 0
     /// The hero card's glyph, scaled with Dynamic Type against large title.
     @ScaledMetric(relativeTo: .largeTitle) private var heroGlyphSize: CGFloat = 46
+    /// The hero card grows with its caption, or the page dots sit on the words.
+    @ScaledMetric(relativeTo: .largeTitle) private var heroHeight: CGFloat = 176
 
     private static let features = [
         ("square.grid.3x3.fill", "200+ templates"),
@@ -100,7 +102,7 @@ struct PaywallView: View {
         }
         .tabViewStyle(.page(indexDisplayMode: .always))
         .indexViewStyle(.page(backgroundDisplayMode: .always))
-        .frame(height: 176)
+        .frame(height: heroHeight)
         .accessibilityIdentifier("paywallHero")
         // Swipeable either way; it advances on its own only when the user has
         // not asked the system to calm down.
@@ -154,7 +156,7 @@ struct PaywallView: View {
                     Text(LocalizedStringKey(text))
                         .font(.themeSubheadline)
                         .foregroundStyle(Color.themeTextPrimary)
-                        .lineLimit(1)
+                        .fixedSize(horizontal: false, vertical: true)
                         .minimumScaleFactor(0.8)
                 }
             }

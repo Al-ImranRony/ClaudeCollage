@@ -53,6 +53,8 @@ struct UniversalExportSheetView: View {
 
     @State private var options: ExportOptions
     @State private var useCredit = false
+    /// A platform tile grows with its caption; the strip scrolls sideways.
+    @ScaledMetric(relativeTo: .body) private var tileSize: CGFloat = 74
 
     init(capabilities: ExportCapabilities,
          onSaveToPhotos: @escaping (ExportOptions, ExportPayment) -> Void,
@@ -134,6 +136,10 @@ struct UniversalExportSheetView: View {
         }
         .padding()
         .foregroundStyle(Color.themeAccentStrong)
+        // Capped at the largest standard size, the way a navigation bar caps
+        // its title: "Cancel · Export" must stay one line. The content beneath
+        // scales fully.
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
     }
 
     // MARK: - Section 1: platform presets
@@ -162,11 +168,11 @@ struct UniversalExportSheetView: View {
             VStack(spacing: 6) {
                 Image(systemName: info.symbol)
                     .font(.themeTitle2)
-                    .frame(width: 54, height: 40)
+                    .frame(width: tileSize * 0.73, height: tileSize * 0.54)
                 Text(info.title).font(.themeCaption)
             }
             .foregroundStyle(selected ? Color.themeTextOnAccent : Color.themeTextPrimary)
-            .frame(width: 74, height: 74)
+            .frame(width: tileSize, height: tileSize)
             // The selected fill is `accentStrong` rather than the indigo: a
             // filled pill is the segmented control's pattern, and the caption
             // under the glyph needs `textOnAccent` on the ink to stay legible.
@@ -187,6 +193,7 @@ struct UniversalExportSheetView: View {
                 Text("Video").tag(ExportOptions.Media.video)
             }
             .pickerStyle(.segmented)
+            .dynamicTypeSize(...DynamicTypeSize.xxxLarge)   // a segment cannot grow; see `header`
         }
     }
 
@@ -200,6 +207,7 @@ struct UniversalExportSheetView: View {
                 Text("PNG").tag(ExportSettings.ImageFormat.png)
             }
             .pickerStyle(.segmented)
+            .dynamicTypeSize(...DynamicTypeSize.xxxLarge)   // a segment cannot grow; see `header`
 
             if options.imageFormat == .jpeg {
                 VStack(alignment: .leading, spacing: 4) {
@@ -216,6 +224,7 @@ struct UniversalExportSheetView: View {
                 Text("Half").tag(ExportOptions.Resolution.half)
             }
             .pickerStyle(.segmented)
+            .dynamicTypeSize(...DynamicTypeSize.xxxLarge)   // a segment cannot grow; see `header`
         }
     }
 
@@ -228,11 +237,15 @@ struct UniversalExportSheetView: View {
                     Text("4K").tag(ExportOptions.VideoResolution.uhd4k)
                 }
                 .pickerStyle(.segmented)
+                .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+            .dynamicTypeSize(...DynamicTypeSize.xxxLarge)   // a segment cannot grow; see `header`
                 Picker("Format", selection: $options.videoCodec) {
                     Text("MP4 · H.264").tag(ExportSettings.VideoCodec.h264)
                     Text("MOV · HEVC").tag(ExportSettings.VideoCodec.hevc)
                 }
                 .pickerStyle(.segmented)
+                .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+            .dynamicTypeSize(...DynamicTypeSize.xxxLarge)   // a segment cannot grow; see `header`
                 .onChange(of: options.videoCodec) { _, codec in
                     options.videoContainer = codec == .hevc ? .mov : .mp4
                 }
@@ -311,6 +324,8 @@ struct UniversalExportSheetView: View {
             } label: {
                 Label("Save to Photos", systemImage: "square.and.arrow.down")
                     .font(.themeHeadline)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity)
                     .padding()
                     .background(Color.themeAccentStrong)
@@ -325,6 +340,8 @@ struct UniversalExportSheetView: View {
             } label: {
                 Label("Quick Share", systemImage: "square.and.arrow.up")
                     .font(.themeHeadline)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity)
                     .padding()
                     .background(Color.themeSurface)
