@@ -33,6 +33,13 @@ public final class IntentRouter {
         case newGridCollage(photoCount: Int)
         case newStoryCarousel(frameCount: Int)
         case exportLastProject
+        // Deep links (Home retention, phase 1). Parsed by `DeepLink`; routed by
+        // the coordinator through the same queue as the intents above.
+        case openProject(UUID)
+        case openCollection(String)
+        case openTemplate(String)
+        case openCarouselTemplate(String)
+        case openSettings
     }
 
     /// Set by the coordinator. Requests that arrive before the app is ready are

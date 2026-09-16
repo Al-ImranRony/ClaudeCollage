@@ -36,6 +36,10 @@ final class AppCoordinator {
     private var startEditingPicker: StartEditingPhotoPicker?
     /// Home, kept so onboarding's answer can reorder what it leads with.
     private weak var homeViewController: HomeViewController?
+    /// The two galleries, kept so a "See All" from a Home collection can land
+    /// on the matching category rather than on the tab's default view.
+    private weak var templateGallery: TemplateGalleryViewController?
+    private weak var carouselGallery: CarouselGalleryViewController?
 
     init(tabBarController: AppTabBarController, container: ModelContainer) {
         self.tabBarController = tabBarController
@@ -84,6 +88,7 @@ final class AppCoordinator {
 
         let templates = TemplateGalleryViewController(service: .shared)
         templates.onSelectTemplate = { [weak self] template in self?.openTemplate(template) }
+        templateGallery = templates
 
         let projects = makeGallery(configuration: .allProjects) { [weak self] in
             self?.startNewGridProject()
@@ -98,6 +103,7 @@ final class AppCoordinator {
         carousels.onSelectTemplate = { [weak self] template in
             self?.openCarouselTemplate(template)
         }
+        carouselGallery = carousels
 
         tabBarController.setTabs([
             // Home is the one tab a user returns to rather than visits, so it
@@ -228,9 +234,46 @@ final class AppCoordinator {
             beginCarousel(config: CarouselStartConfig(
                 type: .matched, frameCount: frameCount, aspectRatio: "4:5"))
         case .exportLastProject:
-            guard let latest = store.listSummaries().first else { return }
+            guard let latest = store.recentSummaries(limit: 1).first else { return }
             openProject(id: latest.id)
+        case let .openProject(id):
+            // A stale link (the project was deleted) does nothing at all — not
+            // even a tab change. Otherwise land on Projects first so Back
+            // returns to the archive the card came from, as a tap there would.
+            guard store.hasProject(id: id) else { return }
+            showTabRoot { $0 is ProjectsViewController }
+            openProject(id: id)
+        case let .openTemplate(id):
+            guard let template = TemplateService.shared.templates.first(where: { $0.id == id })
+            else { return }
+            showTabRoot { $0 is TemplateGalleryViewController }
+            openTemplate(template)
+        case let .openCarouselTemplate(id):
+            guard let template = TemplateService.shared.carouselTemplates.first(where: { $0.id == id })
+            else { return }
+            showTabRoot { $0 is CarouselGalleryViewController }
+            openCarouselTemplate(template)
+        case .openCollection:
+            // Phase 2 scrolls Home to the named collection; until then the
+            // link at least lands on the screen that has it.
+            showTabRoot { $0 is HomeViewController }
+        case .openSettings:
+            // Phase 3 presents the Settings sheet from here.
+            showTabRoot { $0 is HomeViewController }
         }
+    }
+
+    /// Selects a tab and clears whatever was pushed or presented over it, so a
+    /// deep link opens onto a known screen rather than on top of an editor that
+    /// happened to be up. Onboarding is the one presentation left alone: a
+    /// first launch from a link should still run the funnel.
+    private func showTabRoot(_ predicate: (UIViewController) -> Bool) {
+        if let presented = tabBarController.presentedViewController,
+           !(presented is OnboardingHostingController) {
+            presented.dismiss(animated: false)
+        }
+        tabBarController.selectTab(containing: predicate)
+        tabBarController.activeNavigationController?.popToRootViewController(animated: false)
     }
 
     private func tabItem(

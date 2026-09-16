@@ -60,17 +60,72 @@ final class ProjectStore {
     // MARK: - Listing
 
     func listSummaries() -> [ProjectSummary] {
-        let projects = ((try? context.fetch(FetchDescriptor<CollageProject>())) ?? [])
-            .sorted { $0.updatedAt > $1.updatedAt }
-        return projects.map { project in
-            ProjectSummary(
-                id: project.id,
-                updatedAt: project.updatedAt,
-                thumbnail: project.previewThumbnail.flatMap(UIImage.init(data:)),
-                mode: project.mode,
-                name: project.name
-            )
-        }
+        ((try? context.fetch(Self.summaryDescriptor())) ?? []).map(Self.summary(of:))
+    }
+
+    /// The newest few, for Home's "Continue editing" strip (Home retention,
+    /// phase 2). Bounded in the store rather than trimmed by the caller so a
+    /// library of hundreds never decodes hundreds of thumbnails for a strip of
+    /// six.
+    func recentSummaries(limit: Int) -> [ProjectSummary] {
+        // A `fetchLimit` of zero means "no limit" to SwiftData, not "nothing".
+        guard limit > 0 else { return [] }
+        var descriptor = Self.summaryDescriptor()
+        descriptor.fetchLimit = limit
+        return ((try? context.fetch(descriptor)) ?? []).map(Self.summary(of:))
+    }
+
+    /// Whether a project with this id exists. A deep link to a project that
+    /// was deleted since the link was made must not move the user anywhere.
+    func hasProject(id: UUID) -> Bool {
+        fetchProject(id: id) != nil
+    }
+
+    /// How many projects exist, without loading any of them.
+    func projectCount() -> Int {
+        (try? context.fetchCount(FetchDescriptor<CollageProject>())) ?? 0
+    }
+
+    /// Newest first, and only the columns a summary needs. The editor-state
+    /// blobs (`gridStateData`, `carouselData`, `videoData`) used to ride along
+    /// with every listing; a summary never reads them.
+    private static func summaryDescriptor() -> FetchDescriptor<CollageProject> {
+        var descriptor = FetchDescriptor<CollageProject>(
+            sortBy: [SortDescriptor(\.updatedAt, order: .reverse)])
+        descriptor.propertiesToFetch = [\.id, \.updatedAt, \.modeRaw, \.name, \.previewThumbnail]
+        return descriptor
+    }
+
+    private static func summary(of project: CollageProject) -> ProjectSummary {
+        ProjectSummary(
+            id: project.id,
+            updatedAt: project.updatedAt,
+            thumbnail: project.previewThumbnail.flatMap(UIImage.init(data:)),
+            mode: project.mode,
+            name: project.name
+        )
+    }
+
+    // MARK: - Export bookkeeping (Home retention)
+
+    /// Records a successful export. Deliberately does not touch `updatedAt`:
+    /// exporting is not editing, and the gallery's "Recent" sort should not
+    /// reshuffle because the user shared something.
+    func markExported(id: UUID, at date: Date = Date()) {
+        guard let project = fetchProject(id: id) else { return }
+        project.lastExportedAt = date
+        try? context.save()
+    }
+
+    /// The most recently edited project that has never been exported and was
+    /// touched on or after `since` — what the unfinished-project reminder asks
+    /// about. Nil when every recent project has been shared.
+    func mostRecentUnexported(since: Date) -> ProjectSummary? {
+        var descriptor = FetchDescriptor<CollageProject>(
+            predicate: #Predicate { $0.lastExportedAt == nil && $0.updatedAt >= since },
+            sortBy: [SortDescriptor(\.updatedAt, order: .reverse)])
+        descriptor.fetchLimit = 1
+        return ((try? context.fetch(descriptor)) ?? []).map(Self.summary(of:)).first
     }
 
     // MARK: - Save

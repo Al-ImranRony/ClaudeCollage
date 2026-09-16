@@ -19,6 +19,19 @@
 import Photos
 import UIKit
 
+/// One recent photo and the asset it was read from.
+///
+/// `CGImage` is immutable once made, which is what `@unchecked` asserts here.
+public struct RecentPhoto: @unchecked Sendable {
+    public let assetID: String
+    public let image: CGImage
+
+    public init(assetID: String, image: CGImage) {
+        self.assetID = assetID
+        self.image = image
+    }
+}
+
 @MainActor
 public final class RecentPhotoProvider {
 
@@ -61,22 +74,42 @@ public final class RecentPhotoProvider {
     /// Returns empty rather than throwing when access is absent — a suggestion
     /// row that quietly shows nothing is fine; one that errors is not.
     public func recentPhotos(limit: Int = 9) async -> [CGImage] {
-        guard access == .authorized else { return [] }
+        await recentPhotoSet(limit: limit).map(\.image)
+    }
 
+    /// The same photos, each with the asset it came from, so a cache keyed on
+    /// the library's contents can tell "same nine photos" from "nine new ones"
+    /// (Home retention, phase 2).
+    public func recentPhotoSet(limit: Int = 9) async -> [RecentPhoto] {
+        guard access == .authorized else { return [] }
+        let assets = Self.fetchRecentAssets(limit: limit)
+        guard assets.count > 0 else { return [] }
+
+        var photos: [RecentPhoto] = []
+        photos.reserveCapacity(assets.count)
+        for index in 0 ..< assets.count {
+            let asset = assets.object(at: index)
+            if let image = await requestImage(for: asset) {
+                photos.append(RecentPhoto(assetID: asset.localIdentifier, image: image))
+            }
+        }
+        return photos
+    }
+
+    /// Only the identifiers, in the same order `recentPhotoSet` would return
+    /// them. A metadata fetch, no decoding: cheap enough to run on every Home
+    /// appearance to decide whether a cached suggestion set is still current.
+    public func recentAssetIDs(limit: Int = 9) -> [String] {
+        guard access == .authorized else { return [] }
+        let assets = Self.fetchRecentAssets(limit: limit)
+        return (0 ..< assets.count).map { assets.object(at: $0).localIdentifier }
+    }
+
+    private static func fetchRecentAssets(limit: Int) -> PHFetchResult<PHAsset> {
         let options = PHFetchOptions()
         options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
         options.fetchLimit = limit
-        let assets = PHAsset.fetchAssets(with: .image, options: options)
-        guard assets.count > 0 else { return [] }
-
-        var images: [CGImage] = []
-        images.reserveCapacity(assets.count)
-        for index in 0 ..< assets.count {
-            if let image = await requestImage(for: assets.object(at: index)) {
-                images.append(image)
-            }
-        }
-        return images
+        return PHAsset.fetchAssets(with: .image, options: options)
     }
 
     /// One asset at analysis resolution. Small on purpose: these feed face and

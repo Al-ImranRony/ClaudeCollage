@@ -215,6 +215,17 @@ final class CarouselGalleryViewController: UIViewController {
         }
     }
 
+    /// Lands the gallery on one carousel type, as a Home collection's "See
+    /// All" does (Home retention, phase 1). `nil` is every type. Safe before
+    /// the view loads: `viewWillAppear` applies whatever is selected.
+    func preselect(type: CarouselType?) {
+        selectedType = type
+        guard isViewLoaded else { return }
+        chipsView.reloadData()
+        applyFilters(animated: false)
+        scrollGridToTop()
+    }
+
     private func select(type: CarouselType?) {
         guard selectedType != type else { return }
         selectedType = type

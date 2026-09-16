@@ -147,6 +147,27 @@ final class TemplateGalleryViewController: UIViewController {
 
     // MARK: - Filtering
 
+    /// Lands the gallery on one category, as a Home collection's "See All"
+    /// does (Home retention, phase 1). Matched against `categories` without
+    /// regard to case, so a collection authored as "seasonal" finds the
+    /// "Seasonal" chip; an unknown name leaves the gallery as it was. Safe
+    /// before the view loads: `viewDidLoad` applies whatever is selected.
+    func preselect(category: String) {
+        guard let match = Self.categories.first(where: {
+            $0.caseInsensitiveCompare(category) == .orderedSame
+        }) else { return }
+        selectedCategory = match
+        guard isViewLoaded else { return }
+        chipsView.reloadData()
+        applyFilters(animated: false)
+        if let index = Self.categories.firstIndex(of: match) {
+            chipsView.scrollToItem(
+                at: IndexPath(item: index, section: 0), at: .centeredHorizontally, animated: false)
+        }
+        gridView.setContentOffset(
+            CGPoint(x: 0, y: -gridView.adjustedContentInset.top), animated: false)
+    }
+
     /// Recomputes the visible set (preset ∩ category ∩ search) and applies it.
     private func applyFilters(animated: Bool = true) {
         let forCanvas = service.templates(forCanvas: selectedPreset)
