@@ -159,6 +159,11 @@ targets:
       path: CaroullageWidgets/Info.plist
       properties:
         CFBundleDisplayName: Caroullage Widgets
+        # An extension must carry its parent app's version strings exactly —
+        # App Store validation rejects a mismatch, and XcodeGen's defaults
+        # (1.0 / 1) drift from MARKETING_VERSION the first time it is bumped.
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     settings:
