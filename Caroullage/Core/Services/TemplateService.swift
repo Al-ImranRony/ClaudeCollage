@@ -38,7 +38,11 @@ public final class TemplateService {
 
     /// In-memory thumbnail cache, backed by an on-disk PNG cache that survives
     /// relaunches.
-    private var thumbnailCache: [String: CGImage] = [:]
+    /// Bounded (Home retention, phase 4): it used to be a dictionary that held
+    /// every render for the life of the process, disk-backed but never
+    /// evicting. Photo-real showcase previews at up to 900px are large; the
+    /// disk copy is what survives, memory only needs what is on screen.
+    private let thumbnailCache = BoundedImageCache(countLimit: 120)
 
     public init(bundle: Bundle = .main, entitlements: EntitlementStore = .shared) {
         self.bundle = bundle
@@ -147,7 +151,9 @@ public final class TemplateService {
     /// editor's slots use, and the outline down to a hairline.
     /// 5 — The obsidian rebrand: `cellWellChip` went from a warm grey to a
     /// neutral one, which every cached thumbnail draws in the old warm tone.
-    private static let rendererRevision = 5
+    // Internal, not private: `SuggestionPreviewCache` keys its composites on
+    // the same revision, so a renderer change invalidates both caches at once.
+    static let rendererRevision = 5
 
     /// A `maxDimension`-bounded thumbnail for the template, rendered once via the
     /// shared `CollageRenderer` and cached in memory + on disk. Photo zones show
@@ -161,15 +167,15 @@ public final class TemplateService {
         // happened when the empty-cell well moved off the system greys.
         let key = "\(template.id)-\(Self.contentFingerprint(of: template))"
             + "-r\(Self.rendererRevision)@\(Int(maxDimension))"
-        if let cached = thumbnailCache[key] { return cached }
+        if let cached = thumbnailCache.image(for: key) { return cached }
         if let disk = loadDiskThumbnail(key: key) {
-            thumbnailCache[key] = disk
+            thumbnailCache.set(disk, for: key)
             return disk
         }
         guard let image = renderer.render(renderRequest(for: template, maxDimension: maxDimension), scale: 1) else {
             return nil
         }
-        thumbnailCache[key] = image
+        thumbnailCache.set(image, for: key)
         storeDiskThumbnail(image, key: key)
         return image
     }
@@ -210,9 +216,9 @@ public final class TemplateService {
         // template in the manifest changes the render without touching either.
         let key = "showcase-\(template.id)-\(Self.contentFingerprint(of: template))"
             + "-s\(sampleContent.version)-r\(Self.rendererRevision)@\(Int(maxDimension))"
-        if let cached = thumbnailCache[key] { return cached }
+        if let cached = thumbnailCache.image(for: key) { return cached }
         if let disk = loadDiskThumbnail(key: key) {
-            thumbnailCache[key] = disk
+            thumbnailCache.set(disk, for: key)
             return disk
         }
 
@@ -248,7 +254,7 @@ public final class TemplateService {
             stickerOverlays: request.stickerOverlays, stickerImages: request.stickerImages
         )
         guard let image = renderer.render(dressedRequest, scale: 1) else { return nil }
-        thumbnailCache[key] = image
+        thumbnailCache.set(image, for: key)
         storeDiskThumbnail(image, key: key)
         return image
     }
@@ -273,9 +279,9 @@ public final class TemplateService {
         // also clears the caches directory on install.
         let key = "showcase-carousel-\(template.id)"
             + "-s\(sampleContent.version)-r\(Self.rendererRevision)@\(Int(frameMaxDimension))"
-        if let cached = thumbnailCache[key] { return cached }
+        if let cached = thumbnailCache.image(for: key) { return cached }
         if let disk = loadDiskThumbnail(key: key) {
-            thumbnailCache[key] = disk
+            thumbnailCache.set(disk, for: key)
             return disk
         }
 
@@ -291,7 +297,7 @@ public final class TemplateService {
             rendered.append(image)
         }
         guard let strip = Self.compositeStrip(rendered) else { return nil }
-        thumbnailCache[key] = strip
+        thumbnailCache.set(strip, for: key)
         storeDiskThumbnail(strip, key: key)
         return strip
     }
@@ -320,16 +326,16 @@ public final class TemplateService {
 
         let key = "cover-carousel-\(template.id)"
             + "-s\(sampleContent.version)-r\(Self.rendererRevision)@\(Int(maxDimension))"
-        if let cached = thumbnailCache[key] { return cached }
+        if let cached = thumbnailCache.image(for: key) { return cached }
         if let disk = loadDiskThumbnail(key: key) {
-            thumbnailCache[key] = disk
+            thumbnailCache.set(disk, for: key)
             return disk
         }
 
         guard let image = renderCarouselFrame(
             frame, photos: first, of: template, maxDimension: maxDimension)
         else { return nil }
-        thumbnailCache[key] = image
+        thumbnailCache.set(image, for: key)
         storeDiskThumbnail(image, key: key)
         return image
     }
@@ -352,16 +358,16 @@ public final class TemplateService {
         // manifest, so re-dressing a template cannot change it.
         let key = "schematic-carousel-\(template.id)"
             + "-r\(Self.rendererRevision)@\(Int(maxDimension))"
-        if let cached = thumbnailCache[key] { return cached }
+        if let cached = thumbnailCache.image(for: key) { return cached }
         if let disk = loadDiskThumbnail(key: key) {
-            thumbnailCache[key] = disk
+            thumbnailCache.set(disk, for: key)
             return disk
         }
 
         guard let image = renderCarouselFrame(
             frame, photos: nil, of: template, maxDimension: maxDimension)
         else { return nil }
-        thumbnailCache[key] = image
+        thumbnailCache.set(image, for: key)
         storeDiskThumbnail(image, key: key)
         return image
     }
@@ -653,5 +659,23 @@ public final class TemplateService {
         guard let url = thumbnailDirectory?.appendingPathComponent("\(key).png"),
               let data = UIImage(cgImage: image).pngData() else { return }
         try? data.write(to: url, options: .atomic)
+    }
+}
+
+/// `NSCache` for `CGImage`, with the value semantics the service's own cache
+/// had: a string key in, an image or nil out.
+final class BoundedImageCache {
+    private let cache = NSCache<NSString, CGImage>()
+
+    init(countLimit: Int) {
+        cache.countLimit = countLimit
+    }
+
+    func image(for key: String) -> CGImage? {
+        cache.object(forKey: key as NSString)
+    }
+
+    func set(_ image: CGImage, for key: String) {
+        cache.setObject(image, forKey: key as NSString)
     }
 }

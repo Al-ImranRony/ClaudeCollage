@@ -37,6 +37,8 @@ final class CarouselGalleryViewController: UIViewController {
     private var searchText = ""
 
     private var sections: [CarouselGalleryFilter.Section] = []
+    /// Holds a long-press menu's action until the menu is gone (phase 4).
+    private let menuStash = ContextMenuActionStash()
 
     /// The chip row's items: "All" followed by the four types.
     private var chipTypes: [CarouselType?] { [nil] + CarouselType.allCases }
@@ -107,6 +109,10 @@ final class CarouselGalleryViewController: UIViewController {
         emptyLabel.textAlignment = .center
         emptyLabel.numberOfLines = 0
         emptyLabel.accessibilityIdentifier = "carouselGalleryEmptyLabel"
+        // A save made here or on Home redraws the hearts here.
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(favouritesChanged),
+            name: FavoritesStore.didChangeNotification, object: nil)
         // Constant — the catalog is bundled, so the only empty this screen has
         // is "your filters match nothing", never "you have made nothing".
         emptyLabel.text = String(localized: "No carousel templates match your filters.")
@@ -174,6 +180,7 @@ final class CarouselGalleryViewController: UIViewController {
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
+        revealSelectedChipIfNeeded()
         // Clears the pinned ratio chip and type chips above the grid.
         let inset = chipsView.frame.maxY - view.safeAreaInsets.top + Theme.Spacing.xs
         if abs(gridView.contentInset.top - inset) > 0.5 {
@@ -220,10 +227,27 @@ final class CarouselGalleryViewController: UIViewController {
     /// the view loads: `viewWillAppear` applies whatever is selected.
     func preselect(type: CarouselType?) {
         selectedType = type
+        needsChipReveal = true
         guard isViewLoaded else { return }
         chipsView.reloadData()
         applyFilters(animated: false)
         scrollGridToTop()
+        revealSelectedChipIfNeeded()
+    }
+
+    /// A preselected type can sit past the right edge of the chip row; a user
+    /// landing from "See All" must see which chip is on.
+    private var needsChipReveal = false
+
+    private func revealSelectedChipIfNeeded() {
+        guard needsChipReveal, chipsView.bounds.width > 0 else { return }
+        needsChipReveal = false
+        // Item 0 is "All"; the types follow in `CarouselType.allCases` order.
+        let index = selectedType.flatMap { CarouselType.allCases.firstIndex(of: $0) }.map { $0 + 1 } ?? 0
+        guard index < chipsView.numberOfItems(inSection: 0) else { return }
+        chipsView.layoutIfNeeded()
+        chipsView.scrollToItem(
+            at: IndexPath(item: index, section: 0), at: .centeredHorizontally, animated: false)
     }
 
     private func select(type: CarouselType?) {
@@ -445,13 +469,54 @@ extension CarouselGalleryViewController: UICollectionViewDataSource, UICollectio
                 photos: template.photoZoneCount,
                 pages: template.frameCount,
                 locked: locked,
-                identifier: locked ? "carouselTemplateCard.premium" : "carouselTemplateCard.free"),
+                identifier: locked ? "carouselTemplateCard.premium" : "carouselTemplateCard.free",
+                saved: FavoritesStore.shared.isSaved(.init(kind: .carousel, id: template.id))),
             preview: { [service] in
                 // Photo-real first; the wireframe is what stops a card in a LIST
                 // ever coming back blank.
                 service.showcaseCover(for: template) ?? service.schematicCover(for: template)
             })
+        card.accessibilityCustomActions = [
+            FavouriteContextMenu.customAction(for: .init(kind: .carousel, id: template.id)) {},
+        ]
         return cell
+    }
+
+    @objc private func favouritesChanged() {
+        gridView.reloadData()
+    }
+
+    // MARK: Save on long press (phase 4)
+
+    func collectionView(
+        _ collectionView: UICollectionView,
+        contextMenuConfigurationForItemAt indexPath: IndexPath, point: CGPoint
+    ) -> UIContextMenuConfiguration? {
+        guard collectionView === gridView, let template = template(at: indexPath) else { return nil }
+        return FavouriteContextMenu.configuration(
+            for: .init(kind: .carousel, id: template.id), at: indexPath, stash: menuStash) {}
+    }
+
+    func collectionView(
+        _ collectionView: UICollectionView,
+        willEndContextMenuInteraction configuration: UIContextMenuConfiguration,
+        animator: UIContextMenuInteractionAnimating?
+    ) {
+        menuStash.complete(with: animator)
+    }
+
+    func collectionView(
+        _ collectionView: UICollectionView,
+        previewForHighlightingContextMenuWithConfiguration configuration: UIContextMenuConfiguration
+    ) -> UITargetedPreview? {
+        FavouriteContextMenu.preview(for: configuration, in: collectionView)
+    }
+
+    func collectionView(
+        _ collectionView: UICollectionView,
+        previewForDismissingContextMenuWithConfiguration configuration: UIContextMenuConfiguration
+    ) -> UITargetedPreview? {
+        FavouriteContextMenu.preview(for: configuration, in: collectionView)
     }
 
     func collectionView(

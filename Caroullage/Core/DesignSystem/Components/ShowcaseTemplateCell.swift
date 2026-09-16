@@ -139,6 +139,8 @@ final class ShowcaseTemplateCell: UICollectionViewCell {
     /// past eight pages, which the hand-rolled row answers by truncating.
     private let pageControl = UIPageControl()
     private let lockBadge = UIImageView()
+    /// A heart, top-trailing, for a template the user saved (phase 4).
+    private let savedBadge = UIImageView()
 
     private var previewTask: Task<Void, Never>?
     /// The artwork's two geometries, swapped by `apply(_:)`.
@@ -228,6 +230,20 @@ final class ShowcaseTemplateCell: UICollectionViewCell {
             withConfiguration: UIImage.SymbolConfiguration(pointSize: 11, weight: .semibold))
         lockBadge.translatesAutoresizingMaskIntoConstraints = false
 
+        // Opposite the lock, on the scrim-coloured pill the video cell's play
+        // badge uses: a state, not a sale, so not the accent.
+        savedBadge.contentMode = .center
+        savedBadge.tintColor = Theme.Color.textOnToast
+        savedBadge.backgroundColor = Theme.Color.toast.withAlphaComponent(0.55)
+        savedBadge.layer.cornerRadius = Self.lockBadgeSide / 2
+        savedBadge.layer.cornerCurve = .continuous
+        savedBadge.clipsToBounds = true
+        savedBadge.isHidden = true
+        savedBadge.image = UIImage(
+            systemName: "heart.fill",
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: 11, weight: .semibold))
+        savedBadge.translatesAutoresizingMaskIntoConstraints = false
+
         // Order is z-order: the bed under the artwork, the scrim over both, the
         // caption and the chips over the scrim.
         contentView.addSubview(bedImageView)
@@ -237,6 +253,7 @@ final class ShowcaseTemplateCell: UICollectionViewCell {
         contentView.addSubview(nameLabel)
         contentView.addSubview(pageControl)
         contentView.addSubview(lockBadge)
+        contentView.addSubview(savedBadge)
 
         NSLayoutConstraint.activate([
             bedImageView.topAnchor.constraint(equalTo: contentView.topAnchor),
@@ -280,6 +297,13 @@ final class ShowcaseTemplateCell: UICollectionViewCell {
                 equalTo: contentView.leadingAnchor, constant: Theme.Spacing.xs),
             lockBadge.widthAnchor.constraint(equalToConstant: Self.lockBadgeSide),
             lockBadge.heightAnchor.constraint(equalToConstant: Self.lockBadgeSide),
+
+            savedBadge.topAnchor.constraint(
+                equalTo: contentView.topAnchor, constant: Theme.Spacing.xs),
+            savedBadge.trailingAnchor.constraint(
+                equalTo: contentView.trailingAnchor, constant: -Theme.Spacing.xs),
+            savedBadge.widthAnchor.constraint(equalToConstant: Self.lockBadgeSide),
+            savedBadge.heightAnchor.constraint(equalToConstant: Self.lockBadgeSide),
         ])
 
         // Two geometries for one image view — the hero's own pair. The fitted
@@ -336,10 +360,12 @@ final class ShowcaseTemplateCell: UICollectionViewCell {
         pages: Int? = nil,
         presentation: Presentation = .fill,
         locked: Bool = false,
+        saved: Bool = false,
         preview: @escaping () -> CGImage?
     ) {
         nameLabel.text = name
         lockBadge.isHidden = !locked
+        savedBadge.isHidden = !saved
 
         // One page is not a carousel and `nil` is not a carousel at all, so in
         // neither case is there anything for dots to say. `hidesForSinglePage`
@@ -355,7 +381,11 @@ final class ShowcaseTemplateCell: UICollectionViewCell {
         accessibilityLabel = name
         // The page count is stated only in pixels; without this the dots reach
         // nobody using VoiceOver.
-        accessibilityValue = shown >= 2 ? String(localized: "\(shown) pages") : nil
+        // Spoken, since both badges are pictures: the page count and "saved".
+        var spoken: [String] = []
+        if shown >= 2 { spoken.append(String(localized: "\(shown) pages")) }
+        if saved { spoken.append(String(localized: "saved")) }
+        accessibilityValue = spoken.isEmpty ? nil : spoken.joined(separator: ", ")
 
         previewTask?.cancel()
         previewTask = Task { @MainActor [weak self] in
@@ -412,6 +442,8 @@ final class ShowcaseTemplateCell: UICollectionViewCell {
         pageControl.numberOfPages = 0
         pageControl.isHidden = true
         lockBadge.isHidden = true
+        savedBadge.isHidden = true
         accessibilityValue = nil
+        accessibilityCustomActions = nil
     }
 }

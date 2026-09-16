@@ -2,6 +2,8 @@
 
 ## Context
 
+**Status (2026-09-17):** phases 1–4 implemented on branch `feat/home-retention` (worktree `.claude/worktrees/home-retention`). Left open on purpose: the `markExported` hooks in the three editor view controllers (another session holds uncommitted edits there; until they land the unfinished-project reminder never fires because `lastExportedAt` is never set), the device QA pass, and the App Group entitlement the widget still needs.
+
 The user asked for a review of the Home tab (icons, components, collections, design, structure, appearance) and a plan that lifts it to the standard of SCRL, Unfold, Prequel and Canva, and that hooks users into long-term retention. Step 06 (deployment) is in progress; this is the last screen-level investment before submission.
 
 Reviewed: every file in `Caroullage/Features/Home/`, the showcase components in `Core/DesignSystem/Components/`, `SampleContentCatalog`, the `TemplateService` preview API, both gallery tabs, the retention surfaces (widget, intents, Spotlight, notifications, rating), the two prior Home specs, Step 06's roadmap, and live screenshots of the 2026-09-07 build on the iPhone 17 simulator in light and dark (Home top, mid, bottom; Collage tab for comparison).
