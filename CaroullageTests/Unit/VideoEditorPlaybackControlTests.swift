@@ -107,6 +107,49 @@ final class VideoEditorPlaybackControlTests: XCTestCase {
         }
     }
 
+    // MARK: - Runtime capability
+
+    /// Skips on a runtime that cannot DISPLAY a video composition at all — which
+    /// the iOS 27.0 simulator (24A434) cannot: any `AVPlayerItem` carrying an
+    /// `AVVideoComposition` fails with -11800/-12784 the moment an
+    /// `AVPlayerLayer` asks it for frames, Apple's own
+    /// `videoComposition(withPropertiesOf:)` on an untouched file included.
+    /// Items without a video composition, and the export reader path (which
+    /// consumes the same composition), are unaffected; iOS 26.5 displays
+    /// everything. Found 2026-09-17, the day Xcode 27 arrived.
+    ///
+    /// Probed through the pure-Apple path — a raw file plus Apple's own helper,
+    /// no `VideoCompositionBuilder` anywhere — so a regression in OUR
+    /// composition can never hide behind this skip: if this probe fails, no
+    /// composition could have displayed on this runtime, and asserting that
+    /// `player` reached `.playing` would only measure the simulator.
+    private func skipUnlessRuntimeCanDisplayVideoCompositions() async throws {
+        // Two `AVURLAsset`s over the one file rather than one shared instance:
+        // `videoComposition(withPropertiesOf:)` is nonisolated async, so the
+        // asset it is handed is sent off the main actor and cannot be reused.
+        let fixture = try await makeRealVideoAsset()
+        let url = try XCTUnwrap((fixture as? AVURLAsset)?.url)
+        let videoComposition = try await AVMutableVideoComposition.videoComposition(
+            withPropertiesOf: AVURLAsset(url: url))
+        let item = AVPlayerItem(asset: AVURLAsset(url: url))
+        item.videoComposition = videoComposition
+        let player = AVPlayer(playerItem: item)
+        let canvas = VideoCanvasView(frame: CGRect(x: 0, y: 0, width: 64, height: 64))
+        canvas.player = player
+        let window = UIWindow(frame: canvas.frame)
+        window.addSubview(canvas)
+        windows.append(window)
+        window.isHidden = false
+        window.layoutIfNeeded()
+        await waitUntil { item.status != .unknown }
+        if item.status == .failed {
+            throw XCTSkip(
+                "This runtime cannot display a video composition through an AVPlayerLayer " +
+                "(\(item.error.map { String(describing: $0) } ?? "no error")) — a known iOS 27.0 " +
+                "simulator limitation, not a Caroullage bug; run this class on iOS 26.5 or a device.")
+        }
+    }
+
     // MARK: - Tests
 
     func testTheEditorLoadsPausedRatherThanAutoplaying() async throws {
@@ -122,6 +165,7 @@ final class VideoEditorPlaybackControlTests: XCTestCase {
     }
 
     func testTappingTheTimelinesPlaybackControlTogglesTheRealPlayer() async throws {
+        try await skipUnlessRuntimeCanDisplayVideoCompositions()
         let editor = makeEditor(asset: try await makeRealVideoAsset())
         await editor.waitForPendingRebuildForTesting()
         let tl = try timeline(in: editor)
@@ -138,6 +182,7 @@ final class VideoEditorPlaybackControlTests: XCTestCase {
     }
 
     func testPausingSurvivesACompositionRebuild() async throws {
+        try await skipUnlessRuntimeCanDisplayVideoCompositions()
         let editor = makeEditor(asset: try await makeRealVideoAsset())
         await editor.waitForPendingRebuildForTesting()
         let tl = try timeline(in: editor)
@@ -174,6 +219,7 @@ final class VideoEditorPlaybackControlTests: XCTestCase {
     /// Posting the notification explicitly makes that ordering deterministic
     /// instead of waiting for it to happen by luck.
     func testAnEndOfItemNotificationDoesNotOverrideADeliberatePause() async throws {
+        try await skipUnlessRuntimeCanDisplayVideoCompositions()
         let editor = makeEditor(asset: try await makeRealVideoAsset())
         await editor.waitForPendingRebuildForTesting()
         let tl = try timeline(in: editor)
@@ -198,6 +244,7 @@ final class VideoEditorPlaybackControlTests: XCTestCase {
     func testPlayingSurvivesACompositionRebuildToo() async throws {
         // The other half of the same fix: a rebuild while genuinely playing
         // must keep playing, not over-correct into freezing on every edit.
+        try await skipUnlessRuntimeCanDisplayVideoCompositions()
         let editor = makeEditor(asset: try await makeRealVideoAsset())
         await editor.waitForPendingRebuildForTesting()
         let tl = try timeline(in: editor)
