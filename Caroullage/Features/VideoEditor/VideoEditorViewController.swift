@@ -1328,7 +1328,7 @@ final class VideoEditorViewController: UIViewController {
         guard let asset = viewModel.asset(forCellAt: index) else { return }
         let cell = viewModel.cells[index]
 
-        Task { @MainActor in
+        Task { @MainActor [self] in
             let duration = (try? await asset.load(.duration).seconds) ?? 0
             let thumbnails = await self.makeThumbnails(AssetBox(asset: asset))
             let resolved = cell.trim.clamped(toAssetDuration: duration)
@@ -1558,7 +1558,7 @@ final class VideoEditorViewController: UIViewController {
             let url = FileManager.default.temporaryDirectory
                 .appendingPathComponent("VideoCollage-\(UUID().uuidString).\(ext)")
             let renderSize = options.videoPixelSize(canvasSize: self.viewModel.canvasSize)
-            Task { @MainActor in
+            Task { @MainActor [self, progressVC] in
                 do {
                     // Export bakes the overlays into the file (preview shows them as
                     // interactive views instead, so preview == export).

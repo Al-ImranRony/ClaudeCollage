@@ -474,7 +474,7 @@ final class CarouselEditorViewController: UIViewController {
             let ext = options.videoContainer == .mov ? "mov" : "mp4"
             let url = FileManager.default.temporaryDirectory
                 .appendingPathComponent("Carousel-\(UUID().uuidString).\(ext)")
-            Task { @MainActor in
+            Task { @MainActor [self, progressVC] in
                 do {
                     try await VideoComposer().renderSlideshow(
                         frames: frames, size: size, secondsPerFrame: 2.0,

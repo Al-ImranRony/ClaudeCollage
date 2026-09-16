@@ -992,7 +992,7 @@ final class GridEditorViewController: UIViewController {
         canvasView.setSelectedCell(index)
         let progress = presentLiftProgress()
 
-        Task { @MainActor in
+        Task { @MainActor [self] in
             defer { canvasView.setSelectedCell(nil) }
             do {
                 let subject = try await aiService.liftSubject(from: photo)
