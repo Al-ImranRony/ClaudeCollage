@@ -63,6 +63,31 @@ final class CreditPurchaseTests: XCTestCase {
         )
     }
 
+    func testAReplayedTransactionGrantsThePackOnlyOnce() async {
+        // StoreKit re-delivers a transaction that was never finished — the app
+        // crashed between delivery and finish — and consumables cannot be
+        // restored, so a second delivery of the same transaction must be a no-op.
+        let gateway = StubPurchaseGateway()
+        let credits = CreditStore(defaults: defaults)
+        let service = makeService(gateway, credits: credits)
+        await service.start()
+
+        await gateway.emitDelivery(of: CreditProduct.pack5.id, transactionID: 42)
+        await gateway.emitDelivery(of: CreditProduct.pack5.id, transactionID: 42)
+        XCTAssertEqual(credits.balance, 5, "One transaction, one grant")
+
+        await gateway.emitDelivery(of: CreditProduct.pack5.id, transactionID: 43)
+        XCTAssertEqual(credits.balance, 10, "A different transaction is a real second purchase")
+    }
+
+    func testTheDeliveredRecordSurvivesARelaunch() {
+        let first = CreditStore(defaults: defaults)
+        first.deliver(ConsumableDelivery(productID: CreditProduct.single.id, transactionID: 7))
+        let relaunched = CreditStore(defaults: defaults)
+        relaunched.deliver(ConsumableDelivery(productID: CreditProduct.single.id, transactionID: 7))
+        XCTAssertEqual(relaunched.balance, 1)
+    }
+
     func testACancelledCreditPurchaseGrantsNothing() async {
         let gateway = StubPurchaseGateway()
         gateway.outcome = .userCancelled

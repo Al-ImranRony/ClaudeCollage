@@ -258,6 +258,10 @@ final class BrowseTemplateCell: UICollectionViewCell {
                 equalTo: imageView.topAnchor, constant: Theme.Spacing.xs),
             badgeRow.trailingAnchor.constraint(
                 equalTo: imageView.trailingAnchor, constant: -Theme.Spacing.xs),
+            // The row keeps the badge height even with both badges hidden — a
+            // stack with every child hidden collapses to nothing, which put the
+            // page dots (centred on it) against the card's top edge.
+            badgeRow.heightAnchor.constraint(equalToConstant: Self.lockBadgeSide),
             lockBadge.widthAnchor.constraint(equalToConstant: Self.lockBadgeSide),
             lockBadge.heightAnchor.constraint(equalToConstant: Self.lockBadgeSide),
             savedBadge.widthAnchor.constraint(equalToConstant: Self.lockBadgeSide),

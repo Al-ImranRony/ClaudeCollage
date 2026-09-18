@@ -118,8 +118,8 @@ public final class PurchaseService: ObservableObject {
     private func listenForTransactionUpdates() {
         guard updatesTask == nil else { return }
         let credits = self.credits
-        let stream = gateway.transactionUpdates(deliver: { productID in
-            await credits.deliver(productID: productID)
+        let stream = gateway.transactionUpdates(deliver: { delivery in
+            await credits.deliver(delivery)
         })
         updatesTask = Task { [weak self] in
             for await _ in stream {
@@ -214,8 +214,8 @@ public final class PurchaseService: ObservableObject {
 
         let credits = self.credits
         do {
-            let outcome = try await gateway.purchaseConsumable(product.id, deliver: { productID in
-                await credits.deliver(productID: productID)
+            let outcome = try await gateway.purchaseConsumable(product.id, deliver: { delivery in
+                await credits.deliver(delivery)
             })
             return outcome == .success
         } catch {

@@ -47,8 +47,14 @@ public enum LocalNotificationAuthorization: Equatable, Sendable {
 /// one, so the centre is still touched from exactly one type.
 @MainActor
 public protocol LocalNotificationScheduling {
-    /// Returns whether the app may post notifications.
+    /// Returns whether the app may post notifications. Provisional: quiet
+    /// delivery to Notification Center, no prompt — right for the trial
+    /// warning the user did not ask for.
     func requestAuthorization() async -> Bool
+    /// The real prompt, for reminders the user turned on themselves: a
+    /// provisional grant delivers silently, and a toggle that produces nothing
+    /// visible reads as broken.
+    func requestFullAuthorization() async -> Bool
     func authorization() async -> LocalNotificationAuthorization
     func schedule(_ request: TrialReminderRequest) async
     func cancel(identifier: String) async
@@ -60,6 +66,7 @@ public extension LocalNotificationScheduling {
     // engagement tests use a spy of their own that records everything.
     func authorization() async -> LocalNotificationAuthorization { .authorized }
     func pendingIdentifiers() async -> [String] { [] }
+    func requestFullAuthorization() async -> Bool { await requestAuthorization() }
 }
 
 /// The name the trial reminder used before the seam was shared.
@@ -135,6 +142,22 @@ public struct SystemTrialNotificationScheduler: LocalNotificationScheduling {
             return false
         case .notDetermined:
             return (try? await centre.requestAuthorization(options: [.alert, .sound, .provisional])) ?? false
+        @unknown default:
+            return false
+        }
+    }
+
+    public func requestFullAuthorization() async -> Bool {
+        let centre = UNUserNotificationCenter.current()
+        let settings = await centre.notificationSettings()
+        switch settings.authorizationStatus {
+        case .authorized, .ephemeral:
+            return true
+        case .denied:
+            return false
+        case .notDetermined, .provisional:
+            // A provisional grant can be upgraded: the prompt is shown once.
+            return (try? await centre.requestAuthorization(options: [.alert, .sound, .badge])) ?? false
         @unknown default:
             return false
         }

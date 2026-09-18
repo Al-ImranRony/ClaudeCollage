@@ -24,6 +24,10 @@ public final class CreditStore: ObservableObject {
 
     private let defaults: UserDefaults
     private static let key = "credits.balance"
+    /// Transactions already granted, newest last, so a re-delivered one is
+    /// recognised. Bounded: nobody buys a hundred packs between launches.
+    private static let deliveredKey = "credits.deliveredTransactions"
+    private static let deliveredMemory = 100
 
     public init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -38,10 +42,31 @@ public final class CreditStore: ObservableObject {
     }
 
     /// Grants whatever pack the identifier names. Anything else — a
-    /// subscription, an unknown id — is ignored.
+    /// subscription, an unknown id — is ignored. No transaction identity here:
+    /// the store's own path goes through `deliver(_:)`.
     public func deliver(productID: String) {
         guard let product = CreditProduct(id: productID) else { return }
         grant(product)
+    }
+
+    /// Grants a pack once per transaction. StoreKit re-delivers a transaction
+    /// that was never finished — a crash between delivery and `finish()` — and
+    /// the App Store cannot restore consumables, so this record is what stops
+    /// one purchase becoming two grants.
+    public func deliver(_ delivery: ConsumableDelivery) {
+        guard CreditProduct(id: delivery.productID) != nil else { return }
+        var delivered = deliveredTransactionIDs
+        guard !delivered.contains(delivery.transactionID) else { return }
+        delivered.append(delivery.transactionID)
+        if delivered.count > Self.deliveredMemory {
+            delivered.removeFirst(delivered.count - Self.deliveredMemory)
+        }
+        defaults.set(delivered.map { NSNumber(value: $0) }, forKey: Self.deliveredKey)
+        deliver(productID: delivery.productID)
+    }
+
+    private var deliveredTransactionIDs: [UInt64] {
+        (defaults.array(forKey: Self.deliveredKey) as? [NSNumber])?.map(\.uint64Value) ?? []
     }
 
     /// Takes one credit for an export. Returns false when there is nothing to

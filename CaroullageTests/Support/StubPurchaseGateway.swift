@@ -39,7 +39,9 @@ final class StubPurchaseGateway: PurchaseGateway, @unchecked Sendable {
     /// finished — the ordering that keeps a crash from eating a purchase.
     private(set) var deliveredBeforeFinishing = false
     private var didFinish = false
-    private var deliverToApp: (@Sendable (String) async -> Void)?
+    private var deliverToApp: (@Sendable (ConsumableDelivery) async -> Void)?
+    /// Each stub purchase is its own transaction, like the store's.
+    private var nextTransactionID: UInt64 = 1
 
     private var updateContinuation: AsyncStream<Void>.Continuation?
 
@@ -67,12 +69,13 @@ final class StubPurchaseGateway: PurchaseGateway, @unchecked Sendable {
     }
 
     func purchaseConsumable(
-        _ id: String, deliver: @Sendable @escaping (String) async -> Void
+        _ id: String, deliver: @Sendable @escaping (ConsumableDelivery) async -> Void
     ) async throws -> PurchaseOutcome {
         purchasedIDs.append(id)
         if let purchaseError { throw purchaseError }
         guard outcome == .success else { return outcome }
-        await deliver(id)
+        await deliver(ConsumableDelivery(productID: id, transactionID: nextTransactionID))
+        nextTransactionID += 1
         deliveredBeforeFinishing = !didFinish
         didFinish = true
         return .success
@@ -110,7 +113,7 @@ final class StubPurchaseGateway: PurchaseGateway, @unchecked Sendable {
     }
 
     func transactionUpdates(
-        deliver: @Sendable @escaping (String) async -> Void
+        deliver: @Sendable @escaping (ConsumableDelivery) async -> Void
     ) -> AsyncStream<Void> {
         deliverToApp = deliver
         return AsyncStream { continuation in self.updateContinuation = continuation }
@@ -122,7 +125,14 @@ final class StubPurchaseGateway: PurchaseGateway, @unchecked Sendable {
 
     /// A consumable arriving unprompted — approved Ask-to-Buy, another device.
     func emitDelivery(of productID: String) async {
-        await deliverToApp?(productID)
+        await emitDelivery(of: productID, transactionID: nextTransactionID)
+        nextTransactionID += 1
+    }
+
+    /// A specific transaction, so a test can replay one the way StoreKit
+    /// replays an unfinished transaction at launch.
+    func emitDelivery(of productID: String, transactionID: UInt64) async {
+        await deliverToApp?(ConsumableDelivery(productID: productID, transactionID: transactionID))
         updateContinuation?.yield()
     }
 }

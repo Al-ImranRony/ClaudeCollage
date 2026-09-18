@@ -127,7 +127,7 @@ final class SuggestionPreviewCacheTests: XCTestCase {
     func testRemoveAllLeavesNothingBehind() async {
         let cache = makeCache()
         _ = await cache.thumbnail(for: .oneCell, photos: photos([.red]))
-        cache.store(layouts: [.oneCell], forAssetIDs: ["p0"])
+        cache.store(layouts: [.oneCell], forAssetIDs: ["p0"], photoIDs: ["p0"])
         cache.removeAll()
         XCTAssertNil(cache.cachedLayouts(forAssetIDs: ["p0"]))
         let files = (try? FileManager.default.contentsOfDirectory(atPath: directory.path)) ?? []
@@ -138,10 +138,20 @@ final class SuggestionPreviewCacheTests: XCTestCase {
 
     func testSuggestedLayoutsAreRememberedForExactlyThoseAssets() {
         let cache = makeCache()
-        cache.store(layouts: [.fourSquare, .sixGrid], forAssetIDs: ["a", "b", "c", "d"])
+        // Four assets in the library; one (the iCloud-only "c") never loaded.
+        cache.store(layouts: [.fourSquare, .sixGrid], forAssetIDs: ["a", "b", "c", "d"], photoIDs: ["a", "b", "d"])
 
-        XCTAssertEqual(cache.cachedLayouts(forAssetIDs: ["a", "b", "c", "d"]), [.fourSquare, .sixGrid])
+        let cached = cache.cachedLayouts(forAssetIDs: ["a", "b", "c", "d"])
+        XCTAssertEqual(cached?.templates, [.fourSquare, .sixGrid])
+        XCTAssertEqual(cached?.photoIDs, ["a", "b", "d"], "The loaded subset rides along for the thumbnail keys")
         XCTAssertNil(cache.cachedLayouts(forAssetIDs: ["a", "b", "c", "e"]), "One new photo is a new library")
         XCTAssertNil(cache.cachedLayouts(forAssetIDs: ["b", "a", "c", "d"]), "Order is part of the state")
+    }
+
+    func testTheDiskFileNameIsTheSameInEveryProcess() {
+        // SHA-256 of "abc", so a relaunch finds what the last run wrote.
+        XCTAssertEqual(SuggestionPreviewCache.fileName(for: "abc"), "ba7816bf8f01cfea414140de5dae2223.png")
+        XCTAssertEqual(SuggestionPreviewCache.fileName(for: "abc"), SuggestionPreviewCache.fileName(for: "abc"))
+        XCTAssertNotEqual(SuggestionPreviewCache.fileName(for: "abc"), SuggestionPreviewCache.fileName(for: "abd"))
     }
 }

@@ -39,6 +39,20 @@ public struct CreditProductInfo: Sendable, Equatable, Identifiable {
     }
 }
 
+/// A consumable the store says has been paid for. The transaction id is what
+/// makes delivery idempotent: StoreKit re-delivers an unfinished transaction on
+/// the next launch, and the app must grant a pack once however many times it
+/// hears about it.
+public struct ConsumableDelivery: Sendable, Equatable {
+    public let productID: String
+    public let transactionID: UInt64
+
+    public init(productID: String, transactionID: UInt64) {
+        self.productID = productID
+        self.transactionID = transactionID
+    }
+}
+
 public protocol PurchaseGateway: Sendable {
 
     /// Fetches store metadata for the given identifiers. Unknown identifiers are
@@ -55,7 +69,7 @@ public protocol PurchaseGateway: Sendable {
     /// finishing first would lose the credits on a crash, and the App Store does
     /// not restore consumables.
     func purchaseConsumable(
-        _ id: String, deliver: @Sendable @escaping (String) async -> Void
+        _ id: String, deliver: @Sendable @escaping (ConsumableDelivery) async -> Void
     ) async throws -> PurchaseOutcome
 
     /// Everything the user currently owns, ignoring revoked transactions.
@@ -72,7 +86,7 @@ public protocol PurchaseGateway: Sendable {
     /// consumable approved elsewhere. Consumables are handed to `deliver` before
     /// they are finished, for the same reason as `purchaseConsumable`.
     func transactionUpdates(
-        deliver: @Sendable @escaping (String) async -> Void
+        deliver: @Sendable @escaping (ConsumableDelivery) async -> Void
     ) -> AsyncStream<Void>
 }
 
@@ -149,7 +163,7 @@ public struct StoreKitPurchaseGateway: PurchaseGateway {
     }
 
     public func purchaseConsumable(
-        _ id: String, deliver: @Sendable @escaping (String) async -> Void
+        _ id: String, deliver: @Sendable @escaping (ConsumableDelivery) async -> Void
     ) async throws -> PurchaseOutcome {
         guard let product = try await Product.products(for: [id]).first else {
             throw PurchaseGatewayError.productUnavailable
@@ -162,7 +176,7 @@ public struct StoreKitPurchaseGateway: PurchaseGateway {
             }
             // Deliver, then finish. An unfinished transaction is re-delivered on
             // the next launch, so a crash here costs the user nothing.
-            await deliver(transaction.productID)
+            await deliver(ConsumableDelivery(productID: transaction.productID, transactionID: transaction.id))
             await transaction.finish()
             return .success
         case .userCancelled:
@@ -197,13 +211,14 @@ public struct StoreKitPurchaseGateway: PurchaseGateway {
     }
 
     public func transactionUpdates(
-        deliver: @Sendable @escaping (String) async -> Void
+        deliver: @Sendable @escaping (ConsumableDelivery) async -> Void
     ) -> AsyncStream<Void> {
         AsyncStream { continuation in
             let task = Task {
                 for await result in Transaction.updates {
                     if case .verified(let transaction) = result {
-                        await deliver(transaction.productID)
+                        await deliver(ConsumableDelivery(
+                            productID: transaction.productID, transactionID: transaction.id))
                         await transaction.finish()
                     }
                     continuation.yield()
