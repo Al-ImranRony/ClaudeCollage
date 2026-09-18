@@ -67,7 +67,10 @@ def merge(ours, theirs, base=None):
 
 def from_index(path):
     def stage(n):
-        return subprocess.run(["git", "show", f":{n}:{path}"], capture_output=True, text=True, check=True).stdout
+        result = subprocess.run(["git", "show", f":{n}:{path}"], capture_output=True, text=True)
+        if result.returncode != 0:
+            sys.exit(f"{path} is not in a merge conflict (no stage {n} in the index); nothing to do.")
+        return result.stdout
     return load(stage(1)), load(stage(2)), load(stage(3))
 
 
