@@ -22,15 +22,48 @@ public struct TrialReminderRequest: Equatable, Sendable {
     public let title: String
     public let body: String
     public let fireDate: Date
+    /// Where a tap on the notification lands (Home retention, phase 3). Stored
+    /// in the request's `userInfo` and routed by `AppDelegate` through
+    /// `DeepLink`, so the notification centre never learns navigation.
+    public let deepLink: URL?
+
+    public init(identifier: String, title: String, body: String, fireDate: Date, deepLink: URL? = nil) {
+        self.identifier = identifier
+        self.title = title
+        self.body = body
+        self.fireDate = fireDate
+        self.deepLink = deepLink
+    }
 }
 
+/// What the system will do with a notification, as the Settings toggle
+/// needs to know it.
+public enum LocalNotificationAuthorization: Equatable, Sendable {
+    case notDetermined, authorized, denied
+}
+
+/// The seam in front of `UNUserNotificationCenter`. It began as the trial
+/// reminder's; the engagement reminders (phase 3) book through the same
+/// one, so the centre is still touched from exactly one type.
 @MainActor
-public protocol TrialNotificationScheduling {
+public protocol LocalNotificationScheduling {
     /// Returns whether the app may post notifications.
     func requestAuthorization() async -> Bool
+    func authorization() async -> LocalNotificationAuthorization
     func schedule(_ request: TrialReminderRequest) async
     func cancel(identifier: String) async
+    func pendingIdentifiers() async -> [String]
 }
+
+public extension LocalNotificationScheduling {
+    // Defaults so the trial reminder's existing spy keeps compiling; the
+    // engagement tests use a spy of their own that records everything.
+    func authorization() async -> LocalNotificationAuthorization { .authorized }
+    func pendingIdentifiers() async -> [String] { [] }
+}
+
+/// The name the trial reminder used before the seam was shared.
+public typealias TrialNotificationScheduling = LocalNotificationScheduling
 
 @MainActor
 public final class TrialReminderScheduler {
@@ -88,7 +121,7 @@ public final class TrialReminderScheduler {
 /// expected notification that provisional authorization exists for, and it means
 /// no permission prompt lands on the user seconds after they paid.
 @MainActor
-public struct SystemTrialNotificationScheduler: TrialNotificationScheduling {
+public struct SystemTrialNotificationScheduler: LocalNotificationScheduling {
 
     public init() {}
 
@@ -107,11 +140,28 @@ public struct SystemTrialNotificationScheduler: TrialNotificationScheduling {
         }
     }
 
+    public func authorization() async -> LocalNotificationAuthorization {
+        let settings = await UNUserNotificationCenter.current().notificationSettings()
+        switch settings.authorizationStatus {
+        case .authorized, .provisional, .ephemeral: return .authorized
+        case .denied: return .denied
+        case .notDetermined: return .notDetermined
+        @unknown default: return .denied
+        }
+    }
+
+    public func pendingIdentifiers() async -> [String] {
+        await UNUserNotificationCenter.current().pendingNotificationRequests().map(\.identifier)
+    }
+
     public func schedule(_ request: TrialReminderRequest) async {
         let content = UNMutableNotificationContent()
         content.title = request.title
         content.body = request.body
         content.sound = .default
+        if let deepLink = request.deepLink {
+            content.userInfo = [AppDelegate.deepLinkUserInfoKey: deepLink.absoluteString]
+        }
 
         let interval = max(1, request.fireDate.timeIntervalSinceNow)
         let trigger = UNTimeIntervalNotificationTrigger(timeInterval: interval, repeats: false)

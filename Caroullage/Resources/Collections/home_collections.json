@@ -1,0 +1,179 @@
+{
+  "version": 1,
+  "collections": [
+    {
+      "id": "weekly-picks",
+      "titleKey": "This Week's Picks",
+      "kind": "photo",
+      "weeklyPick": 6,
+      "galleryCategory": "All",
+      "itemIDs": [
+        "minimal-duo-offset", "story-caption-hero", "grid-mosaic-four", "travel-horizon-split",
+        "minimal-gallery-trio", "story-stack-trio", "grid-six-airy", "minimal-frame-quote",
+        "travel-postcard-note", "story-split-tall", "minimal-solo-frame", "grid-filmstrip",
+        "seasonal-bloom", "story-quote-block", "minimal-split-air", "travel-panorama-row",
+        "grid-celebrate", "minimal-tower"
+      ]
+    },
+    {
+      "id": "spring",
+      "titleKey": "Spring",
+      "kind": "photo",
+      "window": { "start": "03-01", "end": "05-31" },
+      "galleryCategory": "Seasonal",
+      "priority": 10,
+      "itemIDs": [
+        "seasonal-bloom", "minimal-circle-focus", "minimal-gallery-trio",
+        "travel-postcard-note", "story-hero-strip", "minimal-split-air"
+      ]
+    },
+    {
+      "id": "summer",
+      "titleKey": "Summer",
+      "kind": "photo",
+      "window": { "start": "06-01", "end": "08-31" },
+      "galleryCategory": "Travel",
+      "priority": 10,
+      "itemIDs": [
+        "travel-panorama-row", "travel-horizon-split", "travel-postcard",
+        "story-split-tall", "grid-six-airy", "travel-passport"
+      ]
+    },
+    {
+      "id": "autumn",
+      "titleKey": "Autumn",
+      "kind": "photo",
+      "window": { "start": "09-01", "end": "11-15" },
+      "galleryCategory": "Seasonal",
+      "priority": 10,
+      "itemIDs": [
+        "seasonal-thanks", "seasonal-quartet", "travel-horizon-split",
+        "minimal-frame-quote", "story-caption-hero", "seasonal-greeting"
+      ]
+    },
+    {
+      "id": "holiday",
+      "titleKey": "Holiday Season",
+      "kind": "photo",
+      "window": { "start": "11-16", "end": "01-05" },
+      "galleryCategory": "Seasonal",
+      "priority": 10,
+      "itemIDs": [
+        "seasonal-sparkle", "seasonal-ornament", "seasonal-greeting",
+        "seasonal-thanks", "grid-celebrate", "birthday-confetti"
+      ]
+    },
+    {
+      "id": "for-carousels",
+      "titleKey": "For Instagram Carousels",
+      "kind": "carousel",
+      "creatorKinds": ["carousels"],
+      "carouselType": "matched",
+      "itemIDs": [
+        "carousel-matched-team", "carousel-matched-tips", "carousel-matched-steps",
+        "carousel-story-beforeafter", "carousel-gridpreview-family", "carousel-matched-product"
+      ]
+    },
+    {
+      "id": "for-reels",
+      "titleKey": "For Reels & Stories",
+      "kind": "photo",
+      "creatorKinds": ["reels"],
+      "galleryCategory": "Story",
+      "itemIDs": [
+        "story-caption-hero", "story-hero-strip", "story-stack-trio",
+        "story-split-tall", "story-quote-block", "story-moments"
+      ]
+    },
+    {
+      "id": "pinterest-grids",
+      "titleKey": "Pinterest-Ready Grids",
+      "kind": "photo",
+      "creatorKinds": ["pinterest"],
+      "galleryCategory": "Grid",
+      "itemIDs": [
+        "grid-4cell-square", "grid-mosaic-four", "grid-six-airy",
+        "minimal-tower", "minimal-gallery-trio", "grid-filmstrip"
+      ]
+    },
+    {
+      "id": "celebrations",
+      "titleKey": "Celebrations",
+      "kind": "photo",
+      "galleryCategory": "Birthday",
+      "itemIDs": [
+        "birthday-bash", "birthday-confetti", "grid-celebrate",
+        "minimal-sticker-accent", "seasonal-greeting"
+      ]
+    },
+    {
+      "id": "clean-minimal",
+      "titleKey": "Clean & Minimal",
+      "kind": "photo",
+      "galleryCategory": "Minimal",
+      "itemIDs": [
+        "minimal-duo-offset", "minimal-solo-frame", "minimal-split-air",
+        "minimal-tower", "minimal-circle-focus", "minimal-sticker-accent"
+      ]
+    },
+    {
+      "id": "travel-diaries",
+      "titleKey": "Travel Diaries",
+      "kind": "photo",
+      "galleryCategory": "Travel",
+      "itemIDs": [
+        "travel-horizon-split", "travel-postcard-note", "travel-panorama-row",
+        "travel-passport", "travel-postcard"
+      ]
+    },
+    {
+      "id": "tell-a-story",
+      "titleKey": "Tell a Story",
+      "kind": "carousel",
+      "carouselType": "scrollThrough",
+      "itemIDs": [
+        "carousel-story-lessons", "carousel-story-recipe", "carousel-story-tutorial",
+        "carousel-story-beforeafter", "carousel-story-travel"
+      ]
+    },
+    {
+      "id": "panoramic-swipes",
+      "titleKey": "Panoramic Swipes",
+      "kind": "carousel",
+      "carouselType": "panoramic",
+      "itemIDs": [
+        "carousel-panoramic-sunset", "carousel-panoramic-beach", "carousel-panoramic-skyline",
+        "carousel-panoramic-travel", "carousel-panoramic-city"
+      ]
+    },
+    {
+      "id": "photo-collages",
+      "titleKey": "Photo Collages",
+      "kind": "photo",
+      "isPillar": true,
+      "galleryCategory": "All",
+      "itemIDs": [
+        "grid-4cell-square", "grid-filmstrip", "minimal-duo-offset", "minimal-gallery-trio",
+        "story-hero-strip", "story-caption-hero", "travel-horizon-split", "birthday-confetti",
+        "seasonal-bloom"
+      ]
+    },
+    {
+      "id": "video-collages",
+      "titleKey": "Video Collages",
+      "kind": "video",
+      "isPillar": true,
+      "itemIDs": ["duo-motion", "quad-motion", "solo-motion"]
+    },
+    {
+      "id": "carousels",
+      "titleKey": "Carousels",
+      "kind": "carousel",
+      "isPillar": true,
+      "itemIDs": [
+        "carousel-matched-team", "carousel-matched-menu", "carousel-matched-tips",
+        "carousel-matched-steps", "carousel-story-beforeafter", "carousel-gridpreview-family"
+      ]
+    }
+  ]
+}

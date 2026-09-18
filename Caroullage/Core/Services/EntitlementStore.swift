@@ -16,6 +16,11 @@ public final class EntitlementStore {
 
     public static let shared = EntitlementStore()
 
+    /// Posted, with the store as `object`, when `isPremiumUnlocked` actually
+    /// changes. Surfaces used to re-read the flag on every appearance because
+    /// nothing announced a purchase or a restore; now they can listen instead.
+    public static let didChangeNotification = Notification.Name("EntitlementStore.didChange")
+
     /// Whether the user has unlocked premium features. Defaults to `false`
     /// (free tier). Step 06 drives this from the live StoreKit transaction state.
     public private(set) var isPremiumUnlocked: Bool
@@ -33,6 +38,8 @@ public final class EntitlementStore {
     }
 
     public func setPremiumUnlocked(_ unlocked: Bool) {
+        guard unlocked != isPremiumUnlocked else { return }
         isPremiumUnlocked = unlocked
+        NotificationCenter.default.post(name: Self.didChangeNotification, object: self)
     }
 }

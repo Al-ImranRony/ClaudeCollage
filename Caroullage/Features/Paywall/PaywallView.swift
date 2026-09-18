@@ -385,8 +385,8 @@ struct PaywallView: View {
             }
             .accessibilityIdentifier("paywallRestoreButton")
 
-            Link(destination: PaywallView.termsURL) { Text("Terms").hitTargetPadded() }
-            Link(destination: PaywallView.privacyURL) { Text("Privacy").hitTargetPadded() }
+            Link(destination: LegalLinks.terms) { Text("Terms").hitTargetPadded() }
+            Link(destination: LegalLinks.privacy) { Text("Privacy").hitTargetPadded() }
         }
         .font(.themeCaption)
         .foregroundStyle(Color.themeTextSecondary)
@@ -394,6 +394,8 @@ struct PaywallView: View {
     }
 
     // Both must resolve before submission — App Review checks them.
-    static let termsURL = URL(string: "https://devron.com/legal/caroullage/terms.html")!
-    static let privacyURL = URL(string: "https://devron.com/legal/caroullage/privacy.html")!
+    // Kept as names the rest of the paywall may still reach for; the URLs
+    // themselves live in `LegalLinks`, shared with Settings.
+    static var termsURL: URL { LegalLinks.terms }
+    static var privacyURL: URL { LegalLinks.privacy }
 }

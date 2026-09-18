@@ -167,11 +167,46 @@ final class HeroShowcaseView: UIView {
         return min(max(Int(raw.rounded()), 0), max(pages.count - 1, 0))
     }
 
+    /// The timer's advance: a cross-fade, not a slide (Home retention, phase 4).
+    ///
+    /// `scrollToItem(animated:)` slid the whole card sideways every four
+    /// seconds while the user was reading it, which is what the showcase spec
+    /// asked NOT to happen. `UIView.transition(.transitionCrossDissolve)`
+    /// snapshots the from-state itself, so the page moves without animation
+    /// under the fade and nothing else changes: the dots still track the
+    /// offset, a finger still pages the collection view directly, and the
+    /// rotation controller is untouched.
+    ///
+    /// The visible players are stopped first: a live `AVPlayerLayer` snapshots
+    /// black, and the poster underneath is a complete picture in its own right.
+    /// `scrollViewDidEndScrollingAnimation` does not fire for a non-animated
+    /// offset change, so playback is handed on in the completion instead.
     private func advance(to page: Int) {
-        guard pages.indices.contains(page) else { return }
-        collectionView.scrollToItem(
-            at: IndexPath(item: page, section: 0), at: .centeredHorizontally, animated: true)
+        guard pages.indices.contains(page),
+              let attributes = collectionView.layoutAttributesForItem(at: IndexPath(item: page, section: 0))
+        else { return }
+        let target = CGPoint(x: attributes.frame.minX, y: 0)
+
+        // Off screen, or mid-drag: no fade to see, and a finger owns the offset.
+        guard window != nil, !collectionView.isDragging, !collectionView.isDecelerating else {
+            collectionView.setContentOffset(target, animated: false)
+            pageControl.currentPage = page
+            updateLoopPlayback()
+            return
+        }
+
+        for case let cell as HeroPageCell in collectionView.visibleCells { cell.stop() }
         pageControl.currentPage = page
+        UIView.transition(
+            with: collectionView,
+            duration: Theme.Motion.duration(Theme.Motion.slow),
+            options: [.transitionCrossDissolve, .allowUserInteraction]
+        ) {
+            self.collectionView.setContentOffset(target, animated: false)
+            self.collectionView.layoutIfNeeded()
+        } completion: { _ in
+            self.updateLoopPlayback()
+        }
     }
 
     @objc private func pageControlChanged() {

@@ -29,6 +29,14 @@ final class AppCoordinator {
     private let spotlight = SpotlightIndexer()
     private let aiService = AIService()
     private let recentPhotos = RecentPhotoProvider()
+    /// Home's "From your photos" composites, keyed on the library's contents.
+    private let suggestionPreviews = SuggestionPreviewCache()
+    /// The opt-in nudges (Home retention, phase 3). Booked when the app goes
+    /// to the background, cleared when it comes back.
+    private let reminders = EngagementReminderScheduler()
+    /// Never schedule from a UI test: the authorization prompt would block
+    /// the runner, and a booked reminder would outlive the test.
+    private var isUITest: Bool { ProcessInfo.processInfo.arguments.contains("-UITestMode") }
     private let widgetSnapshots = WidgetSnapshotStore()
     /// Retains the panoramic PHPicker delegate for the life of the pick.
     private var panoramicPicker: PanoramicSourcePicker?
@@ -36,6 +44,10 @@ final class AppCoordinator {
     private var startEditingPicker: StartEditingPhotoPicker?
     /// Home, kept so onboarding's answer can reorder what it leads with.
     private weak var homeViewController: HomeViewController?
+    /// The two galleries, kept so a "See All" from a Home collection can land
+    /// on the matching category rather than on the tab's default view.
+    private weak var templateGallery: TemplateGalleryViewController?
+    private weak var carouselGallery: CarouselGalleryViewController?
 
     init(tabBarController: AppTabBarController, container: ModelContainer) {
         self.tabBarController = tabBarController
@@ -71,19 +83,24 @@ final class AppCoordinator {
             await self?.recentPhotos.requestAccess() ?? .denied
         }
         home.suggestedLayoutsProvider = { [weak self] in
-            guard let self else { return [] }
-            let photos = await self.recentPhotos.recentPhotos()
-            // Below three photos there is nothing meaningful to suggest — a single
-            // photo has exactly one sensible layout.
-            guard photos.count >= 3 else { return [] }
-            return await self.aiService.suggestLayouts(for: photos, limit: 5)
+            await self?.homeSuggestions() ?? []
         }
+        home.recentProjectsProvider = { [weak self] in self?.store.recentSummaries(limit: 6) ?? [] }
+        home.onOpenProject = { [weak self] id in self?.openProject(id: id) }
+        home.onBrowseProjects = { [weak self] in
+            self?.tabBarController.selectTab { $0 is ProjectsViewController }
+        }
+        home.creatorKindProvider = { OnboardingViewModel.storedCreatorKind() }
+        home.collectionsProvider = { [weak self] in self?.plannedHomeCollections() ?? [] }
+        home.onBrowseCollection = { [weak self] collection in self?.browse(collection) }
+        home.onOpenSettings = { [weak self] in self?.presentSettings() }
         home.onSelectSuggestedLayout = { [weak self] template in
             self?.startProjectFromRecentPhotos(template: template)
         }
 
         let templates = TemplateGalleryViewController(service: .shared)
         templates.onSelectTemplate = { [weak self] template in self?.openTemplate(template) }
+        templateGallery = templates
 
         let projects = makeGallery(configuration: .allProjects) { [weak self] in
             self?.startNewGridProject()
@@ -98,6 +115,7 @@ final class AppCoordinator {
         carousels.onSelectTemplate = { [weak self] template in
             self?.openCarouselTemplate(template)
         }
+        carouselGallery = carousels
 
         tabBarController.setTabs([
             // Home is the one tab a user returns to rather than visits, so it
@@ -143,6 +161,7 @@ final class AppCoordinator {
 
         IntentRouter.shared.onRequest = { [weak self] request in self?.handle(request) }
         refreshPlatformSurfaces()
+        observeLifecycleForReminders()
 
         // Reconcile the entitlement with the App Store, load the paywall's
         // products, and start listening for renewals. Off the launch path: the
@@ -228,9 +247,161 @@ final class AppCoordinator {
             beginCarousel(config: CarouselStartConfig(
                 type: .matched, frameCount: frameCount, aspectRatio: "4:5"))
         case .exportLastProject:
-            guard let latest = store.listSummaries().first else { return }
+            guard let latest = store.recentSummaries(limit: 1).first else { return }
             openProject(id: latest.id)
+        case let .openProject(id):
+            // A stale link (the project was deleted) does nothing at all — not
+            // even a tab change. Otherwise land on Projects first so Back
+            // returns to the archive the card came from, as a tap there would.
+            guard store.hasProject(id: id) else { return }
+            showTabRoot { $0 is ProjectsViewController }
+            openProject(id: id)
+        case let .openTemplate(id):
+            guard let template = TemplateService.shared.templates.first(where: { $0.id == id })
+            else { return }
+            showTabRoot { $0 is TemplateGalleryViewController }
+            openTemplate(template)
+        case let .openCarouselTemplate(id):
+            guard let template = TemplateService.shared.carouselTemplates.first(where: { $0.id == id })
+            else { return }
+            showTabRoot { $0 is CarouselGalleryViewController }
+            openCarouselTemplate(template)
+        case let .openCollection(id):
+            showTabRoot { $0 is HomeViewController }
+            homeViewController?.scroll(toCollection: id)
+        case .openSettings:
+            showTabRoot { $0 is HomeViewController }
+            presentSettings()
         }
+    }
+
+    // MARK: - Settings and reminders (Home retention, phase 3)
+
+    private func presentSettings() {
+        guard tabBarController.presentedViewController == nil else { return }
+        let model = SettingsViewModel(reminders: reminders)
+        tabBarController.present(SettingsHostingController.sheet(model: model), animated: true)
+    }
+
+    private static let installedAtKey = "app.installedAt"
+
+    /// When this install first ran. Recorded here rather than in onboarding so
+    /// an install that skipped the funnel still has a first day.
+    private var installedAt: Date {
+        let defaults = UserDefaults.standard
+        if let date = defaults.object(forKey: Self.installedAtKey) as? Date { return date }
+        let now = Date()
+        defaults.set(now, forKey: Self.installedAtKey)
+        return now
+    }
+
+    private func observeLifecycleForReminders() {
+        _ = installedAt
+        guard !isUITest else { return }
+        let center = NotificationCenter.default
+        center.addObserver(
+            self, selector: #selector(appDidEnterBackgroundForReminders),
+            name: UIApplication.didEnterBackgroundNotification, object: nil)
+        center.addObserver(
+            self, selector: #selector(appWillEnterForegroundForReminders),
+            name: UIApplication.willEnterForegroundNotification, object: nil)
+    }
+
+    @objc private func appDidEnterBackgroundForReminders() {
+        let now = Date()
+        let unfinished = store
+            .mostRecentUnexported(since: now.addingTimeInterval(-7 * 24 * 3600))
+            .map { EngagementReminderPolicy.UnfinishedProject(
+                id: $0.id, name: $0.displayName, updatedAt: $0.updatedAt) }
+        let seasonal = HomeCollectionPlanner
+            .nextSeasonalDrop(HomeCollectionCatalog.shared.authored, after: now)
+            .map { EngagementReminderPolicy.SeasonalDrop(
+                collectionID: $0.collection.id, title: $0.collection.title, windowStart: $0.windowStart) }
+        let installed = installedAt
+        Task { [reminders] in
+            await reminders.refresh(now: now, installedAt: installed, unfinished: unfinished, seasonal: seasonal)
+        }
+    }
+
+    @objc private func appWillEnterForegroundForReminders() {
+        Task { [reminders] in await reminders.noteOpened() }
+    }
+
+    // MARK: - Home collections and suggestions (Home retention, phase 2)
+
+    /// What Home shows today: the bundled collections, planned against the
+    /// clock (or `-debug.homeDate`) and the onboarding answer.
+    private func plannedHomeCollections() -> [HomeCollection] {
+        HomeCollectionPlanner.plan(
+            HomeCollectionCatalog.shared.collections(fallingBackTo: SampleContentCatalog.shared),
+            now: HomeCollectionPlanner.overrideDate() ?? Date(),
+            creatorKind: OnboardingViewModel.storedCreatorKind())
+    }
+
+    /// A collection's "See All": the gallery for its kind, already on its
+    /// category. Video has no gallery, so Home never offers the button.
+    private func browse(_ collection: HomeCollection) {
+        switch collection.kind {
+        case .photo:
+            templateGallery?.preselect(category: collection.galleryCategory ?? "All")
+            showTabRoot { $0 is TemplateGalleryViewController }
+        case .carousel:
+            carouselGallery?.preselect(type: collection.carouselType.flatMap(CarouselType.init(rawValue:)))
+            showTabRoot { $0 is CarouselGalleryViewController }
+        case .video:
+            break
+        }
+    }
+
+    /// The top three layouts for the user's recent photos, each rendered with
+    /// them. Costs nothing when the library has not changed: the layouts and
+    /// the composites are both cached on the asset ids, and those are read
+    /// without decoding a single photo.
+    private func homeSuggestions() async -> [HomeSuggestion] {
+        // Below three photos there is nothing meaningful to suggest — a single
+        // photo has exactly one sensible layout.
+        let assetIDs = recentPhotos.recentAssetIDs()
+        guard assetIDs.count >= 3 else { return [] }
+
+        if let layouts = suggestionPreviews.cachedLayouts(forAssetIDs: assetIDs) {
+            let cached = layouts.map { template in
+                HomeSuggestion(
+                    template: template,
+                    thumbnail: suggestionPreviews.cachedThumbnail(for: template, assetIDs: assetIDs))
+            }
+            if cached.allSatisfy({ $0.thumbnail != nil }) { return cached }
+        }
+
+        let photos = await recentPhotos.recentPhotoSet()
+        guard photos.count >= 3 else { return [] }
+        let ids = photos.map(\.assetID)
+        let layouts: [GridTemplate]
+        if let cached = suggestionPreviews.cachedLayouts(forAssetIDs: ids) {
+            layouts = cached
+        } else {
+            layouts = await aiService.suggestLayouts(for: photos.map(\.image), limit: 3)
+            suggestionPreviews.store(layouts: layouts, forAssetIDs: ids)
+        }
+
+        var suggestions: [HomeSuggestion] = []
+        for template in layouts {
+            let thumbnail = await suggestionPreviews.thumbnail(for: template, photos: photos)
+            suggestions.append(HomeSuggestion(template: template, thumbnail: thumbnail))
+        }
+        return suggestions
+    }
+
+    /// Selects a tab and clears whatever was pushed or presented over it, so a
+    /// deep link opens onto a known screen rather than on top of an editor that
+    /// happened to be up. Onboarding is the one presentation left alone: a
+    /// first launch from a link should still run the funnel.
+    private func showTabRoot(_ predicate: (UIViewController) -> Bool) {
+        if let presented = tabBarController.presentedViewController,
+           !(presented is OnboardingHostingController) {
+            presented.dismiss(animated: false)
+        }
+        tabBarController.selectTab(containing: predicate)
+        tabBarController.activeNavigationController?.popToRootViewController(animated: false)
     }
 
     private func tabItem(

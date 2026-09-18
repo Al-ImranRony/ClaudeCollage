@@ -38,7 +38,7 @@ final class HomeShowcaseUITests: XCTestCase {
     /// Requiring the full frame, with the tab bar's height kept clear at the
     /// bottom, is what makes a tap mean what it says.
     @MainActor
-    private func reveal(_ element: XCUIElement, in app: XCUIApplication, swipes: Int = 6) {
+    private func reveal(_ element: XCUIElement, in app: XCUIApplication, swipes: Int = 12) {
         let tabBarInset: CGFloat = 96
         var remaining = swipes
         while remaining > 0 {
@@ -143,41 +143,41 @@ final class HomeShowcaseUITests: XCTestCase {
         // skips a test that should have run. The message stays vague on purpose —
         // two states hide this section, denied access and an empty result, and
         // from out here they are indistinguishable.
-        let suggested = app.staticTexts["Suggested For You"]
+        let suggested = app.staticTexts["sectionHeader-suggestions"]
         try XCTSkipUnless(suggested.waitForExistence(timeout: 5),
                           "Suggestions are hidden here — photo access is off, or nothing was analysable")
 
         XCTAssertGreaterThanOrEqual(suggested.frame.minY, hero.frame.maxY,
-                                    "Suggested For You follows the hero")
+                                    "From your photos follows the hero")
         XCTAssertLessThanOrEqual(suggested.frame.maxY, photoCollages.frame.minY,
                                  "…and precedes the catalog strips")
     }
 
-    /// The floating "Start Editing" pill must not land on the "Photo Collages"
-    /// header. It did once: the header ran 730.3 → 756.7 against a pill fixed at
-    /// 733.0, so the first screen read "Photo Coll ( + Start Editing )" with
-    /// "See All" stranded beside it.
+    /// The floating "Start Editing" pill must never cut a section header. It
+    /// did once: the "Photo Collages" header ran 730.3 → 756.7 against a pill
+    /// fixed at 733.0, so the first screen read "Photo Coll ( + Start Editing )".
     ///
-    /// Unconditional on purpose. The suggestions section above has three states
-    /// and each puts this header somewhere different — hidden (header at 569),
-    /// the enable card, or the populated strip — so this is the one assertion
-    /// that has to hold no matter which state the simulator happens to be in.
-    /// That is also what makes it the guard on `suggestionsContentHeight`: if
-    /// the strip and the card ever drift apart again, one of the three states
-    /// fails here.
+    /// Unconditional on purpose, and over EVERY header rather than one named
+    /// section: Home now has several states — the suggestions section's three,
+    /// and "Continue editing" present or not — and each lands a different
+    /// header near the pill. Whatever sits under the pill must be a strip's
+    /// cards, which is the "scroll for more" cue the budget relies on.
     @MainActor
-    func testTheCatalogHeaderClearsTheStartEditingPill() {
+    func testNoSectionHeaderIsCutByTheStartEditingPill() {
         let app = launch()
 
         let pill = app.buttons["startEditingButton"]
         XCTAssertTrue(pill.waitForExistence(timeout: 10), "The Start Editing pill is on Home")
+        let band = pill.frame
 
-        let photoCollages = app.staticTexts["Photo Collages"]
-        XCTAssertTrue(photoCollages.exists, "The Photo Collages header is on Home")
-
-        XCTAssertLessThanOrEqual(
-            photoCollages.frame.maxY, pill.frame.minY,
-            "The pill overlaps the Photo Collages header — it should overlap the cards below it")
+        let headers = app.staticTexts.matching(
+            NSPredicate(format: "identifier BEGINSWITH 'sectionHeader-'")).allElementsBoundByIndex
+        XCTAssertFalse(headers.isEmpty, "Home has headed sections")
+        for header in headers + [app.staticTexts["Create New"]] {
+            let frame = header.frame
+            let intersects = frame.minY < band.maxY && frame.maxY > band.minY
+            XCTAssertFalse(intersects, "\(header.identifier) is cut by the pill at \(frame)")
+        }
     }
 
     /// The hero renders real pages, not an empty carousel.

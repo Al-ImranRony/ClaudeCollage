@@ -33,6 +33,11 @@ public final class CollageProject {
     /// which is how every carousel was arranged until now.
     public var carouselAxisRaw: String?
     public var frameCount: Int
+    /// When this project was last exported successfully (Home retention,
+    /// phase 1). Optional so every existing project loads without a migration
+    /// and reads as "never exported", which is the state the unfinished-project
+    /// reminder looks for.
+    public var lastExportedAt: Date?
     @Relationship(deleteRule: .cascade) public var cells: [CollageCell]
     public var previewThumbnail: Data?
     public var exportSettings: ExportSettings

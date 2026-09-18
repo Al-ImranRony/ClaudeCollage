@@ -132,4 +132,65 @@ final class ProjectLibraryTests: XCTestCase {
             XCTAssertFalse(mode.displayName.isEmpty, "\(mode) has no card label")
         }
     }
+
+    // MARK: - Recents and export bookkeeping (Home retention, phase 1)
+
+    func testRecentSummariesAreNewestFirstAndBounded() throws {
+        let store = try makeStore()
+        let first = makeProject(in: store)
+        Thread.sleep(forTimeInterval: 0.02)
+        let second = makeProject(in: store)
+        Thread.sleep(forTimeInterval: 0.02)
+        let third = makeProject(in: store)
+
+        let recent = store.recentSummaries(limit: 2)
+        XCTAssertEqual(recent.map(\.id), [third, second],
+                       "The strip shows the newest work first and never more than it asked for")
+        XCTAssertEqual(store.recentSummaries(limit: 10).map(\.id), [third, second, first])
+        XCTAssertTrue(store.recentSummaries(limit: 0).isEmpty)
+    }
+
+    func testProjectCountNeedsNoThumbnails() throws {
+        let store = try makeStore()
+        XCTAssertEqual(store.projectCount(), 0)
+        _ = makeProject(in: store)
+        _ = makeProject(in: store)
+        XCTAssertEqual(store.projectCount(), 2)
+    }
+
+    func testASummaryStillCarriesItsThumbnailAndName() throws {
+        // The bounded listing fetches only the columns a summary needs; that
+        // must include the two a card actually draws.
+        let store = try makeStore()
+        let id = makeProject(in: store)
+        store.rename(id: id, to: "Lake day")
+        let summary = try XCTUnwrap(store.recentSummaries(limit: 1).first)
+        XCTAssertEqual(summary.name, "Lake day")
+        XCTAssertEqual(summary.mode, .grid)
+        XCTAssertNotNil(summary.thumbnail, "A saved grid project renders a thumbnail on save")
+    }
+
+    func testMarkingExportedRemovesAProjectFromTheUnfinishedList() throws {
+        let store = try makeStore()
+        let id = makeProject(in: store)
+        let since = Date().addingTimeInterval(-3600)
+
+        XCTAssertEqual(store.mostRecentUnexported(since: since)?.id, id,
+                       "A fresh project has never been exported")
+
+        let exportedAt = Date()
+        store.markExported(id: id, at: exportedAt)
+        XCTAssertNil(store.mostRecentUnexported(since: since))
+
+        let summary = try XCTUnwrap(store.recentSummaries(limit: 1).first)
+        XCTAssertGreaterThanOrEqual(exportedAt, summary.updatedAt,
+                                    "Exporting is not editing: it must not bump updatedAt")
+    }
+
+    func testUnfinishedIgnoresProjectsOlderThanTheWindow() throws {
+        let store = try makeStore()
+        _ = makeProject(in: store)
+        XCTAssertNil(store.mostRecentUnexported(since: Date().addingTimeInterval(60)),
+                     "A project edited before the window started is not nagged about")
+    }
 }

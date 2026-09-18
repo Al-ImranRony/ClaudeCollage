@@ -43,6 +43,11 @@ final class CategoryChipCell: UICollectionViewCell {
 
     func configure(title: String, isSelected: Bool) {
         label.text = title
+        // On the label, not the cell: the galleries' tests find a chip by its
+        // text, and making the cell the element would hide that text from them.
+        // `selected` is what lets a test (and VoiceOver) read which one is on.
+        label.accessibilityIdentifier = "categoryChip-\(title)"
+        label.accessibilityTraits = isSelected ? [.staticText, .selected] : .staticText
         // A chip label is body-sized, so the selected state takes `accentStrong`
         // — `accent` on the soft-accent fill is 3.6:1, short of AA.
         label.textColor = isSelected ? Theme.Color.accentStrong : Theme.Color.textSecondary

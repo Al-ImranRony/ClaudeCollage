@@ -119,6 +119,14 @@ targets:
         # export-compliance question per build instead of per upload.
         ITSAppUsesNonExemptEncryption: false
         NSSupportsLiveActivities: true
+        # The scheme the widget, the export Live Activity and local reminders
+        # link back with (`DeepLink`). It was emitted for a year before it was
+        # registered here, so every one of those taps cold-launched to Home.
+        CFBundleURLTypes:
+          - CFBundleURLName: com.devron.caroullage
+            CFBundleTypeRole: Editor
+            CFBundleURLSchemes:
+              - caroullage
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
           UISceneConfigurations:

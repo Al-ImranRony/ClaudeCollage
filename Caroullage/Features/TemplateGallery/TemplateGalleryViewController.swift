@@ -43,6 +43,8 @@ final class TemplateGalleryViewController: UIViewController {
     private lazy var gridView = makeGridView()
     private lazy var dataSource = makeDataSource()
     private let emptyLabel = UILabel()
+    /// Holds a long-press menu's action until the menu is gone (phase 4).
+    private let menuStash = ContextMenuActionStash()
     private let searchController = UISearchController(searchResultsController: nil)
 
     init(service: TemplateService = .shared) {
@@ -57,6 +59,7 @@ final class TemplateGalleryViewController: UIViewController {
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
+        revealSelectedChipIfNeeded()
         // Clears the pinned preset control and category chips above the grid.
         let inset = chipsView.frame.maxY - view.safeAreaInsets.top + Theme.Spacing.xs
         if abs(gridView.contentInset.top - inset) > 0.5 {
@@ -143,9 +146,51 @@ final class TemplateGalleryViewController: UIViewController {
 
         service.loadBundledTemplates()
         applyFilters(animated: false)
+
+        // A save made here or on Home redraws the hearts here.
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(favouritesChanged),
+            name: FavoritesStore.didChangeNotification, object: nil)
+    }
+
+    @objc private func favouritesChanged() {
+        gridView.reloadData()
     }
 
     // MARK: - Filtering
+
+    /// Lands the gallery on one category, as a Home collection's "See All"
+    /// does (Home retention, phase 1). Matched against `categories` without
+    /// regard to case, so a collection authored as "seasonal" finds the
+    /// "Seasonal" chip; an unknown name leaves the gallery as it was. Safe
+    /// before the view loads: `viewDidLoad` applies whatever is selected.
+    func preselect(category: String) {
+        guard let match = Self.categories.first(where: {
+            $0.caseInsensitiveCompare(category) == .orderedSame
+        }) else { return }
+        selectedCategory = match
+        needsChipReveal = true
+        guard isViewLoaded else { return }
+        chipsView.reloadData()
+        applyFilters(animated: false)
+        gridView.setContentOffset(
+            CGPoint(x: 0, y: -gridView.adjustedContentInset.top), animated: false)
+        revealSelectedChipIfNeeded()
+    }
+
+    /// A preselected category can sit past the right edge of the chip row
+    /// ("Seasonal" is the sixth of seven); a user landing from "See All" must
+    /// see which chip is on, so the row scrolls to it once it has a width.
+    private var needsChipReveal = false
+
+    private func revealSelectedChipIfNeeded() {
+        guard needsChipReveal, chipsView.bounds.width > 0,
+              let index = Self.categories.firstIndex(of: selectedCategory) else { return }
+        needsChipReveal = false
+        chipsView.layoutIfNeeded()
+        chipsView.scrollToItem(
+            at: IndexPath(item: index, section: 0), at: .centeredHorizontally, animated: false)
+    }
 
     /// Recomputes the visible set (preset ∩ category ∩ search) and applies it.
     private func applyFilters(animated: Bool = true) {
@@ -303,13 +348,17 @@ final class TemplateGalleryViewController: UIViewController {
                     // A collage is one canvas. No pages, so no dots.
                     pages: nil,
                     locked: !self.service.canOpen(template),
-                    identifier: isPremium ? "templateCard.premium" : "templateCard.free"),
+                    identifier: isPremium ? "templateCard.premium" : "templateCard.free",
+                    saved: FavoritesStore.shared.isSaved(.init(kind: .photo, id: template.id))),
                 preview: { [service = self.service] in
                     // Photo-real first, schematic second — the same fallback the
                     // Carousel tab uses, and the reason a card in a browse LIST
                     // can never come back blank.
                     service.showcasePreview(for: template) ?? service.thumbnail(for: template)
                 })
+            cell.accessibilityCustomActions = [
+                FavouriteContextMenu.customAction(for: .init(kind: .photo, id: template.id)) {},
+            ]
         }
         return UICollectionViewDiffableDataSource<Int, String>(collectionView: gridView) {
             collectionView, indexPath, templateID in
@@ -360,6 +409,40 @@ extension TemplateGalleryViewController: UICollectionViewDataSource, UICollectio
             Haptics.boundary()
             presentPaywall { [weak self] in self?.onSelectTemplate?(template) }
         }
+    }
+
+    // MARK: Save on long press (phase 4)
+
+    func collectionView(
+        _ collectionView: UICollectionView,
+        contextMenuConfigurationForItemAt indexPath: IndexPath, point: CGPoint
+    ) -> UIContextMenuConfiguration? {
+        guard collectionView === gridView,
+              let templateID = dataSource.itemIdentifier(for: indexPath) else { return nil }
+        return FavouriteContextMenu.configuration(
+            for: .init(kind: .photo, id: templateID), at: indexPath, stash: menuStash) {}
+    }
+
+    func collectionView(
+        _ collectionView: UICollectionView,
+        willEndContextMenuInteraction configuration: UIContextMenuConfiguration,
+        animator: UIContextMenuInteractionAnimating?
+    ) {
+        menuStash.complete(with: animator)
+    }
+
+    func collectionView(
+        _ collectionView: UICollectionView,
+        previewForHighlightingContextMenuWithConfiguration configuration: UIContextMenuConfiguration
+    ) -> UITargetedPreview? {
+        FavouriteContextMenu.preview(for: configuration, in: collectionView)
+    }
+
+    func collectionView(
+        _ collectionView: UICollectionView,
+        previewForDismissingContextMenuWithConfiguration configuration: UIContextMenuConfiguration
+    ) -> UITargetedPreview? {
+        FavouriteContextMenu.preview(for: configuration, in: collectionView)
     }
 }
 

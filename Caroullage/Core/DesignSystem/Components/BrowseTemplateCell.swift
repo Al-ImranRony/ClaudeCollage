@@ -88,6 +88,9 @@ final class BrowseTemplateCell: UICollectionViewCell {
         /// told apart in UI tests by this rather than by reading a badge out of
         /// a screenshot, so the caller names them.
         let identifier: String
+        /// A template the user saved (phase 4). Defaulted so the two galleries'
+        /// existing call sites read unchanged.
+        var saved: Bool = false
     }
 
     /// Room under the artwork for the name and the metadata row. Fixed, and
@@ -107,6 +110,10 @@ final class BrowseTemplateCell: UICollectionViewCell {
     private let dotsPill = PillView()
     private let dotsRow = UIStackView()
     private let lockBadge = UIImageView()
+    /// A heart beside the lock, for a saved template (phase 4). The two share
+    /// a row so a hidden one leaves no gap.
+    private let savedBadge = UIImageView()
+    private let badgeRow = UIStackView()
     private let nameLabel = UILabel()
     private let metaLabel = UILabel()
 
@@ -162,6 +169,25 @@ final class BrowseTemplateCell: UICollectionViewCell {
             withConfiguration: UIImage.SymbolConfiguration(pointSize: 11, weight: .semibold))
         lockBadge.translatesAutoresizingMaskIntoConstraints = false
 
+        savedBadge.contentMode = .center
+        savedBadge.tintColor = Theme.Color.textOnToast
+        savedBadge.backgroundColor = Theme.Color.toast.withAlphaComponent(0.55)
+        savedBadge.layer.cornerRadius = Self.lockBadgeSide / 2
+        savedBadge.layer.cornerCurve = .continuous
+        savedBadge.clipsToBounds = true
+        savedBadge.isHidden = true
+        savedBadge.image = UIImage(
+            systemName: "heart.fill",
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: 11, weight: .semibold))
+        savedBadge.translatesAutoresizingMaskIntoConstraints = false
+
+        badgeRow.axis = .horizontal
+        badgeRow.spacing = Theme.Spacing.xxs
+        badgeRow.alignment = .center
+        badgeRow.translatesAutoresizingMaskIntoConstraints = false
+        badgeRow.addArrangedSubview(savedBadge)
+        badgeRow.addArrangedSubview(lockBadge)
+
         // Below the artwork, on the app surface — so these take the surface
         // tokens, unlike `ShowcaseTemplateCell`'s caption which floats over
         // photography and cannot.
@@ -182,7 +208,7 @@ final class BrowseTemplateCell: UICollectionViewCell {
         dotsPill.addSubview(dotsRow)
         contentView.addSubview(imageView)
         contentView.addSubview(dotsPill)
-        contentView.addSubview(lockBadge)
+        contentView.addSubview(badgeRow)
         contentView.addSubview(nameLabel)
         contentView.addSubview(metaLabel)
 
@@ -221,19 +247,21 @@ final class BrowseTemplateCell: UICollectionViewCell {
             // whether or not it is hidden.
             dotsPill.leadingAnchor.constraint(
                 equalTo: imageView.leadingAnchor, constant: Theme.Spacing.xs),
-            dotsPill.centerYAnchor.constraint(equalTo: lockBadge.centerYAnchor),
+            dotsPill.centerYAnchor.constraint(equalTo: badgeRow.centerYAnchor),
 
             dotsRow.topAnchor.constraint(equalTo: dotsPill.topAnchor, constant: 5),
             dotsRow.bottomAnchor.constraint(equalTo: dotsPill.bottomAnchor, constant: -5),
             dotsRow.leadingAnchor.constraint(equalTo: dotsPill.leadingAnchor, constant: 7),
             dotsRow.trailingAnchor.constraint(equalTo: dotsPill.trailingAnchor, constant: -7),
 
-            lockBadge.topAnchor.constraint(
+            badgeRow.topAnchor.constraint(
                 equalTo: imageView.topAnchor, constant: Theme.Spacing.xs),
-            lockBadge.trailingAnchor.constraint(
+            badgeRow.trailingAnchor.constraint(
                 equalTo: imageView.trailingAnchor, constant: -Theme.Spacing.xs),
             lockBadge.widthAnchor.constraint(equalToConstant: Self.lockBadgeSide),
             lockBadge.heightAnchor.constraint(equalToConstant: Self.lockBadgeSide),
+            savedBadge.widthAnchor.constraint(equalToConstant: Self.lockBadgeSide),
+            savedBadge.heightAnchor.constraint(equalToConstant: Self.lockBadgeSide),
 
             nameLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
             nameLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
@@ -298,6 +326,7 @@ final class BrowseTemplateCell: UICollectionViewCell {
         metaLabel.attributedText = Self.metadata(ratio: ratio, photos: photos, pages: pages)
 
         lockBadge.isHidden = !locked
+        savedBadge.isHidden = !content.saved
         setPageDots(pages)
 
         accessibilityIdentifier = content.identifier
@@ -311,6 +340,7 @@ final class BrowseTemplateCell: UICollectionViewCell {
         spoken.append(String(localized: "\(photos) photos"))
         if let pages { spoken.append(String(localized: "\(pages) pages")) }
         if locked { spoken.append(String(localized: "premium")) }
+        if content.saved { spoken.append(String(localized: "saved")) }
         accessibilityValue = spoken.joined(separator: ", ")
 
         previewTask?.cancel()
@@ -413,5 +443,7 @@ final class BrowseTemplateCell: UICollectionViewCell {
         // be a very quiet lie, and the sibling cell hides its badge here too.
         dotsPill.isHidden = true
         accessibilityValue = nil
+        savedBadge.isHidden = true
+        accessibilityCustomActions = nil
     }
 }

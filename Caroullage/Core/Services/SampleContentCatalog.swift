@@ -55,7 +55,14 @@ public final class SampleContentCatalog {
 
     private let bundle: Bundle
     public private(set) var manifest: SampleContentManifest?
-    private var imageCache: [String: UIImage] = [:]
+    /// Bounded: the sample photography is decoded on demand and this held every
+    /// decode for the life of the process. Twenty-seven JPEGs at ~1200px is
+    /// tens of megabytes of bitmaps that a memory warning could never reclaim.
+    private let imageCache: NSCache<NSString, UIImage> = {
+        let cache = NSCache<NSString, UIImage>()
+        cache.countLimit = 40
+        return cache
+    }()
 
     public init(bundle: Bundle = .main) {
         self.bundle = bundle
@@ -119,10 +126,10 @@ public final class SampleContentCatalog {
     }
 
     public func image(named name: String) -> UIImage? {
-        if let cached = imageCache[name] { return cached }
+        if let cached = imageCache.object(forKey: name as NSString) { return cached }
         guard let url = bundle.url(forResource: name, withExtension: "jpg"),
               let image = UIImage(contentsOfFile: url.path) else { return nil }
-        imageCache[name] = image
+        imageCache.setObject(image, forKey: name as NSString)
         return image
     }
 

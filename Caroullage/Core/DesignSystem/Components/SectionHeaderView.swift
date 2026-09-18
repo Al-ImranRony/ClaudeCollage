@@ -16,6 +16,8 @@ public final class SectionHeaderView: UIStackView {
 
     public init(
         title: String,
+        titleIdentifier: String? = nil,
+        badge: String? = nil,
         actionTitle: String? = nil,
         actionIdentifier: String? = nil,
         action: (() -> Void)? = nil
@@ -27,7 +29,33 @@ public final class SectionHeaderView: UIStackView {
         titleLabel.textColor = Theme.Color.textPrimary
         titleLabel.adjustsFontForContentSizeCategory = true
         titleLabel.numberOfLines = 0   // wraps at accessibility sizes rather than clipping
-        addArrangedSubview(titleLabel)
+        titleLabel.accessibilityIdentifier = titleIdentifier
+
+        if let badge, !badge.isEmpty {
+            // A small capsule beside the title — "NEW" on a collection that
+            // just landed (Home retention, phase 2). The selected category
+            // chip's colours, so the two marks read as one system.
+            let badgeLabel = PaddedLabel()
+            badgeLabel.text = badge
+            badgeLabel.font = Theme.Typography.rounded(11, .bold, .caption2)
+            badgeLabel.adjustsFontForContentSizeCategory = true
+            badgeLabel.textColor = Theme.Color.accentStrong
+            badgeLabel.backgroundColor = Theme.Color.accentSoft
+            badgeLabel.layer.cornerRadius = 8
+            badgeLabel.layer.cornerCurve = .continuous
+            badgeLabel.clipsToBounds = true
+            badgeLabel.setContentHuggingPriority(.required, for: .horizontal)
+            badgeLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
+            badgeLabel.accessibilityIdentifier = titleIdentifier.map { "\($0)-badge" }
+
+            let titleRow = UIStackView(arrangedSubviews: [titleLabel, badgeLabel])
+            titleRow.axis = .horizontal
+            titleRow.alignment = .center
+            titleRow.spacing = Theme.Spacing.xs
+            addArrangedSubview(titleRow)
+        } else {
+            addArrangedSubview(titleLabel)
+        }
 
         if let actionTitle, let action {
             let button = ThemeButton(
@@ -66,5 +94,21 @@ public final class SectionHeaderView: UIStackView {
     public var title: String? {
         get { titleLabel.text }
         set { titleLabel.text = newValue }
+    }
+}
+
+/// A label with its own horizontal padding, so a capsule badge can be one
+/// view rather than a label inside a container.
+private final class PaddedLabel: UILabel {
+    private let inset = UIEdgeInsets(top: 3, left: 7, bottom: 3, right: 7)
+
+    override func drawText(in rect: CGRect) {
+        super.drawText(in: rect.inset(by: inset))
+    }
+
+    override var intrinsicContentSize: CGSize {
+        let size = super.intrinsicContentSize
+        return CGSize(width: size.width + inset.left + inset.right,
+                      height: size.height + inset.top + inset.bottom)
     }
 }
