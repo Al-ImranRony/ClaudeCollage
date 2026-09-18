@@ -151,6 +151,30 @@ final class PaywallViewModelTests: XCTestCase {
         XCTAssertTrue(terms.lowercased().contains("cancel"), terms)
     }
 
+    func testATrialOnAMonthlyPlanStatesAMonthlyRenewal() async {
+        // The store decides which plans carry an intro offer; the copy must
+        // follow the selected plan's period, not assume the yearly one.
+        let gateway = StubPurchaseGateway()
+        gateway.stockedProducts = [
+            PremiumProductInfo(product: .yearly, displayName: "Premium Yearly", displayPrice: "$24.99",
+                               price: 24.99, priceFormatStyle: .usd, introductoryOfferDays: 7),
+            PremiumProductInfo(product: .monthly, displayName: "Premium Monthly", displayPrice: "$4.99",
+                               price: 4.99, priceFormatStyle: .usd, introductoryOfferDays: 3),
+        ]
+        gateway.introOfferEligible = true
+        let service = PurchaseService(
+            gateway: gateway, defaults: defaults, entitlements: EntitlementStore(isPremiumUnlocked: false))
+        let model = PaywallViewModel(service: service)
+        await model.load()
+
+        model.select(.monthly)
+        let terms = model.termsText
+        XCTAssertTrue(terms.contains("3 days free"), terms)
+        XCTAssertTrue(terms.contains("$4.99"), terms)
+        XCTAssertTrue(terms.lowercased().contains("per month"), terms)
+        XCTAssertFalse(terms.lowercased().contains("year"), terms)
+    }
+
     func testTheTermsDropTheTrialSentenceWhenThereIsNoTrial() async {
         let model = await makeModel(gateway: StubPurchaseGateway(), trialEligible: false)
 

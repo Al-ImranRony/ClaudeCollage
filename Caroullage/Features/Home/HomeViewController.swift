@@ -265,6 +265,10 @@ final class HomeViewController: UIViewController {
     }
 
     private var strips: [CollectionStrip] = []
+    /// The plan the sections were last built from. Compared against the new
+    /// plan rather than against `strips`, which drops collections that resolved
+    /// to nothing — comparing against those would rebuild on every appearance.
+    private var lastPlanned: [HomeCollection] = []
     /// "Saved Collages" and "Saved Carousels" (phase 4): the same shape as a
     /// planned collection so the cards, taps and menus share one path.
     private var savedStrips: [CollectionStrip] = []
@@ -438,10 +442,11 @@ final class HomeViewController: UIViewController {
     /// cards in place, which is what a lock coming off needs.
     private func rebuildCollectionsIfNeeded() {
         let planned = collectionsProvider?() ?? []
-        if planned == strips.map(\.collection) {
+        if planned == lastPlanned {
             reloadStrips()
             return
         }
+        lastPlanned = planned
 
         for old in strips {
             collectionsStack.removeArrangedSubview(old.section)

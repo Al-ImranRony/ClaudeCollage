@@ -20,6 +20,7 @@
 //  is ever in flight.
 //
 
+import CryptoKit
 import Foundation
 import UIKit
 
@@ -49,7 +50,7 @@ public final class SuggestionPreviewCache {
 
     private var thumbnails: [String: CGImage] = [:]
     private var renders: [String: Task<CGImage?, Never>] = [:]
-    private var layouts: [String: [GridTemplate]] = [:]
+    private var layouts: [String: CachedLayouts] = [:]
 
     /// How many renders actually ran. Tests read it to prove the caches hit.
     public private(set) var renderCount = 0
@@ -74,14 +75,26 @@ public final class SuggestionPreviewCache {
 
     // MARK: - Suggested layouts
 
-    /// The layouts last suggested for exactly these photos, if the library has
+    /// What was suggested for one library state: the layouts, and the ids of
+    /// the photos that actually loaded (an iCloud-only asset can be in the
+    /// library and still yield no image), which is what the thumbnails are
+    /// keyed on.
+    public struct CachedLayouts: Equatable, Sendable {
+        public let templates: [GridTemplate]
+        public let photoIDs: [String]
+    }
+
+    /// The layouts last suggested for exactly these assets, if the library has
     /// not changed since. Skips the Vision pass on every Home appearance.
-    public func cachedLayouts(forAssetIDs ids: [String]) -> [GridTemplate]? {
+    public func cachedLayouts(forAssetIDs ids: [String]) -> CachedLayouts? {
         layouts[Self.assetKey(ids)]
     }
 
-    public func store(layouts templates: [GridTemplate], forAssetIDs ids: [String]) {
-        layouts = [Self.assetKey(ids): templates]   // one library state at a time
+    /// `ids` is every recent asset — the list the caller will check with —
+    /// and `photoIDs` the subset whose images loaded.
+    public func store(layouts templates: [GridTemplate], forAssetIDs ids: [String], photoIDs: [String]) {
+        // One library state at a time.
+        layouts = [Self.assetKey(ids): CachedLayouts(templates: templates, photoIDs: photoIDs)]
     }
 
     // MARK: - Thumbnails
@@ -160,12 +173,18 @@ public final class SuggestionPreviewCache {
 
     // MARK: - Disk
 
+    /// Asset identifiers carry slashes, so the key is digested into a name.
+    /// A cryptographic digest rather than `Hasher`: Swift's hasher is seeded
+    /// per process, so a name made with it can never be found on the next
+    /// launch — which quietly turned the disk cache into a per-run one.
+    static func fileName(for key: String) -> String {
+        let digest = SHA256.hash(data: Data(key.utf8))
+        let hex = digest.map { String(format: "%02x", $0) }.joined()
+        return String(hex.prefix(32)) + ".png"
+    }
+
     private func fileURL(for key: String) -> URL? {
-        // Asset identifiers carry slashes; the key is hashed into a file name.
-        var hasher = Hasher()
-        hasher.combine(key)
-        let name = String(UInt(bitPattern: hasher.finalize()), radix: 36)
-        return directory?.appendingPathComponent("\(name).png")
+        directory?.appendingPathComponent(Self.fileName(for: key))
     }
 
     private func loadFromDisk(_ key: String) -> CGImage? {

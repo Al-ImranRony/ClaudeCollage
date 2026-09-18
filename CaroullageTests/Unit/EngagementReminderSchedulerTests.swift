@@ -16,11 +16,18 @@ private final class SpyLocalNotifications: LocalNotificationScheduling {
     var grants = true
     var status: LocalNotificationAuthorization = .notDetermined
     var authorizationRequests = 0
+    var fullAuthorizationRequests = 0
     var scheduled: [TrialReminderRequest] = []
     var cancelled: [String] = []
 
     func requestAuthorization() async -> Bool {
         authorizationRequests += 1
+        status = grants ? .authorized : .denied
+        return grants
+    }
+
+    func requestFullAuthorization() async -> Bool {
+        fullAuthorizationRequests += 1
         status = grants ? .authorized : .denied
         return grants
     }
@@ -61,7 +68,8 @@ final class EngagementReminderSchedulerTests: XCTestCase {
     func testTurningOnAsksTheSystemAndRemembersTheAnswer() async {
         let granted = await scheduler.setEnabled(true)
         XCTAssertTrue(granted)
-        XCTAssertEqual(spy.authorizationRequests, 1)
+        XCTAssertEqual(spy.fullAuthorizationRequests, 1, "An opt-in asks for the real prompt")
+        XCTAssertEqual(spy.authorizationRequests, 0, "…never the provisional one, which delivers silently")
         XCTAssertTrue(scheduler.isEnabled)
     }
 
@@ -118,7 +126,8 @@ final class EngagementReminderSchedulerTests: XCTestCase {
         await scheduler.setEnabled(false)
         XCTAssertFalse(scheduler.isEnabled)
         XCTAssertTrue(spy.cancelled.contains(EngagementReminderPolicy.unfinishedIdentifier))
-        XCTAssertTrue(spy.cancelled.contains("caroullage.reminder.seasonal.spring"))
+        let year = Calendar.current.component(.year, from: drop.windowStart)
+        XCTAssertTrue(spy.cancelled.contains("caroullage.reminder.seasonal.spring.\(year)"))
         XCTAssertTrue(EngagementReminderPolicy(defaults: defaults).scheduled.isEmpty)
     }
 }

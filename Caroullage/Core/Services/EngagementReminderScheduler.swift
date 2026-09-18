@@ -35,7 +35,9 @@ public final class EngagementReminderScheduler {
     @discardableResult
     public func setEnabled(_ enabled: Bool) async -> Bool {
         if enabled {
-            let granted = await notifications.requestAuthorization()
+            // Full, not provisional: the user asked for these in Settings and
+            // expects to see them.
+            let granted = await notifications.requestFullAuthorization()
             policy.isEnabled = granted
             return granted
         }

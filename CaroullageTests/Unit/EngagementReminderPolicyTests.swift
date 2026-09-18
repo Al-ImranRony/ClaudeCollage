@@ -106,7 +106,8 @@ final class EngagementReminderPolicyTests: XCTestCase {
             calendar: calendar).first)
 
         XCTAssertEqual(decision.kind, .seasonalDrop)
-        XCTAssertEqual(decision.identifier, "caroullage.reminder.seasonal.spring")
+        let year = calendar.component(.year, from: start)
+        XCTAssertEqual(decision.identifier, "caroullage.reminder.seasonal.spring.\(year)")
         XCTAssertEqual(calendar.component(.hour, from: decision.fireDate), 10)
         XCTAssertTrue(calendar.isDate(decision.fireDate, inSameDayAs: start))
         XCTAssertTrue(decision.title.contains("Spring"))
@@ -134,6 +135,22 @@ final class EngagementReminderPolicyTests: XCTestCase {
         XCTAssertTrue(relaunched.decisions(
             now: now, installedAt: installedLongAgo, unfinished: nil,
             seasonal: seasonal(startsIn: 5 * day)).isEmpty)
+    }
+
+    func testTheSameSeasonIsAnnouncedAgainTheFollowingYear() throws {
+        let policy = policy()
+        let thisYear = try XCTUnwrap(policy.decisions(
+            now: now, installedAt: installedLongAgo, unfinished: nil,
+            seasonal: seasonal(startsIn: 5 * day)).first)
+        policy.recordScheduled(thisYear)
+
+        let nextYear = now.addingTimeInterval(365 * day)
+        let again = policy.decisions(
+            now: nextYear, installedAt: installedLongAgo, unfinished: nil,
+            seasonal: .init(collectionID: "spring", title: "Spring", windowStart: nextYear.addingTimeInterval(5 * day)))
+        XCTAssertEqual(again.count, 1, "Last year's booking must not block this year's season")
+        XCTAssertNotEqual(again.first?.identifier, thisYear.identifier)
+        XCTAssertNil(policy.scheduled[thisYear.identifier], "…and the old booking has been forgotten")
     }
 
     // MARK: - Caps

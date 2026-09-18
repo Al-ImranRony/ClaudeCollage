@@ -69,9 +69,16 @@ public struct EngagementReminderPolicy {
     }
 
     public static let unfinishedIdentifier = "caroullage.reminder.unfinished"
-    public static func seasonalIdentifier(_ collectionID: String) -> String {
-        "caroullage.reminder.seasonal.\(collectionID)"
+    /// Per collection AND per year: the same season comes round again, and a
+    /// record keyed on the id alone would have announced it exactly once for
+    /// the life of the install.
+    public static func seasonalIdentifier(_ collectionID: String, year: Int) -> String {
+        "caroullage.reminder.seasonal.\(collectionID).\(year)"
     }
+    /// Bookings older than this are forgotten. Long enough to enforce the
+    /// monthly cap, short enough that last year's season does not block this
+    /// year's.
+    static let bookingMemory: TimeInterval = 60 * 24 * 3600
 
     static let quietAfterInstall: TimeInterval = 24 * 3600
     static let unfinishedDelay: TimeInterval = 24 * 3600
@@ -123,6 +130,13 @@ public struct EngagementReminderPolicy {
         defaults.set(all, forKey: Key.scheduled)
     }
 
+    /// Drops bookings whose fire date is more than `bookingMemory` in the past.
+    public func forgetOldBookings(now: Date) {
+        let kept = scheduled.filter { now.timeIntervalSince($0.value) <= Self.bookingMemory }
+        guard kept.count != scheduled.count else { return }
+        defaults.set(kept, forKey: Key.scheduled)
+    }
+
     public func recordCancelled(identifier: String) {
         var all = scheduled
         all[identifier] = nil
@@ -145,6 +159,7 @@ public struct EngagementReminderPolicy {
         guard isEnabled else { return [] }
         guard now >= installedAt.addingTimeInterval(Self.quietAfterInstall) else { return [] }
 
+        forgetOldBookings(now: now)
         var booked = scheduled
         var out: [Decision] = []
 
@@ -189,7 +204,8 @@ public struct EngagementReminderPolicy {
         guard let fireDate = calendar.date(from: components), fireDate > now else { return nil }
         return Decision(
             kind: .seasonalDrop,
-            identifier: Self.seasonalIdentifier(drop.collectionID),
+            identifier: Self.seasonalIdentifier(
+                drop.collectionID, year: calendar.component(.year, from: drop.windowStart)),
             title: String(localized: "New for \(drop.title)"),
             body: String(localized: "Fresh templates just landed on Home."),
             fireDate: fireDate,

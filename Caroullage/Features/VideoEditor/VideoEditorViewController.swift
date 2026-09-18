@@ -1584,6 +1584,7 @@ final class VideoEditorViewController: UIViewController {
                         progressVC.dismiss(animated: true) {
                             self.showSuccess(String(localized: "Saved to Photos"))
                             RatingPrompt.exportSucceeded(in: self.view.window?.windowScene)
+                            ExportEvents.projectExported(self.viewModel.projectID)
                         }
                     }
                 } catch VideoComposer.ComposerError.cancelled {

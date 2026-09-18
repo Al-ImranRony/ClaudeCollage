@@ -160,8 +160,18 @@ public final class PaywallViewModel: ObservableObject {
             return String(localized: "\(price) once. Not a subscription — pay once and keep Caroullage Premium forever.")
         }
 
+        // Whole sentences per period, as below: the renewal term stated here is
+        // the one the store will charge, and a monthly plan with a trial must
+        // not promise a yearly renewal.
         if let days = availableTrialDays[selectedProduct] {
-            return String(localized: "\(days) days free, then \(price) per year. Renews automatically until cancelled. Cancel anytime in Settings.")
+            switch selectedProduct {
+            case .monthly:
+                return String(localized: "\(days) days free, then \(price) per month. Renews automatically until cancelled. Cancel anytime in Settings.")
+            case .weekly:
+                return String(localized: "\(days) days free, then \(price) per week. Renews automatically until cancelled. Cancel anytime in Settings.")
+            case .yearly, .yearlyOffer, .lifetime:
+                return String(localized: "\(days) days free, then \(price) per year. Renews automatically until cancelled. Cancel anytime in Settings.")
+            }
         }
 
         switch selectedProduct {

@@ -162,6 +162,11 @@ final class AppCoordinator {
         IntentRouter.shared.onRequest = { [weak self] request in self?.handle(request) }
         refreshPlatformSurfaces()
         observeLifecycleForReminders()
+        // The editors announce a successful export; the store records it, which is
+        // what keeps the unfinished-project reminder honest.
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(projectDidExport(_:)),
+            name: ExportEvents.didExportProject, object: nil)
 
         // Reconcile the entitlement with the App Store, load the paywall's
         // products, and start listening for renewals. Off the launch path: the
@@ -198,19 +203,11 @@ final class AppCoordinator {
 
     /// Puts the templates matching the user's stated interest first on Home.
     private func applyOnboardingPreference() {
-        guard let kind = OnboardingViewModel.storedCreatorKind() else { return }
-        let preferred: String? = switch kind {
-        case .carousels: "Story"
-        case .reels: "Story"
-        case .pinterest: "Grid"
-        case .fun: nil
-        }
-        guard let preferred, let home = homeViewController else { return }
-        let all = TemplateService.shared.templates
-        let matching = all.filter { $0.category.caseInsensitiveCompare(preferred) == .orderedSame }
-        guard !matching.isEmpty else { return }
-        home.featuredTemplatesProvider = { matching + all.filter { !matching.contains($0) } }
-        home.reload()
+        // The answer is read by Home itself on reload: `HeroOrdering` leads the
+        // hero with it and the collections planner lifts the matching
+        // collection. Reordering the template provider, as this once did, no
+        // longer reached anything — Home resolves every card by id.
+        homeViewController?.reload()
     }
 
     // MARK: - Platform surfaces (Step 05 batch C)
@@ -281,6 +278,11 @@ final class AppCoordinator {
         guard tabBarController.presentedViewController == nil else { return }
         let model = SettingsViewModel(reminders: reminders)
         tabBarController.present(SettingsHostingController.sheet(model: model), animated: true)
+    }
+
+    @objc private func projectDidExport(_ notification: Notification) {
+        guard let id = ExportEvents.projectID(from: notification) else { return }
+        store.markExported(id: id)
     }
 
     private static let installedAtKey = "app.installedAt"
@@ -363,24 +365,27 @@ final class AppCoordinator {
         let assetIDs = recentPhotos.recentAssetIDs()
         guard assetIDs.count >= 3 else { return [] }
 
-        if let layouts = suggestionPreviews.cachedLayouts(forAssetIDs: assetIDs) {
-            let cached = layouts.map { template in
+        // Keyed on every recent asset, whether or not its image loads: the
+        // fast path checks with the same list it stored under, and the ids of
+        // the photos that actually loaded ride along for the thumbnail keys.
+        if let cached = suggestionPreviews.cachedLayouts(forAssetIDs: assetIDs) {
+            let suggestions = cached.templates.map { template in
                 HomeSuggestion(
                     template: template,
-                    thumbnail: suggestionPreviews.cachedThumbnail(for: template, assetIDs: assetIDs))
+                    thumbnail: suggestionPreviews.cachedThumbnail(for: template, assetIDs: cached.photoIDs))
             }
-            if cached.allSatisfy({ $0.thumbnail != nil }) { return cached }
+            if suggestions.allSatisfy({ $0.thumbnail != nil }) { return suggestions }
         }
 
         let photos = await recentPhotos.recentPhotoSet()
         guard photos.count >= 3 else { return [] }
-        let ids = photos.map(\.assetID)
         let layouts: [GridTemplate]
-        if let cached = suggestionPreviews.cachedLayouts(forAssetIDs: ids) {
-            layouts = cached
+        if let cached = suggestionPreviews.cachedLayouts(forAssetIDs: assetIDs) {
+            layouts = cached.templates
         } else {
             layouts = await aiService.suggestLayouts(for: photos.map(\.image), limit: 3)
-            suggestionPreviews.store(layouts: layouts, forAssetIDs: ids)
+            suggestionPreviews.store(
+                layouts: layouts, forAssetIDs: assetIDs, photoIDs: photos.map(\.assetID))
         }
 
         var suggestions: [HomeSuggestion] = []

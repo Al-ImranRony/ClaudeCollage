@@ -782,6 +782,148 @@
         }
       }
     },
+    "%lld days free, then %@ per month. Renews automatically until cancelled. Cancel anytime in Settings." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld أيام مجانًا، ثم %@ شهريًا. يتجدد تلقائيًا حتى الإلغاء. يمكنك الإلغاء في أي وقت من الإعدادات."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld Tage kostenlos, danach %@ pro Monat. Verlängert sich automatisch bis zur Kündigung. Jederzeit in den Einstellungen kündbar."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld days free, then %@ per month. Renews automatically until cancelled. Cancel anytime in Settings."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld días gratis, luego %@ al mes. Se renueva automáticamente hasta que se cancele. Cancela cuando quieras en Ajustes."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld jours gratuits, puis %@ par mois. Renouvellement automatique jusqu'à annulation. Annulez à tout moment dans les Réglages."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld दिन मुफ़्त, फिर %@ प्रति माह। रद्द करने तक अपने आप नवीनीकृत होता है। सेटिंग्स में कभी भी रद्द करें।"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld giorni gratis, poi %@ al mese. Si rinnova automaticamente fino alla disdetta. Annulla in qualsiasi momento nelle Impostazioni."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld日間無料、その後は月額%@。解約するまで自動更新されます。「設定」からいつでも解約できます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld일 무료, 이후 월 %@. 해지할 때까지 자동 갱신됩니다. 설정에서 언제든지 해지할 수 있습니다."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld dias grátis, depois %@ por mês. Renova automaticamente até ser cancelado. Cancele quando quiser nos Ajustes."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 天免费，之后每月 %@。自动续订直至取消。可随时在“设置”中取消。"
+          }
+        }
+      }
+    },
+    "%lld days free, then %@ per week. Renews automatically until cancelled. Cancel anytime in Settings." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld أيام مجانًا، ثم %@ أسبوعيًا. يتجدد تلقائيًا حتى الإلغاء. يمكنك الإلغاء في أي وقت من الإعدادات."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld Tage kostenlos, danach %@ pro Woche. Verlängert sich automatisch bis zur Kündigung. Jederzeit in den Einstellungen kündbar."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld days free, then %@ per week. Renews automatically until cancelled. Cancel anytime in Settings."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld días gratis, luego %@ a la semana. Se renueva automáticamente hasta que se cancele. Cancela cuando quieras en Ajustes."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld jours gratuits, puis %@ par semaine. Renouvellement automatique jusqu'à annulation. Annulez à tout moment dans les Réglages."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld दिन मुफ़्त, फिर %@ प्रति सप्ताह। रद्द करने तक अपने आप नवीनीकृत होता है। सेटिंग्स में कभी भी रद्द करें।"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld giorni gratis, poi %@ alla settimana. Si rinnova automaticamente fino alla disdetta. Annulla in qualsiasi momento nelle Impostazioni."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld日間無料、その後は週額%@。解約するまで自動更新されます。「設定」からいつでも解約できます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld일 무료, 이후 주 %@. 해지할 때까지 자동 갱신됩니다. 설정에서 언제든지 해지할 수 있습니다."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld dias grátis, depois %@ por semana. Renova automaticamente até ser cancelado. Cancele quando quiser nos Ajustes."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 天免费，之后每周 %@。自动续订直至取消。可随时在“设置”中取消。"
+          }
+        }
+      }
+    },
     "%lld days free, then %@ per year. Renews automatically until cancelled. Cancel anytime in Settings." : {
       "extractionState" : "manual",
       "localizations" : {
