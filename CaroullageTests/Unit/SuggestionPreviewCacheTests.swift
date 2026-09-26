@@ -15,15 +15,15 @@ final class SuggestionPreviewCacheTests: XCTestCase {
 
     private var directory: URL!
 
-    override func setUp() {
-        super.setUp()
+    override func setUp() async throws {
+        try await super.setUp()
         directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("SuggestionPreviewCacheTests-\(UUID().uuidString)", isDirectory: true)
     }
 
-    override func tearDown() {
+    override func tearDown() async throws {
         try? FileManager.default.removeItem(at: directory)
-        super.tearDown()
+        try await super.tearDown()
     }
 
     private func makeCache() -> SuggestionPreviewCache {
