@@ -28,17 +28,21 @@ final class OnboardingHostingController: UIHostingController<OnboardingView> {
         model: OnboardingViewModel = OnboardingViewModel(),
         requestPhotoAccess: @escaping () async -> RecentPhotoProvider.Access
     ) -> OnboardingHostingController {
-        var controller: OnboardingHostingController!
+        // Weak: this controller owns the root view whose callbacks capture it, so a
+        // strong capture kept every sheet alive for the life of the process
+        // (HostingControllerLifetimeTests).
+        weak var controller: OnboardingHostingController?
         let view = OnboardingView(
             model: model,
             onReachedPaywall: { controller?.presentPaywall() },
             requestPhotoAccess: requestPhotoAccess
         )
-        controller = OnboardingHostingController(model: model, rootView: view)
-        controller.view.accessibilityIdentifier = "onboardingScreen"
-        controller.modalPresentationStyle = .fullScreen
-        controller.isModalInPresentation = true
-        return controller
+        let hosting = OnboardingHostingController(model: model, rootView: view)
+        controller = hosting
+        hosting.view.accessibilityIdentifier = "onboardingScreen"
+        hosting.modalPresentationStyle = .fullScreen
+        hosting.isModalInPresentation = true
+        return hosting
     }
 
     private init(model: OnboardingViewModel, rootView: OnboardingView) {

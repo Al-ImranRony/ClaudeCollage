@@ -12,6 +12,7 @@
 
 import AVFoundation
 import Foundation
+import OSLog
 import SwiftData
 import UIKit
 
@@ -52,6 +53,7 @@ final class ProjectStore {
     /// autosave never blocks the UI. `mediaGroup` tracks in-flight copies.
     private let mediaQueue = DispatchQueue(label: "com.devron.caroullage.mediacopy", qos: .utility)
     private let mediaGroup = DispatchGroup()
+    private static let log = Logger(subsystem: "com.devron.caroullage", category: "Persistence")
 
     init(container: ModelContainer) {
         self.container = container
@@ -114,7 +116,7 @@ final class ProjectStore {
     func markExported(id: UUID, at date: Date = Date()) {
         guard let project = fetchProject(id: id) else { return }
         project.lastExportedAt = date
-        try? context.save()
+        persist()
     }
 
     /// The most recently edited project that has never been exported and was
@@ -156,7 +158,9 @@ final class ProjectStore {
         writeImages(viewModel.sourceImageSnapshot(), forProject: projectID,
                     referenced: referencedImageIDs(in: state))
 
-        let stateData = try? JSONEncoder().encode(state)
+        // An unencodable state (a non-finite Double from a gesture) must not be
+        // written as nil over the last good save.
+        guard let stateData = Self.encoded(state, what: "grid state") else { return }
         let thumbnailData = makeThumbnailData(from: viewModel)
 
         let project = fetchProject(id: projectID) ?? {
@@ -173,7 +177,27 @@ final class ProjectStore {
         project.previewThumbnail = thumbnailData
         project.updatedAt = Date()
 
-        try? context.save()
+        persist()
+    }
+
+    /// Encodes an editor-state blob, logging instead of returning nil silently.
+    private static func encoded<T: Encodable>(_ value: T, what: String) -> Data? {
+        do {
+            return try JSONEncoder().encode(value)
+        } catch {
+            log.error("Not saving \(what, privacy: .public): it could not be encoded (\(String(describing: error), privacy: .public)); the last good save stays")
+            return nil
+        }
+    }
+
+    /// Commits the context. A failure is logged rather than discarded, so it at
+    /// least reaches a sysdiagnose; the edit stays in memory for the next save.
+    private func persist() {
+        do {
+            try context.save()
+        } catch {
+            Self.log.error("SwiftData save failed: \(String(describing: error), privacy: .public)")
+        }
     }
 
     // MARK: - Load
@@ -217,7 +241,7 @@ final class ProjectStore {
         writeImages(viewModel.imagesSnapshot(), forProject: projectID,
                     referenced: referencedImageIDs(in: frames))
 
-        let framesData = try? JSONEncoder().encode(frames)
+        guard let framesData = Self.encoded(frames, what: "carousel frames") else { return }
         let thumbnailData = carouselThumbnailData(viewModel)
 
         let project = fetchProject(id: projectID) ?? {
@@ -236,7 +260,7 @@ final class ProjectStore {
         project.previewThumbnail = thumbnailData
         project.updatedAt = Date()
 
-        try? context.save()
+        persist()
     }
 
     /// Rehydrates a saved carousel into a view model (frames + decoded images).
@@ -294,7 +318,7 @@ final class ProjectStore {
         scheduleMediaCopies(viewModel.mediaFileURLs(), forProject: projectID,
                             referenced: data.referencedMediaIDs)
 
-        let payload = try? JSONEncoder().encode(data)
+        guard let payload = Self.encoded(data, what: "video project") else { return }
         let thumbnailData = viewModel.thumbnail.flatMap {
             UIImage(cgImage: $0).jpegData(compressionQuality: 0.8)
         }
@@ -315,7 +339,7 @@ final class ProjectStore {
         if let thumbnailData { project.previewThumbnail = thumbnailData }
         project.updatedAt = Date()
 
-        try? context.save()
+        persist()
     }
 
     /// Rehydrates a saved video collage: decodes the cell/music state and reopens
@@ -346,7 +370,7 @@ final class ProjectStore {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         project.name = trimmed.isEmpty ? nil : trimmed
         project.updatedAt = Date()
-        try? context.save()
+        persist()
     }
 
     /// Copies a project, its state blob, and its on-disk images and media.
@@ -383,7 +407,7 @@ final class ProjectStore {
         }
 
         context.insert(copy)
-        try? context.save()
+        persist()
         return copy.id
     }
 
@@ -404,7 +428,7 @@ final class ProjectStore {
     func delete(id: UUID) {
         if let project = fetchProject(id: id) {
             context.delete(project)
-            try? context.save()
+            persist()
         }
         try? fileManager.removeItem(at: projectDirectory(id))
     }

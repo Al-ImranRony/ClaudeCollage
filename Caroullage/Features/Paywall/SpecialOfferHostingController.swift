@@ -19,7 +19,10 @@ final class SpecialOfferHostingController: UIHostingController<SpecialOfferView>
         onUnlocked: @escaping () -> Void = {}
     ) -> SpecialOfferHostingController {
         let model = SpecialOfferViewModel(service: service)
-        var controller: SpecialOfferHostingController!
+        // Weak: this controller owns the root view whose callbacks capture it, so a
+        // strong capture kept every sheet alive for the life of the process
+        // (HostingControllerLifetimeTests).
+        weak var controller: SpecialOfferHostingController?
 
         let view = SpecialOfferView(
             model: model,
@@ -27,10 +30,11 @@ final class SpecialOfferHostingController: UIHostingController<SpecialOfferView>
             onClose: { controller?.dismiss(animated: true) }
         )
 
-        controller = SpecialOfferHostingController(rootView: view)
-        controller.view.accessibilityIdentifier = "specialOfferScreen"
-        controller.modalPresentationStyle = .fullScreen
-        return controller
+        let hosting = SpecialOfferHostingController(rootView: view)
+        controller = hosting
+        hosting.view.accessibilityIdentifier = "specialOfferScreen"
+        hosting.modalPresentationStyle = .fullScreen
+        return hosting
     }
 }
 

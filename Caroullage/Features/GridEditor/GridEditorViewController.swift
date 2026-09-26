@@ -1182,11 +1182,13 @@ final class GridEditorViewController: UIViewController {
                             self.showAlert(String(localized: "Export failed"), String(localized: "Could not render the collage."))
                             return
                         }
-                        creditSession.succeeded()
+                        // The credit is only spent once the user has the file: in
+                        // Photos, or written out for the share sheet.
                         if share {
-                            self.shareData(data, fileExtension: options.imageFormat == .png ? "png" : "jpg")
+                            let written = self.shareData(data, fileExtension: options.imageFormat == .png ? "png" : "jpg")
+                            if written { creditSession.succeeded() } else { creditSession.failed() }
                         } else {
-                            self.saveToPhotos(data)
+                            self.saveToPhotos(data, creditSession: creditSession)
                         }
                     }
                 }
@@ -1195,7 +1197,9 @@ final class GridEditorViewController: UIViewController {
     }
 
     /// Writes `data` to a temp file and opens the iOS share sheet (Quick Share).
-    private func shareData(_ data: Data, fileExtension: String) {
+    /// False when the file could not be written, so the caller can refund.
+    @discardableResult
+    private func shareData(_ data: Data, fileExtension: String) -> Bool {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("Collage-\(UUID().uuidString).\(fileExtension)")
         do {
@@ -1203,46 +1207,32 @@ final class GridEditorViewController: UIViewController {
         } catch {
             Haptics.error()
             showAlert(String(localized: "Share failed"), String(localized: "Could not prepare the file to share."))
-            return
+            return false
         }
         let share = UIActivityViewController(activityItems: [url], applicationActivities: nil)
         anchorPopover(share) { popover in
             popover.barButtonItem = navigationItem.rightBarButtonItems?.first
         }
         present(share, animated: true)
+        return true
     }
 
-    private func saveToPhotos(_ data: Data) {
-        // PhotoKit invokes these completion handlers on a BACKGROUND queue. Their
-        // closure parameters are non-Sendable, so under Swift 6 complete
-        // concurrency the compiler infers them as @MainActor-isolated (inheriting
-        // this view controller's actor). The moment PhotoKit runs them off-main,
-        // the runtime executor assertion (`dispatch_assert_queue`) trips → crash.
-        // Marking each @Sendable keeps them genuinely non-isolated; all UI/state
-        // work hops back explicitly via `Task { @MainActor in … }`. Same fix as
-        // GridEditorViewModel.scheduleFilter.
-        PHPhotoLibrary.requestAuthorization(for: .addOnly) { @Sendable [weak self] status in
-            guard status == .authorized || status == .limited else {
-                Task { @MainActor in
-                    self?.showAlert(String(localized: "No Photos Access"), String(localized: "Enable photo library access in Settings to save your collage."))
-                }
-                return
-            }
-            PHPhotoLibrary.shared().performChanges {
-                let request = PHAssetCreationRequest.forAsset()
-                request.addResource(with: .photo, data: data, options: nil)
-            } completionHandler: { @Sendable success, _ in
-                Task { @MainActor in
-                    guard let self else { return }
-                    if success {
-                        self.showSuccess(String(localized: "Saved to Photos"))
-                        RatingPrompt.exportSucceeded(in: self.view.window?.windowScene)
-                        ExportEvents.projectExported(self.viewModel.projectID)
-                    } else {
-                        Haptics.error()
-                        self.showAlert(String(localized: "Save Failed"), String(localized: "The collage could not be saved to Photos."))
-                    }
-                }
+    /// Saves through `PhotoLibrarySaver`, as the video and carousel editors do
+    /// (it owns the @Sendable PhotoKit handlers), and settles the credit on the
+    /// outcome: a denied permission or a failed write gives it back.
+    private func saveToPhotos(_ data: Data, creditSession: ExportCreditSession) {
+        Task { @MainActor [weak self] in
+            do {
+                try await creditSession.deliver { try await PhotoLibrarySaver().saveImage(data) }
+                guard let self else { return }
+                self.showSuccess(String(localized: "Saved to Photos"))
+                RatingPrompt.exportSucceeded(in: self.view.window?.windowScene)
+                ExportEvents.projectExported(self.viewModel.projectID)
+            } catch PhotoLibrarySaver.SaveError.notAuthorized {
+                self?.showAlert(String(localized: "No Photos Access"), String(localized: "Enable photo library access in Settings to save your collage."))
+            } catch {
+                Haptics.error()
+                self?.showAlert(String(localized: "Save Failed"), String(localized: "The collage could not be saved to Photos."))
             }
         }
     }

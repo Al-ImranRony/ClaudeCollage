@@ -52,7 +52,8 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
 extension AppDelegate: UNUserNotificationCenterDelegate {
 
     /// The key a scheduled reminder stores its `DeepLink` URL under.
-    static let deepLinkUserInfoKey = "deepLink"
+    /// `nonisolated`: a constant, read by the nonisolated notification callback.
+    nonisolated static let deepLinkUserInfoKey = "deepLink"
 
     /// A reminder that fires while the app is open still shows, as a banner:
     /// the user asked for it in Settings, and a silent drop would make the

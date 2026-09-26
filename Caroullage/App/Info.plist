@@ -42,7 +42,7 @@
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Caroullage saves your finished collages to your photo library.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Caroullage needs access to your photos to create collages.</string>
+	<string>Caroullage reads your recent photos to suggest collages made from them. Nothing leaves your phone.</string>
 	<key>NSSupportsLiveActivities</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>

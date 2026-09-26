@@ -58,9 +58,13 @@ for t in manifest:
         if not n.startswith('store-'): continue
         scene = n.split('_')[0][len('store-'):]          # "2-shapes"
         caption = captions.get(scene, {}).get(lang) or captions.get(scene, {}).get('en', '')
+        framed = os.path.join(out, scene + '.png')
         subprocess.run(['swift', 'Tools/ScreenshotFramer/main.swift', os.path.join(src, a['exportedFileName']),
-                        caption, os.path.join(out, scene + '.png')], check=True)
-        print('   ', os.path.join(out, scene + '.png'))
+                        caption, framed], check=True)
+        # App Store Connect rejects a screenshot with an alpha channel.
+        if 'hasAlpha: yes' in subprocess.run(['sips', '-g', 'hasAlpha', framed], capture_output=True, text=True).stdout:
+            sys.exit(f'{framed} has an alpha channel; App Store Connect will reject it')
+        print('   ', framed)
 PY
   done
 done

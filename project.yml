@@ -107,7 +107,7 @@ targets:
         # Permission strings. English here; the eleven languages live in
         # Caroullage/Resources/InfoPlist.xcstrings. No microphone string: the
         # camera door shoots stills and no audio is ever captured (phase 6.6).
-        NSPhotoLibraryUsageDescription: "Caroullage needs access to your photos to create collages."
+        NSPhotoLibraryUsageDescription: "Caroullage reads your recent photos to suggest collages made from them. Nothing leaves your phone."
         NSPhotoLibraryAddUsageDescription: "Caroullage saves your finished collages to your photo library."
         NSCameraUsageDescription: "Caroullage uses the camera when you shoot a photo for a collage."
         # Standard encryption only (HTTPS, StoreKit): answers App Store Connect's

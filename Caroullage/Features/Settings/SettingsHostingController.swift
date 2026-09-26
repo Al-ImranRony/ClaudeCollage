@@ -13,16 +13,20 @@ import UIKit
 final class SettingsHostingController: UIHostingController<SettingsView> {
 
     static func sheet(model: SettingsViewModel) -> SettingsHostingController {
-        var controller: SettingsHostingController!
+        // Weak: this controller owns the root view whose callbacks capture it, so a
+        // strong capture kept every sheet alive for the life of the process
+        // (HostingControllerLifetimeTests).
+        weak var controller: SettingsHostingController?
         let view = SettingsView(model: model, onDone: { controller?.dismiss(animated: true) })
-        controller = SettingsHostingController(rootView: view)
-        controller.view.accessibilityIdentifier = "settingsScreen"
-        controller.view.backgroundColor = Theme.Color.background
-        if let sheet = controller.sheetPresentationController {
+        let hosting = SettingsHostingController(rootView: view)
+        controller = hosting
+        hosting.view.accessibilityIdentifier = "settingsScreen"
+        hosting.view.backgroundColor = Theme.Color.background
+        if let sheet = hosting.sheetPresentationController {
             sheet.detents = [.large()]
             sheet.prefersGrabberVisible = true
             sheet.preferredCornerRadius = Theme.Radius.xl
         }
-        return controller
+        return hosting
     }
 }

@@ -115,4 +115,34 @@ final class ExportCreditSessionTests: XCTestCase {
 
         XCTAssertEqual(store.balance, 0)
     }
+
+    // MARK: - Delivering the file
+
+    func testTheCreditIsKeptOnceTheFileIsDelivered() async throws {
+        let (session, store) = makeSession(startingCredits: 1)
+        _ = session.begin()
+
+        try await session.deliver { }
+
+        XCTAssertEqual(store.balance, 0)
+        XCTAssertFalse(session.isActive)
+    }
+
+    func testADeliveryThatFailsGivesTheCreditBack() async {
+        // The grid editor used to consume the credit before the Photos save, so
+        // a denied permission or a failed write cost the user a paid credit.
+        struct SaveFailed: Error {}
+        let (session, store) = makeSession(startingCredits: 1)
+        _ = session.begin()
+
+        do {
+            try await session.deliver { throw SaveFailed() }
+            XCTFail("the delivery's error reaches the caller, which tells the user")
+        } catch {
+            XCTAssertTrue(error is SaveFailed)
+        }
+
+        XCTAssertEqual(store.balance, 1)
+        XCTAssertFalse(session.isActive)
+    }
 }
