@@ -476,32 +476,12 @@ final class GridEditorViewController: UIViewController {
         return FramePanelView(borderSlider: borderSlider, cornerSlider: cornerSlider)
     }
 
+    /// No generative chip: Image Playground has no sheet behind it yet, and an
+    /// entry that answered "Coming Soon" after the paywall sold a feature that
+    /// did not exist (removed before submission). It returns with the sheet —
+    /// gated on `aiService.generativeBackgroundsAvailable` and on Premium.
     private func makeBackgroundPanel() -> UIView {
-        BackgroundPanelView(picker: backgroundPicker,
-                            generativeButton: makeGenerativeBackgroundButton())
-    }
-
-    /// The AI generative-background entry, as the trailing chip of the Background
-    /// panel rather than a row of its own.
-    ///
-    /// Returns `nil` where Image Playground cannot run — the old row hid itself for
-    /// the same reason, and `MagicEraserUITests` asserts the button is ABSENT, not
-    /// merely disabled. Do not simplify this to always return a button.
-    private func makeGenerativeBackgroundButton() -> UIButton? {
-        guard aiService.generativeBackgroundsAvailable else { return nil }
-
-        var config = UIButton.Configuration.tinted()
-        config.image = UIImage(systemName: "sparkles")
-        config.cornerStyle = .capsule   // never set layer.cornerRadius on a configured button
-        config.baseBackgroundColor = Theme.Color.accent
-        config.baseForegroundColor = Theme.Color.accent
-        let button = UIButton(configuration: config, primaryAction: UIAction { [weak self] _ in
-            Haptics.tap()
-            self?.presentGenerativeBackground()
-        })
-        button.accessibilityIdentifier = "generateBackgroundButton"
-        button.accessibilityLabel = String(localized: "Generate background")
-        return button
+        BackgroundPanelView(picker: backgroundPicker, generativeButton: nil)
     }
 
     private func setupGestures() {
@@ -1037,22 +1017,7 @@ final class GridEditorViewController: UIViewController {
         present(alert, animated: true)
     }
 
-    // MARK: - Generative background
-
-    private func presentGenerativeBackground() {
-        guard EntitlementStore.shared.isPremiumUnlocked else {
-            presentPaywall { [weak self] in self?.presentGenerativeBackground() }
-            return
-        }
-        // The paywall now exists; the Image Playground sheet behind it is still
-        // outstanding Step 06 work (it needs an Apple Intelligence device).
-        let alert = UIAlertController(
-            title: String(localized: "Coming Soon"),
-            message: String(localized: "Background generation arrives with the Premium release."),
-            preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: String(localized: "OK"), style: .default))
-        present(alert, animated: true)
-    }
+    // MARK: - Magic eraser
 
     /// Opens the brush surface for one cell's photo. The erased result replaces the
     /// cell image through the normal commit, so the collage's undo sees a single

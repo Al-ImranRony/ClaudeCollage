@@ -95,13 +95,13 @@ final class AccessibilityAuditUITests: XCTestCase {
         // The paywall's feature list and terms use native semantic fonts
         // (.subheadline / .caption2) and are visibly scaled in the AX-XXXL
         // screenshot; the audit measures the LazyVGrid before it re-lays out.
-        KnownIssue(audit: .dynamicType, elementLabel: "200+ templates", surface: "Paywall",
+        KnownIssue(audit: .dynamicType, elementLabel: "Every template", surface: "Paywall",
                    reason: "native semantic font; scaled in the AX-XXXL screenshot"),
         KnownIssue(audit: .dynamicType, elementLabel: "Every shape", surface: "Paywall",
                    reason: "native semantic font; scaled in the AX-XXXL screenshot"),
         KnownIssue(audit: .dynamicType, elementLabel: "4K, no watermark", surface: "Paywall",
                    reason: "native semantic font; scaled in the AX-XXXL screenshot"),
-        KnownIssue(audit: .dynamicType, elementLabel: "AI backgrounds", surface: "Paywall",
+        KnownIssue(audit: .dynamicType, elementLabel: "HEVC & MOV video", surface: "Paywall",
                    reason: "native semantic font; scaled in the AX-XXXL screenshot"),
         KnownIssue(audit: .dynamicType, elementLabel: "Prices are shown in your local currency at checkout.", surface: "Paywall",
                    reason: "native semantic font (.caption2); scaled in the AX-XXXL screenshot"),
