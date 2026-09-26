@@ -1165,12 +1165,10 @@ final class GridEditorViewController: UIViewController {
                     })
                 }
             }
-            guard let data else { throw RenderFailed() }
+            guard let data else { throw ExportRenderFailed() }
             return .images([data], fileExtension: options.imageFormat == .png ? "png" : "jpg", baseName: "Collage")
         }
     }
-
-    private struct RenderFailed: Error {}
 
     // MARK: - Helpers
 

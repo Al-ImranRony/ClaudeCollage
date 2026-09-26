@@ -70,12 +70,13 @@ final class EditorExportFlow {
     ///
     /// - Parameters:
     ///   - failure: what to say when the render itself fails.
-    ///   - savedMessage: the success line after a Photos save.
+    ///   - savedMessage: the success line after a Photos save, given how many
+    ///     items were actually saved.
     func run(payment: ExportPayment,
              destination: ExportDestination,
              wait: Wait,
              failure: ExportRefusal,
-             savedMessage: String = String(localized: "Saved to Photos"),
+             savedMessage: @escaping (Int) -> String = { _ in String(localized: "Saved to Photos") },
              refuseIf: @escaping () -> ExportRefusal? = { nil },
              produce: @escaping (Work) async throws -> ExportArtifact) {
         guard let host else { return }
@@ -101,8 +102,8 @@ final class EditorExportFlow {
                 folder = try ExportFiles.makeFolder()
             } catch {
                 credit.failed()
-                self.report(.failed(.making, error), destination: destination, failure: failure,
-                            savedMessage: savedMessage, folder: nil)
+                self.report(.failed(.making, error), destination: destination, credit: credit,
+                            failure: failure, savedMessage: savedMessage, folder: nil)
                 return
             }
             let token = ExportCancellationToken()
@@ -113,12 +114,12 @@ final class EditorExportFlow {
             })
             Task { @MainActor in
                 let outcome = await ExportRun.perform(
-                    credit: credit,
+                    credit: credit, destination: destination,
                     produce: { try await produce(work) },
                     handOver: { artifact in try await Self.handOver(artifact, to: destination, in: folder) })
                 waitController.dismiss(animated: true) {
-                    self.report(outcome, destination: destination, failure: failure,
-                                savedMessage: savedMessage, folder: folder)
+                    self.report(outcome, destination: destination, credit: credit,
+                                failure: failure, savedMessage: savedMessage, folder: folder)
                 }
             }
         }
@@ -168,20 +169,32 @@ final class EditorExportFlow {
         }
     }
 
-    private func report(_ outcome: ExportOutcome, destination: ExportDestination, failure: ExportRefusal,
-                        savedMessage: String, folder: URL?) {
-        guard let host else { return }
+    private func report(_ outcome: ExportOutcome, destination: ExportDestination, credit: ExportCreditSession,
+                        failure: ExportRefusal, savedMessage: (Int) -> String, folder: URL?) {
+        guard let host else {
+            // The editor went away mid-export: nobody will see a share sheet, so
+            // a held credit goes back, and the files go with it.
+            credit.failed()
+            Self.remove(folder)
+            return
+        }
         switch outcome {
-        case .delivered(let urls) where destination == .share:
+        case .delivered(let urls, _) where destination == .share:
             let share = UIActivityViewController(activityItems: urls, applicationActivities: nil)
-            share.completionWithItemsHandler = { _, _, _, _ in Self.remove(folder) }
+            // The credit was held while the files were written; how the sheet
+            // ends settles it. The files stay while the sheet is still open.
+            share.completionWithItemsHandler = { activityType, completed, _, _ in
+                let ending = ShareSheetEnding(activityChosen: activityType != nil, completed: completed)
+                credit.settle(after: ending)
+                if ending != .stillOpen { Self.remove(folder) }
+            }
             host.anchorPopover(share) { popover in
                 popover.barButtonItem = host.navigationItem.rightBarButtonItems?.first
             }
             host.present(share, animated: true)
             return
-        case .delivered:
-            host.showSuccess(savedMessage)
+        case .delivered(_, let items):
+            host.showSuccess(savedMessage(items))
             RatingPrompt.exportSucceeded(in: host.view.window?.windowScene)
             ExportEvents.projectExported(projectID())
         case .cancelled:
@@ -206,10 +219,17 @@ final class EditorExportFlow {
         Self.remove(folder)
     }
 
+    /// Presented over whatever is on top: the "No Credits Left" check runs
+    /// while the export sheet is still up, and a host that is already
+    /// presenting cannot present again.
     private func alert(_ title: String, _ message: String) {
+        guard var presenter = host else { return }
+        while let presented = presenter.presentedViewController, !presented.isBeingDismissed {
+            presenter = presented
+        }
         let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: String(localized: "OK"), style: .default))
-        host?.present(alert, animated: true)
+        presenter.present(alert, animated: true)
     }
 
     private static func remove(_ folder: URL?) {

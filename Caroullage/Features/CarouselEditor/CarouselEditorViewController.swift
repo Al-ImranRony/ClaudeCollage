@@ -446,8 +446,10 @@ final class CarouselEditorViewController: UIViewController {
             refuseIf: { [weak self] in self?.noFramesRefusal }
         ) { [weak self] work in
             guard let self else { throw CancellationError() }
+            // `refuseIf` already turned away an empty carousel; no frames here
+            // means every render failed, which is a failure, not a refusal.
             let frames = self.renderFrames(watermarked: options.includeWatermark)
-            guard !frames.isEmpty else { throw Self.noFrames }
+            guard !frames.isEmpty else { throw ExportRenderFailed() }
             let url = work.folder.appendingPathComponent("Carousel")
                 .appendingPathExtension(options.videoContainer == .mov ? "mov" : "mp4")
             try await VideoComposer().renderSlideshow(
@@ -469,12 +471,12 @@ final class CarouselEditorViewController: UIViewController {
             wait: .spinner(destination == .photos ? String(localized: "Saving…") : String(localized: "Exporting…")),
             failure: ExportRefusal(title: String(localized: "Export Failed"),
                                    message: String(localized: "Couldn't create the image set. Please try again.")),
-            savedMessage: String(localized: "Saved \(viewModel.frames.count) images"),
+            savedMessage: { saved in String(localized: "Saved \(saved) images") },
             refuseIf: { [weak self] in self?.noFramesRefusal }
         ) { [weak self] _ in
             guard let self else { throw CancellationError() }
             let frames = self.renderFrames(watermarked: options.includeWatermark)
-            guard !frames.isEmpty else { throw Self.noFrames }
+            guard !frames.isEmpty else { throw ExportRenderFailed() }
             let images = try frames.map {
                 try ImageExporter().encode($0, format: options.imageExporterFormat, resolution: options.imageResolution)
             }
@@ -482,11 +484,11 @@ final class CarouselEditorViewController: UIViewController {
         }
     }
 
-    private static var noFrames: ExportRefusal {
-        ExportRefusal(title: String(localized: "Export Failed"), message: String(localized: "There are no frames to export."))
+    private var noFramesRefusal: ExportRefusal? {
+        guard viewModel.frames.isEmpty else { return nil }
+        return ExportRefusal(title: String(localized: "Export Failed"),
+                             message: String(localized: "There are no frames to export."))
     }
-
-    private var noFramesRefusal: ExportRefusal? { viewModel.frames.isEmpty ? Self.noFrames : nil }
 
     private func showComingSoon(title: String, message: String) {
         let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)

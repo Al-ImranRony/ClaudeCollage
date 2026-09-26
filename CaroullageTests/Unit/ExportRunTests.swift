@@ -45,19 +45,67 @@ final class ExportRunTests: XCTestCase {
 
     // MARK: - Delivered
 
-    func testADeliveredExportKeepsTheCreditAndReturnsTheSharedFiles() async {
-        let shared = [URL(fileURLWithPath: "/tmp/Collage.jpg")]
-        let outcome = await ExportRun.perform(credit: paidSession(),
+    func testAPhotosSaveKeepsTheCredit() async {
+        let outcome = await ExportRun.perform(credit: paidSession(), destination: .photos,
                                               produce: { self.artifact },
-                                              handOver: { _ in shared })
+                                              handOver: { _ in [] })
 
-        guard case .delivered(let urls) = outcome else { return XCTFail("\(outcome)") }
-        XCTAssertEqual(urls, shared)
+        guard case .delivered = outcome else { return XCTFail("\(outcome)") }
         XCTAssertEqual(credits.balance, 0)
     }
 
+    // MARK: - A share holds the credit until the sheet closes
+
+    private func heldShare() async -> ExportCreditSession {
+        let session = paidSession()
+        let shared = [URL(fileURLWithPath: "/tmp/Collage.jpg")]
+        let outcome = await ExportRun.perform(credit: session, destination: .share,
+                                              produce: { self.artifact },
+                                              handOver: { _ in shared })
+        guard case .delivered(let urls, _) = outcome else { XCTFail("\(outcome)"); return session }
+        XCTAssertEqual(urls, shared)
+        return session
+    }
+
+    func testAShareHoldsTheCreditWhileTheSheetIsOpen() async {
+        // Writing the files is not delivery: the user has nothing until they
+        // share. The credit stays taken but unsettled.
+        let session = await heldShare()
+
+        XCTAssertTrue(session.isActive)
+        XCTAssertEqual(credits.balance, 0)
+    }
+
+    func testDismissingTheShareSheetGivesTheCreditBack() async {
+        let session = await heldShare()
+
+        session.settle(after: .stillOpen)          // an activity was cancelled; the sheet is still up
+        XCTAssertTrue(session.isActive)
+        session.settle(after: .dismissed)
+
+        XCTAssertFalse(session.isActive)
+        XCTAssertEqual(credits.balance, 1)
+    }
+
+    func testSharingKeepsTheCredit() async {
+        let session = await heldShare()
+
+        session.settle(after: .shared)
+
+        XCTAssertFalse(session.isActive)
+        XCTAssertEqual(credits.balance, 0)
+    }
+
+    func testTheSheetsCompletionValuesMapToHowItEnded() {
+        XCTAssertEqual(ShareSheetEnding(activityChosen: true, completed: true), .shared)
+        XCTAssertEqual(ShareSheetEnding(activityChosen: false, completed: false), .dismissed)
+        // iOS reports a cancelled activity while leaving the sheet on screen;
+        // the files must survive that, for the user's next choice.
+        XCTAssertEqual(ShareSheetEnding(activityChosen: true, completed: false), .stillOpen)
+    }
+
     func testAnEntitledExportNeverTouchesTheBalance() async {
-        let outcome = await ExportRun.perform(credit: ExportCreditSession(credits: credits),
+        let outcome = await ExportRun.perform(credit: ExportCreditSession(credits: credits), destination: .photos,
                                               produce: { self.artifact },
                                               handOver: { _ in [] })
 
@@ -69,7 +117,7 @@ final class ExportRunTests: XCTestCase {
 
     func testAFailedRenderGivesTheCreditBack() async {
         struct RenderFailed: Error {}
-        let outcome = await ExportRun.perform(credit: paidSession(),
+        let outcome = await ExportRun.perform(credit: paidSession(), destination: .photos,
                                               produce: { throw RenderFailed() },
                                               handOver: { _ in [] })
 
@@ -78,7 +126,7 @@ final class ExportRunTests: XCTestCase {
     }
 
     func testAFailedHandOverGivesTheCreditBack() async {
-        let outcome = await ExportRun.perform(credit: paidSession(),
+        let outcome = await ExportRun.perform(credit: paidSession(), destination: .photos,
                                               produce: { self.artifact },
                                               handOver: { _ in throw PhotoLibrarySaver.SaveError.notAuthorized })
 
@@ -88,7 +136,7 @@ final class ExportRunTests: XCTestCase {
     }
 
     func testACancelledRenderGivesTheCreditBackAndIsNotAFailure() async {
-        let outcome = await ExportRun.perform(credit: paidSession(),
+        let outcome = await ExportRun.perform(credit: paidSession(), destination: .photos,
                                               produce: { throw VideoComposer.ComposerError.cancelled },
                                               handOver: { _ in [] })
 
@@ -98,7 +146,7 @@ final class ExportRunTests: XCTestCase {
 
     func testARefusalGivesTheCreditBackAndCarriesItsMessage() async {
         let refusal = ExportRefusal(title: "Nothing to Export", message: "Add a video to a slot first.")
-        let outcome = await ExportRun.perform(credit: paidSession(),
+        let outcome = await ExportRun.perform(credit: paidSession(), destination: .photos,
                                               produce: { throw refusal },
                                               handOver: { _ in [] })
 
@@ -165,5 +213,22 @@ final class ExportRunTests: XCTestCase {
             if source.contains("ExportCreditSession(") { openers.append(url.lastPathComponent) }
         }
         XCTAssertEqual(openers, ["EditorExportFlow.swift"])
+    }
+
+    func testNoEditorHandsAFileOverOutsideTheFlow() throws {
+        // The carousel's share used to build its own UIActivityViewController,
+        // which is how it skipped the credit. Photos saves and share sheets
+        // belong to EditorExportFlow alone.
+        let features = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Caroullage/Features")
+        for editor in ["GridEditor/GridEditorViewController.swift",
+                       "CarouselEditor/CarouselEditorViewController.swift",
+                       "VideoEditor/VideoEditorViewController.swift"] {
+            let source = try String(contentsOf: features.appendingPathComponent(editor), encoding: .utf8)
+            for bypass in ["UIActivityViewController(", "PhotoLibrarySaver(", "ExportCreditSession("] {
+                XCTAssertFalse(source.contains(bypass), "\(editor) hands a file over itself via \(bypass)")
+            }
+        }
     }
 }
