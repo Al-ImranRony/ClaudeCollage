@@ -129,29 +129,35 @@ public struct VideoTimelineModel: Equatable, Sendable {
 
 // MARK: - Shared with the lanes (VideoTimelineLanes.swift)
 
-/// This codebase's hairline idiom: a flat point constant rather than a
-/// `UIScreen.main.scale`-derived value (`UIScreen.main` is deprecated as of
-/// iOS 26). Matches `EditorToolRail.separatorHeight` / `EditorPanel.separatorHeight`.
-let videoTimelineHairline: CGFloat = 1
-let videoTimelinePlayheadWidth: CGFloat = 2
+/// The layout constants and helpers the timeline and its lane views share —
+/// a namespace rather than free functions, so splitting the lanes into their
+/// own file did not put `pixelSnapped` into the whole module's scope.
+enum VideoTimelineLayout {
 
-/// Rounds a value to the nearest whole point. `VideoTimelineGeometry` returns
-/// fractional points; for the same reason this file doesn't chase an exact
-/// device pixel grid via `UIScreen.main.scale` (deprecated, and wrong on an
-/// external display anyway), block and playhead edges are snapped to whole
-/// points instead — crisper than a fractional edge on any scale, without
-/// depending on which scale it is.
-func pixelSnapped(_ value: CGFloat) -> CGFloat { value.rounded() }
+    /// This codebase's hairline idiom: a flat point constant rather than a
+    /// `UIScreen.main.scale`-derived value (`UIScreen.main` is deprecated as of
+    /// iOS 26). Matches `EditorToolRail.separatorHeight` / `EditorPanel.separatorHeight`.
+    static let hairline: CGFloat = 1
+    static let playheadWidth: CGFloat = 2
 
-func pixelSnapped(_ rect: CGRect) -> CGRect {
-    let minX = pixelSnapped(rect.minX)
-    let maxX = pixelSnapped(rect.minX + rect.width)
-    return CGRect(x: minX, y: rect.minY, width: max(0, maxX - minX), height: rect.height)
-}
+    /// Rounds a value to the nearest whole point. `VideoTimelineGeometry` returns
+    /// fractional points; for the same reason this file doesn't chase an exact
+    /// device pixel grid via `UIScreen.main.scale` (deprecated, and wrong on an
+    /// external display anyway), block and playhead edges are snapped to whole
+    /// points instead — crisper than a fractional edge on any scale, without
+    /// depending on which scale it is.
+    static func pixelSnapped(_ value: CGFloat) -> CGFloat { value.rounded() }
 
-func formatTimelineTime(_ seconds: Double) -> String {
-    let total = max(0, Int(seconds.rounded()))
-    return String(format: "%d:%02d", total / 60, total % 60)
+    static func pixelSnapped(_ rect: CGRect) -> CGRect {
+        let minX = pixelSnapped(rect.minX)
+        let maxX = pixelSnapped(rect.minX + rect.width)
+        return CGRect(x: minX, y: rect.minY, width: max(0, maxX - minX), height: rect.height)
+    }
+
+    static func formatTime(_ seconds: Double) -> String {
+        let total = max(0, Int(seconds.rounded()))
+        return String(format: "%d:%02d", total / 60, total % 60)
+    }
 }
 
 // MARK: - VideoTimeline
@@ -513,7 +519,7 @@ public final class VideoTimeline: UIView {
     }
 
     private func updateReadouts() {
-        timeLabel.text = "\(formatTimelineTime(playheadTime)) / \(formatTimelineTime(model.duration))"
+        timeLabel.text = "\(VideoTimelineLayout.formatTime(playheadTime)) / \(VideoTimelineLayout.formatTime(model.duration))"
     }
 
     // MARK: - Gestures

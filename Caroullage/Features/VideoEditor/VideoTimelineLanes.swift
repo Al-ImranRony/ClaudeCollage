@@ -77,7 +77,7 @@ final class CollapsedStripView: UIScrollView {
                 view.backgroundColor = Theme.Color.cellWell
                 view.layer.borderColor = Theme.Color.cellWellOutline.cgColor
             }
-            view.layer.borderWidth = videoTimelineHairline
+            view.layer.borderWidth = VideoTimelineLayout.hairline
             filmstripTrack.addSubview(view)
             return view
         }
@@ -107,19 +107,19 @@ final class CollapsedStripView: UIScrollView {
             x: 0, y: filmHeight + Self.trackSpacing, width: bounds.width, height: Self.pillTrackHeight)
 
         for (clip, view) in zip(model.clips, clipViews) {
-            view.frame = pixelSnapped(VideoTimelineGeometry.laneRect(
+            view.frame = VideoTimelineLayout.pixelSnapped(VideoTimelineGeometry.laneRect(
                 start: clip.start, duration: clip.duration,
                 compositionDuration: model.duration, in: filmstripTrack.bounds))
         }
         for (pill, view) in zip(model.textPills, pillViews) {
-            view.frame = pixelSnapped(VideoTimelineGeometry.laneRect(
+            view.frame = VideoTimelineLayout.pixelSnapped(VideoTimelineGeometry.laneRect(
                 start: pill.start, duration: pill.end - pill.start,
                 compositionDuration: model.duration, in: pillTrack.bounds))
         }
 
         let x = VideoTimelineGeometry.x(forTime: playheadTime, duration: model.duration, width: bounds.width)
-        let clampedX = min(max(0, x - videoTimelinePlayheadWidth / 2), max(0, bounds.width - videoTimelinePlayheadWidth))
-        playhead.frame = CGRect(x: pixelSnapped(clampedX), y: 0, width: videoTimelinePlayheadWidth, height: bounds.height)
+        let clampedX = min(max(0, x - VideoTimelineLayout.playheadWidth / 2), max(0, bounds.width - VideoTimelineLayout.playheadWidth))
+        playhead.frame = CGRect(x: VideoTimelineLayout.pixelSnapped(clampedX), y: 0, width: VideoTimelineLayout.playheadWidth, height: bounds.height)
     }
 }
 
@@ -270,8 +270,8 @@ final class ExpandedLanesView: UIView {
 
     private func updatePlayheadPosition() {
         let x = VideoTimelineGeometry.x(forTime: playheadTime, duration: model.duration, width: bounds.width)
-        let clampedX = min(max(0, x - videoTimelinePlayheadWidth / 2), max(0, bounds.width - videoTimelinePlayheadWidth))
-        playhead.frame = CGRect(x: pixelSnapped(clampedX), y: 0, width: videoTimelinePlayheadWidth, height: bounds.height)
+        let clampedX = min(max(0, x - VideoTimelineLayout.playheadWidth / 2), max(0, bounds.width - VideoTimelineLayout.playheadWidth))
+        playhead.frame = CGRect(x: VideoTimelineLayout.pixelSnapped(clampedX), y: 0, width: VideoTimelineLayout.playheadWidth, height: bounds.height)
     }
 }
 
@@ -319,7 +319,7 @@ final class ClipRowView: UIView {
             block.backgroundColor = Theme.Color.cellWell
             block.layer.borderColor = Theme.Color.cellWellOutline.cgColor
         }
-        block.layer.borderWidth = videoTimelineHairline
+        block.layer.borderWidth = VideoTimelineLayout.hairline
         block.isAccessibilityElement = true
         block.accessibilityLabel = clip.isFilled
             ? String(localized: "Clip \(clip.index + 1)") : String(localized: "Clip \(clip.index + 1), empty")
@@ -329,7 +329,7 @@ final class ClipRowView: UIView {
 
     override func layoutSubviews() {
         super.layoutSubviews()
-        block.frame = pixelSnapped(VideoTimelineGeometry.laneRect(
+        block.frame = VideoTimelineLayout.pixelSnapped(VideoTimelineGeometry.laneRect(
             start: clipStart, duration: clipDuration, compositionDuration: compositionDuration, in: bounds))
     }
 }
@@ -385,7 +385,7 @@ final class TextPillLaneRow: UIView {
         for pill in pills {
             guard let view = blocks[pill.id] else { continue }
             // TextPill is modelled as start/end; laneRect wants start/duration.
-            view.frame = pixelSnapped(VideoTimelineGeometry.laneRect(
+            view.frame = VideoTimelineLayout.pixelSnapped(VideoTimelineGeometry.laneRect(
                 start: pill.start, duration: pill.end - pill.start,
                 compositionDuration: compositionDuration, in: bounds))
         }
@@ -472,7 +472,7 @@ final class TimeRulerView: UIView {
         self.duration = duration
         for (index, label) in labels.enumerated() {
             let fraction = Double(index) / Double(Self.tickCount - 1)
-            label.text = formatTimelineTime(fraction * duration)
+            label.text = VideoTimelineLayout.formatTime(fraction * duration)
         }
         setNeedsLayout()
     }
