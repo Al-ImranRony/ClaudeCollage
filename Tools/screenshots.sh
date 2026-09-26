@@ -1,7 +1,7 @@
 #!/bin/sh
 # Step 06 phase 6.7 — the App Store screenshot matrix.
 #
-#   Tools/screenshots.sh [device ...]          # default: the two below
+#   Tools/screenshots.sh [device ...]          # default: the 6.9" iPhone below
 #   LANGUAGES="en ja" Tools/screenshots.sh     # a subset of the eleven
 #
 # For each device and language: boots the simulator, runs
@@ -18,7 +18,9 @@ export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Develope
 export PATH="$DEVELOPER_DIR/usr/bin:$PATH"
 LANGUAGES="${LANGUAGES:-en es fr de pt-BR ja ko zh-Hans hi it ar}"
 DEVICES="$*"
-[ -n "$DEVICES" ] || DEVICES="iPhone 16 Pro Max|iPad Pro 13-inch (M4)"
+# iPhone only: v1 does not declare the iPad family (project.yml), so App Store
+# Connect asks for no iPad screenshots. Pass a device to shoot another size.
+[ -n "$DEVICES" ] || DEVICES="iPhone 16 Pro Max"
 WORK="${SCREENSHOT_WORK:-$(mktemp -d)}"
 OUT="Marketing/Screenshots"
 mkdir -p "$WORK"

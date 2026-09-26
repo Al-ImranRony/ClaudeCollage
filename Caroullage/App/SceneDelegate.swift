@@ -70,13 +70,9 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         IntentRouter.shared.send(link.request)
     }
 
-    /// `-deepLink caroullage://…` on the launch line, honoured only under
-    /// `-UITestMode`: XCUITest cannot open a URL into the app under test, so
-    /// this is how `DeepLinkUITests` drives the routes.
+    /// `-deepLink caroullage://…` on the launch line — see `DevelopmentHooks`.
     private func routeLaunchArgumentLink() {
-        let arguments = ProcessInfo.processInfo.arguments
-        guard arguments.contains("-UITestMode"),
-              let raw = UserDefaults.standard.string(forKey: "deepLink"),
+        guard let raw = DevelopmentHooks.launchDeepLink(),
               let url = URL(string: raw) else { return }
         route(url)
     }

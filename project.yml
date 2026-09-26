@@ -104,11 +104,6 @@ targets:
           UIColorName: ""
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
-        UISupportedInterfaceOrientations~ipad:
-          - UIInterfaceOrientationPortrait
-          - UIInterfaceOrientationPortraitUpsideDown
-          - UIInterfaceOrientationLandscapeLeft
-          - UIInterfaceOrientationLandscapeRight
         # Permission strings. English here; the eleven languages live in
         # Caroullage/Resources/InfoPlist.xcstrings. No microphone string: the
         # camera door shoots stills and no audio is ever captured (phase 6.6).
@@ -136,7 +131,12 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.devron.caroullage
-        TARGETED_DEVICE_FAMILY: "1,2"
+        # iPhone only for v1 (2026-09-26). No screen was built for iPad landscape,
+        # Split View or Stage Manager, and iPad support cannot be withdrawn once a
+        # version ships with it. iPads still run the iPhone layout. Adding "2"
+        # later means designing for those modes first, and iPad screenshots.
+        # `SupportedDevicesTests` pins this in the built plists.
+        TARGETED_DEVICE_FAMILY: "1"
         CODE_SIGN_STYLE: Automatic
         SUPPORTS_MACCATALYST: NO
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
@@ -177,7 +177,8 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.devron.caroullage.widgets
-        TARGETED_DEVICE_FAMILY: "1,2"
+        # Must match the app's family (see the app target above).
+        TARGETED_DEVICE_FAMILY: "1"
 
   CaroullageTests:
     type: bundle.unit-test

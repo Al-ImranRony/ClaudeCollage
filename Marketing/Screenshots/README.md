@@ -3,9 +3,10 @@
 Generated, not authored: `Tools/screenshots.sh` runs `AppStoreScreenshotUITests` on
 each device and language, exports the captures, and `Tools/ScreenshotFramer` sets
 each one under its caption from `captions.json` at the device's exact pixel size.
-The PNGs are gitignored (the full matrix is ~200 MB); regenerate before an upload.
+The PNGs are gitignored; regenerate before an upload. v1 is iPhone-only, so App
+Store Connect asks for the 6.9" iPhone set and no iPad screenshots.
 
-    Tools/screenshots.sh                       # iPhone 16 Pro Max + iPad Pro 13", all 11 languages
+    Tools/screenshots.sh                       # iPhone 16 Pro Max (6.9"), all 11 languages
     LANGUAGES="en" Tools/screenshots.sh "iPhone 16 Pro Max"
 
 Scenes (`-ScreenshotMode` fills the editors with the bundled sample photography):

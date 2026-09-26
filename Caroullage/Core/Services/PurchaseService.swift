@@ -52,7 +52,6 @@ public final class PurchaseService: ObservableObject {
 
     private enum Key {
         static let cachedTier = "purchase.cachedTier"
-        static let debugOverride = "debug.premiumUnlocked"
     }
 
     public init(
@@ -164,9 +163,9 @@ public final class PurchaseService: ObservableObject {
     }
 
     private func applyToEntitlementStore() {
-        // The simulator override stays honoured: premium flows have to be
-        // exercisable on a machine that cannot buy anything.
-        let unlocked = currentTier == .premium || defaults.bool(forKey: Key.debugOverride)
+        // The simulator override stays honoured in Debug builds: premium flows
+        // have to be exercisable on a machine that cannot buy anything.
+        let unlocked = currentTier == .premium || DevelopmentHooks.isPremiumOverridden(in: defaults)
         entitlements.setPremiumUnlocked(unlocked)
     }
 

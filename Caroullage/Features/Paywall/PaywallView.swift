@@ -30,13 +30,6 @@ struct PaywallView: View {
     /// The hero card grows with its caption, or the page dots sit on the words.
     @ScaledMetric(relativeTo: .largeTitle) private var heroHeight: CGFloat = 176
 
-    private static let features = [
-        ("square.grid.3x3.fill", "200+ templates"),
-        ("hexagon.fill", "Every shape"),
-        ("4k.tv.fill", "4K, no watermark"),
-        ("wand.and.stars", "AI backgrounds"),
-    ]
-
     var body: some View {
         ZStack(alignment: .topTrailing) {
             Color.themeBackground.ignoresSafeArea()
@@ -84,14 +77,14 @@ struct PaywallView: View {
 
     private var hero: some View {
         TabView(selection: $heroIndex) {
-            ForEach(Array(Self.heroCards.enumerated()), id: \.offset) { index, card in
+            ForEach(Array(PaywallViewModel.heroCards.enumerated()), id: \.offset) { index, card in
                 ZStack {
                     RoundedRectangle(cornerRadius: Theme.Radius.xl, style: .continuous)
                         .fill(LinearGradient.themeSpark())
                     VStack(spacing: Theme.Spacing.xs) {
                         Image(systemName: card.symbol)
                             .font(.themeDisplay(heroGlyphSize, weight: .semibold))
-                        Text(LocalizedStringKey(card.caption))
+                        Text(LocalizedStringKey(card.title))
                             .font(.themeCallout)
                     }
                     .foregroundStyle(Color.themeTextOnAccent)
@@ -109,18 +102,10 @@ struct PaywallView: View {
         .onReceive(Timer.publish(every: 2.4, on: .main, in: .common).autoconnect()) { _ in
             guard !Theme.Motion.isReduced else { return }
             withAnimation(.easeInOut(duration: Theme.Motion.duration(Theme.Motion.standard))) {
-                heroIndex = (heroIndex + 1) % Self.heroCards.count
+                heroIndex = (heroIndex + 1) % PaywallViewModel.heroCards.count
             }
         }
     }
-
-    private struct HeroCard { let symbol: String; let caption: String }
-
-    private static let heroCards = [
-        HeroCard(symbol: "rectangle.stack.fill", caption: "Carousels that swipe"),
-        HeroCard(symbol: "square.grid.3x3.fill", caption: "Every layout, unlocked"),
-        HeroCard(symbol: "wand.and.stars", caption: "AI that does the fiddly bits"),
-    ]
 
     // MARK: - Copy
 
@@ -142,9 +127,9 @@ struct PaywallView: View {
             columns: [GridItem(.flexible(), alignment: .leading), GridItem(.flexible(), alignment: .leading)],
             alignment: .leading, spacing: Theme.Spacing.xs
         ) {
-            ForEach(Self.features, id: \.1) { symbol, text in
+            ForEach(PaywallViewModel.features, id: \.title) { feature in
                 HStack(spacing: 6) {
-                    Image(systemName: symbol)
+                    Image(systemName: feature.symbol)
                         .font(.themeRounded(.caption, weight: .semibold))
                         .foregroundStyle(Color.themeAccentStrong)
                         .frame(width: 20)
@@ -153,7 +138,7 @@ struct PaywallView: View {
                         .accessibilityHidden(true)
                     // A `String` in a variable is not a localizable literal, so
                     // the key is made explicit.
-                    Text(LocalizedStringKey(text))
+                    Text(LocalizedStringKey(feature.title))
                         .font(.themeSubheadline)
                         .foregroundStyle(Color.themeTextPrimary)
                         .fixedSize(horizontal: false, vertical: true)

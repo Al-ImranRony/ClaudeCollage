@@ -133,7 +133,7 @@ enum HomeCollectionPlanner {
     /// `-debug.homeDate YYYY-MM-DD` on the launch line, so a seasonal window
     /// can be walked on a simulator without waiting for the season.
     static func overrideDate(from defaults: UserDefaults = .standard) -> Date? {
-        guard let raw = defaults.string(forKey: "debug.homeDate") else { return nil }
+        guard let raw = DevelopmentHooks.homeDate(in: defaults) else { return nil }
         let parts = raw.split(separator: "-").compactMap { Int($0) }
         guard parts.count == 3 else { return nil }
         var components = DateComponents()

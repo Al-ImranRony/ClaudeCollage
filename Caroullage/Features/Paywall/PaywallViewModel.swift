@@ -52,6 +52,32 @@ public final class PaywallViewModel: ObservableObject {
     @Published public private(set) var errorMessage: String?
     @Published public private(set) var restoreMessage: String?
 
+    /// One line of the "what Premium adds" grid, or one hero card.
+    public struct Feature: Equatable, Sendable {
+        public let symbol: String
+        /// A String Catalog key — the view renders it through `LocalizedStringKey`.
+        public let title: String
+    }
+
+    /// Each is a claim a reviewer can check by buying, so each must name
+    /// something the purchase actually changes: the premium templates, the
+    /// custom-shape editor, and the export tiers `ExportOptions` gates. No
+    /// template count (the catalog is 53, not the brief's 200) and no AI line
+    /// (generative backgrounds have no sheet yet; the AI tools that ship are
+    /// free). `PaywallClaimsTests` holds the list to both.
+    public static let features = [
+        Feature(symbol: "square.grid.3x3.fill", title: "Every template"),
+        Feature(symbol: "hexagon.fill", title: "Every shape"),
+        Feature(symbol: "4k.tv.fill", title: "4K, no watermark"),
+        Feature(symbol: "film.fill", title: "HEVC & MOV video"),
+    ]
+
+    public static let heroCards = [
+        Feature(symbol: "rectangle.stack.fill", title: "Carousels that swipe"),
+        Feature(symbol: "square.grid.3x3.fill", title: "Every layout, unlocked"),
+        Feature(symbol: "lasso", title: "Draw your own shapes"),
+    ]
+
     /// What credits are and, just as importantly, what they are not. Said before
     /// the user pays rather than discovered after.
     public let creditExplanation = String(localized:

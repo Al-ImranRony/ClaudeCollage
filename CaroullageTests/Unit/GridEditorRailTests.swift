@@ -364,10 +364,9 @@ final class GridEditorRailTests: XCTestCase {
     func testTheBackgroundPanelHasNoGenerativeButtonWhenUnavailable() throws {
         // Image Playground never reports available in the simulator (see
         // AIService.ImagePlaygroundAvailability) and there is no injection seam
-        // to force it `true` — so only the `false` path is reachable from a
-        // unit test. That is still worth guarding: it exercises the same guard
-        // `makeGenerativeBackgroundButton()` uses, and would catch a regression
-        // that stopped checking the flag at all.
+        // to force it `true`. The editor offers no generative chip at all until
+        // the Image Playground sheet exists; when it returns it must stay gated
+        // on this flag, and this test catches one that stops checking it.
         let editor = makeEditor()
         XCTAssertFalse(editor.aiService.generativeBackgroundsAvailable,
                        "Precondition: the simulator never reports Image Playground available")

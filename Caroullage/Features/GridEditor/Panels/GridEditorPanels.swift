@@ -77,12 +77,13 @@ final class FramePanelView: UIView {
     required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
 }
 
-/// The background swatches, with the AI generative entry as the trailing chip.
+/// The background swatches, with room for the AI generative entry as a trailing chip.
 ///
 /// `generativeButton` is OPTIONAL on purpose. Image Playground needs Apple
 /// Intelligence hardware, and where it cannot run the control must be absent
 /// entirely rather than present-but-disabled — offering a premium feature the
 /// device can never run would be false advertising. `MagicEraserUITests` pins this.
+/// Today the editor always passes `nil`: the Image Playground sheet is unbuilt.
 @MainActor
 final class BackgroundPanelView: UIView {
 
