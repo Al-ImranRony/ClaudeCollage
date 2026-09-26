@@ -38,7 +38,10 @@ final class PaywallHostingController: UIHostingController<PaywallView> {
         onUnlocked: @escaping () -> Void = {}
     ) -> PaywallHostingController {
         let model = PaywallViewModel(service: service)
-        var controller: PaywallHostingController!
+        // Weak: this controller owns the root view whose callbacks capture it, so a
+        // strong capture kept every sheet alive for the life of the process
+        // (HostingControllerLifetimeTests).
+        weak var controller: PaywallHostingController?
 
         let view = PaywallView(
             model: model,
@@ -48,26 +51,29 @@ final class PaywallHostingController: UIHostingController<PaywallView> {
             },
             onClose: { [weak model] in
                 let unlocked = model?.isPremium ?? false
+                // Read before dismissing: once the sheet is gone, nothing holds
+                // `controller` any more.
+                let presenter = controller?.offerPresenter
                 controller?.dismiss(animated: true) {
                     // Someone who walked away without buying gets one discounted
                     // second chance — not every time, see SpecialOfferPolicy.
                     guard !unlocked else { return }
                     // The screen underneath: this sheet is gone by now.
-                    controller?.offerPresenter?.presentSpecialOfferIfDue(
-                        service: service, onUnlocked: onUnlocked)
+                    presenter?.presentSpecialOfferIfDue(service: service, onUnlocked: onUnlocked)
                 }
             }
         )
 
-        controller = PaywallHostingController(rootView: view)
-        controller.view.accessibilityIdentifier = "paywallScreen"
-        controller.isModalInPresentation = false
-        if let sheet = controller.sheetPresentationController {
+        let hosting = PaywallHostingController(rootView: view)
+        controller = hosting
+        hosting.view.accessibilityIdentifier = "paywallScreen"
+        hosting.isModalInPresentation = false
+        if let sheet = hosting.sheetPresentationController {
             sheet.detents = [.large()]
             sheet.prefersGrabberVisible = true
             sheet.preferredCornerRadius = Theme.Radius.xl
         }
-        return controller
+        return hosting
     }
 }
 
