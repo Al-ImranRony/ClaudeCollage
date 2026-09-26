@@ -33,6 +33,7 @@ final class HomeCollectionsUITests: XCTestCase {
         return app
     }
 
+    @MainActor
     private func headers(in app: XCUIApplication) -> XCUIElementQuery {
         app.staticTexts.matching(NSPredicate(format: "identifier BEGINSWITH 'sectionHeader-'"))
     }

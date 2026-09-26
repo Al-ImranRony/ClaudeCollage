@@ -31,17 +31,17 @@ final class SettingsViewModelTests: XCTestCase {
     private var spy: SpyNotifications!
     private var opened: [URL] = []
 
-    override func setUp() {
-        super.setUp()
+    override func setUp() async throws {
+        try await super.setUp()
         suiteName = "SettingsViewModelTests-\(UUID().uuidString)"
         defaults = UserDefaults(suiteName: suiteName)
         spy = SpyNotifications()
         opened = []
     }
 
-    override func tearDown() {
+    override func tearDown() async throws {
         defaults.removePersistentDomain(forName: suiteName)
-        super.tearDown()
+        try await super.tearDown()
     }
 
     private func makeModel(gateway: StubPurchaseGateway = StubPurchaseGateway()) -> SettingsViewModel {

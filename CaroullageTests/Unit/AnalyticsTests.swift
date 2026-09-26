@@ -20,14 +20,14 @@ final class AnalyticsTests: XCTestCase {
 
     private var previous: (any AnalyticsTracking)!
 
-    override func setUp() {
-        super.setUp()
+    override func setUp() async throws {
+        try await super.setUp()
         previous = Analytics.tracker
     }
 
-    override func tearDown() {
+    override func tearDown() async throws {
         Analytics.tracker = previous
-        super.tearDown()
+        try await super.tearDown()
     }
 
     func testTheInstalledTrackerReceivesEveryEvent() {

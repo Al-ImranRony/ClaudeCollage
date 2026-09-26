@@ -13,14 +13,14 @@ final class FavoritesStoreTests: XCTestCase {
 
     private var defaults: UserDefaults!
 
-    override func setUp() {
-        super.setUp()
+    override func setUp() async throws {
+        try await super.setUp()
         defaults = UserDefaults(suiteName: "FavoritesStoreTests-\(UUID().uuidString)")
     }
 
-    override func tearDown() {
+    override func tearDown() async throws {
         defaults.removePersistentDomain(forName: defaults.description)
-        super.tearDown()
+        try await super.tearDown()
     }
 
     private let bloom = FavoritesStore.Item(kind: .photo, id: "seasonal-bloom")

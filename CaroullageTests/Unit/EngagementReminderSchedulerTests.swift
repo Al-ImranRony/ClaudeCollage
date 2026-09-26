@@ -48,17 +48,17 @@ final class EngagementReminderSchedulerTests: XCTestCase {
     private let installed = Date(timeIntervalSince1970: 1_700_000_000)
     private let day: TimeInterval = 24 * 3600
 
-    override func setUp() {
-        super.setUp()
+    override func setUp() async throws {
+        try await super.setUp()
         defaults = UserDefaults(suiteName: "EngagementReminderSchedulerTests-\(UUID().uuidString)")
         spy = SpyLocalNotifications()
         scheduler = EngagementReminderScheduler(
             notifications: spy, policy: EngagementReminderPolicy(defaults: defaults))
     }
 
-    override func tearDown() {
+    override func tearDown() async throws {
         defaults.removePersistentDomain(forName: defaults.description)
-        super.tearDown()
+        try await super.tearDown()
     }
 
     private var unfinished: EngagementReminderPolicy.UnfinishedProject {
