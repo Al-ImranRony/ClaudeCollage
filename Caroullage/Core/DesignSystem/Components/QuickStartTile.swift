@@ -13,7 +13,7 @@
 //  Step 07 ended that in one direction only. Home became a showcase — hero
 //  card, three strips of finished work — where four full-width rows took half
 //  the page to say what four pills say in one line, so Home's copy became the
-//  private `QuickStartChip` in `HomeViewController`. The "+" sheet is now this
+//  `QuickStartChip` (Features/Home). The "+" sheet is now this
 //  type's only caller, and it is still the right one: there the choice IS the
 //  screen, and a row that size can afford a subtitle.
 //

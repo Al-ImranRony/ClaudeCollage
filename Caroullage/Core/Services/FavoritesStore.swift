@@ -5,10 +5,9 @@
 //  Home retention, phase 4 — the templates a user has saved.
 //
 //  `UserDefaults`, not SwiftData. There are no relationships and tens of
-//  ids, and every model added to `ModelContainerFactory`'s schema is a
-//  migration whose failure silently falls back to an in-memory store — i.e.
-//  lost projects — so the project database is the wrong place to put a
-//  heart. Insertion-ordered, so the "Saved" strips on Home are stable rather
+//  ids, and every model added to the versioned schema is a migration stage
+//  (`CaroullageSchema.swift`) whose failure sets the whole project store
+//  aside, so the project database is the wrong place to put a heart. Insertion-ordered, so the "Saved" strips on Home are stable rather
 //  than reshuffling on every toggle. The same shape as `CreditStore`.
 //
 

@@ -1503,130 +1503,64 @@ final class VideoEditorViewController: UIViewController {
 
     // MARK: - Export
 
+    private lazy var exportFlow = EditorExportFlow(host: self) { [weak self] in
+        self?.viewModel.projectID ?? UUID()
+    }
+
     @objc private func exportTapped() {
-        let capabilities = ExportCapabilities(
-            canvasSize: viewModel.canvasSize,
-            canvasAspect: CanvasSize.aspectString(for: viewModel.canvasSize),
-            supportsVideo: true,
-            isPremium: EntitlementStore.shared.isPremiumUnlocked,
-            creditBalance: CreditStore.shared.balance)
-        let sheet = UniversalExportSheetView(
-            capabilities: capabilities,
-            onSaveToPhotos: { [weak self] options, payment in
-                self?.exportVideo(options, share: false, payment: payment)
+        exportFlow.presentSheet(
+            capabilities: ExportCapabilities(
+                canvasSize: viewModel.canvasSize,
+                canvasAspect: CanvasSize.aspectString(for: viewModel.canvasSize),
+                supportsVideo: true,
+                isPremium: EntitlementStore.shared.isPremiumUnlocked,
+                creditBalance: CreditStore.shared.balance),
+            onExport: { [weak self] options, destination, payment in
+                self?.exportVideo(options, to: destination, payment: payment)
             },
-            onQuickShare: { [weak self] options, payment in
-                self?.exportVideo(options, share: true, payment: payment)
-            },
-            onCancel: { [weak self] in self?.dismiss(animated: true) },
             onBuyCredits: { [weak self] in
                 self?.dismiss(animated: true) { self?.presentPaywall() }
             })
-        let host = UIHostingController(rootView: sheet)
-        host.modalPresentationStyle = .pageSheet
-        if let presentation = host.sheetPresentationController {
-            presentation.detents = Theme.Layout.sheetDetents(for: traitCollection)
-            presentation.prefersGrabberVisible = true
-        }
-        present(host, animated: true)
     }
 
     /// Composes and writes the collage through the slice-4/5a direct
-    /// reader→writer path (video + muxed audio), then saves or shares it.
-    private func exportVideo(_ options: ExportOptions, share: Bool, payment: ExportPayment = .entitled) {
-        let creditSession = ExportCreditSession()
-        if payment == .credit, !creditSession.begin() {
-            Haptics.error()
-            showInfo(title: String(localized: "No Credits Left"), message: String(localized: "Buy a credit or start Premium to export at full quality."))
-            return
-        }
-        dismiss(animated: true) { [weak self] in
-            guard let self else { return }
-            guard self.viewModel.hasContent else {
-                creditSession.failed()
-                self.showInfo(title: String(localized: "Nothing to Export"), message: String(localized: "Add a video to a slot first."))
-                return
-            }
-            self.setPlaying(false)
-
-            let token = ExportCancellationToken()
-            let progressVC = ExportProgressViewController()
-            progressVC.onCancel = { token.cancel() }
-            self.present(progressVC, animated: true)
-
-            let ext = options.videoContainer == .mov ? "mov" : "mp4"
-            let url = FileManager.default.temporaryDirectory
-                .appendingPathComponent("VideoCollage-\(UUID().uuidString).\(ext)")
-            let renderSize = options.videoPixelSize(canvasSize: self.viewModel.canvasSize)
-            Task { @MainActor [self, progressVC] in
-                do {
-                    // Export bakes the overlays into the file (preview shows them as
-                    // interactive views instead, so preview == export).
-                    let bundle = try await self.viewModel.buildBundle(
-                        textOverlays: self.viewModel.textOverlays,
-                        stickerOverlays: self.viewModel.stickerOverlays,
-                        renderSize: renderSize)
-                    try await VideoComposer().export(
-                        bundle: bundle, codec: options.videoCodec,
-                        container: options.videoContainer, to: url,
-                        progress: { [weak progressVC] value in
-                            progressVC?.update(fraction: Double(value))
-                        },
-                        cancellation: token,
-                        watermark: options.includeWatermark
-                            ? WatermarkRenderer.overlayImage(canvasPx: bundle.renderSize) : nil)
-                    if share {
-                        creditSession.succeeded()
-                        progressVC.dismiss(animated: true) { self.shareURL(url) }
-                    } else {
-                        try await PhotoLibrarySaver().saveVideo(at: url)
-                        creditSession.succeeded()
-                        progressVC.dismiss(animated: true) {
-                            self.showSuccess(String(localized: "Saved to Photos"))
-                            RatingPrompt.exportSucceeded(in: self.view.window?.windowScene)
-                            ExportEvents.projectExported(self.viewModel.projectID)
-                        }
-                    }
-                } catch VideoComposer.ComposerError.cancelled {
-                    // A deliberate cancel isn't a failure — no error alert, and
-                    // the credit goes back: they got no file.
-                    creditSession.cancelled()
-                    progressVC.dismiss(animated: true) { self.showToast(String(localized: "Export cancelled")) }
-                } catch {
-                    creditSession.failed()
-                    progressVC.dismiss(animated: true) {
-                        Haptics.error()
-                        self.showInfo(title: String(localized: "Export Failed"),
-                                      message: String(localized: "The video couldn't be created. Please try again."))
-                    }
+    /// reader→writer path (video + muxed audio); `EditorExportFlow` saves or shares it.
+    private func exportVideo(_ options: ExportOptions, to destination: ExportDestination, payment: ExportPayment) {
+        exportFlow.run(
+            payment: payment, destination: destination, wait: .progress,
+            failure: ExportRefusal(title: String(localized: "Export Failed"),
+                                   message: String(localized: "The video couldn't be created. Please try again.")),
+            refuseIf: { [weak self] in
+                guard let self, self.viewModel.hasContent else {
+                    return ExportRefusal(title: String(localized: "Nothing to Export"),
+                                         message: String(localized: "Add a video to a slot first."))
                 }
+                return nil
             }
+        ) { [weak self] work in
+            guard let self else { throw CancellationError() }
+            self.setPlaying(false)
+            let url = work.folder.appendingPathComponent("VideoCollage")
+                .appendingPathExtension(options.videoContainer == .mov ? "mov" : "mp4")
+            let renderSize = options.videoPixelSize(canvasSize: self.viewModel.canvasSize)
+            // Export bakes the overlays into the file (preview shows them as
+            // interactive views instead, so preview == export).
+            let bundle = try await self.viewModel.buildBundle(
+                textOverlays: self.viewModel.textOverlays,
+                stickerOverlays: self.viewModel.stickerOverlays,
+                renderSize: renderSize)
+            try await VideoComposer().export(
+                bundle: bundle, codec: options.videoCodec,
+                container: options.videoContainer, to: url,
+                progress: work.progress,
+                cancellation: work.cancellation,
+                watermark: options.includeWatermark
+                    ? WatermarkRenderer.overlayImage(canvasPx: bundle.renderSize) : nil)
+            return .video(url)
         }
     }
 
     // MARK: - Helpers
-
-    private func presentSpinner(_ message: String) -> UIAlertController {
-        let alert = UIAlertController(title: nil, message: message, preferredStyle: .alert)
-        let indicator = UIActivityIndicatorView(style: .medium)
-        indicator.translatesAutoresizingMaskIntoConstraints = false
-        indicator.startAnimating()
-        alert.view.addSubview(indicator)
-        NSLayoutConstraint.activate([
-            indicator.centerXAnchor.constraint(equalTo: alert.view.centerXAnchor),
-            indicator.bottomAnchor.constraint(equalTo: alert.view.bottomAnchor, constant: -20),
-        ])
-        present(alert, animated: true)
-        return alert
-    }
-
-    private func shareURL(_ url: URL) {
-        let share = UIActivityViewController(activityItems: [url], applicationActivities: nil)
-        anchorPopover(share) { popover in
-            popover.barButtonItem = navigationItem.rightBarButtonItems?.first
-        }
-        present(share, animated: true)
-    }
 
     private func showInfo(title: String, message: String) {
         let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)

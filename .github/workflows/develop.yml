@@ -1,8 +1,11 @@
-name: TestFlight (develop)
+name: TestFlight
 
+# Manual only until the Apple Developer account exists: the App Store Connect
+# API key and Match secrets it needs do not exist yet, so an automatic trigger
+# would fail on every push. See docs/step-06-account-gated.md. Once they do,
+# consider `push: branches: [dev]` or a tag trigger.
 on:
-  push:
-    branches: [develop]
+  workflow_dispatch:
 
 concurrency:
   group: testflight-develop
@@ -11,15 +14,17 @@ concurrency:
 jobs:
   testflight:
     name: Build & Upload to TestFlight
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 60
     environment: testflight
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Select Xcode 26
-        run: sudo xcode-select -s /Applications/Xcode_26.app/Contents/Developer || true
+      - name: Select the newest released Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
 
       - name: Install XcodeGen
         run: brew install xcodegen

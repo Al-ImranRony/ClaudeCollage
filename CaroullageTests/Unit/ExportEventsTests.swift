@@ -27,7 +27,7 @@ final class ExportEventsTests: XCTestCase {
     }
 
     func testMarkingExportedThroughTheEventClearsTheUnfinishedList() throws {
-        let schema = Schema([CollageProject.self, CollageCell.self, PersonalSticker.self])
+        let schema = Schema(versionedSchema: CaroullageSchemaV1.self)
         let container = try ModelContainer(
             for: schema, configurations: [ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)])
         let store = ProjectStore(container: container)

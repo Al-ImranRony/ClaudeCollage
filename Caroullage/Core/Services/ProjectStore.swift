@@ -394,7 +394,6 @@ final class ProjectStore {
         copy.gridStateData = original.gridStateData
         copy.carouselData = original.carouselData
         copy.videoData = original.videoData
-        copy.exportSettings = original.exportSettings
 
         // Same image ids inside the state blob, so the copied directory keeps
         // resolving without rewriting the state.
