@@ -527,7 +527,7 @@ final class CarouselEditorViewController: UIViewController {
                 self.showComingSoon(title: String(localized: "Export Failed"), message: String(localized: "There are no frames to export."))
                 return
             }
-            let spinner = self.presentSpinner("Saving…")
+            let spinner = self.presentSpinner(String(localized: "Saving…"))
             Task { @MainActor in
                 do {
                     let saver = PhotoLibrarySaver()
