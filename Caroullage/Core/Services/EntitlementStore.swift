@@ -26,9 +26,9 @@ public final class EntitlementStore {
     public private(set) var isPremiumUnlocked: Bool
 
     private init() {
-        // Honour a debug override so the premium flows can be exercised in the
-        // simulator without buying anything.
-        self.isPremiumUnlocked = UserDefaults.standard.bool(forKey: "debug.premiumUnlocked")
+        // Honour the Debug-only override so the premium flows can be exercised
+        // in the simulator without buying anything.
+        self.isPremiumUnlocked = DevelopmentHooks.isPremiumOverridden()
     }
 
     /// A store with an explicit starting state, for tests and previews. The app

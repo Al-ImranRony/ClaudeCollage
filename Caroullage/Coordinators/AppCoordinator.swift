@@ -36,7 +36,7 @@ final class AppCoordinator {
     private let reminders = EngagementReminderScheduler()
     /// Never schedule from a UI test: the authorization prompt would block
     /// the runner, and a booked reminder would outlive the test.
-    private var isUITest: Bool { ProcessInfo.processInfo.arguments.contains("-UITestMode") }
+    private var isUITest: Bool { DevelopmentHooks.isUITest }
     private let widgetSnapshots = WidgetSnapshotStore()
     /// Retains the panoramic PHPicker delegate for the life of the pick.
     private var panoramicPicker: PanoramicSourcePicker?

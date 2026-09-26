@@ -68,7 +68,7 @@ public enum RatingPrompt {
     public static func exportSucceeded(in scene: UIWindowScene?, defaults: UserDefaults = .standard) {
         var policy = RatingPromptPolicy(defaults: defaults)
         guard policy.recordSuccessfulExport() else { return }
-        guard !ProcessInfo.processInfo.arguments.contains("-UITestMode"), let scene else { return }
+        guard !DevelopmentHooks.isUITest, let scene else { return }
         policy.recordRequested()
         DispatchQueue.main.asyncAfter(deadline: .now() + delayAfterSuccess) {
             AppStore.requestReview(in: scene)

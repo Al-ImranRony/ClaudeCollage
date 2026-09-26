@@ -19,9 +19,7 @@ import UIKit
 @MainActor
 enum ScreenshotStaging {
 
-    static var isActive: Bool {
-        ProcessInfo.processInfo.arguments.contains("-ScreenshotMode")
-    }
+    static var isActive: Bool { DevelopmentHooks.isScreenshotMode }
 
     /// Photos in the order they read best across a 4-up, a hexagon and a
     /// carousel: a face first, then variety.
