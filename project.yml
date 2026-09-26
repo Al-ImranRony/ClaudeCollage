@@ -186,6 +186,9 @@ targets:
     deploymentTarget: "17.0"
     sources:
       - path: CaroullageTests
+        # Stores the persistence tests copy from the source tree by path; not bundled.
+        excludes:
+          - "Fixtures/**"
     dependencies:
       - target: Caroullage
     settings:

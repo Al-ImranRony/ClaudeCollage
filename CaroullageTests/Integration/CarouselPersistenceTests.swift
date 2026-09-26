@@ -17,7 +17,7 @@ import SwiftData
 final class CarouselPersistenceTests: XCTestCase {
 
     private func makeStore() throws -> ProjectStore {
-        let schema = Schema([CollageProject.self, CollageCell.self])
+        let schema = Schema(versionedSchema: CaroullageSchemaV1.self)
         let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
         let container = try ModelContainer(for: schema, configurations: [config])
         return ProjectStore(container: container)

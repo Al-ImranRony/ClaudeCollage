@@ -78,6 +78,55 @@ final class PersistenceDurabilityTests: XCTestCase {
 
     private var recoveredFolder: URL { directory.appendingPathComponent("Recovered", isDirectory: true) }
 
+    func testTheStoresExternalDataIsSetAsideWithIt() throws {
+        // SwiftData keeps `.externalStorage` blobs (personal stickers) in a
+        // `.<store>_SUPPORT` folder beside the file; leaving it behind would
+        // orphan the old blobs next to the fresh store.
+        try Data("not a database".utf8).write(to: storeURL)
+        let support = directory.appendingPathComponent(".default_SUPPORT/_EXTERNAL_DATA", isDirectory: true)
+        try FileManager.default.createDirectory(at: support, withIntermediateDirectories: true)
+        try Data([1, 2, 3]).write(to: support.appendingPathComponent("blob"))
+
+        _ = ModelContainerFactory.makeContainer(storeURL: storeURL)
+
+        let setAside = try FileManager.default.subpathsOfDirectory(atPath: recoveredFolder.path)
+        XCTAssertTrue(setAside.contains { $0.hasSuffix(".default_SUPPORT/_EXTERNAL_DATA/blob") }, "\(setAside)")
+    }
+
+    // MARK: - The versioned schema
+
+    func testTheSchemaIsVersionedAndStoresNoEditorTypes() {
+        XCTAssertEqual(CaroullageMigrationPlan.schemas.map { $0.versionIdentifier }, [Schema.Version(1, 0, 0)])
+        // CollageCell (dead since Step 00) stored CellTransform, CellFilters and
+        // [TextOverlay] as columns, tying the frozen schema to live editor types.
+        let entities = Set(Schema(versionedSchema: CaroullageSchemaV1.self).entities.map(\.name))
+        XCTAssertEqual(entities, ["CollageProject", "PersonalSticker"])
+    }
+
+    func testAStoreFromBeforeVersioningMigratesWithItsProjects() throws {
+        // Written by the pre-versioning schema (CollageCell table with a row,
+        // CollageProject.exportSettings) — every development install up to v1.
+        let fixture = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()   // Integration
+            .deletingLastPathComponent()   // CaroullageTests
+            .appendingPathComponent("Fixtures/UnversionedStore/default.store")
+        try FileManager.default.copyItem(at: fixture, to: storeURL)
+
+        let container = ModelContainerFactory.makeContainer(storeURL: storeURL)
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: recoveredFolder.path), "migrated, not set aside")
+        XCTAssertFalse(try XCTUnwrap(container.configurations.first).isStoredInMemoryOnly)
+        XCTAssertFalse(container.schema.entities.map(\.name).contains("CollageCell"))
+        let store = ProjectStore(container: container)
+        XCTAssertEqual(Set(store.listSummaries().compactMap(\.name)), ["Legacy grid", "Legacy carousel"])
+        XCTAssertNotNil(store.loadViewModel(id: try XCTUnwrap(UUID(uuidString: "11111111-1111-1111-1111-111111111111"))))
+        XCTAssertEqual(try container.mainContext.fetchCount(FetchDescriptor<PersonalSticker>()), 1)
+
+        // The next launch opens it straight through the migration plan.
+        let relaunched = ProjectStore(container: ModelContainerFactory.makeContainer(storeURL: storeURL))
+        XCTAssertEqual(relaunched.projectCount(), 2)
+    }
+
     // MARK: - Saving
 
     func testAStateThatCannotBeEncodedDoesNotEraseTheLastGoodSave() throws {

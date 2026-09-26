@@ -18,7 +18,7 @@ import SwiftData
 final class ProjectLibraryTests: XCTestCase {
 
     private func makeStore() throws -> ProjectStore {
-        let schema = Schema([CollageProject.self, CollageCell.self, PersonalSticker.self])
+        let schema = Schema(versionedSchema: CaroullageSchemaV1.self)
         let container = try ModelContainer(
             for: schema,
             configurations: [ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)])

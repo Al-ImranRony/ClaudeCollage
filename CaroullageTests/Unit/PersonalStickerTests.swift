@@ -95,7 +95,7 @@ final class PersonalStickerTests: XCTestCase {
 
     @MainActor
     private func makeStore() throws -> PersonalStickerStore {
-        let schema = Schema([CollageProject.self, CollageCell.self, PersonalSticker.self])
+        let schema = Schema(versionedSchema: CaroullageSchemaV1.self)
         let container = try ModelContainer(
             for: schema,
             configurations: [ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)])

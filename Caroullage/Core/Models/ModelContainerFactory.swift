@@ -10,6 +10,12 @@
 //  files are set aside — kept, never deleted — and a fresh store opens on disk
 //  in their place. `PersistenceDurabilityTests` pins both halves.
 //
+//  The schema is versioned (`CaroullageSchema.swift`) and opened through its
+//  migration plan. A store written before versioning — every development
+//  install up to v1, with the retired CollageCell table — opens through the
+//  plan directly: SwiftData infers the lightweight step to V1 on its own
+//  (`PersistenceDurabilityTests` pins it with a real pre-versioning store).
+//
 
 import Foundation
 import OSLog
@@ -17,11 +23,7 @@ import SwiftData
 
 public enum ModelContainerFactory {
 
-    static let schema = Schema([
-        CollageProject.self,
-        CollageCell.self,
-        PersonalSticker.self,
-    ])
+    static let schema = Schema(versionedSchema: CaroullageSchemaV1.self)
 
     private static let log = Logger(subsystem: "com.devron.caroullage", category: "Persistence")
 
@@ -59,11 +61,13 @@ public enum ModelContainerFactory {
     }
 
     private static func openOnDisk(at url: URL) throws -> ModelContainer {
-        try ModelContainer(for: schema, configurations: [ModelConfiguration(schema: schema, url: url)])
+        try ModelContainer(for: schema, migrationPlan: CaroullageMigrationPlan.self,
+                           configurations: [ModelConfiguration(schema: schema, url: url)])
     }
 
-    /// Moves the store and its SQLite sidecars (`-wal`, `-shm`) into a dated
-    /// folder under `Recovered/` next to it, and returns that folder.
+    /// Moves the store, its SQLite sidecars (`-wal`, `-shm`) and SwiftData's
+    /// external-storage folder (`.<name>_SUPPORT`) into a dated folder under
+    /// `Recovered/` next to it, and returns that folder.
     private static func setAsideStoreFiles(at storeURL: URL, fileManager: FileManager) throws -> URL {
         let parent = storeURL.deletingLastPathComponent()
         let stamp = ISO8601DateFormatter().string(from: Date()).replacingOccurrences(of: ":", with: "-")
@@ -72,7 +76,9 @@ public enum ModelContainerFactory {
             .appendingPathComponent(stamp, isDirectory: true)
         try fileManager.createDirectory(at: folder, withIntermediateDirectories: true)
         let name = storeURL.lastPathComponent
-        for file in try fileManager.contentsOfDirectory(atPath: parent.path) where file.hasPrefix(name) {
+        let support = ".\(storeURL.deletingPathExtension().lastPathComponent)_SUPPORT"
+        for file in try fileManager.contentsOfDirectory(atPath: parent.path)
+        where file.hasPrefix(name) || file == support {
             try fileManager.moveItem(at: parent.appendingPathComponent(file),
                                     to: folder.appendingPathComponent(file))
         }

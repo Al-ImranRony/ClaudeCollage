@@ -2,8 +2,9 @@
 //  CollageProject.swift
 //  Caroullage
 //
-//  SwiftData model for a saved/in-progress collage. Stub for Step 00.
-//  Persistence and resume logic land in Step 01.
+//  SwiftData model for a saved/in-progress collage (`CaroullageSchemaV1`).
+//  Every field is a plain column; each editor's state is a JSON blob, so the
+//  editors evolve without schema migrations.
 //
 
 import Foundation
@@ -38,12 +39,9 @@ public final class CollageProject {
     /// and reads as "never exported", which is the state the unfinished-project
     /// reminder looks for.
     public var lastExportedAt: Date?
-    @Relationship(deleteRule: .cascade) public var cells: [CollageCell]
     public var previewThumbnail: Data?
-    public var exportSettings: ExportSettings
     /// Serialized `GridEditorState` for grid-mode projects (Step 01). The
-    /// authoritative editor state lives here; `cells` above is the normalized
-    /// schema populated in later steps.
+    /// authoritative editor state lives here.
     public var gridStateData: Data?
     /// Serialized `[CarouselFrame]` for carousel-mode projects (Step 03b). Each
     /// frame carries its own `GridEditorState`; photos live on disk as JPEGs keyed
@@ -60,9 +58,7 @@ public final class CollageProject {
         canvasSize: CGSize,
         templateID: String? = nil,
         carouselType: CarouselType? = nil,
-        frameCount: Int = 1,
-        cells: [CollageCell] = [],
-        exportSettings: ExportSettings = ExportSettings()
+        frameCount: Int = 1
     ) {
         let now = Date()
         self.id = id
@@ -74,9 +70,7 @@ public final class CollageProject {
         self.templateID = templateID
         self.carouselTypeRaw = carouselType?.rawValue
         self.frameCount = frameCount
-        self.cells = cells
         self.previewThumbnail = nil
-        self.exportSettings = exportSettings
     }
 
     public var mode: CollageMode {

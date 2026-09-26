@@ -14,7 +14,7 @@ import SwiftData
 final class PersistenceSmokeTests: XCTestCase {
 
     func testContainerRealizesAndFetches() throws {
-        let schema = Schema([CollageProject.self, CollageCell.self])
+        let schema = Schema(versionedSchema: CaroullageSchemaV1.self)
         let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
         let container = try ModelContainer(for: schema, configurations: [config])
         let context = container.mainContext
@@ -23,7 +23,7 @@ final class PersistenceSmokeTests: XCTestCase {
     }
 
     func testOnDiskContainerRealizesAndFetches() throws {
-        let schema = Schema([CollageProject.self, CollageCell.self])
+        let schema = Schema(versionedSchema: CaroullageSchemaV1.self)
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("cc-test-\(UUID().uuidString).store")
         let config = ModelConfiguration(schema: schema, url: url)
