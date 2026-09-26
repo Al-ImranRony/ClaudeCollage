@@ -19,6 +19,13 @@ enum ExportArtifact {
     case images([Data], fileExtension: String, baseName: String)
     /// A finished video file.
     case video(URL)
+
+    var itemCount: Int {
+        switch self {
+        case .images(let images, _, _): images.count
+        case .video: 1
+        }
+    }
 }
 
 enum ExportDestination: Equatable {
@@ -33,12 +40,17 @@ struct ExportRefusal: Error, Equatable {
     let message: String
 }
 
+/// A render that produced nothing to hand over.
+struct ExportRenderFailed: Error {}
+
 /// How one export ended.
 enum ExportOutcome {
     enum Stage { case making, delivering }
 
-    /// Handed over. For a share, the files to offer; empty after a Photos save.
-    case delivered([URL])
+    /// Handed over. For a share, the files to offer — the credit is still held
+    /// until the sheet closes (`settle(after:)`); empty after a Photos save.
+    /// `items` is how many images (or videos) went out, for the message.
+    case delivered([URL], items: Int)
     case cancelled
     case refused(ExportRefusal)
     case failed(Stage, Error)
@@ -48,10 +60,13 @@ enum ExportOutcome {
 enum ExportRun {
 
     /// Runs one export against a credit session the caller has already begun
-    /// (or left idle, for an entitled export). The credit is only consumed when
-    /// `handOver` completes; every other ending gives it back.
+    /// (or left idle, for an entitled export). A Photos save consumes the credit
+    /// when it completes. A share only writes the files the sheet will offer —
+    /// the user has nothing yet — so the credit stays held for the caller to
+    /// settle when the sheet closes. Every failure gives it back.
     static func perform(
         credit: ExportCreditSession,
+        destination: ExportDestination,
         produce: () async throws -> ExportArtifact,
         handOver: (ExportArtifact) async throws -> [URL]
     ) async -> ExportOutcome {
@@ -70,11 +85,16 @@ enum ExportRun {
             return .failed(.making, error)
         }
 
-        var shared: [URL] = []
         do {
-            try await credit.deliver { shared = try await handOver(artifact) }
-            return .delivered(shared)
+            switch destination {
+            case .photos:
+                try await credit.deliver { _ = try await handOver(artifact) }
+                return .delivered([], items: artifact.itemCount)
+            case .share:
+                return .delivered(try await handOver(artifact), items: artifact.itemCount)
+            }
         } catch {
+            credit.failed()            // latched: a no-op when deliver already refunded
             return isCancellation(error) ? .cancelled : .failed(.delivering, error)
         }
     }
@@ -83,6 +103,35 @@ enum ExportRun {
         if error is CancellationError { return true }
         if let composer = error as? VideoComposer.ComposerError, case .cancelled = composer { return true }
         return false
+    }
+}
+
+/// How the share sheet ended, read from its completion handler. iOS calls the
+/// handler when an activity ends, and leaves the sheet on screen when that
+/// activity was cancelled — so only some calls mean the sheet is done.
+enum ShareSheetEnding: Equatable {
+    /// An activity finished: the user has the file.
+    case shared
+    /// The sheet went away without sharing.
+    case dismissed
+    /// An activity was cancelled; the sheet is still open for another choice.
+    case stillOpen
+
+    init(activityChosen: Bool, completed: Bool) {
+        if completed { self = .shared } else { self = activityChosen ? .stillOpen : .dismissed }
+    }
+}
+
+extension ExportCreditSession {
+    /// Settles a credit held across a share sheet: kept once something was
+    /// shared, given back when the sheet is dismissed, untouched while it is
+    /// still open.
+    func settle(after ending: ShareSheetEnding) {
+        switch ending {
+        case .shared: succeeded()
+        case .dismissed: failed()
+        case .stillOpen: break
+        }
     }
 }
 

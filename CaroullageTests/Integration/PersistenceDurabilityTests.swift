@@ -78,6 +78,38 @@ final class PersistenceDurabilityTests: XCTestCase {
 
     private var recoveredFolder: URL { directory.appendingPathComponent("Recovered", isDirectory: true) }
 
+    func testAFreshInstallOpensWithoutARecovery() throws {
+        // A new app container has no Library/Application Support yet. SwiftData
+        // creates the folder itself (checked 2026-09-26); this pins that a first
+        // launch never looks like a corrupt store and sets nothing aside.
+        let freshURL = directory.appendingPathComponent("Application Support/default.store")
+
+        let container = ModelContainerFactory.makeContainer(storeURL: freshURL)
+
+        let configuration = try XCTUnwrap(container.configurations.first)
+        XCTAssertFalse(configuration.isStoredInMemoryOnly)
+        XCTAssertFalse(FileManager.default.fileExists(
+            atPath: directory.appendingPathComponent("Application Support/Recovered").path),
+            "nothing was set aside on a first launch")
+    }
+
+    func testTheStoreIsPutBackWhenAFreshOneCannotOpenEither() throws {
+        // Moving a store aside only helps if a new one can then open. When even
+        // that fails — a full disk, data protection before first unlock — the
+        // environment is the problem, not the file: put it back, run in memory
+        // for this session, and let the next launch try again.
+        let original = Data("the user's library".utf8)
+        try original.write(to: storeURL)
+        struct CannotOpen: Error {}
+
+        let container = ModelContainerFactory.makeContainer(storeURL: storeURL, open: { _ in throw CannotOpen() })
+
+        XCTAssertTrue(try XCTUnwrap(container.configurations.first).isStoredInMemoryOnly)
+        XCTAssertEqual(try Data(contentsOf: storeURL), original, "the store is back where it was")
+        let leftBehind = (try? FileManager.default.subpathsOfDirectory(atPath: recoveredFolder.path)) ?? []
+        XCTAssertFalse(leftBehind.contains { $0.hasSuffix("default.store") }, "\(leftBehind)")
+    }
+
     func testTheStoresExternalDataIsSetAsideWithIt() throws {
         // SwiftData keeps `.externalStorage` blobs (personal stickers) in a
         // `.<store>_SUPPORT` folder beside the file; leaving it behind would
