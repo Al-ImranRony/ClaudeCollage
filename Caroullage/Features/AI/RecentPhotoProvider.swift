@@ -13,7 +13,9 @@
 //  prompts. A system permission dialog the user did not ask for, for a feature
 //  they have not seen, is the fastest way to get a permanent "Don't Allow".
 //
-//  `.readWrite` is deliberately not requested — suggestions only need to read.
+//  It asks for `.readWrite` because PhotoKit has no read-only level; nothing
+//  here writes (exports save through the separate add-only level). The purpose
+//  string, `NSPhotoLibraryUsageDescription`, says exactly this use.
 //
 
 import Photos

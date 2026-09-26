@@ -149,67 +149,67 @@
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "يحتاج Caroullage إلى الوصول إلى صورك لإنشاء المجمّعات."
+            "value" : "يقرأ Caroullage صورك الأخيرة ليقترح عليك مجمّعات مصنوعة منها. ولا يغادر شيء هاتفك."
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Caroullage benötigt Zugriff auf deine Fotos, um Collagen zu erstellen."
+            "value" : "Caroullage liest deine letzten Fotos, um dir Collagen daraus vorzuschlagen. Nichts verlässt dein Gerät."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Caroullage needs access to your photos to create collages."
+            "value" : "Caroullage reads your recent photos to suggest collages made from them. Nothing leaves your phone."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Caroullage necesita acceder a tus fotos para crear collages."
+            "value" : "Caroullage lee tus fotos recientes para sugerirte collages hechos con ellas. Nada sale de tu móvil."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Caroullage a besoin d'accéder à vos photos pour créer des collages."
+            "value" : "Caroullage lit vos photos récentes pour vous suggérer des collages créés avec elles. Rien ne quitte votre téléphone."
           }
         },
         "hi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "कोलाज बनाने के लिए Caroullage को आपकी फ़ोटो तक पहुँच चाहिए।"
+            "value" : "Caroullage आपकी हाल की फ़ोटो पढ़कर उन्हीं से बने कोलाज सुझाता है। कुछ भी फ़ोन से बाहर नहीं जाता।"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Caroullage ha bisogno di accedere alle tue foto per creare collage."
+            "value" : "Caroullage legge le tue foto recenti per suggerirti collage creati con esse. Nulla lascia il telefono."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "コラージュを作成するために、Caroullage は写真へのアクセスを必要とします。"
+            "value" : "Caroullage は最近の写真を読み込み、それらを使ったコラージュを提案します。データは端末から出ません。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "콜라주를 만들려면 Caroullage가 사진에 접근해야 합니다."
+            "value" : "Caroullage는 최근 사진을 읽어 그 사진으로 만든 콜라주를 추천합니다. 어떤 것도 기기를 벗어나지 않습니다."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "O Caroullage precisa acessar suas fotos para criar colagens."
+            "value" : "O Caroullage lê suas fotos recentes para sugerir colagens feitas com elas. Nada sai do seu celular."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Caroullage 需要访问你的照片来创建拼贴。"
+            "value" : "Caroullage 读取你最近的照片，为你推荐用它们制作的拼贴。所有内容都留在手机上。"
           }
         }
       }
