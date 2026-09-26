@@ -12,6 +12,10 @@
 //
 //  macOS-only (AppKit for text); runs on the Mac that runs the simulator.
 //
+//  The file is written OPAQUE — RGB, no alpha channel. App Store Connect
+//  rejects screenshots that carry one, even a fully opaque one, and AppKit's
+//  drawable bitmaps always have it, so the canvas is flattened before saving.
+//
 
 import AppKit
 import Foundation
@@ -86,6 +90,17 @@ NSAttributedString(string: caption, attributes: attributes)
     .draw(with: textRect, options: [.usesLineFragmentOrigin, .usesFontLeading])
 
 NSGraphicsContext.restoreGraphicsState()
-guard let png = canvas.representation(using: .png, properties: [:]) else { exit(1) }
+
+// Flatten: redraw into an RGB context with no alpha (noneSkipLast), so the PNG
+// encoder writes three channels.
+guard let drawn = canvas.cgImage,
+      let sRGB = CGColorSpace(name: CGColorSpace.sRGB),
+      let opaque = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
+                             space: sRGB, bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue) else { exit(1) }
+opaque.draw(drawn, in: CGRect(x: 0, y: 0, width: width, height: height))
+guard let flattened = opaque.makeImage() else { exit(1) }
+
 try! FileManager.default.createDirectory(at: outURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-try! png.write(to: outURL)
+guard let destination = CGImageDestinationCreateWithURL(outURL as CFURL, "public.png" as CFString, 1, nil) else { exit(1) }
+CGImageDestinationAddImage(destination, flattened, nil)
+guard CGImageDestinationFinalize(destination) else { exit(1) }
