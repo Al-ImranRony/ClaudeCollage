@@ -392,42 +392,31 @@ final class CarouselEditorViewController: UIViewController {
             ? viewModel.canvasSize.width / viewModel.canvasSize.height : 1
         let preview = CarouselPreviewViewController(
             images: images, aspectRatio: aspect, startIndex: viewModel.currentIndex)
-        // The preview's own share door has no credit step, so it carries the
-        // mark unless Premium is on.
-        preview.onExport = { [weak self] in
-            self?.shareFrameImages(watermarked: !EntitlementStore.shared.isPremiumUnlocked)
-        }
+        // The preview's export door opens the editor's own export sheet, so it
+        // offers the same choices — and takes a credit the same way.
+        preview.onExport = { [weak self] in self?.exportTapped() }
         present(preview, animated: true)
     }
 
+    private lazy var exportFlow = EditorExportFlow(host: self) { [weak self] in
+        self?.viewModel.projectID ?? UUID()
+    }
+
     @objc private func exportTapped() {
-        let capabilities = ExportCapabilities(
-            canvasSize: viewModel.canvasSize,
-            canvasAspect: CanvasSize.aspectString(for: viewModel.canvasSize),
-            supportsVideo: true,
-            isPremium: EntitlementStore.shared.isPremiumUnlocked,
-            creditBalance: CreditStore.shared.balance)
-        let sheet = UniversalExportSheetView(
-            capabilities: capabilities,
-            onSaveToPhotos: { [weak self] options, payment in
-                if options.media == .video { self?.exportVideo(options, share: false, payment: payment) }
-                else { self?.saveImagesToPhotos(options, payment: payment) }
+        exportFlow.presentSheet(
+            capabilities: ExportCapabilities(
+                canvasSize: viewModel.canvasSize,
+                canvasAspect: CanvasSize.aspectString(for: viewModel.canvasSize),
+                supportsVideo: true,
+                isPremium: EntitlementStore.shared.isPremiumUnlocked,
+                creditBalance: CreditStore.shared.balance),
+            onExport: { [weak self] options, destination, payment in
+                if options.media == .video { self?.exportVideo(options, to: destination, payment: payment) }
+                else { self?.exportImages(options, to: destination, payment: payment) }
             },
-            onQuickShare: { [weak self] options, payment in
-                if options.media == .video { self?.exportVideo(options, share: true, payment: payment) }
-                else { self?.dismiss(animated: true) { self?.shareFrameImages(watermarked: options.includeWatermark) } }
-            },
-            onCancel: { [weak self] in self?.dismiss(animated: true) },
             onBuyCredits: { [weak self] in
                 self?.dismiss(animated: true) { self?.presentPaywall() }
             })
-        let host = UIHostingController(rootView: sheet)
-        host.modalPresentationStyle = .pageSheet
-        if let presentation = host.sheetPresentationController {
-            presentation.detents = Theme.Layout.sheetDetents(for: traitCollection)
-            presentation.prefersGrabberVisible = true
-        }
-        present(host, animated: true)
     }
 
     /// Renders every frame full-resolution via a throwaway grid VM (reusing the
@@ -446,161 +435,58 @@ final class CarouselEditorViewController: UIViewController {
         }
     }
 
-    /// Composes the frames into a slideshow video (direct AVAssetWriter) and either
-    /// saves it to Photos or opens the share sheet. This is Step 03b's deferred
-    /// carousel video export, now delivered through Step 04's `VideoComposer`.
-    private func exportVideo(_ options: ExportOptions, share: Bool, payment: ExportPayment = .entitled) {
-        let creditSession = ExportCreditSession()
-        if payment == .credit, !creditSession.begin() {
-            Haptics.error()
-            showComingSoon(title: String(localized: "No Credits Left"),
-                           message: String(localized: "Buy a credit or start Premium to export at full quality."))
-            return
-        }
-        dismiss(animated: true) { [weak self] in
-            guard let self else { return }
+    /// Composes the frames into a slideshow video (direct AVAssetWriter). This is
+    /// Step 03b's deferred carousel video export, delivered through Step 04's
+    /// `VideoComposer`; `EditorExportFlow` saves or shares it.
+    private func exportVideo(_ options: ExportOptions, to destination: ExportDestination, payment: ExportPayment) {
+        exportFlow.run(
+            payment: payment, destination: destination, wait: .progress,
+            failure: ExportRefusal(title: String(localized: "Export Failed"),
+                                   message: String(localized: "The video couldn't be created. Please try again.")),
+            refuseIf: { [weak self] in self?.noFramesRefusal }
+        ) { [weak self] work in
+            guard let self else { throw CancellationError() }
             let frames = self.renderFrames(watermarked: options.includeWatermark)
-            guard !frames.isEmpty else {
-                creditSession.failed()
-                self.showComingSoon(title: String(localized: "Export Failed"), message: String(localized: "There are no frames to export."))
-                return
-            }
-            let token = ExportCancellationToken()
-            let progressVC = ExportProgressViewController()
-            progressVC.onCancel = { token.cancel() }
-            self.present(progressVC, animated: true)
-
-            let size = options.videoPixelSize(canvasSize: self.viewModel.canvasSize)
-            let ext = options.videoContainer == .mov ? "mov" : "mp4"
-            let url = FileManager.default.temporaryDirectory
-                .appendingPathComponent("Carousel-\(UUID().uuidString).\(ext)")
-            Task { @MainActor [self, progressVC] in
-                do {
-                    try await VideoComposer().renderSlideshow(
-                        frames: frames, size: size, secondsPerFrame: 2.0,
-                        codec: options.videoCodec, container: options.videoContainer, to: url,
-                        progress: { [weak progressVC] value in
-                            progressVC?.update(fraction: Double(value))
-                        },
-                        cancellation: token)
-                    if share {
-                        creditSession.succeeded()
-                        progressVC.dismiss(animated: true) { self.shareURL(url) }
-                    } else {
-                        try await PhotoLibrarySaver().saveVideo(at: url)
-                        creditSession.succeeded()
-                        progressVC.dismiss(animated: true) {
-                            self.showSuccess(String(localized: "Saved to Photos"))
-                            RatingPrompt.exportSucceeded(in: self.view.window?.windowScene)
-                            ExportEvents.projectExported(self.viewModel.projectID)
-                        }
-                    }
-                } catch VideoComposer.ComposerError.cancelled {
-                    creditSession.cancelled()
-                    progressVC.dismiss(animated: true) { self.showToast(String(localized: "Export cancelled")) }
-                } catch {
-                    creditSession.failed()
-                    progressVC.dismiss(animated: true) {
-                        Haptics.error()
-                        self.showComingSoon(title: String(localized: "Export Failed"),
-                                            message: String(localized: "The video couldn't be created. Please try again."))
-                    }
-                }
-            }
+            guard !frames.isEmpty else { throw Self.noFrames }
+            let url = work.folder.appendingPathComponent("Carousel")
+                .appendingPathExtension(options.videoContainer == .mov ? "mov" : "mp4")
+            try await VideoComposer().renderSlideshow(
+                frames: frames, size: options.videoPixelSize(canvasSize: self.viewModel.canvasSize),
+                secondsPerFrame: 2.0, codec: options.videoCodec, container: options.videoContainer, to: url,
+                progress: work.progress, cancellation: work.cancellation)
+            return .video(url)
         }
     }
 
-    /// Saves each frame to Photos as an individual image asset.
-    private func saveImagesToPhotos(_ options: ExportOptions, payment: ExportPayment = .entitled) {
-        let creditSession = ExportCreditSession()
-        if payment == .credit, !creditSession.begin() {
-            Haptics.error()
-            showComingSoon(title: String(localized: "No Credits Left"),
-                           message: String(localized: "Buy a credit or start Premium to export at full quality."))
-            return
-        }
-        dismiss(animated: true) { [weak self] in
-            guard let self else { return }
+    /// The frames as individual images, in carousel order: each saved to Photos
+    /// as its own asset, or offered to the share sheet as numbered files. The
+    /// share sheet used to get a .zip, which nothing a carousel is posted from can
+    /// unpack — and, until this ran through `EditorExportFlow`, it never took the
+    /// credit a watermark-free export costs.
+    private func exportImages(_ options: ExportOptions, to destination: ExportDestination, payment: ExportPayment) {
+        exportFlow.run(
+            payment: payment, destination: destination,
+            wait: .spinner(destination == .photos ? String(localized: "Saving…") : String(localized: "Exporting…")),
+            failure: ExportRefusal(title: String(localized: "Export Failed"),
+                                   message: String(localized: "Couldn't create the image set. Please try again.")),
+            savedMessage: String(localized: "Saved \(viewModel.frames.count) images"),
+            refuseIf: { [weak self] in self?.noFramesRefusal }
+        ) { [weak self] _ in
+            guard let self else { throw CancellationError() }
             let frames = self.renderFrames(watermarked: options.includeWatermark)
-            guard !frames.isEmpty else {
-                creditSession.failed()
-                self.showComingSoon(title: String(localized: "Export Failed"), message: String(localized: "There are no frames to export."))
-                return
+            guard !frames.isEmpty else { throw Self.noFrames }
+            let images = try frames.map {
+                try ImageExporter().encode($0, format: options.imageExporterFormat, resolution: options.imageResolution)
             }
-            let spinner = self.presentSpinner(String(localized: "Saving…"))
-            Task { @MainActor in
-                do {
-                    let saver = PhotoLibrarySaver()
-                    for frame in frames {
-                        let data = try ImageExporter().encode(
-                            frame, format: options.imageExporterFormat, resolution: options.imageResolution)
-                        try await saver.saveImage(data)
-                    }
-                    creditSession.succeeded()
-                    spinner.dismiss(animated: true) {
-                        self.showSuccess(String(localized: "Saved \(frames.count) images"))
-                        RatingPrompt.exportSucceeded(in: self.view.window?.windowScene)
-                        ExportEvents.projectExported(self.viewModel.projectID)
-                    }
-                } catch {
-                    creditSession.failed()
-                    spinner.dismiss(animated: true) {
-                        Haptics.error()
-                        self.showComingSoon(title: String(localized: "Save Failed"), message: String(localized: "Couldn't save to Photos."))
-                    }
-                }
-            }
+            return .images(images, fileExtension: options.imageFormat == .png ? "png" : "jpg", baseName: "Carousel")
         }
     }
 
-    private func presentSpinner(_ message: String) -> UIAlertController {
-        let alert = UIAlertController(title: nil, message: message, preferredStyle: .alert)
-        let indicator = UIActivityIndicatorView(style: .medium)
-        indicator.translatesAutoresizingMaskIntoConstraints = false
-        indicator.startAnimating()
-        alert.view.addSubview(indicator)
-        NSLayoutConstraint.activate([
-            indicator.centerXAnchor.constraint(equalTo: alert.view.centerXAnchor),
-            indicator.bottomAnchor.constraint(equalTo: alert.view.bottomAnchor, constant: -20),
-        ])
-        present(alert, animated: true)
-        return alert
+    private static var noFrames: ExportRefusal {
+        ExportRefusal(title: String(localized: "Export Failed"), message: String(localized: "There are no frames to export."))
     }
 
-    private func shareURL(_ url: URL) {
-        let share = UIActivityViewController(activityItems: [url], applicationActivities: nil)
-        share.popoverPresentationController?.barButtonItem = navigationItem.rightBarButtonItems?.first
-        present(share, animated: true)
-    }
-
-    /// Renders every frame full-resolution and offers the images themselves via the
-    /// share sheet, in carousel order.
-    ///
-    /// This used to hand over a single .zip. That is a fine artifact for Files, but
-    /// it is the wrong one for the apps carousels are actually posted to — nothing
-    /// downstream can unpack it, so the export was effectively a dead end. Sharing
-    /// the individual JPEGs lets AirDrop, Messages, Files and the photo apps each
-    /// take the frames directly.
-    private func shareFrameImages(watermarked: Bool) {
-        let images = renderFrames(watermarked: watermarked)
-        guard !images.isEmpty else {
-            showComingSoon(title: String(localized: "Export Failed"), message: String(localized: "There are no frames to export."))
-            return
-        }
-        do {
-            let dir = FileManager.default.temporaryDirectory
-                .appendingPathComponent("CarouselExport", isDirectory: true)
-            try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-            let urls = try CarouselExporter().writeShareableFrames(
-                images, baseName: "Carousel", into: dir)
-            let share = UIActivityViewController(activityItems: urls, applicationActivities: nil)
-            share.popoverPresentationController?.barButtonItem = navigationItem.rightBarButtonItems?.first
-            present(share, animated: true)
-        } catch {
-            showComingSoon(title: String(localized: "Export Failed"),
-                           message: String(localized: "Couldn't create the image set. Please try again."))
-        }
-    }
+    private var noFramesRefusal: ExportRefusal? { viewModel.frames.isEmpty ? Self.noFrames : nil }
 
     private func showComingSoon(title: String, message: String) {
         let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)

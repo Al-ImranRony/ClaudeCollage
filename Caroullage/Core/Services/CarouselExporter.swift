@@ -3,17 +3,16 @@
 //  Caroullage
 //
 //  Step 03b slice 7 — exports a carousel as an image set: each frame written as a
-//  zero-padded, numbered .jpg. Two deliveries share that one writer:
-//
-//  • `writeShareableFrames` returns the loose images, which is what the share sheet
-//    hands to AirDrop / Messages / the photo apps a carousel is posted from.
-//  • `exportImageSet` archives them into a .zip for Files (the Camera Roll can't
-//    hold a numbered folder), via NSFileCoordinator's `.forUploading` archive —
-//    the platform's own directory-to-zip, so there's no third-party dependency.
-//
-//  Step 04.5: sharing used to go through the zip only, which nothing downstream
-//  could unpack. Frame ORDER is the contract in both paths — a carousel is only
+//  zero-padded, numbered .jpg, and `exportImageSet` archives them into a .zip for
+//  Files (the Camera Roll can't hold a numbered folder), via NSFileCoordinator's
+//  `.forUploading` archive — the platform's own directory-to-zip, so there's no
+//  third-party dependency. Frame ORDER is the contract — a carousel is only
 //  meaningful in sequence.
+//
+//  The share sheet no longer comes through here: `EditorExportFlow` writes the
+//  loose, numbered images for every editor (`ExportFiles`), in the format and
+//  resolution the export sheet chose. Nothing in the app calls the zip today;
+//  it is kept for a Files export.
 //
 
 import CoreGraphics
@@ -52,21 +51,6 @@ public struct CarouselExporter {
             urls.append(url)
         }
         return urls
-    }
-
-    /// Writes the frames as individually shareable JPEGs in a fresh directory and
-    /// returns them in order, ready to hand straight to a share sheet.
-    ///
-    /// This is the counterpart to `exportImageSet`: same files, no archive around
-    /// them. A zip is the right artifact for Files, but it is useless to the apps
-    /// people actually post carousels to, which expect the images themselves.
-    public func writeShareableFrames(
-        _ images: [CGImage], baseName: String, into directory: URL
-    ) throws -> [URL] {
-        guard !images.isEmpty else { throw ExportError.noFrames }
-        let framesDir = directory.appendingPathComponent(baseName, isDirectory: true)
-        try? FileManager.default.removeItem(at: framesDir)
-        return try writeFrames(images, to: framesDir, prefix: baseName)
     }
 
     /// Renders the frames to `<baseName>/frame_NN.jpg` under `directory`, then zips

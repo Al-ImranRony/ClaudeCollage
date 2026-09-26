@@ -1119,139 +1119,60 @@ final class GridEditorViewController: UIViewController {
 
     // MARK: - Export
 
+    private lazy var exportFlow = EditorExportFlow(host: self) { [weak self] in
+        self?.viewModel.projectID ?? UUID()
+    }
+
     @objc private func exportTapped() {
-        let capabilities = ExportCapabilities(
-            canvasSize: viewModel.canvasSize,
-            canvasAspect: CanvasSize.aspectString(for: viewModel.canvasSize),
-            supportsVideo: false,
-            isPremium: EntitlementStore.shared.isPremiumUnlocked,
-            creditBalance: CreditStore.shared.balance)
-        let sheet = UniversalExportSheetView(
-            capabilities: capabilities,
-            onSaveToPhotos: { [weak self] options, payment in
-                self?.performImageExport(options, share: false, payment: payment)
+        exportFlow.presentSheet(
+            capabilities: ExportCapabilities(
+                canvasSize: viewModel.canvasSize,
+                canvasAspect: CanvasSize.aspectString(for: viewModel.canvasSize),
+                supportsVideo: false,
+                isPremium: EntitlementStore.shared.isPremiumUnlocked,
+                creditBalance: CreditStore.shared.balance),
+            onExport: { [weak self] options, destination, payment in
+                self?.exportImage(options, to: destination, payment: payment)
             },
-            onQuickShare: { [weak self] options, payment in
-                self?.performImageExport(options, share: true, payment: payment)
-            },
-            onCancel: { [weak self] in self?.dismiss(animated: true) },
             onBuyCredits: { [weak self] in
                 self?.dismiss(animated: true) { self?.presentPaywall() }
             })
-        let host = UIHostingController(rootView: sheet)
-        host.modalPresentationStyle = .pageSheet
-        if let presentation = host.sheetPresentationController {
-            presentation.detents = Theme.Layout.sheetDetents(for: traitCollection)
-            presentation.prefersGrabberVisible = true
-        }
-        present(host, animated: true)
     }
 
-    /// Renders the canvas full-resolution off the main thread, encodes it per the
-    /// export options, then saves to Photos or opens the share sheet.
-    private func performImageExport(_ options: ExportOptions, share: Bool, payment: ExportPayment = .entitled) {
-        // The credit is taken up front and given back below if nothing comes out
-        // of the export.
-        let creditSession = ExportCreditSession()
-        if payment == .credit, !creditSession.begin() {
-            Haptics.error()
-            showAlert(String(localized: "No credits left"), String(localized: "Buy a credit or start Premium to export at full quality."))
-            return
-        }
-        dismiss(animated: true) { [weak self] in
-            guard let self else { return }
-            let spinner = self.presentSpinner()
+    /// Renders the canvas full-resolution off the main thread and encodes it per
+    /// the export options; `EditorExportFlow` does the rest.
+    private func exportImage(_ options: ExportOptions, to destination: ExportDestination, payment: ExportPayment) {
+        exportFlow.run(
+            payment: payment, destination: destination,
+            wait: .spinner(String(localized: "Exporting…")),
+            failure: ExportRefusal(title: String(localized: "Export failed"),
+                                   message: String(localized: "Could not render the collage."))
+        ) { [weak self] _ in
+            guard let self else { throw CancellationError() }
             // Build the (Sendable) request on the main actor, then composite +
             // encode entirely off the main thread so the UI never blocks.
             let request = self.viewModel.exportRequest()
             let compositor = self.compositor
-            DispatchQueue.global(qos: .userInitiated).async {
-                // The free tier's mark goes onto the file here, after the
-                // composite — the canvas never shows it.
-                let cgImage = compositor.render(request, scale: 1)
-                    .map { options.includeWatermark ? WatermarkRenderer.stamp($0) : $0 }
-                let data: Data? = cgImage.flatMap {
-                    try? ImageExporter().encode($0, format: options.imageExporterFormat,
-                                               resolution: options.imageResolution)
-                }
-                DispatchQueue.main.async {
-                    spinner.dismiss(animated: true) {
-                        guard let data else {
-                            creditSession.failed()
-                            Haptics.error()
-                            self.showAlert(String(localized: "Export failed"), String(localized: "Could not render the collage."))
-                            return
-                        }
-                        // The credit is only spent once the user has the file: in
-                        // Photos, or written out for the share sheet.
-                        if share {
-                            let written = self.shareData(data, fileExtension: options.imageFormat == .png ? "png" : "jpg")
-                            if written { creditSession.succeeded() } else { creditSession.failed() }
-                        } else {
-                            self.saveToPhotos(data, creditSession: creditSession)
-                        }
-                    }
+            let data: Data? = await withCheckedContinuation { continuation in
+                DispatchQueue.global(qos: .userInitiated).async {
+                    // The free tier's mark goes onto the file here, after the
+                    // composite — the canvas never shows it.
+                    let image = compositor.render(request, scale: 1)
+                        .map { options.includeWatermark ? WatermarkRenderer.stamp($0) : $0 }
+                    continuation.resume(returning: image.flatMap {
+                        try? ImageExporter().encode($0, format: options.imageExporterFormat,
+                                                   resolution: options.imageResolution)
+                    })
                 }
             }
+            guard let data else { throw RenderFailed() }
+            return .images([data], fileExtension: options.imageFormat == .png ? "png" : "jpg", baseName: "Collage")
         }
     }
 
-    /// Writes `data` to a temp file and opens the iOS share sheet (Quick Share).
-    /// False when the file could not be written, so the caller can refund.
-    @discardableResult
-    private func shareData(_ data: Data, fileExtension: String) -> Bool {
-        let url = FileManager.default.temporaryDirectory
-            .appendingPathComponent("Collage-\(UUID().uuidString).\(fileExtension)")
-        do {
-            try data.write(to: url)
-        } catch {
-            Haptics.error()
-            showAlert(String(localized: "Share failed"), String(localized: "Could not prepare the file to share."))
-            return false
-        }
-        let share = UIActivityViewController(activityItems: [url], applicationActivities: nil)
-        anchorPopover(share) { popover in
-            popover.barButtonItem = navigationItem.rightBarButtonItems?.first
-        }
-        present(share, animated: true)
-        return true
-    }
-
-    /// Saves through `PhotoLibrarySaver`, as the video and carousel editors do
-    /// (it owns the @Sendable PhotoKit handlers), and settles the credit on the
-    /// outcome: a denied permission or a failed write gives it back.
-    private func saveToPhotos(_ data: Data, creditSession: ExportCreditSession) {
-        Task { @MainActor [weak self] in
-            do {
-                try await creditSession.deliver { try await PhotoLibrarySaver().saveImage(data) }
-                guard let self else { return }
-                self.showSuccess(String(localized: "Saved to Photos"))
-                RatingPrompt.exportSucceeded(in: self.view.window?.windowScene)
-                ExportEvents.projectExported(self.viewModel.projectID)
-            } catch PhotoLibrarySaver.SaveError.notAuthorized {
-                self?.showAlert(String(localized: "No Photos Access"), String(localized: "Enable photo library access in Settings to save your collage."))
-            } catch {
-                Haptics.error()
-                self?.showAlert(String(localized: "Save Failed"), String(localized: "The collage could not be saved to Photos."))
-            }
-        }
-    }
+    private struct RenderFailed: Error {}
 
     // MARK: - Helpers
-
-    private func presentSpinner() -> UIAlertController {
-        let alert = UIAlertController(title: nil, message: String(localized: "Exporting…"), preferredStyle: .alert)
-        let indicator = UIActivityIndicatorView(style: .medium)
-        indicator.translatesAutoresizingMaskIntoConstraints = false
-        indicator.startAnimating()
-        alert.view.addSubview(indicator)
-        NSLayoutConstraint.activate([
-            indicator.centerXAnchor.constraint(equalTo: alert.view.centerXAnchor),
-            indicator.bottomAnchor.constraint(equalTo: alert.view.bottomAnchor, constant: -20),
-        ])
-        present(alert, animated: true)
-        return alert
-    }
 
     private func showAlert(_ title: String, _ message: String) {
         let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
