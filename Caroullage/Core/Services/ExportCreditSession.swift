@@ -51,4 +51,18 @@ public final class ExportCreditSession {
     public func cancelled() {
         failed()
     }
+
+    /// Runs the step that puts the file in the user's hands — the Photos save,
+    /// writing the file the share sheet offers — and settles the credit on its
+    /// outcome: kept when it completes, given back when it throws. A rendered
+    /// file the user never receives is not an export they paid for.
+    public func deliver(_ handOver: () async throws -> Void) async throws {
+        do {
+            try await handOver()
+            succeeded()
+        } catch {
+            failed()
+            throw error
+        }
+    }
 }
