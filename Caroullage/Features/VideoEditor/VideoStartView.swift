@@ -133,7 +133,8 @@ struct VideoStartView: View {
         }
         .buttonStyle(PressableCardStyle())
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(Text("\(template.name), \(template.summary), \(clipCount(template))"))
+        // Every part is already localized; the list itself is not copy.
+        .accessibilityLabel(Text(verbatim: "\(template.name), \(template.summary), \(clipCount(template))"))
         .accessibilityHint(Text("Opens the template with empty slots for your clips"))
         .accessibilityIdentifier("videoTemplate-\(template.id)")
     }
