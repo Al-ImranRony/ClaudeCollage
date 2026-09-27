@@ -39,11 +39,11 @@ public enum VideoTemplateCatalog {
                 // A Didone headline sitting a little left of centre on the seam…
                 TextOverlay(
                     text: String(localized: "COLLAGE"),
-                    fontName: "Didot", fontSize: 118, colorHex: "#FFFFFF",
+                    fontName: "Didot", fontSize: 104, colorHex: "#FFFFFF",
                     alignment: .center, letterSpacing: 2, lineHeight: 1, opacity: 0.94,
                     style: TextStyle(kind: .shadow, colorHex: "#000000", width: 5),
                     animation: .fade, startTime: 0, endTime: 2.6,
-                    frame: CGRect(x: 0.06, y: 0.405, width: 0.76, height: 0.085)),
+                    frame: CGRect(x: 0.07, y: 0.422, width: 0.75, height: 0.08)),
                 // …with a thin italic line tucked under it, pushed right.
                 TextOverlay(
                     text: String(localized: "of videos & photos"),
@@ -61,11 +61,11 @@ public enum VideoTemplateCatalog {
         func lyric(_ text: String, _ start: Double, _ end: Double, y: Double, lines: Int) -> TextOverlay {
             TextOverlay(
                 text: text,
-                fontName: "DINCondensed-Bold", fontSize: 104, colorHex: "#F3E7CF",
+                fontName: "DINCondensed-Bold", fontSize: 104, colorHex: "#FCF8E0",
                 alignment: .leading, letterSpacing: 1, lineHeight: 0.9,
                 style: TextStyle(kind: .shadow, colorHex: "#000000", width: 7),
                 animation: .words, startTime: start, endTime: end,
-                frame: CGRect(x: 0.12, y: y, width: 0.52, height: 0.058 * Double(lines) + 0.02))
+                frame: CGRect(x: 0.155, y: y, width: 0.52, height: 0.058 * Double(lines) + 0.02))
         }
         return VideoTemplate(
             id: "lyric-stack",
@@ -75,10 +75,10 @@ public enum VideoTemplateCatalog {
             layout: .grid(.threeRows),
             textOverlays: [
                 // Every phrase hangs off the first seam, left of centre.
-                lyric(String(localized: "OH"), 0, 1.3, y: 0.262, lines: 1),
-                lyric(String(localized: "HERE\nWE GO"), 1.8, 3.3, y: 0.2, lines: 2),
-                lyric(String(localized: "AGAIN"), 3.3, 4.8, y: 0.262, lines: 1),
-                lyric(String(localized: "WORD\nBY\nWORD"), 4.8, 7, y: 0.19, lines: 3),
+                lyric(String(localized: "OH"), 0, 1.3, y: 0.266, lines: 1),
+                lyric(String(localized: "HERE\nWE GO"), 1.8, 3.3, y: 0.215, lines: 2),
+                lyric(String(localized: "AGAIN"), 3.3, 4.8, y: 0.266, lines: 1),
+                lyric(String(localized: "WORD\nBY\nWORD"), 4.8, 7, y: 0.212, lines: 3),
             ])
     }
 
@@ -88,11 +88,11 @@ public enum VideoTemplateCatalog {
         func caption(_ text: String, _ start: Double, _ end: Double) -> TextOverlay {
             TextOverlay(
                 text: text,
-                fontName: "Georgia-Bold", fontSize: 72, colorHex: "#1C1B19",
-                alignment: .center, letterSpacing: -1.5, lineHeight: 1,
-                style: TextStyle(kind: .box, colorHex: "#FBF3D6", width: 30),
+                fontName: "BodoniSvtyTwoITCTT-Bold", fontSize: 74, colorHex: "#120F08",
+                alignment: .center, letterSpacing: 0.5, lineHeight: 1,
+                style: TextStyle(kind: .box, colorHex: "#FCF8D2", width: 30),
                 animation: .wordFade, startTime: start, endTime: end,
-                frame: CGRect(x: 0.06, y: 0.445, width: 0.88, height: 0.075))
+                frame: CGRect(x: 0.04, y: 0.439, width: 0.92, height: 0.08))
         }
         return VideoTemplate(
             id: "caption-stack",
@@ -138,24 +138,24 @@ public enum VideoTemplateCatalog {
                 // A handwritten aside by the narrow panel…
                 TextOverlay(
                     text: String(localized: "Hey !"),
-                    fontName: "Noteworthy-Light", fontSize: 46, colorHex: "#FFFFFF",
-                    alignment: .center, letterSpacing: 2, lineHeight: 1,
+                    fontName: "Noteworthy-Light", fontSize: 64, colorHex: "#FFFFFF",
+                    alignment: .center, letterSpacing: 6, lineHeight: 1,
                     style: TextStyle(kind: .shadow, colorHex: "#000000", width: 4),
-                    frame: CGRect(x: sx(0.54), y: 0.57, width: sx(0.2), height: 0.1)),
+                    frame: CGRect(x: sx(0.5), y: 0.56, width: sx(0.28), height: 0.12)),
                 // …and the place, signed small at the foot of a later panel.
                 TextOverlay(
                     text: String(localized: "Place name"),
-                    fontName: "Noteworthy-Light", fontSize: 40, colorHex: "#FFFFFF",
-                    alignment: .trailing, letterSpacing: 3, lineHeight: 1,
+                    fontName: "Noteworthy-Light", fontSize: 54, colorHex: "#FFFFFF",
+                    alignment: .trailing, letterSpacing: 5, lineHeight: 1,
                     style: TextStyle(kind: .shadow, colorHex: "#000000", width: 4),
-                    frame: CGRect(x: sx(1.56), y: 0.8, width: sx(0.4), height: 0.09)),
+                    frame: CGRect(x: sx(1.3), y: 0.8, width: sx(0.6), height: 0.11)),
             ],
             stickerOverlays: [
                 // The doodled heart above the aside. `sizeNorm` is a fraction of
                 // the STRIP's width, so it reads ~5% of the frame.
                 StickerOverlay(
                     stickerID: "basic.heart", symbolName: "heart", colorHex: "#FFFFFF",
-                    center: CGPoint(x: sx(0.63), y: 0.2), sizeNorm: 0.02),
+                    center: CGPoint(x: sx(0.64), y: 0.2), sizeNorm: 0.016),
             ])
     }
 }

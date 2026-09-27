@@ -712,7 +712,10 @@ final class AppCoordinator {
     /// 4:5 two-up directly, with no way to reach 9:16).
     private func startVideoCollage() {
         let start = VideoStartViewController(templates: VideoTemplateCatalog.all)
-        start.onPickTemplate = { [weak self] template in self?.openVideoTemplate(template) }
+        start.onPickTemplate = { [weak self] template in
+            Analytics.track(.templateOpened(id: template.id, source: "video-start"))
+            self?.openVideoTemplate(template)
+        }
         start.onPickBlank = { [weak self] ratio in self?.startBlankVideo(aspectRatio: ratio) }
         tabBarController.present(start, animated: true)
     }
@@ -734,7 +737,6 @@ final class AppCoordinator {
     /// Opens a video template: its canvas, layout, camera and captions, every
     /// slot empty for the user's clips.
     private func openVideoTemplate(_ template: VideoTemplate) {
-        Analytics.track(.templateOpened(id: template.id, source: "video-start"))
         let viewModel = VideoEditorViewModel(template: template)
         if ScreenshotStaging.isActive { ScreenshotStaging.seed(viewModel) }
         attachVideoAutosave(to: viewModel)
@@ -833,6 +835,12 @@ final class AppCoordinator {
     /// Opens the video editor preset to a Home showcase's layout, cells empty —
     /// the moving equivalent of `openTemplate`.
     private func openVideoShowcase(_ showcase: SampleContentManifest.VideoShowcase) {
+        // A template's preview opens the template itself — captions, camera
+        // and all — not just its grid.
+        if let template = showcase.videoTemplate {
+            openVideoTemplate(template)
+            return
+        }
         // The manifest carries the layout as a `GridTemplate` raw value. An
         // unknown one means the manifest and the enum have drifted; do nothing
         // rather than open a layout the loop was not composed in.

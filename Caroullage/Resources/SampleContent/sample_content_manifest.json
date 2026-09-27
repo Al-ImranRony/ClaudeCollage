@@ -77,6 +77,10 @@
     "carousel-gridpreview-family"
   ],
   "videoShowcases": [
+    { "id": "tpl-caption-stack", "template": "caption-stack", "loop": "sample_loop_tpl_caption_stack", "poster": "sample_loop_tpl_caption_stack_poster", "title": "Caption Stack", "layout": "threeRows" },
+    { "id": "tpl-lyric-stack", "template": "lyric-stack", "loop": "sample_loop_tpl_lyric_stack", "poster": "sample_loop_tpl_lyric_stack_poster", "title": "Lyric Stack", "layout": "threeRows" },
+    { "id": "tpl-title-grid", "template": "title-grid", "loop": "sample_loop_tpl_title_grid", "poster": "sample_loop_tpl_title_grid_poster", "title": "Title Grid", "layout": "fourSquare" },
+    { "id": "tpl-travel-filmstrip", "template": "travel-filmstrip", "loop": "sample_loop_tpl_travel_filmstrip", "poster": "sample_loop_tpl_travel_filmstrip_poster", "title": "Travel Filmstrip", "layout": "threeColumns" },
     { "id": "duo-motion",  "loop": "sample_loop_duo",  "poster": "sample_loop_duo_poster",  "title": "Duo Motion",  "layout": "twoUpVertical" },
     { "id": "quad-motion", "loop": "sample_loop_quad", "poster": "sample_loop_quad_poster", "title": "Quad Motion", "layout": "fourSquare" },
     { "id": "solo-motion", "loop": "sample_loop_solo", "poster": "sample_loop_solo_poster", "title": "Spotlight",   "layout": "oneCell" }

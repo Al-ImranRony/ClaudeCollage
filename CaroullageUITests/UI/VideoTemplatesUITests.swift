@@ -105,6 +105,31 @@ final class VideoTemplatesUITests: XCTestCase {
         attach("video-motion-panel", app)
     }
 
+    /// Home's Video Collages row leads with the templates' own previews, and a
+    /// card opens its template — captions, layout and all — not a bare grid.
+    @MainActor
+    func testHomeVideoRowLeadsWithTheTemplates() {
+        let app = XCUIApplication.underTest()
+        app.launch()
+        let strip = app.collectionViews["videoShowcaseStrip"]
+        XCTAssertTrue(strip.waitForExistence(timeout: 10))
+        var swipes = 12
+        while swipes > 0, !(strip.isHittable && strip.frame.maxY <= app.frame.maxY - 96) {
+            app.swipeUp()
+            swipes -= 1
+        }
+        let first = strip.cells.firstMatch
+        XCTAssertTrue(first.waitForExistence(timeout: 10))
+        XCTAssertEqual(first.identifier, "showcaseVideo-tpl-caption-stack", "the row leads with a template")
+        attach("home-video-row", app)
+        first.tap()
+
+        XCTAssertTrue(app.navigationBars["Video Collage"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["videoCell-2"].exists, "Caption Stack's three rows")
+        XCTAssertFalse(app.buttons["videoCell-3"].exists)
+        XCTAssertTrue(app.buttons["videoAddClipsButton"].exists, "a fresh template offers Add clips")
+    }
+
     /// Visual QA: each template filled with the sample loops, a moment in.
     @MainActor
     func testCaptureEveryTemplateFilled() {

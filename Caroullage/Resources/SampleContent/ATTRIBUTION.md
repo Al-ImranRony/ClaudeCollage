@@ -59,3 +59,14 @@ trimmed to 2.5 seconds and re-encoded muted. The posters
 | clip 5 — Father And Daughter Dancing In The Living Room | Annushka Ahuja | https://www.pexels.com/video/father-and-daughter-dancing-in-the-living-room-8052007/ | sample_loop_quad (bottom-left pane) |
 
 All: Pexels License.
+
+## Video template loops (2026-09-27)
+
+The four `sample_loop_tpl_*.mp4` loops and their `_poster.jpg` stills preview the
+video templates on Home. They contain no video footage: each is a render of
+`VideoTemplatePreviewRenderer` — the template's own layout, captions and camera move —
+over photographs already credited above (`sample_travel_*`, `sample_friends_*`,
+`sample_portrait_*`, `sample_seasonal_*`, `sample_food_02`), baked by
+`CaroullageTests/Integration/VideoTemplateLoopBakeTests.swift`. Re-bake them whenever a
+template or the renderer changes.
+

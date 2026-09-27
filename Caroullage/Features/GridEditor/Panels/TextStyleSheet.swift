@@ -35,6 +35,7 @@ struct TextStyleSheet: View {
         ("Didot", "Didot"),
         ("Didot Italic", "Didot-Italic"),
         ("Bodoni", "BodoniSvtyTwoITCTT-Book"),
+        ("Bodoni Bold", "BodoniSvtyTwoITCTT-Bold"),
         ("Georgia Bold", "Georgia-Bold"),
         ("Condensed", "DINCondensed-Bold"),
         ("Heavy", "AvenirNextCondensed-Heavy"),

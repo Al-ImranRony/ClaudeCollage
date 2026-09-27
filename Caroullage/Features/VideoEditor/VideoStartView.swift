@@ -237,13 +237,14 @@ enum VideoTemplateSamplePhotos {
                              "sample_seasonal_02", "sample_travel_03"],
     ]
 
-    static func photos(for template: VideoTemplate) -> [CGImage] {
-        if let cached = cache[template.id] { return cached }
+    static func photos(for template: VideoTemplate, maxSide: CGFloat = 480) -> [CGImage] {
+        let key = "\(template.id)@\(Int(maxSide))"
+        if let cached = cache[key] { return cached }
         let images = (names[template.id] ?? []).compactMap { name -> CGImage? in
             guard let image = SampleContentCatalog.shared.image(named: name)?.cgImage else { return nil }
-            return downsample(image, maxSide: 480)
+            return downsample(image, maxSide: maxSide)
         }
-        cache[template.id] = images
+        cache[key] = images
         return images
     }
 
