@@ -34,9 +34,9 @@
 //  a panning collage is normalized against the strip and rides along with its
 //  panel, exactly as the export draws it, and a tap hit-tests through the offset.
 //
-//  Captions are animated (`TextAnimationMath`) from the same preview time. A
-//  display link drives that time while the player runs — the VC's 10 Hz
-//  observer is fine for in/out points, too coarse for motion.
+//  Captions are animated (`TextAnimationMath`) from the same preview time while
+//  the player runs (`animatesCaptions`). A display link drives that time — the
+//  VC's 10 Hz observer is fine for in/out points, too coarse for motion.
 //
 
 import AVFoundation
@@ -79,11 +79,14 @@ final class VideoCanvasView: UIView {
     var compositionDuration: Double = 0 {
         didSet { if compositionDuration != oldValue { refreshTimedState() } }
     }
-    /// A caption that should show its finished (rest) state rather than its
-    /// animation — the VC sets the selected caption while playback is paused,
-    /// so the thing being edited is never mid-reveal or invisible.
-    var restingTextID: UUID? {
-        didSet { if restingTextID != oldValue { refreshTimedState() } }
+    /// Whether captions play their animation. The VC turns it on only while
+    /// the player runs: a paused preview shows every caption on screen in its
+    /// finished state, so a freshly opened template — paused at 0:00, where a
+    /// fade or a word reveal has not begun — never looks captionless, and the
+    /// caption being edited is never mid-reveal. Scrubbing still shows WHICH
+    /// captions are on screen at each moment; only the motion waits for Play.
+    var animatesCaptions = false {
+        didSet { if animatesCaptions != oldValue { refreshTimedState() } }
     }
     private var displayLink: CADisplayLink?
 
@@ -274,8 +277,8 @@ final class VideoCanvasView: UIView {
             let visible = overlay.isVisible(at: previewTime)
             view.isHidden = !visible
             guard visible else { continue }
-            view.applyAnimation(overlay.id == restingTextID
-                ? nil : TextAnimationMath.frame(for: overlay, at: previewTime))
+            view.applyAnimation(animatesCaptions
+                ? TextAnimationMath.frame(for: overlay, at: previewTime) : nil)
         }
         layoutStrip()
     }

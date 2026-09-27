@@ -55,8 +55,9 @@ a normalized offset, and per-character alpha ranges. It is the ONLY place animat
 - **Preview** — `TextOverlayView` applies the same frame (content-view transform + alpha + attributed
   per-range alpha). The VC drives it from a display link while playing (10 Hz is too coarse for motion)
   and from the playhead when paused.
-- A **selected** caption on a **paused** player shows its rest state, so the thing being edited is
-  never invisible; playback always shows the motion.
+- A **paused** preview shows every on-screen caption in its rest state; captions move only while
+  playing. (First built as "only the selected caption rests" — but a template opens paused at 0:00,
+  where a fade or a word reveal has not begun, so Title Grid opened looking title-less.)
 
 Timing rules: entrance runs from `startTime ?? 0`; exit (fade) only when `endTime` is set. Word
 reveals spread across ≈60 % of the window, clamped to 0.12–0.45 s per word.
@@ -77,10 +78,10 @@ the overlay layer per frame translated by the offset.
 
 | id | name | canvas | layout | text |
 |----|------|--------|--------|------|
-| `travel-filmstrip` | Travel Filmstrip | 16:9, pan ×2.5 | 5 panels, widths .28/.12/.22/.18/.20 of the strip | Bradley Hand "Hey !" + heart sticker on panel 2, place name on panel 4 |
-| `title-grid` | Title Grid | 9:16 | 2×2 | Didot `COLLAGE` 110 pt + Didot Italic subtitle, `fade`, 0–2.4 s |
-| `lyric-stack` | Lyric Stack | 9:16 | 3 rows | DIN Condensed Bold cream caps, `words`, four phrases in sequence (placeholder lyrics — never real song lyrics) |
-| `caption-stack` | Caption Stack | 9:16 | 3 rows | Georgia Bold on a cream `box`, `wordFade`, two captions |
+| `travel-filmstrip` | Travel Filmstrip | 16:9, pan ×2.5 | 5 panels, widths .62/.26/.58/.46/.58 frames | Noteworthy "Hey !" 64 pt + outline heart by the narrow panel, place name 54 pt on panel 4 |
+| `title-grid` | Title Grid | 9:16 | 2×2 | Didot `COLLAGE` 104 pt + Didot Italic subtitle offset right, `fade`, 0–2.6 s |
+| `lyric-stack` | Lyric Stack | 9:16 | 3 rows | DIN Condensed Bold `#FCF8E0` caps at x 0.155, `words`, four phrases in sequence (placeholder lyrics — never real song lyrics) |
+| `caption-stack` | Caption Stack | 9:16 | 3 rows, 4 px hairlines | Bodoni 72 Bold `#120F08` on a `#FCF8D2` `box`, `wordFade`, two captions |
 
 All borders 0 (the references are seamless); cells loop.
 
@@ -101,3 +102,23 @@ All borders 0 (the references are seamless); cells loop.
 
 Per-word *scale* pops (would need glyph-by-glyph drawing), timed stickers, sticker animation, a pan
 speed control independent of the clip length, changing a project's aspect inside the editor.
+
+## 5. Verification
+
+Typography and geometry were measured on the recordings at native resolution (video rect located by
+pixel analysis, seams by row/column gradients, colours sampled) and compared side by side with frames
+of the baked loops. `VideoTemplateCompositionTests` proves the pan and the animated captions in real
+exported files (pixel read-back at chosen times). `VideoTemplatesUITests.testCaptureEveryTemplateFilled`
+captures every template filled with the sample loops — run it on an iOS 26.x simulator (27.0 cannot
+display an `AVVideoComposition`).
+
+Home's loops are rendered, not filmed: `VideoTemplateLoopBakeTests` (skipped unless
+`TEST_RUNNER_CAROULLAGE_BAKE_DIR` is set) writes `sample_loop_tpl_*.mp4` + posters from
+`VideoTemplatePreviewRenderer`. Re-bake after changing a template.
+
+## 6. Follow-ups
+
+- Pan speed follows the composition length (the longest clip). The reference glides ~0.56 frames/s;
+  a clip-independent speed control would let a long clip keep that pace.
+- Personal (subject-lift) stickers in the video editor — the filmstrip reference uses photo cut-outs.
+- Per-word scale ("pop") and timed stickers.

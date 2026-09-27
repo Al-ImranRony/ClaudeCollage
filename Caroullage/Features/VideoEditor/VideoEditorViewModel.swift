@@ -197,6 +197,16 @@ public final class VideoEditorViewModel {
         record()
     }
 
+    // MARK: - Camera glide
+
+    /// How fast a panning collage glides. One undo step; a no-op without a pan.
+    public func setGlide(_ glide: CanvasPan.Glide) {
+        guard var current = pan, current.glide != glide else { return }
+        current.speed = glide.speed
+        pan = current
+        record()
+    }
+
     // MARK: - Per-cell content
 
     public func setVideo(assetID: UUID, asset: AVAsset, forCellAt index: Int) {

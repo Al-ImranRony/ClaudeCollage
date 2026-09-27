@@ -845,9 +845,11 @@ extension VideoComposer {
             return base.concatenating(CGAffineTransform(translationX: -camera.x, y: -camera.y))
         }
 
-        let boundaries = Set([0, windowStart, windowEnd, totalSeconds].compactMap { $0 }
-            .map { min(max(0, $0), totalSeconds) })
-            .sorted()
+        // A fixed-speed glide reverses along the way; each reversal is a
+        // keyframe too, or the ramp would cut the corner.
+        let keyTimes = [0, windowStart, windowEnd, totalSeconds].compactMap { $0 }
+            + pan.turningPoints(duration: totalSeconds)
+        let boundaries = Set(keyTimes.map { min(max(0, $0), totalSeconds) }).sorted()
         layer.setTransform(placement(at: 0), at: .zero)
         for (from, to) in zip(boundaries, boundaries.dropFirst()) where to - from > 1e-4 {
             // `placement` holds the start state up to AND AT the window's start, so

@@ -507,7 +507,7 @@ final class VideoEditorViewController: UIViewController {
         // is what makes `refreshCanvas` pick up the freshly-set `selectedTextID`
         // and show the new overlay's on-canvas selection chrome immediately.
         viewModel.selectCell(at: nil)
-        refreshRestingCaption()
+        refreshCaptionMotion()
         Haptics.selectionChanged()
         toolRail.setContext(EditorRailContext(
             chipTitle: String(localized: "Text"), chipSystemImage: "textformat", tools: Self.textTools))
@@ -517,7 +517,7 @@ final class VideoEditorViewController: UIViewController {
         selectedTextID = nil
         activeContextKind = nil
         viewModel.selectCell(at: nil)
-        refreshRestingCaption()
+        refreshCaptionMotion()
         clearContext()
     }
 
@@ -597,7 +597,27 @@ final class VideoEditorViewController: UIViewController {
     private func makeFramePanel() -> UIView {
         let maxWidth = maxBorderWidth
         borderSlider.value = maxWidth > 0 ? Float(viewModel.borderWidth / maxWidth) : 0
-        return VideoFramePanelView(borderSlider: borderSlider)
+        return VideoFramePanelView(borderSlider: borderSlider, glideControl: makeGlideControl())
+    }
+
+    /// Whole Video · Slow · Medium · Fast — only for a panning collage. The
+    /// preview replays from the start so the new pace is seen at once.
+    private func makeGlideControl() -> UISegmentedControl? {
+        guard let pan = viewModel.pan, pan.extent > 1 else { return nil }
+        let glides = CanvasPan.Glide.allCases
+        let control = UISegmentedControl(items: glides.map(\.displayName))
+        control.selectedSegmentIndex = glides.firstIndex(of: pan.glide) ?? 0
+        control.accessibilityIdentifier = "videoGlideControl"
+        control.addAction(UIAction { [weak self, weak control] _ in
+            guard let self, let control, glides.indices.contains(control.selectedSegmentIndex) else { return }
+            Haptics.selectionChanged()
+            self.viewModel.setGlide(glides[control.selectedSegmentIndex])
+            if self.viewModel.hasContent {
+                self.scrub(to: 0)
+                self.setPlaying(true)
+            }
+        }, for: .valueChanged)
+        return control
     }
 
     @objc private func borderChanged() {
@@ -892,11 +912,10 @@ final class VideoEditorViewController: UIViewController {
         textAnimationPresetRow?.setSelected(viewModel.textOverlay(id: id)?.animation)
     }
 
-    /// A selected caption on a paused player shows its finished state, so the
-    /// thing being edited is never mid-reveal or faded out; playback always
-    /// shows the motion. Called wherever either input changes.
-    private func refreshRestingCaption() {
-        canvasView.restingTextID = isPlayingIntent ? nil : selectedTextID
+    /// Captions move only while the preview plays; paused, each caption on
+    /// screen shows its finished state — see `VideoCanvasView.animatesCaptions`.
+    private func refreshCaptionMotion() {
+        canvasView.animatesCaptions = isPlayingIntent
     }
 
     private func bindViewModel() {
@@ -1091,7 +1110,7 @@ final class VideoEditorViewController: UIViewController {
         }
         guard isPlayingIntent != playing else { return }
         isPlayingIntent = playing
-        refreshRestingCaption()
+        refreshCaptionMotion()
         refreshTimeline()
     }
 
@@ -1188,7 +1207,7 @@ final class VideoEditorViewController: UIViewController {
             filled: (0 ..< viewModel.cellCount).map { viewModel.cells[$0].videoID != nil },
             selectedIndex: highlightIndex,
             pan: viewModel.pan)
-        refreshRestingCaption()
+        refreshCaptionMotion()
         canvasView.updateTextOverlays(viewModel.textOverlays, selected: selectedTextID)
         canvasView.updateStickerOverlays(viewModel.stickerOverlays, selected: selectedStickerID)
         undoItem.isEnabled = viewModel.canUndo

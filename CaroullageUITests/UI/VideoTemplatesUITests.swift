@@ -130,6 +130,25 @@ final class VideoTemplatesUITests: XCTestCase {
         XCTAssertTrue(app.buttons["videoAddClipsButton"].exists, "a fresh template offers Add clips")
     }
 
+    /// The filmstrip's Frame panel offers the glide speed; a still layout's does not.
+    @MainActor
+    func testThePanningTemplateOffersAGlideSpeed() {
+        let app = XCUIApplication.underTest()
+        app.launch()
+        openStartSheet(app)
+        let filmstrip = app.buttons["videoTemplate-travel-filmstrip"]
+        if !filmstrip.isHittable { app.swipeUp() }
+        filmstrip.tap()
+        XCTAssertTrue(app.navigationBars["Video Collage"].waitForExistence(timeout: 8))
+        app.buttons["videoFrameTool"].tap()
+        let glide = app.segmentedControls["videoGlideControl"]
+        XCTAssertTrue(glide.waitForExistence(timeout: 5), "a panning collage can set its glide")
+        XCTAssertTrue(glide.buttons["Fast"].isSelected, "the filmstrip glides at the reference's pace")
+        glide.buttons["Once"].tap()
+        XCTAssertTrue(glide.buttons["Once"].isSelected)
+        attach("video-glide-control", app)
+    }
+
     /// Visual QA: each template filled with the sample loops, a moment in.
     @MainActor
     func testCaptureEveryTemplateFilled() {

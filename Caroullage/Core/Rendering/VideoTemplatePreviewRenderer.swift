@@ -20,6 +20,8 @@ public enum VideoTemplatePreviewRenderer {
     /// caption and hold a beat after the last, and for a pan to travel at a
     /// readable speed.
     public static func loopDuration(for template: VideoTemplate) -> Double {
+        // A sweeping glide loops seamlessly over one there-and-back.
+        if let leg = template.pan?.legDuration { return 2 * leg }
         if (template.pan?.extent ?? 1) > 1 { return 7 }
         return max(4, template.captionDuration + 0.8)
     }

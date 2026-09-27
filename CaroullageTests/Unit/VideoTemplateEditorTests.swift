@@ -63,6 +63,7 @@ final class VideoTemplateEditorTests: XCTestCase {
 
     func testOnAPanningStripANewOverlayLandsWhereTheCameraIs() {
         let viewModel = VideoEditorViewModel(template: VideoTemplateCatalog.travelFilmstrip)  // 2.5 frames
+        viewModel.setGlide(.wholeVideo)   // one pass, so t = duration is the strip's end
         let rect = CGRect(x: 0, y: 0.4, width: 1, height: 0.1)   // the whole visible frame
 
         let atStart = viewModel.layoutRect(forVisibleRect: rect, at: 0, duration: 10)
@@ -107,7 +108,7 @@ final class VideoTemplateEditorTests: XCTestCase {
                        "the same spot on screen is now over the second panel")
     }
 
-    func testCaptionsAnimateOnTheCanvasButRestWhileBeingEdited() throws {
+    func testCaptionsAnimateWhilePlayingAndRestWhilePaused() throws {
         let canvas = makeCanvas(pan: nil, frames: [CGRect(x: 0, y: 0, width: 1080, height: 1920)],
                                 canvas: CGSize(width: 1080, height: 1920))
         let caption = TextOverlay(text: "One two three", animation: .words, startTime: 0, endTime: 6,
@@ -115,18 +116,19 @@ final class VideoTemplateEditorTests: XCTestCase {
         canvas.updateTextOverlays([caption])
         canvas.setPreviewTime(0.05)
         let view = try XCTUnwrap(canvas.textOverlayViewsForTesting.first as? TextOverlayView)
-        let revealing = try XCTUnwrap(view.animationFrameForTesting, "mid-reveal on the canvas")
+        XCTAssertNil(view.animationFrameForTesting,
+                     "paused (the default), a caption shows its finished state — never an empty frame")
+
+        canvas.animatesCaptions = true
+        let revealing = try XCTUnwrap(view.animationFrameForTesting, "playing: mid-reveal")
         XCTAssertLessThan(revealing.rangeAlphas.last?.alpha ?? 1, 1)
 
-        canvas.restingTextID = caption.id
-        XCTAssertNil(view.animationFrameForTesting, "the caption being edited shows its finished state")
-
-        canvas.restingTextID = nil
-        XCTAssertNotNil(view.animationFrameForTesting)
+        canvas.animatesCaptions = false
+        XCTAssertNil(view.animationFrameForTesting)
     }
 
-    func testPausingWithACaptionSelectedRestsIt() throws {
-        let viewModel = VideoEditorViewModel(template: VideoTemplateCatalog.captionStack)
+    func testAFreshTemplateOpensPausedWithItsCaptionsAtRest() throws {
+        let viewModel = VideoEditorViewModel(template: VideoTemplateCatalog.titleGrid)
         let editor = VideoEditorViewController(viewModel: viewModel)
         let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 402, height: 874))
         window.rootViewController = editor
@@ -134,13 +136,12 @@ final class VideoTemplateEditorTests: XCTestCase {
         windows.append(window)
         window.layoutIfNeeded()
 
-        let id = try XCTUnwrap(viewModel.textOverlays.first?.id)
-        editor.selectTextOverlayForTesting(id)
         let canvas = try XCTUnwrap(editor.view.recursiveSubviews.compactMap { $0 as? VideoCanvasView }.first)
-        XCTAssertEqual(canvas.restingTextID, id)
-
-        editor.clearSelectionForTesting()
-        XCTAssertNil(canvas.restingTextID)
+        XCTAssertFalse(canvas.animatesCaptions)
+        let titles = canvas.textOverlayViewsForTesting.compactMap { $0 as? TextOverlayView }
+        XCTAssertEqual(titles.count, 2)
+        XCTAssertTrue(titles.allSatisfy { !$0.isHidden && $0.animationFrameForTesting == nil },
+                      "the fading title is fully visible at 0:00 on a paused preview")
     }
 
     // MARK: - Style presets stay readable

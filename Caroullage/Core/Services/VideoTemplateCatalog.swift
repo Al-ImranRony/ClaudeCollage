@@ -133,7 +133,8 @@ public enum VideoTemplateCatalog {
                 templateID: "video.travel-filmstrip",
                 name: String(localized: "Filmstrip"),
                 aspectRatio: "16:9", cells: cells)),
-            pan: CanvasPan(axis: .horizontal, extent: extent),
+            // The reference's brisk pace (~0.56 frames/s) whatever the clips' length.
+            pan: CanvasPan(axis: .horizontal, extent: extent, speed: CanvasPan.Glide.fast.speed),
             textOverlays: [
                 // A handwritten aside by the narrow panel…
                 TextOverlay(

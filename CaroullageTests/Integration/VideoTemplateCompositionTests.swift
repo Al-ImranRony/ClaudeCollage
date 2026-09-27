@@ -53,6 +53,26 @@ final class VideoTemplateCompositionTests: XCTestCase {
         XCTAssertGreaterThan(middleRight.g, 150, "…and green already on the right")
     }
 
+    func testAFixedGlideSweepsThereAndBackInTheFile() async throws {
+        // 2-frame strip at 0.5 frames/s: at the far end at 2 s, home again at 4 s.
+        let red = try await makeSolidVideo(r: 220, g: 30, b: 30, seconds: 4)
+        let green = try await makeSolidVideo(r: 30, g: 200, b: 40, seconds: 4)
+        let cells = [
+            VideoCompositionCell(asset: AVURLAsset(url: red), frame: CGRect(x: 0, y: 0, width: 160, height: 160)),
+            VideoCompositionCell(asset: AVURLAsset(url: green), frame: CGRect(x: 160, y: 0, width: 160, height: 160)),
+        ]
+        let bundle = try await VideoComposer().buildComposition(
+            cells: cells, canvasSize: CGSize(width: 160, height: 160),
+            pan: CanvasPan(axis: .horizontal, extent: 2, speed: 0.5))
+        let out = tempURL()
+        try await VideoComposer().export(bundle: bundle, to: out)
+
+        let farEnd = try await pixel(out, x: 80, y: 80, at: 2.0)
+        XCTAssertGreaterThan(farEnd.g, 150, "the far panel at the turn")
+        let backHome = try await pixel(out, x: 80, y: 80, at: 3.9)
+        XCTAssertGreaterThan(backHome.r, 150, "and back on the first panel — a ramp that cut the corner would still show green")
+    }
+
     func testCaptionsRideThePan() async throws {
         let dark = try await makeSolidVideo(r: 10, g: 10, b: 10, seconds: 2)
         let cell = VideoCompositionCell(asset: AVURLAsset(url: dark),

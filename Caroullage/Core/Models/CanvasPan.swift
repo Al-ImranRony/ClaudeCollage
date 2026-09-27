@@ -28,14 +28,56 @@ public struct CanvasPan: Codable, Equatable, Sendable {
 
     public static let extentRange: ClosedRange<Double> = 1 ... 4
 
+    /// How fast the camera glides.
+    public enum Glide: String, CaseIterable, Sendable {
+        /// One pass, start to end, over the whole video — so the speed follows
+        /// the clips' length. The default, and every pan saved before glides.
+        case wholeVideo
+        case slow, medium, fast
+
+        /// Frames per second, or nil for `wholeVideo`. `fast` is the pace of the
+        /// travel reference (~0.56 frames/s).
+        public var speed: Double? {
+            switch self {
+            case .wholeVideo: nil
+            case .slow: 0.2
+            case .medium: 0.35
+            case .fast: 0.55
+            }
+        }
+
+        public var displayName: String {
+            switch self {
+            // "Once": one pass across the video. Short enough to sit in a
+            // four-segment control without truncating.
+            case .wholeVideo: String(localized: "Once")
+            case .slow: String(localized: "Slow")
+            case .medium: String(localized: "Medium")
+            case .fast: String(localized: "Fast")
+            }
+        }
+    }
+
     public var axis: Axis
     /// How many frames long the strip is. 1 means no movement; clamped to
     /// `extentRange` so a corrupt value cannot build a 10,000-pixel canvas.
     public var extent: Double
+    /// Frames per second when gliding at a fixed pace, sweeping back and forth
+    /// along the strip; nil = one pass over the whole video. Clamped positive.
+    public var speed: Double?
 
-    public init(axis: Axis = .horizontal, extent: Double = 2.5) {
+    public init(axis: Axis = .horizontal, extent: Double = 2.5, speed: Double? = nil) {
         self.axis = axis
         self.extent = Self.clampExtent(extent)
+        self.speed = Self.clampSpeed(speed)
+    }
+
+    /// The preset this pan's speed corresponds to (a hand-edited speed reads as
+    /// the nearest preset).
+    public var glide: Glide {
+        guard let speed else { return .wholeVideo }
+        return Glide.allCases.filter { $0.speed != nil }
+            .min { abs(($0.speed ?? 0) - speed) < abs(($1.speed ?? 0) - speed) } ?? .wholeVideo
     }
 
     /// The strip's size in the same units as `canvas` (the frame).
@@ -61,8 +103,33 @@ public struct CanvasPan: Codable, Equatable, Sendable {
 
     /// The camera offset at a composition time, for a composition `duration`
     /// seconds long. A zero-length composition holds the start.
+    ///
+    /// With a fixed `speed` the camera sweeps start → end → start at that pace
+    /// for as long as the video runs, so a long clip keeps the glide lively
+    /// instead of crawling one pass across it.
     public func cameraOffset(at time: Double, duration: Double, canvas: CGSize) -> CGPoint {
-        cameraOffset(progress: duration > 0 ? time / duration : 0, canvas: canvas)
+        cameraOffset(progress: progress(at: time, duration: duration), canvas: canvas)
+    }
+
+    /// 0…1 along the strip at `time`.
+    public func progress(at time: Double, duration: Double) -> Double {
+        guard let leg = legDuration else { return duration > 0 ? time / duration : 0 }
+        let phase = max(0, time).truncatingRemainder(dividingBy: 2 * leg)
+        return phase <= leg ? phase / leg : 2 - phase / leg
+    }
+
+    /// Seconds for one start-to-end pass at `speed`; nil when gliding over the
+    /// whole video or when there is nothing to travel.
+    public var legDuration: Double? {
+        guard let speed, speed > 0, extent > 1 else { return nil }
+        return (extent - 1) / speed
+    }
+
+    /// Where the camera reverses within `[0, duration]` — the points a linear
+    /// ramp between keyframes has to be split at.
+    public func turningPoints(duration: Double) -> [Double] {
+        guard let leg = legDuration, duration > 0 else { return [] }
+        return stride(from: leg, to: duration, by: leg).map { $0 }
     }
 
     private static func clampExtent(_ value: Double) -> Double {
@@ -70,12 +137,18 @@ public struct CanvasPan: Codable, Equatable, Sendable {
         return min(extentRange.upperBound, max(extentRange.lowerBound, value))
     }
 
-    private enum CodingKeys: String, CodingKey { case axis, extent }
+    private static func clampSpeed(_ value: Double?) -> Double? {
+        guard let value, value.isFinite, value > 0 else { return nil }
+        return min(4, value)
+    }
+
+    private enum CodingKeys: String, CodingKey { case axis, extent, speed }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         let raw = try c.decodeIfPresent(String.self, forKey: .axis)
         self.axis = raw.flatMap(Axis.init(rawValue:)) ?? .horizontal
         self.extent = Self.clampExtent(try c.decodeIfPresent(Double.self, forKey: .extent) ?? 2.5)
+        self.speed = Self.clampSpeed(try c.decodeIfPresent(Double.self, forKey: .speed))
     }
 }

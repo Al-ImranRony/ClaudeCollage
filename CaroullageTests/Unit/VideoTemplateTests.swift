@@ -53,6 +53,39 @@ final class VideoTemplateTests: XCTestCase {
                        "clamped past the end")
     }
 
+    func testAFixedGlideSweepsBackAndForthAtItsPace() {
+        let pan = CanvasPan(axis: .horizontal, extent: 2, speed: 0.5)   // 1 frame to travel → 2 s a leg
+        let frame = CGSize(width: 100, height: 50)
+        XCTAssertEqual(pan.legDuration, 2)
+        XCTAssertEqual(pan.cameraOffset(at: 1, duration: 30, canvas: frame).x, 50, accuracy: 1e-9)
+        XCTAssertEqual(pan.cameraOffset(at: 2, duration: 30, canvas: frame).x, 100, accuracy: 1e-9, "the far end")
+        XCTAssertEqual(pan.cameraOffset(at: 3, duration: 30, canvas: frame).x, 50, accuracy: 1e-9, "on its way back")
+        XCTAssertEqual(pan.cameraOffset(at: 4, duration: 30, canvas: frame).x, 0, accuracy: 1e-9)
+        XCTAssertEqual(pan.turningPoints(duration: 7), [2, 4, 6])
+        XCTAssertEqual(pan.glide, .fast, "0.5 reads as the nearest preset (0.55)")
+    }
+
+    func testWholeVideoGlideIsOnePassAndTheDefault() {
+        let pan = CanvasPan(axis: .horizontal, extent: 3)
+        XCTAssertEqual(pan.glide, .wholeVideo)
+        XCTAssertNil(pan.legDuration)
+        XCTAssertTrue(pan.turningPoints(duration: 30).isEmpty)
+    }
+
+    func testChangingTheGlideIsOneUndoStep() {
+        let viewModel = VideoEditorViewModel(template: VideoTemplateCatalog.travelFilmstrip)
+        XCTAssertEqual(viewModel.pan?.glide, .fast, "the filmstrip glides at the reference's pace")
+        viewModel.setGlide(.wholeVideo)
+        XCTAssertNil(viewModel.pan?.speed)
+        viewModel.undo()
+        XCTAssertEqual(viewModel.pan?.glide, .fast)
+
+        let still = VideoEditorViewModel(canvasSize: CGSize(width: 1080, height: 1920))
+        still.setGlide(.fast)
+        XCTAssertNil(still.pan, "no pan, nothing to glide")
+        XCTAssertFalse(still.canUndo)
+    }
+
     func testPanExtentIsClampedAndDecodesDefensively() throws {
         XCTAssertEqual(CanvasPan(extent: 40).extent, CanvasPan.extentRange.upperBound)
         XCTAssertEqual(CanvasPan(extent: 0.2).extent, 1)
