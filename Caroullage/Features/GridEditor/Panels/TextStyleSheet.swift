@@ -29,6 +29,17 @@ struct TextStyleSheet: View {
         ("Marker", "MarkerFelt-Wide"),
         ("Script", "SnellRoundhand"),
         ("Chalkboard", "ChalkboardSE-Regular"),
+        // Added with the video templates (2026-09-27): the editorial Didone,
+        // condensed poster and handwritten faces short-form edits are set in.
+        // All ship with iOS — `VideoTemplateTests` asserts they resolve.
+        ("Didot", "Didot"),
+        ("Didot Italic", "Didot-Italic"),
+        ("Bodoni", "BodoniSvtyTwoITCTT-Book"),
+        ("Georgia Bold", "Georgia-Bold"),
+        ("Condensed", "DINCondensed-Bold"),
+        ("Heavy", "AvenirNextCondensed-Heavy"),
+        ("Note", "Noteworthy-Light"),
+        ("Hand", "BradleyHandITCTT-Bold"),
     ]
 
     /// Preset colour swatches — neutrals, the brand indigo, and a few

@@ -138,6 +138,21 @@ public final class VideoEditorViewModel {
     /// panning collage — the whole strip the camera travels along.
     public var layoutSize: CGSize { pan?.stripSize(for: canvasSize) ?? canvasSize }
 
+    /// Maps a rect normalized to the VISIBLE frame at `time` into layout space
+    /// (normalized to the strip), so a new caption or sticker lands in view on a
+    /// panning collage rather than stretched across the whole strip. Identity
+    /// when nothing pans.
+    public func layoutRect(forVisibleRect rect: CGRect, at time: Double, duration: Double) -> CGRect {
+        guard let pan, layoutSize.width > 0, layoutSize.height > 0 else { return rect }
+        let camera = pan.cameraOffset(at: time, duration: duration, canvas: canvasSize)
+        let absolute = CGRect(x: rect.minX * canvasSize.width + camera.x,
+                              y: rect.minY * canvasSize.height + camera.y,
+                              width: rect.width * canvasSize.width,
+                              height: rect.height * canvasSize.height)
+        return CGRect(x: absolute.minX / layoutSize.width, y: absolute.minY / layoutSize.height,
+                      width: absolute.width / layoutSize.width, height: absolute.height / layoutSize.height)
+    }
+
     /// Absolute-pixel geometry of every slot, from the shared layout engine, in
     /// `layoutSize` space.
     public func cellFrames() -> [CellFrame] {
@@ -195,6 +210,31 @@ public final class VideoEditorViewModel {
         // instead of leaving a hole; the controls sheet can turn it off.
         cells[index].isLooping = true
         record()
+    }
+
+    /// The slots still waiting for a clip, in layout order.
+    public var emptyCellIndices: [Int] { cells.indices.filter { cells[$0].videoID == nil } }
+
+    /// Fills the empty slots, in layout order, with `assets` in the order given —
+    /// "Add clips" on a fresh template, one picker trip for every slot. One undo
+    /// step for the whole batch. Extra assets (more than there are empty slots)
+    /// are ignored. Returns how many slots were filled.
+    @discardableResult
+    public func fillEmptyCells(with newAssets: [AVAsset]) -> Int {
+        let targets = emptyCellIndices
+        var filled = 0
+        for (index, asset) in zip(targets, newAssets) {
+            let id = UUID()
+            assets[id] = asset
+            cells[index].videoID = id
+            // Same fresh-clip defaults as `setVideo`.
+            cells[index].trim = VideoTrim()
+            cells[index].isLooping = true
+            filled += 1
+        }
+        guard filled > 0 else { return 0 }
+        record()
+        return filled
     }
 
     public func clearVideo(atCellIndex index: Int) {

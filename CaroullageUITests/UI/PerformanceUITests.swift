@@ -41,6 +41,9 @@ final class PerformanceUITests: XCTestCase {
             let video = app.buttons["videoCollageButton"]
             XCTAssertTrue(video.waitForExistence(timeout: 10))
             video.tap()
+            let blank = app.buttons["videoBlank-4:5"]   // the start sheet
+            XCTAssertTrue(blank.waitForExistence(timeout: 10))
+            blank.tap()
             XCTAssertTrue(app.otherElements["videoTimeline"].waitForExistence(timeout: 10))
             app.buttons["videoTimelineChevron"].tap()
             sleep(3)   // three loops decoding and compositing

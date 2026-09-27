@@ -76,6 +76,8 @@ final class AppStoreScreenshotUITests: XCTestCase {
         // 4 — Video collage: the editor with its clips.
         XCTAssertTrue(app.buttons["videoCollageButton"].waitForExistence(timeout: 8))
         app.buttons["videoCollageButton"].tap()
+        XCTAssertTrue(app.buttons["videoBlank-4:5"].waitForExistence(timeout: 8))   // the start sheet
+        app.buttons["videoBlank-4:5"].tap()
         XCTAssertTrue(app.otherElements["videoTimeline"].waitForExistence(timeout: 10))
         sleep(2)   // the player's first frame
         capture(4, "video", of: app)

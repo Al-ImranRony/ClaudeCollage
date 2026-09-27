@@ -17,7 +17,15 @@ import UIKit
 final class TextOverlayView: UIView {
 
     private let label = UILabel()
-    /// `.pill`'s background, painted BEHIND the label. `.highlight` needs no such
+    /// Holds the label and its painted background, so an animation can move,
+    /// scale and fade them as one — while the view itself (its frame, drag
+    /// gesture and selection outline) stays put. The view clips, exactly as the
+    /// export clips a caption to its frame before transforming it.
+    private let contentView = UIView()
+    /// The animated state last applied (`nil` = at rest). Kept so a re-configure
+    /// (a style edit, a layout pass) keeps showing the same instant.
+    private var animationFrame: TextAnimationFrame?
+    /// `.pill`/`.box`'s background, painted BEHIND the label. `.highlight` needs no such
     /// layer — it rides `.backgroundColor` inside the label's attributed string
     /// (see `TextRendering.applyStyle`), so it already matches the export.
     private let backgroundLayer = CALayer()
@@ -75,12 +83,16 @@ final class TextOverlayView: UIView {
         backgroundColor = .clear
         clipsToBounds = true
 
+        contentView.isUserInteractionEnabled = false
+        contentView.backgroundColor = .clear
+        addSubview(contentView)
+
         backgroundLayer.isHidden = true
-        layer.addSublayer(backgroundLayer)
+        contentView.layer.addSublayer(backgroundLayer)
 
         label.numberOfLines = 0
         label.lineBreakMode = .byWordWrapping
-        addSubview(label)
+        contentView.addSubview(label)
 
         selectionLayer.fillColor = UIColor.clear.cgColor
         selectionLayer.strokeColor = Theme.Color.accent.cgColor
@@ -98,9 +110,38 @@ final class TextOverlayView: UIView {
     func configure(with overlay: TextOverlay, fontScale: CGFloat) {
         self.overlay = overlay
         self.fontScale = fontScale
-        label.attributedText = TextRendering.attributedString(for: overlay, fontScale: fontScale)
+        refreshText()
         refreshBackground()
         refreshAccessibility()
+    }
+
+    /// Shows the caption at one instant of its animation (`nil` = at rest). The
+    /// same `TextAnimationFrame` the export draws with, applied the same way:
+    /// the content moves and scales about the frame's centre, fades as one
+    /// group, and word/character reveals fade individual glyphs.
+    func applyAnimation(_ frame: TextAnimationFrame?) {
+        let frame = frame.flatMap { $0.isRest ? nil : $0 }
+        let glyphsChanged = frame?.rangeAlphas != animationFrame?.rangeAlphas
+        animationFrame = frame
+        contentView.alpha = frame.map { min(1, max(0, $0.opacity)) } ?? 1
+        contentView.transform = animationTransform
+        if glyphsChanged { refreshText() }
+    }
+
+    /// Test seam: the animated state currently shown.
+    var animationFrameForTesting: TextAnimationFrame? { animationFrame }
+
+    private var animationTransform: CGAffineTransform {
+        guard let frame = animationFrame else { return .identity }
+        return CGAffineTransform(translationX: frame.offset.dx * bounds.width,
+                                 y: frame.offset.dy * bounds.height)
+            .scaledBy(x: frame.scale, y: frame.scale)
+    }
+
+    private func refreshText() {
+        guard let overlay else { return }
+        label.attributedText = TextRendering.attributedString(
+            for: overlay, fontScale: fontScale, animation: animationFrame)
     }
 
     // MARK: - Accessibility (phase 6.5)
@@ -146,7 +187,11 @@ final class TextOverlayView: UIView {
 
     override func layoutSubviews() {
         super.layoutSubviews()
-        label.frame = bounds
+        // bounds + centre, never `frame`, on a view that may carry a transform.
+        contentView.bounds = CGRect(origin: .zero, size: bounds.size)
+        contentView.center = CGPoint(x: bounds.midX, y: bounds.midY)
+        contentView.transform = animationTransform
+        label.frame = contentView.bounds
         selectionLayer.frame = bounds
         selectionLayer.path = UIBezierPath(
             roundedRect: bounds.insetBy(dx: 1, dy: 1), cornerRadius: 6

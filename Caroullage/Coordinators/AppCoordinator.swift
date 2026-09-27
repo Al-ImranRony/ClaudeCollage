@@ -707,13 +707,35 @@ final class AppCoordinator {
         }
     }
 
-    /// Starts a video collage (Step 04 slice 5b). A 4:5 canvas with a 2-up stacked
-    /// layout is the sensible default for social video; the layout is switchable in
-    /// the editor. Persisted immediately so it appears in the gallery on return,
-    /// then autosaved on every change (slice 5c).
+    /// Starts a video collage: the start sheet offers the video templates and a
+    /// blank canvas at each shape (2026-09-27 — until then Video opened a blank
+    /// 4:5 two-up directly, with no way to reach 9:16).
     private func startVideoCollage() {
-        let canvasSize = CanvasSize.size(forAspectRatio: "4:5")
-        let viewModel = VideoEditorViewModel(canvasSize: canvasSize, layout: .grid(.twoUpVertical))
+        let start = VideoStartViewController(templates: VideoTemplateCatalog.all)
+        start.onPickTemplate = { [weak self] template in self?.openVideoTemplate(template) }
+        start.onPickBlank = { [weak self] ratio in self?.startBlankVideo(aspectRatio: ratio) }
+        tabBarController.present(start, animated: true)
+    }
+
+    /// A blank video collage at `aspectRatio`, with a two-slot layout that suits
+    /// the shape: stacked for tall frames, side by side for square and wide.
+    /// Persisted immediately so it appears in the gallery on return, then
+    /// autosaved on every change (slice 5c).
+    private func startBlankVideo(aspectRatio: String) {
+        let canvasSize = CanvasSize.size(forAspectRatio: aspectRatio)
+        let layout: GridTemplate = canvasSize.height > canvasSize.width ? .twoUpVertical : .twoUpHorizontal
+        let viewModel = VideoEditorViewModel(canvasSize: canvasSize, layout: .grid(layout))
+        if ScreenshotStaging.isActive { ScreenshotStaging.seed(viewModel) }
+        attachVideoAutosave(to: viewModel)
+        store.saveVideo(viewModel)
+        pushVideoEditor(viewModel)
+    }
+
+    /// Opens a video template: its canvas, layout, camera and captions, every
+    /// slot empty for the user's clips.
+    private func openVideoTemplate(_ template: VideoTemplate) {
+        Analytics.track(.templateOpened(id: template.id, source: "video-start"))
+        let viewModel = VideoEditorViewModel(template: template)
         if ScreenshotStaging.isActive { ScreenshotStaging.seed(viewModel) }
         attachVideoAutosave(to: viewModel)
         store.saveVideo(viewModel)
