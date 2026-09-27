@@ -2,15 +2,15 @@
 //  TextAnimationTests.swift
 //  CaroullageTests
 //
-//  The reserved tier-3 animation field (spec §4.1). NOTHING reads it yet — it
-//  exists so that shipping fade / slide / pop / typewriter later is a change to
-//  the two render call sites rather than a document migration.
+//  The tier-3 animation field (spec §4.1) — reserved on 2026-09-05, rendered
+//  since the video templates work (2026-09-27) through `TextAnimationMath`,
+//  whose timing has its own test file.
 //
-//  That makes the decode tests the whole point of this file: the field is only
-//  worth adding early if a project written by a build that USES it still opens
-//  here, and if this build re-saving that project does not destroy the choice.
-//  Hence `animationRaw` is stored as the raw string (the `alignmentRaw`
-//  precedent on this same type) rather than as a decoded enum.
+//  The decode tests stay the heart of this file: a project written by a build
+//  that knows a newer animation must still open here, and this build re-saving
+//  that project must not destroy the choice. Hence `animationRaw` is stored as
+//  the raw string (the `alignmentRaw` precedent on this same type) rather than
+//  as a decoded enum.
 //
 
 import XCTest
@@ -97,12 +97,13 @@ final class TextAnimationTests: XCTestCase {
         XCTAssertEqual(decoded.animation, TextAnimation.none)
     }
 
-    // MARK: - Reserved really does mean nothing reads it
+    // MARK: - Animation enters only through an animation frame
 
-    func testAnimationDoesNotAffectRendering() {
-        // Guards the "reserved" half of the spec: until tier 3 has its own spec,
-        // setting this must change nothing about how the overlay draws. If this
-        // starts failing, someone has wired a render path ahead of that spec.
+    func testAnimationDoesNotAffectTheRestState() {
+        // The typeset, at-rest caption is independent of its animation: the
+        // animation reaches a renderer only as a `TextAnimationFrame`, so a
+        // still export (and every path that passes no frame) draws exactly what
+        // it drew before animation existed.
         var plain = TextOverlay(text: "Hello", fontSize: 64)
         plain.style = TextStyle(kind: .stroke, colorHex: "#FF0000", width: 4)
         var animated = plain

@@ -29,13 +29,17 @@ public struct TextStyle: Codable, Sendable, Equatable {
         case highlight
         /// Coloured outer glow.
         case glow
+        /// A painted label: a rectangle hugging the measured text, with a small
+        /// corner radius and more vertical than horizontal padding — the caption
+        /// "sticker" of short-form video, where `.pill` would read as a button.
+        case box
     }
 
     public var kind: Kind
     /// Shadow, stroke, pill, highlight or glow colour. Ignored by `.plain`.
     public var colorHex: String
-    /// Stroke width, glow radius, shadow blur radius and offset, or pill outward
-    /// inset / corner radius — reference-canvas points. Ignored by `.highlight`
+    /// Stroke width, glow radius, shadow blur radius and offset, or pill/box
+    /// outward inset / corner radius — reference-canvas points. Ignored by `.highlight`
     /// (its background hugs the glyphs with no adjustable inset) and by `.plain`.
     /// Expected to stay non-negative; any setter (e.g. a future slider) should clamp with `max(0, ...)`.
     public var width: Double
@@ -72,6 +76,7 @@ public extension TextStyle.Kind {
         case .pill: String(localized: "Pill")
         case .highlight: String(localized: "Highlight")
         case .glow: String(localized: "Glow")
+        case .box: String(localized: "Label")
         }
     }
 }

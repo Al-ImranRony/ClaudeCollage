@@ -22,6 +22,10 @@ public struct VideoProjectData: Codable, Equatable, Sendable {
     public var borderWidth: Double
     public var textOverlays: [TextOverlay]
     public var stickerOverlays: [StickerOverlay]
+    /// A camera move along a strip longer than the frame (the filmstrip
+    /// templates). `nil` — every project saved before 2026-09-27 — is a still
+    /// frame, exactly as before.
+    public var pan: CanvasPan?
 
     public init(
         layout: CollageLayout = .grid(.twoUpVertical),
@@ -29,7 +33,8 @@ public struct VideoProjectData: Codable, Equatable, Sendable {
         music: BackgroundMusicState? = nil,
         borderWidth: Double = 0,
         textOverlays: [TextOverlay] = [],
-        stickerOverlays: [StickerOverlay] = []
+        stickerOverlays: [StickerOverlay] = [],
+        pan: CanvasPan? = nil
     ) {
         self.layout = layout
         self.cells = cells
@@ -37,6 +42,7 @@ public struct VideoProjectData: Codable, Equatable, Sendable {
         self.borderWidth = borderWidth
         self.textOverlays = textOverlays
         self.stickerOverlays = stickerOverlays
+        self.pan = pan
     }
 
     /// Every media id the project references — what the store copies to disk and
@@ -48,7 +54,7 @@ public struct VideoProjectData: Codable, Equatable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case layout, cells, music, borderWidth, textOverlays, stickerOverlays
+        case layout, cells, music, borderWidth, textOverlays, stickerOverlays, pan
     }
 
     /// Defensive decode, matching the rest of the project's persisted values: a
@@ -62,5 +68,6 @@ public struct VideoProjectData: Codable, Equatable, Sendable {
         self.borderWidth = try c.decodeIfPresent(Double.self, forKey: .borderWidth) ?? 0
         self.textOverlays = try c.decodeIfPresent([TextOverlay].self, forKey: .textOverlays) ?? []
         self.stickerOverlays = try c.decodeIfPresent([StickerOverlay].self, forKey: .stickerOverlays) ?? []
+        self.pan = try c.decodeIfPresent(CanvasPan.self, forKey: .pan)
     }
 }

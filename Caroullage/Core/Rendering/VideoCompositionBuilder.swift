@@ -134,6 +134,11 @@ public struct VideoCompositionBundle: @unchecked Sendable {
         public let textOverlays: [TextOverlay]
         public let stickerOverlays: [StickerOverlay]
         public let textFontScale: CGFloat
+        /// The camera move, when the collage pans: overlays live on the strip
+        /// and are drawn through the same offset the cells are.
+        public var pan: CanvasPan? = nil
+        /// The composition's length, which the pan's progress is measured against.
+        public var duration: Double = 0
     }
 
     public let composition: AVMutableComposition
@@ -173,7 +178,8 @@ extension VideoComposer {
         stickerOverlays: [StickerOverlay] = [],
         textFontScale: CGFloat = 1,
         fps: Int32 = 30,
-        renderSize: CGSize? = nil
+        renderSize: CGSize? = nil,
+        pan: CanvasPan? = nil
     ) async throws -> VideoCompositionBundle {
         let composition = AVMutableComposition()
         let ts = Self.compositionTimescale
@@ -263,9 +269,16 @@ extension VideoComposer {
                     VideoCompositionMath.aspectFitTransform(
                         source: oriented.displaySize, in: mappedFrame))
             }
-            applyPlacement(transform, transition: item.cell.transition,
-                           cellFrame: mappedFrame, clipDuration: item.range.duration,
-                           startOffset: offset, timescale: ts, to: layer)
+            if let pan, pan.extent > 1 {
+                applyPannedPlacement(transform, transition: item.cell.transition,
+                                     cellFrame: mappedFrame, clipDuration: item.range.duration,
+                                     startOffset: offset, total: total, pan: pan, render: output,
+                                     timescale: ts, to: layer)
+            } else {
+                applyPlacement(transform, transition: item.cell.transition,
+                               cellFrame: mappedFrame, clipDuration: item.range.duration,
+                               startOffset: offset, timescale: ts, to: layer)
+            }
             layerInstructions.append(layer)
 
             if let audioTrack = item.audioTrack,
@@ -321,14 +334,21 @@ extension VideoComposer {
         // timing, baking one image up front is wrong — a caption's visibility would
         // be frozen at whatever it was when the bundle was built — so the overlays
         // are carried instead and rendered per frame during export.
+        //
+        // An animated caption or a panning canvas changes the overlay from frame to
+        // frame just as timing does, so either takes the per-frame path too.
         let hasTiming = textOverlays.contains { $0.startTime != nil || $0.endTime != nil }
+        let hasAnimation = textOverlays.contains { $0.animation != .none }
+        let isPanning = (pan?.extent ?? 1) > 1
+            && !(textOverlays.isEmpty && stickerOverlays.isEmpty)
         let overlayImage: CGImage?
         let timedOverlays: VideoCompositionBundle.TimedOverlayInputs?
-        if hasTiming {
+        if hasTiming || hasAnimation || isPanning {
             overlayImage = nil
             timedOverlays = VideoCompositionBundle.TimedOverlayInputs(
                 textOverlays: textOverlays, stickerOverlays: stickerOverlays,
-                textFontScale: textFontScale)
+                textFontScale: textFontScale,
+                pan: isPanning ? pan : nil, duration: totalSeconds)
         } else {
             overlayImage = VideoOverlayRenderer.overlayImage(
                 textOverlays: textOverlays, stickerOverlays: stickerOverlays,
@@ -637,13 +657,44 @@ extension VideoComposer {
         guard ctx.writer.status == .completed else { throw ctx.writer.error ?? ComposerError.writeFailed }
     }
 
-    /// The single-slot overlay cache's contents: the visible-set key it was
+    /// The single-slot overlay cache's contents: the drawn-state key it was
     /// rendered for, plus the resulting image (or `nil` — "rendered, and nothing
     /// was visible" — kept distinguishable from "not cached yet", i.e. `cache ==
     /// nil`, so a caption gap doesn't force a re-render every frame).
     private struct OverlayCacheSlot {
-        let key: [UUID]
+        let key: OverlayFrameKey
         let image: CGImage?
+    }
+
+    /// Everything that decides what the overlay layer looks like on one frame:
+    /// which captions are on screen and how far into their animation each is
+    /// (quantized, so identical-looking frames share a key), plus where the
+    /// camera is on a panning strip (whole pixels).
+    struct OverlayFrameKey: Equatable {
+        var captions: [Caption]
+        var camera: CGPoint
+
+        struct Caption: Equatable {
+            let id: UUID
+            let animation: TextAnimationFrame
+        }
+    }
+
+    /// The drawn-state key for one frame. Pure and static so the cache rule is
+    /// testable without running an export.
+    static func overlayFrameKey(
+        _ timed: VideoCompositionBundle.TimedOverlayInputs, at seconds: Double, canvasPx: CGSize
+    ) -> OverlayFrameKey {
+        let captions = timed.textOverlays
+            .filter { $0.isVisible(at: seconds) }
+            .map { OverlayFrameKey.Caption(
+                id: $0.id, animation: TextAnimationMath.frame(for: $0, at: seconds).quantized) }
+            .sorted { $0.id.uuidString < $1.id.uuidString }
+        let camera = timed.pan.map {
+            let offset = $0.cameraOffset(at: seconds, duration: timed.duration, canvas: canvasPx)
+            return CGPoint(x: offset.x.rounded(), y: offset.y.rounded())
+        } ?? .zero
+        return OverlayFrameKey(captions: captions, camera: camera)
     }
 
     /// Resolves the overlay image for one frame at presentation time `pts`.
@@ -652,25 +703,24 @@ extension VideoComposer {
     /// project saved before timing existed) just returns the single baked
     /// `ctx.overlay`, exactly as before. Otherwise the frame's presentation time is
     /// converted to seconds once, via the same `CMTime.seconds` the export already
-    /// used for progress reporting, and the overlays visible at that time (keyed on
-    /// their sorted ids, a stable proxy for "what would be drawn") are compared
-    /// against `cache`'s last key before rendering — so a run of frames sharing a
-    /// visible set, which is most of them given monotonic PTS order, costs one
-    /// render. `canvasPx` is derived from `ctx.width`/`height` (the same ints that
-    /// size the pixel buffer `drawOverlay` writes into) rather than carried on
+    /// used for progress reporting, and the frame's drawn state (`overlayFrameKey`)
+    /// is compared against `cache`'s last key before rendering — so a run of frames
+    /// that look the same, which is most of them given monotonic PTS order, costs
+    /// one render. `canvasPx` is derived from `ctx.width`/`height` (the same ints
+    /// that size the pixel buffer `drawOverlay` writes into) rather than carried on
     /// `TimedOverlayInputs`, so there is one source of truth for the render size.
     private static func overlayForFrame(
         _ ctx: ExportContext, at pts: CMTime, cache: inout OverlayCacheSlot?
     ) -> CGImage? {
         guard let timed = ctx.timedOverlays else { return ctx.overlay }
         let seconds = pts.seconds
-        let visible = timed.textOverlays.filter { $0.isVisible(at: seconds) }
-        let key = visible.map(\.id).sorted { $0.uuidString < $1.uuidString }
+        let canvasPx = CGSize(width: CGFloat(ctx.width), height: CGFloat(ctx.height))
+        let key = overlayFrameKey(timed, at: seconds, canvasPx: canvasPx)
         if let cache, cache.key == key { return cache.image }
         let image = VideoOverlayRenderer.overlayImage(
-            textOverlays: visible, stickerOverlays: timed.stickerOverlays,
-            canvasPx: CGSize(width: CGFloat(ctx.width), height: CGFloat(ctx.height)),
-            textFontScale: timed.textFontScale)
+            textOverlays: timed.textOverlays, stickerOverlays: timed.stickerOverlays,
+            canvasPx: canvasPx, textFontScale: timed.textFontScale,
+            at: seconds, pan: timed.pan, duration: timed.duration)
         cache = OverlayCacheSlot(key: key, image: image)
         return image
     }
@@ -749,6 +799,77 @@ extension VideoComposer {
             // Hold transparent until the beat, then fade in.
             if holdsBeforeBeat { layer.setOpacity(startOpacity, at: .zero) }
             layer.setOpacityRamp(fromStartOpacity: startOpacity, toEndOpacity: 1, timeRange: window)
+        }
+    }
+
+    /// `applyPlacement` for a panning collage: the cell's resting transform (plus
+    /// any intro transition) followed by the camera's translation at that time.
+    ///
+    /// A layer instruction interpolates between the two matrices of each ramp, so
+    /// the move is expressed as consecutive ramps split at the transition's
+    /// boundaries. Between boundaries the pan is linear and a slide is a
+    /// translation, so both are exact; a zoom-in's scale interpolates linearly
+    /// over its short window, which is indistinguishable from the unpanned ramp.
+    private func applyPannedPlacement(
+        _ transform: CGAffineTransform,
+        transition: CellTransition?,
+        cellFrame: CGRect,
+        clipDuration: CMTime,
+        startOffset: CMTime,
+        total: CMTime,
+        pan: CanvasPan,
+        render: CGSize,
+        timescale: CMTimeScale,
+        to layer: AVMutableVideoCompositionLayerInstruction
+    ) {
+        let totalSeconds = total.seconds
+        var windowStart: Double?
+        var windowEnd: Double?
+        var startTransform = transform
+        if let transition, transition.duration > 0 {
+            let start = startOffset.seconds + transition.startTime
+            windowStart = start
+            windowEnd = start + min(transition.duration, clipDuration.seconds)
+            startTransform = VideoCompositionMath.transitionStartTransform(
+                style: transition.style, base: transform, cell: cellFrame)
+        }
+
+        func placement(at time: Double) -> CGAffineTransform {
+            let base: CGAffineTransform
+            if let windowStart, time < windowStart + 1e-6, startTransform != transform {
+                base = startTransform
+            } else {
+                base = transform
+            }
+            let camera = pan.cameraOffset(at: time, duration: totalSeconds, canvas: render)
+            return base.concatenating(CGAffineTransform(translationX: -camera.x, y: -camera.y))
+        }
+
+        let boundaries = Set([0, windowStart, windowEnd, totalSeconds].compactMap { $0 }
+            .map { min(max(0, $0), totalSeconds) })
+            .sorted()
+        layer.setTransform(placement(at: 0), at: .zero)
+        for (from, to) in zip(boundaries, boundaries.dropFirst()) where to - from > 1e-4 {
+            // `placement` holds the start state up to AND AT the window's start, so
+            // the ramp into the window holds still and the ramp across it leaves
+            // from the start state and arrives at rest.
+            layer.setTransformRamp(
+                fromStart: placement(at: from), toEnd: placement(at: to),
+                timeRange: CMTimeRange(
+                    start: CMTime(seconds: from, preferredTimescale: timescale),
+                    end: CMTime(seconds: to, preferredTimescale: timescale)))
+        }
+
+        if let transition, transition.duration > 0, let windowStart, let windowEnd {
+            let startOpacity = VideoCompositionMath.transitionStartOpacity(transition.style)
+            if startOpacity != 1 {
+                if windowStart > 0 { layer.setOpacity(startOpacity, at: .zero) }
+                layer.setOpacityRamp(
+                    fromStartOpacity: startOpacity, toEndOpacity: 1,
+                    timeRange: CMTimeRange(
+                        start: CMTime(seconds: windowStart, preferredTimescale: timescale),
+                        end: CMTime(seconds: windowEnd, preferredTimescale: timescale)))
+            }
         }
     }
 
