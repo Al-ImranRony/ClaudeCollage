@@ -116,7 +116,10 @@ struct VideoStartView: View {
                             .foregroundStyle(.white)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
-                            .background(.black.opacity(0.45), in: Capsule())
+                            // Dark enough to hold white text over the
+                            // brightest sample frame (the accessibility audit
+                            // samples the pixels behind it).
+                            .background(.black.opacity(0.72), in: Capsule())
                             .padding(8)
                     }
                 Text(template.name)

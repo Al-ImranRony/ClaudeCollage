@@ -54,6 +54,10 @@ struct TextStyleSheet: View {
     ]
 
     @State private var overlay: TextOverlay
+    /// One height for every font chip, whatever the face's own line height —
+    /// the handwritten faces are far taller than the rest and would otherwise
+    /// make the row jump. Scales with Dynamic Type.
+    @ScaledMetric(relativeTo: .callout) private var fontChipTextHeight: CGFloat = 22
     private let onChange: (TextOverlay) -> Void
     private let onDone: () -> Void
 
@@ -119,6 +123,7 @@ struct TextStyleSheet: View {
                             Text(entry.label)
                                 .font(fontPreview(entry.name))
                                 .lineLimit(1)
+                                .frame(height: fontChipTextHeight)
                                 .padding(.horizontal, 14)
                                 .padding(.vertical, 8)
                                 .background(isSelected ? accentFill : Color.themeControlFill)
