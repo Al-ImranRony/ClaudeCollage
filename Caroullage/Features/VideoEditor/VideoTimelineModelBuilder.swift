@@ -48,7 +48,8 @@ public enum VideoTimelineModelBuilder {
                 index: index,
                 start: isFilled ? max(0, cell.startOffset) : 0,
                 duration: laneDuration(of: cell, source: sourceDurations[index]),
-                isFilled: isFilled)
+                isFilled: isFilled,
+                sourceStart: isFilled ? sourceStart(of: cell, source: sourceDurations[index]) : 0)
         }
 
         // The same rule the engine uses, so the timeline's ruler and the real
@@ -86,5 +87,12 @@ public enum VideoTimelineModelBuilder {
         guard cell.videoID != nil else { return 0 }
         guard let source, source > 0 else { return cell.trim.duration }
         return cell.trim.clamped(toAssetDuration: source).duration
+    }
+
+    /// The in-point the lane's frames start from, resolved the same way as its
+    /// length so the two can never describe different windows.
+    private static func sourceStart(of cell: VideoCellState, source: Double?) -> Double {
+        guard let source, source > 0 else { return max(0, cell.trim.start) }
+        return cell.trim.clamped(toAssetDuration: source).start
     }
 }

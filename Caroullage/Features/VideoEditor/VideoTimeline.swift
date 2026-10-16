@@ -4,9 +4,17 @@
 //
 //  Task 5 — the video editor's collapsible timeline. Two states, remembered per
 //  project by whoever owns this view (this file has no notion of "the project"):
-//  a 76pt collapsed strip that summarises the whole composition, and a 210pt
-//  expanded view with one lane per cell, a text-pill lane and a music lane, all
-//  sharing one playhead.
+//  an 84pt collapsed strip — a filmstrip of the composed collage — and a 210pt
+//  expanded view with one lane per cell (each showing its own frames), a
+//  caption lane and a music lane drawn as its waveform, all sharing one
+//  playhead. The pictures arrive through `setMedia`, produced by the owner's
+//  `VideoTimelineMediaLoader`; this view never touches an asset.
+//
+//  Feel, which is most of what a timeline is: the playhead runs at display
+//  rate between the owner's 10 Hz reports (`clockTicked`), a scrub or an edge
+//  drag snaps to the meaningful times near it with a haptic tick, an edit that
+//  meets a limit says so with a firmer one, and blocks glide to a change that
+//  did not come from the finger.
 //
 //  Pure renderer, like `EditorToolRail`/`EditorPanel`: every interaction is
 //  reported through a callback, and every visible change — the model, the
@@ -70,12 +78,17 @@ public struct VideoTimelineModel: Equatable, Sendable {
         public let start: Double
         public let duration: Double
         public let isFilled: Bool
+        /// Where in its SOURCE the clip's window begins — its trim in-point. What
+        /// lets a lane pick the right frames out of a whole-source filmstrip, so
+        /// the frames stay put under a trim handle instead of sliding with it.
+        public let sourceStart: Double
 
-        public init(index: Int, start: Double, duration: Double, isFilled: Bool) {
+        public init(index: Int, start: Double, duration: Double, isFilled: Bool, sourceStart: Double = 0) {
             self.index = index
             self.start = start
             self.duration = duration
             self.isFilled = isFilled
+            self.sourceStart = sourceStart
         }
     }
 
@@ -158,6 +171,49 @@ enum VideoTimelineLayout {
         let total = max(0, Int(seconds.rounded()))
         return String(format: "%d:%02d", total / 60, total % 60)
     }
+
+    // Everything below formats through Foundation's `Duration` styles, which
+    // localise digits, separators and unit words themselves — the timeline
+    // adds no strings of its own to the catalog.
+
+    /// `0:03.2` — the header readout, to the tenth, so the playhead visibly
+    /// moves under the finger even on a short clip.
+    static func formatPreciseTime(_ seconds: Double) -> String {
+        let tenths = (max(0, seconds.isFinite ? seconds : 0) * 10).rounded(.down) / 10
+        return Duration.milliseconds(Int64(tenths * 1000))
+            .formatted(.time(pattern: .minuteSecond(padMinuteToLength: 1, fractionalSecondsLength: 1)))
+    }
+
+    /// `3.2s` — a clip's length on its badge.
+    static func formatDuration(_ seconds: Double) -> String {
+        Duration.milliseconds(Int64((max(0, seconds) * 1000).rounded()))
+            .formatted(.units(allowed: [.seconds], width: .narrow,
+                              fractionalPart: .show(length: 1, rounded: .toNearestOrEven)))
+    }
+
+    /// A ruler label: `5s` while the whole composition is under a minute, then
+    /// `1:30`. Half-second ticks keep their fraction.
+    static func formatRulerTime(_ seconds: Double, interval: Double) -> String {
+        let value = Duration.milliseconds(Int64((max(0, seconds) * 1000).rounded()))
+        if interval < 60, seconds < 60 {
+            let fraction = interval < 1 ? 1 : 0
+            return value.formatted(.units(allowed: [.seconds], width: .narrow,
+                                          fractionalPart: .show(length: fraction)))
+        }
+        return value.formatted(.time(pattern: .minuteSecond))
+    }
+
+    /// "3.2 seconds" — a lane's length as VoiceOver reads it.
+    static func spokenDuration(_ seconds: Double) -> String {
+        Duration.milliseconds(Int64((max(0, seconds) * 1000).rounded()))
+            .formatted(.units(allowed: [.minutes, .seconds], width: .wide,
+                              fractionalPart: .show(length: 1, rounded: .toNearestOrEven)))
+    }
+
+    /// "0:01.0 – 0:03.5" — a caption's window as VoiceOver reads it.
+    static func spokenRange(start: Double, end: Double) -> String {
+        "\(formatPreciseTime(start)) – \(formatPreciseTime(end))"
+    }
 }
 
 // MARK: - VideoTimeline
@@ -194,21 +250,28 @@ public final class VideoTimeline: UIView {
     public var onTrim: ((_ clipIndex: Int, _ start: Double, _ end: Double, _ phase: EditPhase) -> Void)?
     public var onRetimeText: ((_ id: UUID, _ start: Double, _ end: Double, _ phase: EditPhase) -> Void)?
 
-    public static let collapsedHeight: CGFloat = 76
+    /// The header plus a 40pt strip: a filmstrip of the collage tall enough to
+    /// read, with the caption track under it.
+    public static let collapsedHeight: CGFloat = 84
     public static let expandedHeight: CGFloat = 210
 
-    /// A full 44pt bar, not the 24pt strip it was: the play and chevron controls
-    /// are pinned to its height, and 24 is not a hit target (phase 6.5). Both
-    /// heights above grew by the same 20pt.
+    /// A full 44pt bar: the play and chevron controls are pinned to its
+    /// height, and anything shorter is not a hit target (phase 6.5).
     private static let headerHeight: CGFloat = Theme.Layout.minimumHitTarget
     private static let chevronWidth: CGFloat = Theme.Layout.minimumHitTarget
     private static let playbackButtonWidth: CGFloat = Theme.Layout.minimumHitTarget
+    /// The ink disc drawn inside the play control's 44pt target.
+    private static let playbackChipSize: CGFloat = 30
     /// Touch slop for grabbing a clip/pill's edge to trim/retime rather than
-    /// its middle to select. `Theme.Spacing.sm` rather than a bespoke literal.
-    /// This is a ceiling, not a fixed value — `edgeTolerance(for:)` scales it
-    /// down for a block narrower than `2 * edgeTolerance`, or the two edge
-    /// zones would overlap and swallow the whole block.
+    /// its middle to select. `Theme.Spacing.sm` rather than a bespoke literal —
+    /// and the width of a selected clip's drawn handles, so what you see is
+    /// what you can grab. A ceiling, not a fixed value: `edgeTolerance(for:)`
+    /// scales it down for a block narrower than `2 * edgeTolerance`, or the two
+    /// edge zones would overlap and swallow the whole block.
     private static let edgeTolerance: CGFloat = Theme.Spacing.sm
+    /// How close (in points) a drag must come to a meaningful time — a clip's
+    /// edge, a caption's, the playhead — before it snaps there.
+    private static let snapDistance: CGFloat = 8
     /// A clip/pill can never be trimmed narrower than this, so a fast drag past
     /// the opposite edge can't invert start/end or produce a zero/negative span.
     /// The shortest window any surface will produce, for a clip's trim or a
@@ -220,13 +283,19 @@ public final class VideoTimeline: UIView {
     public private(set) var state: State = .collapsed
 
     private var model = VideoTimelineModel()
+    /// The last time the owner reported — the player's truth.
     private var playheadTime: Double = 0
+    /// Where the playhead is DRAWN: the report, or where the playback clock
+    /// has carried it since. What a model push re-draws the lanes with, so an
+    /// edit during playback never pulls the playhead back to the last report.
+    private var displayedPlayhead: Double = 0
 
     private let headerRow = UIView()
     private let timeLabel = UILabel()
     private let chevronButton = UIControl()
     private let chevronImageView = UIImageView()
     private let playbackButton = UIControl()
+    private let playbackChip = UIView()
     private let playbackImageView = UIImageView()
 
     private let contentHost = UIView()
@@ -237,6 +306,26 @@ public final class VideoTimeline: UIView {
 
     private lazy var tapGesture = UITapGestureRecognizer(target: self, action: #selector(handleTap(_:)))
     private lazy var panGesture = UIPanGestureRecognizer(target: self, action: #selector(handlePan(_:)))
+
+    // Media the owner hands over (see `setMedia`).
+    private var clipFilmstrips: [Int: VideoTimelineFilmstrip] = [:]
+    private var compositionFrames: [UIImage] = []
+    private var musicWaveform: VideoTimelineWaveform?
+
+    // The playback clock: the owner reports the player's time ten times a
+    // second, which moved the playhead in visible jumps. Between reports the
+    // playhead runs on from the last one at real time, per display frame, and
+    // each report quietly corrects it. Only while playing, never mid-drag.
+    private var clock: CADisplayLink?
+    private var playheadReportedAt: CFTimeInterval = 0
+    /// How far the playhead may run on without a fresh report — a stalled
+    /// player must not leave it gliding off on its own.
+    private static let clockRunOn: CFTimeInterval = 0.5
+    private var readout = ""
+
+    // Drag feedback state.
+    private var snappedTime: Double?
+    private var isAtEditLimit = false
 
     private enum Edge { case leading, trailing }
 
@@ -254,12 +343,10 @@ public final class VideoTimeline: UIView {
         case retimeText(id: UUID, edge: Edge, start: Double, end: Double)
     }
 
-    /// Cleared unconditionally by `setModel`. That single rule is the whole of
-    /// Trap #4's fix here: a drag captured an index/id from the model in effect
-    /// when it began, and the moment that model is replaced, continuing the
-    /// same gesture must stop reporting rather than act on a clip or text id
-    /// the new model may not even have.
-    private var activeDrag: ActiveDrag?
+    /// The drag in flight, if any — see `setModel` for when a model push ends it.
+    private var activeDrag: ActiveDrag? {
+        didSet { updateClock() }
+    }
 
     /// Whether `drag` still points at something the new model has. A trim needs a
     /// lane that is still FILLED — an emptied slot keeps its lane (it is still a
@@ -293,13 +380,23 @@ public final class VideoTimeline: UIView {
         addGestureRecognizer(panGesture)
         addGestureRecognizer(tapGesture)
 
-        updateChevron()
+        updateChevron(animated: false)
         updatePlaybackIcon()
         updateReadouts()
+        registerForTraitChanges([UITraitPreferredContentSizeCategory.self]) {
+            (timeline: VideoTimeline, _: UITraitCollection) in
+            timeline.readout = ""
+            timeline.updateReadouts()
+        }
     }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
+
+    public override func didMoveToWindow() {
+        super.didMoveToWindow()
+        updateClock()
+    }
 
     // MARK: - Public API
 
@@ -320,37 +417,91 @@ public final class VideoTimeline: UIView {
     /// checked by identity. Deliberately NOT by geometry: a drag changes its own
     /// target's duration on every tick, so validating that would cancel the drag
     /// it is supposed to protect.
+    ///
+    /// A change that moves blocks while no drag is running — an undo, a trim
+    /// typed into a panel — glides them there; one the finger is making follows
+    /// the finger exactly.
     public func setModel(_ newModel: VideoTimelineModel) {
+        let previous = model
         model = newModel
         activeDrag = Self.dragSurviving(activeDrag, in: newModel)
-        collapsedContent.configure(model: model, playhead: playheadTime)
-        expandedContent.configure(model: model, playhead: playheadTime)
+        let moved = previous.clips != newModel.clips || previous.textPills != newModel.textPills
+            || previous.duration != newModel.duration
+        collapsedContent.configure(model: model, playhead: displayedPlayhead)
+        if previous.duration != newModel.duration {
+            collapsedContent.setCompositionFrames(compositionFrames)
+        }
+        expandedContent.configure(model: model, playhead: displayedPlayhead,
+                                  animated: moved && activeDrag == nil)
         updatePlaybackIcon()
-        updateReadouts()
+        updateReadouts(at: displayedPlayhead)
+        updateClock()
         setNeedsLayout()
     }
 
+    /// The pictures the lanes draw — frames of each clip (by slot), frames of
+    /// the composed collage, and the soundtrack's shape. Produced by the owner
+    /// (`VideoTimelineMediaLoader`); this view only draws what it is given.
+    public func setMedia(clipFilmstrips: [Int: VideoTimelineFilmstrip],
+                         compositionFrames: [UIImage],
+                         musicWaveform: VideoTimelineWaveform?) {
+        if !compositionFrames.isIdentical(to: self.compositionFrames) {
+            self.compositionFrames = compositionFrames
+            collapsedContent.setCompositionFrames(compositionFrames)
+        }
+        guard clipFilmstrips != self.clipFilmstrips || musicWaveform != self.musicWaveform else { return }
+        self.clipFilmstrips = clipFilmstrips
+        self.musicWaveform = musicWaveform
+        expandedContent.setMedia(filmstrips: clipFilmstrips, waveform: musicWaveform)
+    }
+
+    /// A new report of where the player is. The owner also re-pushes its last
+    /// report on every document change; while the clock runs, such a repeat is
+    /// not news — restamping it would restart the clock from a time up to a
+    /// tenth of a second old and pull the playhead back on every edit.
     public func setPlayhead(_ time: Double) {
+        if clock != nil, time == playheadTime { return }
         playheadTime = time
-        collapsedContent.setPlayhead(time)
-        expandedContent.setPlayhead(time)
-        updateReadouts()
+        playheadReportedAt = CACurrentMediaTime()
+        showPlayhead(at: time)
     }
 
     public func setState(_ newState: State, animated: Bool) {
         guard newState != state else { return }
         state = newState
-        collapsedContent.isHidden = state != .collapsed
-        expandedContent.isHidden = state != .expanded
-        updateChevron()
+        let incoming: UIView = state == .expanded ? expandedContent : collapsedContent
+        let outgoing: UIView = state == .expanded ? collapsedContent : expandedContent
         heightConstraint.constant = state == .collapsed ? Self.collapsedHeight : Self.expandedHeight
+        let isAnimated = animated && !Theme.Motion.isReduced
+        updateChevron(animated: isAnimated)
 
-        guard animated, !Theme.Motion.isReduced else {
+        guard isAnimated else {
+            incoming.isHidden = false
+            incoming.alpha = 1
+            outgoing.isHidden = true
+            outgoing.alpha = 1
             applyPendingLayout()
+            if state == .expanded { expandedContent.revealOverflow() }
             return
         }
-        UIView.animate(withDuration: Theme.Motion.standard) { [weak self] in
+        // The two views crossfade while the height moves, instead of one
+        // blinking out and the other in at the start of the resize.
+        incoming.isHidden = false
+        incoming.alpha = 0
+        let target = state
+        UIView.animate(
+            withDuration: Theme.Motion.standard, delay: 0,
+            usingSpringWithDamping: 0.92, initialSpringVelocity: 0,
+            options: [.beginFromCurrentState, .allowUserInteraction]
+        ) { [weak self] in
+            incoming.alpha = 1
+            outgoing.alpha = 0
             self?.applyPendingLayout()
+        } completion: { [weak self] _ in
+            guard let self, self.state == target else { return }
+            outgoing.isHidden = true
+            outgoing.alpha = 1
+            if target == .expanded { self.expandedContent.revealOverflow() }
         }
     }
 
@@ -369,9 +520,18 @@ public final class VideoTimeline: UIView {
         addSubview(headerRow)
 
         // Left of the time readout, matching the approved design's
-        // `▶ 0:03.1` header — see the class header's plan-defect note.
-        playbackImageView.tintColor = Theme.Color.textSecondary
+        // `▶ 0:03.1` header — see the class header's plan-defect note. Drawn as
+        // an ink disc — the app's primary-control chrome — inside the full 44pt
+        // target, so the one control that starts playback reads as primary.
+        playbackChip.backgroundColor = Theme.Color.accentStrong
+        playbackChip.layer.cornerRadius = Self.playbackChipSize / 2
+        playbackChip.isUserInteractionEnabled = false
+        playbackChip.translatesAutoresizingMaskIntoConstraints = false
+        playbackButton.addSubview(playbackChip)
+
+        playbackImageView.tintColor = Theme.Color.textOnAccent
         playbackImageView.contentMode = .center
+        playbackImageView.preferredSymbolConfiguration = UIImage.SymbolConfiguration(pointSize: 13, weight: .bold)
         playbackImageView.isUserInteractionEnabled = false
         playbackImageView.translatesAutoresizingMaskIntoConstraints = false
         playbackButton.addSubview(playbackImageView)
@@ -390,11 +550,14 @@ public final class VideoTimeline: UIView {
         playbackButton.isAccessibilityElement = true
         playbackButton.accessibilityTraits = .button
         playbackButton.addTarget(self, action: #selector(playbackTapped), for: .touchUpInside)
+        playbackButton.addTarget(self, action: #selector(playbackPressed), for: [.touchDown, .touchDragEnter])
+        playbackButton.addTarget(self, action: #selector(playbackReleased),
+                                 for: [.touchUpInside, .touchUpOutside, .touchCancel, .touchDragExit])
         playbackButton.translatesAutoresizingMaskIntoConstraints = false
         playbackButton.showsLargeContentViewer = true
         headerRow.addSubview(playbackButton)
 
-        timeLabel.font = Theme.Typography.caption
+        timeLabel.font = Theme.Typography.monospacedDigits(13, .semibold, .caption1)
         timeLabel.adjustsFontForContentSizeCategory = true
         timeLabel.textColor = Theme.Color.textSecondary
         timeLabel.translatesAutoresizingMaskIntoConstraints = false
@@ -402,6 +565,7 @@ public final class VideoTimeline: UIView {
 
         chevronImageView.tintColor = Theme.Color.textSecondary
         chevronImageView.contentMode = .center
+        chevronImageView.image = UIImage(systemName: "chevron.down")
         chevronImageView.isUserInteractionEnabled = false
         chevronImageView.translatesAutoresizingMaskIntoConstraints = false
         chevronButton.addSubview(chevronImageView)
@@ -438,11 +602,14 @@ public final class VideoTimeline: UIView {
             headerRow.trailingAnchor.constraint(equalTo: trailingAnchor),
             headerRow.heightAnchor.constraint(equalToConstant: Self.headerHeight),
 
-            // Same reasoning as the chevron button below: the image is centred
-            // within the button, but the button itself is pinned top/bottom to
-            // a non-zero-height ancestor (headerRow) and given an explicit
-            // width — its hit-testable bounds never depend on the image
-            // view's intrinsic size.
+            // The glyph and its disc are centred within the button, but the
+            // button itself is pinned top/bottom to a non-zero-height ancestor
+            // (headerRow) and given an explicit width — its hit-testable bounds
+            // never depend on the image view's intrinsic size.
+            playbackChip.centerXAnchor.constraint(equalTo: playbackButton.centerXAnchor),
+            playbackChip.centerYAnchor.constraint(equalTo: playbackButton.centerYAnchor),
+            playbackChip.widthAnchor.constraint(equalToConstant: Self.playbackChipSize),
+            playbackChip.heightAnchor.constraint(equalToConstant: Self.playbackChipSize),
             playbackImageView.centerXAnchor.constraint(equalTo: playbackButton.centerXAnchor),
             playbackImageView.topAnchor.constraint(equalTo: playbackButton.topAnchor),
             playbackImageView.bottomAnchor.constraint(equalTo: playbackButton.bottomAnchor),
@@ -452,15 +619,14 @@ public final class VideoTimeline: UIView {
             playbackButton.bottomAnchor.constraint(equalTo: headerRow.bottomAnchor),
             playbackButton.widthAnchor.constraint(equalToConstant: Self.playbackButtonWidth),
 
-            timeLabel.leadingAnchor.constraint(equalTo: playbackButton.trailingAnchor, constant: Theme.Spacing.xs),
+            timeLabel.leadingAnchor.constraint(equalTo: playbackButton.trailingAnchor, constant: Theme.Spacing.xxs),
             timeLabel.centerYAnchor.constraint(equalTo: headerRow.centerYAnchor),
+            timeLabel.trailingAnchor.constraint(lessThanOrEqualTo: chevronButton.leadingAnchor,
+                                                constant: -Theme.Spacing.xs),
 
-            // The image is centred within the button, but the button itself is
-            // pinned top/bottom to a non-zero-height ancestor (headerRow) and
-            // given an explicit width — the button's own hit-testable bounds
-            // never depend on the image view's intrinsic size. See the class
-            // header and `EditorToolRail.ToolButton`'s own regression note for
-            // why a center-only pin on the CONTROL itself is the trap.
+            // Same reasoning as the play control above; see also
+            // `EditorToolRail.ToolButton`'s regression note for why a
+            // center-only pin on the CONTROL itself is the trap.
             chevronImageView.centerXAnchor.constraint(equalTo: chevronButton.centerXAnchor),
             chevronImageView.topAnchor.constraint(equalTo: chevronButton.topAnchor),
             chevronImageView.bottomAnchor.constraint(equalTo: chevronButton.bottomAnchor),
@@ -470,6 +636,9 @@ public final class VideoTimeline: UIView {
             chevronButton.bottomAnchor.constraint(equalTo: headerRow.bottomAnchor),
             chevronButton.widthAnchor.constraint(equalToConstant: Self.chevronWidth),
 
+            // Full width: every x in here is a time, measured against this
+            // view's own width (see the class header), so the lanes run edge to
+            // edge rather than inside a margin the geometry knows nothing of.
             contentHost.topAnchor.constraint(equalTo: headerRow.bottomAnchor),
             contentHost.leadingAnchor.constraint(equalTo: leadingAnchor),
             contentHost.trailingAnchor.constraint(equalTo: trailingAnchor),
@@ -492,13 +661,24 @@ public final class VideoTimeline: UIView {
         onToggleState?(state == .collapsed ? .expanded : .collapsed)
     }
 
-    private func updateChevron() {
-        let symbol = state == .collapsed ? "chevron.down" : "chevron.up"
-        chevronImageView.image = UIImage(systemName: symbol)
-        chevronButton.accessibilityLabel = state == .collapsed
-            ? String(localized: "Expand timeline") : String(localized: "Collapse timeline")
+    /// One glyph, turned: the chevron points down to open and rotates to point
+    /// up once open, rather than swapping symbols mid-resize.
+    private func updateChevron(animated: Bool) {
+        let expanded = state == .expanded
+        let rotation = expanded ? CGAffineTransform(rotationAngle: .pi * 0.999) : .identity
+        if animated {
+            UIView.animate(withDuration: Theme.Motion.standard, delay: 0,
+                           usingSpringWithDamping: 0.85, initialSpringVelocity: 0,
+                           options: [.beginFromCurrentState]) {
+                self.chevronImageView.transform = rotation
+            }
+        } else {
+            chevronImageView.transform = rotation
+        }
+        chevronButton.accessibilityLabel = expanded
+            ? String(localized: "Collapse timeline") : String(localized: "Expand timeline")
         chevronButton.largeContentTitle = chevronButton.accessibilityLabel
-        chevronButton.largeContentImage = chevronImageView.image
+        chevronButton.largeContentImage = UIImage(systemName: expanded ? "chevron.up" : "chevron.down")
     }
 
     /// Only ever reports the tap — like `chevronTapped` above, this view never
@@ -510,16 +690,78 @@ public final class VideoTimeline: UIView {
         onTogglePlayback?()
     }
 
+    @objc private func playbackPressed() { playbackChip.setPressed(true, scale: 0.88) }
+    @objc private func playbackReleased() { playbackChip.setPressed(false, scale: 0.88) }
+
     private func updatePlaybackIcon() {
         let symbol = model.isPlaying ? "pause.fill" : "play.fill"
-        playbackImageView.image = UIImage(systemName: symbol)
-        playbackButton.accessibilityLabel = model.isPlaying ? String(localized: "Pause") : String(localized: "Play")
-        playbackButton.largeContentTitle = playbackButton.accessibilityLabel
-        playbackButton.largeContentImage = playbackImageView.image
+        let label = model.isPlaying ? String(localized: "Pause") : String(localized: "Play")
+        guard playbackButton.accessibilityLabel != label || playbackImageView.image == nil,
+              let image = UIImage(systemName: symbol) else { return }
+        if window != nil, playbackImageView.image != nil, !Theme.Motion.isReduced {
+            playbackImageView.setSymbolImage(image, contentTransition: .replace.downUp)
+        } else {
+            playbackImageView.image = image
+        }
+        playbackButton.accessibilityLabel = label
+        playbackButton.largeContentTitle = label
+        playbackButton.largeContentImage = image
     }
 
-    private func updateReadouts() {
-        timeLabel.text = "\(VideoTimelineLayout.formatTime(playheadTime)) / \(VideoTimelineLayout.formatTime(model.duration))"
+    /// `0:03.2 / 0:08.0`: where the playhead is, in ink (accent while the
+    /// finger holds it), against the whole length, quieter. Rebuilt only when
+    /// the tenth changes — the clock calls this every display frame.
+    private func updateReadouts(at time: Double? = nil) {
+        let isScrubbing: Bool
+        if case .scrub = activeDrag { isScrubbing = true } else { isScrubbing = false }
+        let current = VideoTimelineLayout.formatPreciseTime(time ?? playheadTime)
+        let total = VideoTimelineLayout.formatPreciseTime(model.duration)
+        let key = "\(current)|\(total)|\(isScrubbing)"
+        guard key != readout else { return }
+        readout = key
+        let font = timeLabel.font ?? Theme.Typography.monospacedDigits(13, .semibold, .caption1)
+        let text = NSMutableAttributedString(string: current, attributes: [
+            .font: font,
+            .foregroundColor: isScrubbing ? Theme.Color.accent : Theme.Color.textPrimary,
+        ])
+        text.append(NSAttributedString(string: " / \(total)", attributes: [
+            .font: font, .foregroundColor: Theme.Color.textSecondary,
+        ]))
+        timeLabel.attributedText = text
+        timeLabel.accessibilityLabel = "\(current) / \(total)"
+    }
+
+    // MARK: - Playback clock
+
+    private func showPlayhead(at time: Double) {
+        displayedPlayhead = time
+        collapsedContent.setPlayhead(time)
+        expandedContent.setPlayhead(time)
+        updateReadouts(at: time)
+    }
+
+    private func updateClock() {
+        let runs = model.isPlaying && window != nil && activeDrag == nil
+        if runs, clock == nil {
+            // Runs on from where the playhead is NOW — not from when the last
+            // report arrived, which may have been long before play was pressed
+            // (or before a drag paused the clock).
+            playheadTime = displayedPlayhead
+            playheadReportedAt = CACurrentMediaTime()
+            let link = CADisplayLink(target: TimelineClockTarget(self),
+                                     selector: #selector(TimelineClockTarget.tick(_:)))
+            link.add(to: .main, forMode: .common)
+            clock = link
+        } else if !runs, let link = clock {
+            link.invalidate()
+            clock = nil
+        }
+    }
+
+    fileprivate func clockTicked() {
+        guard model.isPlaying, activeDrag == nil else { return }
+        let elapsed = min(CACurrentMediaTime() - playheadReportedAt, Self.clockRunOn)
+        showPlayhead(at: min(playheadTime + elapsed, model.duration))
     }
 
     // MARK: - Gestures
@@ -528,9 +770,56 @@ public final class VideoTimeline: UIView {
         VideoTimelineGeometry.time(forX: x, duration: model.duration, width: bounds.width)
     }
 
+    private func xForTime(_ time: Double) -> CGFloat {
+        VideoTimelineGeometry.x(forTime: time, duration: model.duration, width: bounds.width)
+    }
+
     private func clamped(_ value: Double, _ lowerBound: Double, _ upperBound: Double) -> Double {
         guard lowerBound <= upperBound else { return lowerBound }
         return min(max(value, lowerBound), upperBound)
+    }
+
+    /// Pulls `time` onto the nearest of `targets` within `snapDistance` points,
+    /// with a light tick the moment it takes hold — the feel of a magnet, so a
+    /// caption can be lined up with a cut or the playhead without squinting.
+    private func snapped(_ time: Double, to targets: [Double]) -> Double {
+        let x = xForTime(time)
+        let nearest = targets.min { abs(xForTime($0) - x) < abs(xForTime($1) - x) }
+        guard let nearest, abs(xForTime(nearest) - x) <= Self.snapDistance else {
+            snappedTime = nil
+            return time
+        }
+        if snappedTime != nearest { Haptics.selectionChanged() }
+        snappedTime = nearest
+        return nearest
+    }
+
+    /// What a scrub snaps to: the ends, and every clip's and caption's edges.
+    private var scrubSnapTargets: [Double] {
+        var targets = [0, model.duration]
+        for clip in model.clips where clip.isFilled { targets += [clip.start, clip.start + clip.duration] }
+        for pill in model.textPills { targets += [pill.start, pill.end] }
+        return targets
+    }
+
+    /// What a dragged edge snaps to: the playhead ("trim to here"), and — for a
+    /// caption — the cuts, so it can start and end with a clip.
+    private func editSnapTargets(includingClipEdges: Bool) -> [Double] {
+        var targets = [playheadTime]
+        if includingClipEdges {
+            for clip in model.clips where clip.isFilled { targets += [clip.start, clip.start + clip.duration] }
+        }
+        return targets
+    }
+
+    /// Clamps an edited edge, with a firmer tick when it first meets a limit —
+    /// the shortest a window may be, the start or the end of the composition.
+    private func limited(_ value: Double, _ lowerBound: Double, _ upperBound: Double) -> Double {
+        let result = clamped(value, lowerBound, upperBound)
+        let atLimit = result != value
+        if atLimit, !isAtEditLimit { Haptics.boundary() }
+        isAtEditLimit = atLimit
+        return result
     }
 
     /// The edge tolerance to use for a block `width` points wide: `edgeTolerance`
@@ -579,6 +868,19 @@ public final class VideoTimeline: UIView {
         return .background
     }
 
+    /// A tapped block dips and springs back — the selection is felt where the
+    /// finger is, not only in the rail.
+    private func pop(_ view: UIView?) {
+        guard let view, window != nil, !Theme.Motion.isReduced else { return }
+        view.transform = CGAffineTransform(scaleX: 0.95, y: 0.9)
+        UIView.animate(withDuration: Theme.Motion.standard, delay: 0,
+                       usingSpringWithDamping: Theme.Motion.springDamping,
+                       initialSpringVelocity: Theme.Motion.springVelocity,
+                       options: [.allowUserInteraction, .beginFromCurrentState]) {
+            view.transform = .identity
+        }
+    }
+
     @objc private func handleTap(_ gesture: UITapGestureRecognizer) {
         performTap(at: gesture.location(in: self))
     }
@@ -587,9 +889,11 @@ public final class VideoTimeline: UIView {
         switch hitTarget(at: point) {
         case .clipMiddle(let index):
             Haptics.selectionChanged()
+            pop(expandedContent.clipBlockViews.first { $0.index == index }?.view)
             onSelectClip?(index)
         case .textMiddle(let id):
             Haptics.selectionChanged()
+            pop(expandedContent.textPillBlockViews.first { $0.id == id }?.view)
             onSelectText?(id)
         case .background, .clipEdge, .textEdge:
             let time = timeForX(point.x)
@@ -621,6 +925,8 @@ public final class VideoTimeline: UIView {
     }
 
     private func performPanBegan(at point: CGPoint) {
+        snappedTime = nil
+        isAtEditLimit = false
         switch hitTarget(at: point) {
         case .clipEdge(let index, let edge):
             guard let clip = model.clips.first(where: { $0.index == index }) else {
@@ -628,16 +934,20 @@ public final class VideoTimeline: UIView {
                 return
             }
             activeDrag = .trimClip(index: index, edge: edge, start: clip.start, duration: clip.duration)
+            Haptics.softTap()
         case .textEdge(let id, let edge):
             guard let pill = model.textPills.first(where: { $0.id == id }) else {
                 activeDrag = nil
                 return
             }
             activeDrag = .retimeText(id: id, edge: edge, start: pill.start, end: pill.end)
+            Haptics.softTap()
         case .background, .clipMiddle, .textMiddle:
             // Dragging anywhere that isn't an edge handle scrubs, including
             // over a clip's middle — only a plain tap there selects.
             activeDrag = .scrub
+            collapsedContent.setScrubbing(true)
+            expandedContent.setScrubbing(true)
         }
         performPanContinue(at: point, phase: .changed)
     }
@@ -650,27 +960,30 @@ public final class VideoTimeline: UIView {
         case .scrub:
             // Scrubbing has no undo step to coalesce, so `onScrub` carries no
             // phase — every tick (including the final one) reports the same way.
-            setPlayhead(time)
-            onScrub?(time)
+            let target = snapped(time, to: scrubSnapTargets)
+            setPlayhead(target)
+            onScrub?(target)
 
         case .trimClip(let index, let edge, let start, let duration):
             let end = start + duration
+            let targets = editSnapTargets(includingClipEdges: false)
             switch edge {
             case .leading:
-                let newStart = clamped(time, 0, end - Self.minimumTrimDuration)
+                let newStart = limited(snapped(time, to: targets), 0, end - Self.minimumTrimDuration)
                 onTrim?(index, newStart, end, phase)
             case .trailing:
-                let newEnd = clamped(time, start + Self.minimumTrimDuration, model.duration)
+                let newEnd = limited(snapped(time, to: targets), start + Self.minimumTrimDuration, model.duration)
                 onTrim?(index, start, newEnd, phase)
             }
 
         case .retimeText(let id, let edge, let start, let end):
+            let targets = editSnapTargets(includingClipEdges: true)
             switch edge {
             case .leading:
-                let newStart = clamped(time, 0, end - Self.minimumTrimDuration)
+                let newStart = limited(snapped(time, to: targets), 0, end - Self.minimumTrimDuration)
                 onRetimeText?(id, newStart, end, phase)
             case .trailing:
-                let newEnd = clamped(time, start + Self.minimumTrimDuration, model.duration)
+                let newEnd = limited(snapped(time, to: targets), start + Self.minimumTrimDuration, model.duration)
                 onRetimeText?(id, start, newEnd, phase)
             }
         }
@@ -678,7 +991,14 @@ public final class VideoTimeline: UIView {
 
     private func performPanEnd(at point: CGPoint, phase: EditPhase) {
         performPanContinue(at: point, phase: phase)
+        if case .scrub = activeDrag {
+            collapsedContent.setScrubbing(false)
+            expandedContent.setScrubbing(false)
+        }
         activeDrag = nil
+        snappedTime = nil
+        isAtEditLimit = false
+        updateReadouts(at: displayedPlayhead)
     }
 
     // MARK: - Test seams
@@ -707,9 +1027,29 @@ public final class VideoTimeline: UIView {
     /// The header's two glyph controls, for the large-content-viewer test.
     var headerControlsForTesting: (playback: UIControl, chevron: UIControl) { (playbackButton, chevronButton) }
 
-    /// The playhead's time in seconds, as opposed to `playheadXForTesting`'s
-    /// rendered position.
+    /// The playhead's time in seconds, as last REPORTED by the owner — as
+    /// opposed to `playheadXForTesting`'s rendered position, which the
+    /// playback clock may have carried a little further.
     var playheadTimeForTesting: Double { playheadTime }
+
+    /// The header's readout, as displayed.
+    var readoutForTesting: String? { timeLabel.attributedText?.string }
+
+    /// Whether the playback clock is running (it should only while playing).
+    var isClockRunningForTesting: Bool { clock != nil }
+
+    /// Drives one playback-clock frame now, as if `seconds` had passed since
+    /// the owner's last report.
+    func simulateClockTickForTesting(secondsSinceReport seconds: Double) {
+        playheadReportedAt = CACurrentMediaTime() - seconds
+        clockTicked()
+    }
+
+    /// Makes the last report `seconds` older than it is.
+    func backdateLastReportForTesting(by seconds: Double) { playheadReportedAt -= seconds }
+
+    /// One playback-clock frame, against the clock's own timestamps.
+    func tickClockForTesting() { clockTicked() }
 
     var expandedClipLaneCount: Int { expandedContent.clipBlockViews.count }
     var expandedTextPillCount: Int { expandedContent.textPillBlockViews.count }
@@ -738,9 +1078,8 @@ public final class VideoTimeline: UIView {
     }
 
     /// A clip block's rendered fill, for asserting the selected/unselected
-    /// palette split (selected renders `Theme.Color.accent`; see `hitTarget`'s
-    /// callers in `ExpandedLanesView`/`ClipRowView`) without reaching past the
-    /// public model into private view internals.
+    /// palette split (selected renders `Theme.Color.accent`) without reaching
+    /// past the public model into private view internals.
     func colorForClip(at index: Int) -> UIColor? {
         expandedContent.clipBlockViews.first(where: { $0.index == index })?.view.backgroundColor
     }
@@ -759,6 +1098,21 @@ public final class VideoTimeline: UIView {
     /// Mirrors what `handlePan` does for a `.cancelled`/`.failed` gesture: end
     /// the drag, but only ever report `.changed`, never `.committed`.
     func simulatePanCancelled(at point: CGPoint) { performPanEnd(at: point, phase: .changed) }
+}
+
+/// `CADisplayLink` retains its target; this keeps the timeline's clock from
+/// keeping the timeline alive.
+private final class TimelineClockTarget: NSObject {
+    private weak var timeline: VideoTimeline?
+    init(_ timeline: VideoTimeline) {
+        self.timeline = timeline
+        super.init()
+    }
+    /// A link whose timeline is gone stops itself rather than ticking forever.
+    @MainActor @objc func tick(_ link: CADisplayLink) {
+        guard let timeline else { return link.invalidate() }
+        timeline.clockTicked()
+    }
 }
 
 // MARK: - UIGestureRecognizerDelegate

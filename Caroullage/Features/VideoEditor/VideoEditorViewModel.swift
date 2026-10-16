@@ -532,6 +532,23 @@ public final class VideoEditorViewModel {
         }
     }
 
+    /// Everything the PREVIEW composition is built from: the whole undo snapshot
+    /// minus the text and sticker overlays, which the canvas draws as live views
+    /// over the player and `buildBundle()` only bakes in for the export.
+    ///
+    /// The editor rebuilds its player item only when this changes. Replacing the
+    /// item blanks the player layer until the new one draws its first frame, so a
+    /// rebuild for a caption drag, a sticker drop or a selection tap was nothing
+    /// but a blink. Derived from `currentSnapshot()` rather than listing fields,
+    /// so a field added to the snapshot later is part of the composition by
+    /// default — the safe direction to be wrong in.
+    public var compositionSignature: Snapshot {
+        var signature = currentSnapshot()
+        signature.textOverlays = []
+        signature.stickerOverlays = []
+        return signature
+    }
+
     /// The engine input for the music track, or nil when there is no music (or its
     /// asset never loaded).
     public func backgroundMusic() -> BackgroundMusic? {
