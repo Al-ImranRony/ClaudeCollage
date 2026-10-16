@@ -22,6 +22,14 @@ struct VideoStartView: View {
     let onCancel: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    /// A tall template card grows with its words — at a fixed 150pt the
+    /// accessibility sizes broke "4 clips" and "Caption Stack" mid-word — up to
+    /// a width that still leaves the next card peeking in.
+    @ScaledMetric(relativeTo: .subheadline) private var scaledCardWidth: CGFloat = 150
+    private var tallCardWidth: CGFloat { min(scaledCardWidth, 260) }
+    /// Same for the blank tiles: wider minimum, fewer columns.
+    @ScaledMetric(relativeTo: .subheadline) private var blankTileMinWidth: CGFloat = 72
 
     /// Blank canvases, tallest first — the order people post in.
     static let blankAspects: [(ratio: String, title: LocalizedStringKey, subtitle: LocalizedStringKey)] = [
@@ -43,7 +51,7 @@ struct VideoStartView: View {
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(alignment: .top, spacing: 12) {
                                 ForEach(tallTemplates) { template in
-                                    templateCard(template, previewWidth: 150)
+                                    templateCard(template, previewWidth: tallCardWidth)
                                 }
                             }
                             .padding(.horizontal, 16)
@@ -54,7 +62,7 @@ struct VideoStartView: View {
                         }
                     }
                     section("Start Blank") {
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 72), spacing: 12)], spacing: 12) {
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: min(blankTileMinWidth, 300)), spacing: 12)], spacing: 12) {
                             ForEach(Self.blankAspects, id: \.ratio) { aspect in
                                 blankTile(aspect.ratio, title: aspect.title, subtitle: aspect.subtitle)
                             }
@@ -84,6 +92,10 @@ struct VideoStartView: View {
         }
         .padding()
         .foregroundStyle(Color.themeAccentStrong)
+        // Capped at the largest standard size, the way a navigation bar caps
+        // its title: "Cancel · New Video" must stay one line (the export
+        // sheet's header does the same). The content beneath scales fully.
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
     }
 
     private func section<Content: View>(
@@ -128,7 +140,10 @@ struct VideoStartView: View {
                 Text(template.summary)
                     .font(.themeSubheadline)
                     .foregroundStyle(Color.themeTextSecondary)
-                    .lineLimit(2, reservesSpace: previewWidth != nil)
+                    // Two lines keep the row even; at the accessibility sizes two
+                    // lines hold only a few words, so the summary may run longer.
+                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? 6 : 2,
+                               reservesSpace: previewWidth != nil)
                     .multilineTextAlignment(.leading)
             }
             .frame(width: previewWidth, alignment: .leading)

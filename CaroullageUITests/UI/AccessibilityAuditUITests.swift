@@ -92,6 +92,12 @@ final class AccessibilityAuditUITests: XCTestCase {
                    reason: "header capped like a navigation bar"),
         KnownIssue(audit: .dynamicType, elementLabel: "Export", surface: "Export sheet",
                    reason: "header capped like a navigation bar"),
+        // The new-video sheet's header is capped the same way, so
+        // "Cancel · New Video" stays one line at the accessibility sizes.
+        KnownIssue(audit: .dynamicType, elementLabel: "Cancel", surface: "New video sheet",
+                   reason: "header capped like a navigation bar"),
+        KnownIssue(audit: .dynamicType, elementLabel: "New Video", surface: "New video sheet",
+                   reason: "header capped like a navigation bar"),
         // The paywall's feature list and terms use native semantic fonts
         // (.subheadline / .caption2) and are visibly scaled in the AX-XXXL
         // screenshot; the audit measures the LazyVGrid before it re-lays out.

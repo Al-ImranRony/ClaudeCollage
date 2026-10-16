@@ -29,6 +29,10 @@ struct PaywallView: View {
     @ScaledMetric(relativeTo: .largeTitle) private var heroGlyphSize: CGFloat = 46
     /// The hero card grows with its caption, or the page dots sit on the words.
     @ScaledMetric(relativeTo: .largeTitle) private var heroHeight: CGFloat = 176
+    /// The feature symbols' column grows with their font, or a large symbol
+    /// spills out of a fixed 20pt slot onto its own words.
+    @ScaledMetric(relativeTo: .caption) private var featureSymbolWidth: CGFloat = 20
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
@@ -123,8 +127,11 @@ struct PaywallView: View {
     }
 
     private var featureList: some View {
-        LazyVGrid(
-            columns: [GridItem(.flexible(), alignment: .leading), GridItem(.flexible(), alignment: .leading)],
+        // Two columns until the accessibility sizes, where half the width
+        // breaks "template" and "watermark" mid-word: one column there.
+        let columnCount = dynamicTypeSize.isAccessibilitySize ? 1 : 2
+        return LazyVGrid(
+            columns: Array(repeating: GridItem(.flexible(), alignment: .leading), count: columnCount),
             alignment: .leading, spacing: Theme.Spacing.xs
         ) {
             ForEach(PaywallViewModel.features, id: \.title) { feature in
@@ -132,7 +139,7 @@ struct PaywallView: View {
                     Image(systemName: feature.symbol)
                         .font(.themeRounded(.caption, weight: .semibold))
                         .foregroundStyle(Color.themeAccentStrong)
-                        .frame(width: 20)
+                        .frame(width: featureSymbolWidth)
                         // Decorative beside its text; without this VoiceOver
                         // reads the symbol's name ("4k.tv.fill").
                         .accessibilityHidden(true)
@@ -355,7 +362,12 @@ struct PaywallView: View {
     // MARK: - Footer
 
     private var footer: some View {
-        HStack(spacing: Theme.Spacing.md) {
+        // One row until the accessibility sizes, where a third of the width
+        // broke "Restore Purchase", "Terms" and "Privacy" mid-word: stacked there.
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(spacing: Theme.Spacing.xs))
+            : AnyLayout(HStackLayout(spacing: Theme.Spacing.md))
+        return layout {
             // Caption-sized text, so each gets a 44pt tall hit region of its
             // own; the `contentShape` makes the empty part of it tappable.
             Button {
