@@ -40,6 +40,9 @@ public final class VideoEditorViewModel {
         /// `decodeIfPresent` fallback the way `VideoProjectData.borderWidth`
         /// (the actually-persisted field) does.
         public var borderWidth: CGFloat = 0
+        /// The camera move, if the collage pans. Rides the snapshot so a future
+        /// "Motion" control is undoable for free; templates set it at creation.
+        public var pan: CanvasPan?
     }
 
     public let projectID: UUID
@@ -57,6 +60,10 @@ public final class VideoEditorViewModel {
     /// Settable only through `setBorderWidthInteractive` + `commitInteractive()`
     /// (or `restore`) now that it rides the undo stack — see `Snapshot.borderWidth`.
     public private(set) var borderWidth: CGFloat
+    /// A camera move along a strip longer than the frame — see `CanvasPan`.
+    /// When set, the layout, captions and stickers all live in STRIP space
+    /// (`layoutSize`), and only the frame moves.
+    public private(set) var pan: CanvasPan?
 
     /// Decoded sources, kept out of the persisted state. Never evicted, so undoing
     /// a delete restores a playable cell rather than an empty one.
@@ -81,13 +88,40 @@ public final class VideoEditorViewModel {
         canvasSize: CGSize,
         layout: CollageLayout = .grid(.twoUpVertical),
         borderWidth: CGFloat = 0,
-        projectID: UUID = UUID()
+        projectID: UUID = UUID(),
+        pan: CanvasPan? = nil
     ) {
         self.canvasSize = canvasSize
         self.layout = layout
         self.borderWidth = borderWidth
         self.projectID = projectID
+        self.pan = pan
         self.cells = Array(repeating: VideoCellState(), count: max(1, layout.cellCount))
+        undoStack.push(currentSnapshot())
+    }
+
+    /// Starts a project from a video template: its canvas, layout, gap, camera
+    /// move, captions and stickers — every slot empty, waiting for the user's
+    /// clips (the same deal a photo template makes). Captions and stickers get
+    /// fresh ids so two projects made from one template never share one.
+    public convenience init(template: VideoTemplate, projectID: UUID = UUID()) {
+        self.init(
+            canvasSize: CanvasSize.size(forAspectRatio: template.aspectRatio),
+            layout: template.layout,
+            borderWidth: CGFloat(template.borderWidth),
+            projectID: projectID,
+            pan: template.pan)
+        textOverlays = template.textOverlays.map { overlay in
+            var copy = overlay
+            copy.id = UUID()
+            return copy
+        }
+        stickerOverlays = template.stickerOverlays.map { overlay in
+            var copy = overlay
+            copy.id = UUID()
+            return copy
+        }
+        undoStack.reset()
         undoStack.push(currentSnapshot())
     }
 
@@ -100,9 +134,29 @@ public final class VideoEditorViewModel {
     public var filledCellCount: Int { cells.filter { $0.videoID != nil }.count }
     public var hasContent: Bool { filledCellCount > 0 }
 
-    /// Absolute-pixel geometry of every slot, from the shared layout engine.
+    /// The space the layout is laid out in: the canvas itself, or — for a
+    /// panning collage — the whole strip the camera travels along.
+    public var layoutSize: CGSize { pan?.stripSize(for: canvasSize) ?? canvasSize }
+
+    /// Maps a rect normalized to the VISIBLE frame at `time` into layout space
+    /// (normalized to the strip), so a new caption or sticker lands in view on a
+    /// panning collage rather than stretched across the whole strip. Identity
+    /// when nothing pans.
+    public func layoutRect(forVisibleRect rect: CGRect, at time: Double, duration: Double) -> CGRect {
+        guard let pan, layoutSize.width > 0, layoutSize.height > 0 else { return rect }
+        let camera = pan.cameraOffset(at: time, duration: duration, canvas: canvasSize)
+        let absolute = CGRect(x: rect.minX * canvasSize.width + camera.x,
+                              y: rect.minY * canvasSize.height + camera.y,
+                              width: rect.width * canvasSize.width,
+                              height: rect.height * canvasSize.height)
+        return CGRect(x: absolute.minX / layoutSize.width, y: absolute.minY / layoutSize.height,
+                      width: absolute.width / layoutSize.width, height: absolute.height / layoutSize.height)
+    }
+
+    /// Absolute-pixel geometry of every slot, from the shared layout engine, in
+    /// `layoutSize` space.
     public func cellFrames() -> [CellFrame] {
-        engine.layout(for: layout, canvasSize: canvasSize, borderWidth: borderWidth)
+        engine.layout(for: layout, canvasSize: layoutSize, borderWidth: borderWidth)
     }
 
     public func asset(for id: UUID) -> AVAsset? { assets[id] }
@@ -143,6 +197,16 @@ public final class VideoEditorViewModel {
         record()
     }
 
+    // MARK: - Camera glide
+
+    /// How fast a panning collage glides. One undo step; a no-op without a pan.
+    public func setGlide(_ glide: CanvasPan.Glide) {
+        guard var current = pan, current.glide != glide else { return }
+        current.speed = glide.speed
+        pan = current
+        record()
+    }
+
     // MARK: - Per-cell content
 
     public func setVideo(assetID: UUID, asset: AVAsset, forCellAt index: Int) {
@@ -156,6 +220,31 @@ public final class VideoEditorViewModel {
         // instead of leaving a hole; the controls sheet can turn it off.
         cells[index].isLooping = true
         record()
+    }
+
+    /// The slots still waiting for a clip, in layout order.
+    public var emptyCellIndices: [Int] { cells.indices.filter { cells[$0].videoID == nil } }
+
+    /// Fills the empty slots, in layout order, with `assets` in the order given —
+    /// "Add clips" on a fresh template, one picker trip for every slot. One undo
+    /// step for the whole batch. Extra assets (more than there are empty slots)
+    /// are ignored. Returns how many slots were filled.
+    @discardableResult
+    public func fillEmptyCells(with newAssets: [AVAsset]) -> Int {
+        let targets = emptyCellIndices
+        var filled = 0
+        for (index, asset) in zip(targets, newAssets) {
+            let id = UUID()
+            assets[id] = asset
+            cells[index].videoID = id
+            // Same fresh-clip defaults as `setVideo`.
+            cells[index].trim = VideoTrim()
+            cells[index].isLooping = true
+            filled += 1
+        }
+        guard filled > 0 else { return 0 }
+        record()
+        return filled
     }
 
     public func clearVideo(atCellIndex index: Int) {
@@ -453,7 +542,8 @@ public final class VideoEditorViewModel {
     /// Assembles the composition for BOTH the live preview and the export, so what
     /// plays is what gets written.
     /// - Parameter renderSize: pass the export's target pixel size to write at that
-    ///   resolution; omit for the preview (renders at the canvas size).
+    ///   resolution; omit for the preview (renders at the canvas size). Caption
+    ///   point sizes scale with it, so a 4K export's text is not half-size.
     public func buildBundle(
         textOverlays: [TextOverlay] = [],
         stickerOverlays: [StickerOverlay] = [],
@@ -466,8 +556,18 @@ public final class VideoEditorViewModel {
             music: backgroundMusic(),
             textOverlays: textOverlays,
             stickerOverlays: stickerOverlays,
+            textFontScale: Self.textFontScale(canvas: canvasSize, render: renderSize),
             fps: fps,
-            renderSize: renderSize)
+            renderSize: renderSize,
+            pan: pan)
+    }
+
+    /// How much larger the written frame is than the canvas the captions were
+    /// authored on — the aspect-fit scale `VideoCompositionMath.renderMappedRect`
+    /// maps the cells by, so text and cells stay in proportion.
+    static func textFontScale(canvas: CGSize, render: CGSize?) -> CGFloat {
+        guard let render, canvas.width > 0, canvas.height > 0 else { return 1 }
+        return min(render.width / canvas.width, render.height / canvas.height)
     }
 
     // MARK: - Beat sync (slice 6c)
@@ -521,7 +621,8 @@ public final class VideoEditorViewModel {
     public func projectData() -> VideoProjectData {
         VideoProjectData(layout: layout, cells: cells, music: music,
                          borderWidth: Double(borderWidth),
-                         textOverlays: textOverlays, stickerOverlays: stickerOverlays)
+                         textOverlays: textOverlays, stickerOverlays: stickerOverlays,
+                         pan: pan)
     }
 
     /// File URLs of the cached clips keyed by media id — what the store copies into
@@ -560,6 +661,7 @@ public final class VideoEditorViewModel {
         borderWidth = CGFloat(data.borderWidth)
         textOverlays = data.textOverlays
         stickerOverlays = data.stickerOverlays
+        pan = data.pan
         self.assets = assets
         self.musicAsset = musicAsset
         selectedIndex = nil
@@ -603,6 +705,7 @@ public final class VideoEditorViewModel {
         textOverlays = snapshot.textOverlays
         stickerOverlays = snapshot.stickerOverlays
         borderWidth = snapshot.borderWidth
+        pan = snapshot.pan
         if let selected = selectedIndex, selected >= cells.count { selectedIndex = nil }
         onChanged?()
         onCommit?(self)
@@ -611,7 +714,7 @@ public final class VideoEditorViewModel {
     private func currentSnapshot() -> Snapshot {
         Snapshot(cells: cells, music: music, layout: layout,
                  textOverlays: textOverlays, stickerOverlays: stickerOverlays,
-                 borderWidth: borderWidth)
+                 borderWidth: borderWidth, pan: pan)
     }
 
     private func record() {

@@ -21,6 +21,20 @@ public struct SampleContentManifest: Decodable, Sendable {
         public let title: String
         /// A `GridTemplate` raw value — the layout the loop was composed in.
         public let layout: String
+        /// A `VideoTemplateCatalog` id, when the loop previews a video template
+        /// (baked by `VideoTemplateLoopBakeTests`). Tapping the card then opens
+        /// that template rather than a bare layout. Optional so every manifest
+        /// written before templates existed still decodes.
+        public let template: String?
+
+        /// The template this showcase previews, if any.
+        public var videoTemplate: VideoTemplate? {
+            template.flatMap(VideoTemplateCatalog.template(id:))
+        }
+
+        /// What the card is called: the template's own (localized) name when it
+        /// previews one, the manifest's title otherwise.
+        public var displayTitle: String { videoTemplate?.name ?? title }
     }
     public enum HeroKind: String, Decodable, Sendable, CaseIterable { case template, video, carousel }
     public struct HeroRef: Decodable, Sendable {

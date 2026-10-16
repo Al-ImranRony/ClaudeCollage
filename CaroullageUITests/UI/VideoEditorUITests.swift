@@ -22,6 +22,10 @@ final class VideoEditorUITests: XCTestCase {
         let video = app.buttons["videoCollageButton"]
         XCTAssertTrue(video.waitForExistence(timeout: 8), "Home shows the Video Collage button")
         video.tap()
+        // Video opens the new-video sheet (templates + blank shapes) first.
+        let blank = app.buttons["videoBlank-4:5"]
+        XCTAssertTrue(blank.waitForExistence(timeout: 8), "The new-video sheet offers a blank 4:5")
+        blank.tap()
         XCTAssertTrue(app.navigationBars["Video Collage"].waitForExistence(timeout: 8),
                       "Video editor pushes")
     }

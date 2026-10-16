@@ -22,11 +22,19 @@ import UIKit
 /// slider to drive.
 @MainActor
 final class VideoFramePanelView: UIView {
-    init(borderSlider: UISlider) {
+    /// `glideControl` is present only for a panning collage: how fast the
+    /// camera travels along the strip.
+    init(borderSlider: UISlider, glideControl: UISegmentedControl? = nil) {
         super.init(frame: .zero)
-        EditorPanelRow.fill(self, with: EditorPanelRow.stack([
+        var rows: [UIView] = [
             EditorPanelRow.make(title: "Border", systemImage: "square.dashed", trailing: borderSlider),
-        ]))
+        ]
+        if let glideControl {
+            rows.append(EditorPanelRow.make(
+                title: String(localized: "Glide"), systemImage: "arrow.left.and.right.righttriangle.left.righttriangle.right",
+                trailing: glideControl))
+        }
+        EditorPanelRow.fill(self, with: EditorPanelRow.stack(rows))
     }
 
     @available(*, unavailable)

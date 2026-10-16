@@ -43,6 +43,34 @@ public final class ThemeButton: GradientLayerButton {
         addAction(action, for: .touchUpInside)
         addAction(UIAction { _ in Haptics.tap() }, for: .touchUpInside)
         configure(title: title, image: image)
+        // The title font is resolved at the current text size when the
+        // configuration is built, so a Dynamic Type change rebuilds it.
+        registerForTraitChanges([UITraitPreferredContentSizeCategory.self]) { (button: Self, _) in
+            button.applyTitleFont()
+        }
+    }
+
+    public override func layoutSubviews() {
+        super.layoutSubviews()
+        // The configuration owns the title label, which only exists after the
+        // first layout. Marked here so it follows Dynamic Type (and says so to
+        // the accessibility audit) — the font itself comes from `applyTitleFont`.
+        titleLabel?.adjustsFontForContentSizeCategory = true
+    }
+
+    /// Sets the configuration's title font to the style's Dynamic Type font at
+    /// the CURRENT text size. The transformer captures a resolved font rather
+    /// than calling into `Theme` itself, because UIKit may run it off the main
+    /// actor.
+    private func applyTitleFont() {
+        guard var config = configuration else { return }
+        let font = style == .hero ? Theme.Typography.title2 : Theme.Typography.button
+        config.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
+            var outgoing = incoming
+            outgoing.font = font
+            return outgoing
+        }
+        configuration = config
     }
 
     @available(*, unavailable)

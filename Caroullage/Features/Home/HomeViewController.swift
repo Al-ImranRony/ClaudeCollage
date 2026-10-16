@@ -608,7 +608,7 @@ final class HomeViewController: UIViewController {
                 guard let showcase = videos.first(where: { $0.id == ref.id })
                 else { return nil }
                 return HeroShowcaseView.Page(
-                    title: showcase.title,
+                    title: showcase.displayTitle,
                     subtitle: String(localized: "Video collage · Tap to create"),
                     identifier: "heroPage-\(showcase.id)",
                     poster: sampleContent.image(named: showcase.poster),
@@ -1152,7 +1152,7 @@ extension HomeViewController: UICollectionViewDataSource, UICollectionViewDelega
               showcases.indices.contains(indexPath.item) else { return cell }
         let showcase = showcases[indexPath.item]
         card.configure(
-            name: showcase.title,
+            name: showcase.displayTitle,
             identifier: "showcaseVideo-\(showcase.id)",
             poster: sampleContent.image(named: showcase.poster),
             loopURL: sampleContent.videoURL(named: showcase.loop))

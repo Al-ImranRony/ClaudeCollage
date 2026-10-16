@@ -12,7 +12,8 @@
 import Foundation
 import CoreGraphics
 
-/// The eight rectangular grid layouts shipped in Step 01.
+/// The rectangular grid layouts: the eight shipped in Step 01, plus the three-row
+/// and three-column stacks added for the video templates (2026-09-27).
 ///
 /// Each case exposes a set of *normalized* cell rects (origin + size in the
 /// 0.0...1.0 unit square). `CollageLayoutEngine` scales these to the canvas
@@ -44,6 +45,10 @@ public enum GridTemplate: String, Codable, Sendable, CaseIterable {
     case fourSquare
     case sixGrid
     case nineGrid
+    /// Three full-width rows — the stacked look of short-form video collages.
+    case threeRows
+    /// Three full-height columns.
+    case threeColumns
 
     /// Number of photo cells this layout contains.
     public var cellCount: Int { normalizedCells.count }
@@ -59,6 +64,8 @@ public enum GridTemplate: String, Codable, Sendable, CaseIterable {
         case .fourSquare: return String(localized: "4 · Grid")
         case .sixGrid: return String(localized: "6 · Grid")
         case .nineGrid: return String(localized: "9 · Grid")
+        case .threeRows: return String(localized: "3 · Rows")
+        case .threeColumns: return String(localized: "3 · Columns")
         }
     }
 
@@ -105,6 +112,12 @@ public enum GridTemplate: String, Codable, Sendable, CaseIterable {
 
         case .nineGrid:
             return Self.uniformGrid(columns: 3, rows: 3)
+
+        case .threeRows:
+            return Self.uniformGrid(columns: 1, rows: 3)
+
+        case .threeColumns:
+            return Self.uniformGrid(columns: 3, rows: 1)
         }
     }
 

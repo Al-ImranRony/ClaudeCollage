@@ -53,4 +53,14 @@ public extension UIColor {
         func channel(_ v: CGFloat) -> Int { Int((min(max(v, 0), 1) * 255).rounded()) }
         return String(format: "#%02X%02X%02X", channel(red), channel(green), channel(blue))
     }
+
+    /// True for a colour dark ink reads better on than white — relative
+    /// luminance above the midpoint. Used to pick a caption surface that
+    /// contrasts with the caption's own text colour.
+    var isLight: Bool {
+        var red: CGFloat = 0, green: CGFloat = 0, blue: CGFloat = 0, alpha: CGFloat = 0
+        guard getRed(&red, green: &green, blue: &blue, alpha: &alpha) else { return false }
+        func linear(_ c: CGFloat) -> CGFloat { c <= 0.04045 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4) }
+        return 0.2126 * linear(red) + 0.7152 * linear(green) + 0.0722 * linear(blue) > 0.4
+    }
 }

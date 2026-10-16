@@ -87,6 +87,18 @@ final class VideoEditorViewController: UIViewController {
     /// Only ever assigned once, on the main actor, in `viewDidLoad`.
     private nonisolated(unsafe) var didFinishObserver: (any NSObjectProtocol)?
 
+    /// "Add 3 clips": fills every empty slot from one multi-select pick. Shown
+    /// while two or more slots are empty — a fresh template's natural next step,
+    /// and the one a caption lying over a slot's "+" would otherwise hide.
+    private lazy var addClipsButton: ThemeButton = {
+        let button = ThemeButton(
+            style: .primary, title: "", image: UIImage(systemName: "plus"),
+            action: UIAction { [weak self] _ in self?.presentMultiClipPicker() })
+        button.accessibilityIdentifier = "videoAddClipsButton"
+        button.applyCardShadow()
+        return button
+    }()
+
     private lazy var undoItem = UIBarButtonItem(
         image: UIImage(systemName: "arrow.uturn.backward"),
         style: .plain, target: self, action: #selector(undoTapped))
@@ -127,7 +139,7 @@ final class VideoEditorViewController: UIViewController {
     /// open alongside an unrelated selection must survive untouched (mirrors
     /// `GridEditorViewController.revalidateSelection`'s doc comment).
     private static let selectionPanelToolIDs: Set<EditorTool.ID> =
-        ["trim", "volume", "transition", "styleText", "timingText"]
+        ["trim", "volume", "transition", "styleText", "motionText", "timingText"]
 
     private static let clipTools: [EditorTool] = [
         EditorTool(id: "swap", title: String(localized: "Swap"), systemImage: "arrow.left.arrow.right",
@@ -156,6 +168,9 @@ final class VideoEditorViewController: UIViewController {
                    accessibilityIdentifier: "editTextTool"),
         EditorTool(id: "styleText", title: String(localized: "Style"), systemImage: "textformat",
                    accessibilityIdentifier: "styleTextTool"),
+        EditorTool(id: "motionText", title: String(localized: "Motion"), systemImage: "wand.and.sparkles",
+                   accessibilityIdentifier: "motionTextTool",
+                   emphasis: .bounce),
         EditorTool(id: "timingText", title: String(localized: "Timing"), systemImage: "clock",
                    accessibilityIdentifier: "timingTextTool",
                    // A clock's hands go round.
@@ -187,6 +202,8 @@ final class VideoEditorViewController: UIViewController {
     /// The open Style panel's preset strip, if any — re-synced from the document
     /// on every change so an undo that reverts the style moves its outline too.
     private weak var textStylePresetRow: TextStylePresetRow?
+    /// The open Motion panel's strip, re-synced the same way.
+    private weak var textAnimationPresetRow: TextAnimationPresetRow?
 
     // MARK: - Init
 
@@ -330,6 +347,21 @@ final class VideoEditorViewController: UIViewController {
         canvasView.addGestureRecognizer(pan)
 
         canvasView.isUserInteractionEnabled = true
+
+        addClipsButton.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(addClipsButton)
+        NSLayoutConstraint.activate([
+            addClipsButton.centerXAnchor.constraint(equalTo: canvasView.centerXAnchor),
+            addClipsButton.bottomAnchor.constraint(equalTo: canvasView.bottomAnchor, constant: -Theme.Spacing.md),
+        ])
+    }
+
+    private func refreshAddClipsButton() {
+        let empty = viewModel.emptyCellIndices.count
+        addClipsButton.isHidden = empty < 2
+        guard empty >= 2 else { return }
+        addClipsButton.configuration?.title = String(localized: "Add \(empty) clips")
+        addClipsButton.accessibilityHint = String(localized: "Fills the empty slots in the order you pick")
     }
 
     // MARK: - Tool rail
@@ -424,6 +456,10 @@ final class VideoEditorViewController: UIViewController {
             if let textID = selectedTextID {
                 openPanel(makeTextStylePanel(for: textID), title: String(localized: "Style"), id: id)
             }
+        case "motionText":
+            if let textID = selectedTextID {
+                openPanel(makeTextMotionPanel(for: textID), title: String(localized: "Motion"), id: id)
+            }
         case "timingText":
             if let textID = selectedTextID {
                 openPanel(makeTextTimingPanel(for: textID), title: String(localized: "Timing"), id: id)
@@ -471,6 +507,7 @@ final class VideoEditorViewController: UIViewController {
         // is what makes `refreshCanvas` pick up the freshly-set `selectedTextID`
         // and show the new overlay's on-canvas selection chrome immediately.
         viewModel.selectCell(at: nil)
+        refreshCaptionMotion()
         Haptics.selectionChanged()
         toolRail.setContext(EditorRailContext(
             chipTitle: String(localized: "Text"), chipSystemImage: "textformat", tools: Self.textTools))
@@ -480,6 +517,7 @@ final class VideoEditorViewController: UIViewController {
         selectedTextID = nil
         activeContextKind = nil
         viewModel.selectCell(at: nil)
+        refreshCaptionMotion()
         clearContext()
     }
 
@@ -559,7 +597,27 @@ final class VideoEditorViewController: UIViewController {
     private func makeFramePanel() -> UIView {
         let maxWidth = maxBorderWidth
         borderSlider.value = maxWidth > 0 ? Float(viewModel.borderWidth / maxWidth) : 0
-        return VideoFramePanelView(borderSlider: borderSlider)
+        return VideoFramePanelView(borderSlider: borderSlider, glideControl: makeGlideControl())
+    }
+
+    /// Whole Video · Slow · Medium · Fast — only for a panning collage. The
+    /// preview replays from the start so the new pace is seen at once.
+    private func makeGlideControl() -> UISegmentedControl? {
+        guard let pan = viewModel.pan, pan.extent > 1 else { return nil }
+        let glides = CanvasPan.Glide.allCases
+        let control = UISegmentedControl(items: glides.map(\.displayName))
+        control.selectedSegmentIndex = glides.firstIndex(of: pan.glide) ?? 0
+        control.accessibilityIdentifier = "videoGlideControl"
+        control.addAction(UIAction { [weak self, weak control] _ in
+            guard let self, let control, glides.indices.contains(control.selectedSegmentIndex) else { return }
+            Haptics.selectionChanged()
+            self.viewModel.setGlide(glides[control.selectedSegmentIndex])
+            if self.viewModel.hasContent {
+                self.scrub(to: 0)
+                self.setPlaying(true)
+            }
+        }, for: .valueChanged)
+        return control
     }
 
     @objc private func borderChanged() {
@@ -792,18 +850,72 @@ final class VideoEditorViewController: UIViewController {
     private func makeTextStylePanel(for id: UUID) -> UIView {
         let row = TextStylePresetRow(selected: viewModel.textOverlay(id: id)?.style.kind) { [weak self] kind in
             guard let self, var overlay = self.viewModel.textOverlay(id: id) else { return }
-            overlay.style = TextStyle(kind: kind, colorHex: "#FFFFFF", width: 6)
+            overlay = Self.applying(kind, to: overlay)
             self.viewModel.updateTextOverlay(overlay)
         }
         textStylePresetRow = row
         return row
     }
 
+    /// A style preset applied so the caption stays readable. The outline-type
+    /// treatments sit behind white text in white, as before; the painted ones
+    /// (`.box`, `.pill`, `.highlight`) would then be white on white, so they get a
+    /// surface that contrasts with the text instead — and `.box` gets the cream
+    /// label with ink text that the Caption Stack template uses.
+    static func applying(_ kind: TextStyle.Kind, to overlay: TextOverlay) -> TextOverlay {
+        var overlay = overlay
+        let textIsLight = UIColor(hex: overlay.colorHex).isLight
+        switch kind {
+        case .box:
+            if textIsLight { overlay.colorHex = "#1C1B19" }
+            overlay.style = TextStyle(kind: .box, colorHex: "#FBF3D6", width: 26)
+        case .pill, .highlight:
+            overlay.style = TextStyle(kind: kind, colorHex: textIsLight ? "#1C1B19" : "#FFFFFF", width: 6)
+        case .plain, .shadow, .stroke, .glow:
+            overlay.style = TextStyle(kind: kind, colorHex: textIsLight ? "#000000" : "#FFFFFF", width: 6)
+        }
+        return overlay
+    }
+
+    /// The Motion panel: the animations as preview cards. Choosing one plays it
+    /// on the canvas from the caption's in-point, so the user sees the real
+    /// motion rather than trusting a thumbnail.
+    private func makeTextMotionPanel(for id: UUID) -> UIView {
+        let row = TextAnimationPresetRow(selected: viewModel.textOverlay(id: id)?.animation) { [weak self] animation in
+            guard let self, var overlay = self.viewModel.textOverlay(id: id) else { return }
+            overlay.animation = animation
+            self.viewModel.updateTextOverlay(overlay)
+            self.replayCaption(id)
+        }
+        row.accessibilityIdentifier = "textAnimationRow"
+        textAnimationPresetRow = row
+        return row
+    }
+
+    /// Plays a caption's entrance from its in-point. Needs something to play —
+    /// with no clip yet the canvas shows the rest state and says why.
+    private func replayCaption(_ id: UUID) {
+        guard let overlay = viewModel.textOverlay(id: id), overlay.animation != .none else { return }
+        guard viewModel.hasContent else {
+            showToast(String(localized: "Add a clip to preview the motion"))
+            return
+        }
+        scrub(to: max(0, overlay.startTime ?? 0))
+        setPlaying(true)
+    }
+
     /// Keeps the Style panel's outline on the selected overlay's ACTUAL style —
     /// mirrors `GridEditorViewController.syncTextStylePresetRow`.
     private func syncTextStylePresetRow() {
-        guard let row = textStylePresetRow, let id = selectedTextID else { return }
-        row.setSelected(viewModel.textOverlay(id: id)?.style.kind)
+        guard let id = selectedTextID else { return }
+        textStylePresetRow?.setSelected(viewModel.textOverlay(id: id)?.style.kind)
+        textAnimationPresetRow?.setSelected(viewModel.textOverlay(id: id)?.animation)
+    }
+
+    /// Captions move only while the preview plays; paused, each caption on
+    /// screen shows its finished state — see `VideoCanvasView.animatesCaptions`.
+    private func refreshCaptionMotion() {
+        canvasView.animatesCaptions = isPlayingIntent
     }
 
     private func bindViewModel() {
@@ -998,6 +1110,7 @@ final class VideoEditorViewController: UIViewController {
         }
         guard isPlayingIntent != playing else { return }
         isPlayingIntent = playing
+        refreshCaptionMotion()
         refreshTimeline()
     }
 
@@ -1092,11 +1205,14 @@ final class VideoEditorViewController: UIViewController {
             canvasSize: viewModel.canvasSize,
             cellFrames: viewModel.cellFrames().map(\.frame),
             filled: (0 ..< viewModel.cellCount).map { viewModel.cells[$0].videoID != nil },
-            selectedIndex: highlightIndex)
+            selectedIndex: highlightIndex,
+            pan: viewModel.pan)
+        refreshCaptionMotion()
         canvasView.updateTextOverlays(viewModel.textOverlays, selected: selectedTextID)
         canvasView.updateStickerOverlays(viewModel.stickerOverlays, selected: selectedStickerID)
         undoItem.isEnabled = viewModel.canUndo
         redoItem.isEnabled = viewModel.canRedo
+        refreshAddClipsButton()
         refreshTimeline()
     }
 
@@ -1131,6 +1247,9 @@ final class VideoEditorViewController: UIViewController {
             item.videoComposition = bundle.videoComposition
             item.audioMix = bundle.audioMix
             self.player.replaceCurrentItem(with: item)
+            // What the camera's progress is measured against — the same
+            // duration the export's pan uses.
+            self.canvasView.compositionDuration = bundle.duration.seconds
             if resumeTime.isNumeric, resumeTime > .zero {
                 let seekTime = CMTimeMinimum(resumeTime, bundle.duration)
                 self.player.seek(to: seekTime,
@@ -1322,6 +1441,40 @@ final class VideoEditorViewController: UIViewController {
         present(picker.makePicker(), animated: true)
     }
 
+    /// One pick for every empty slot, in the order the user numbers them.
+    private func presentMultiClipPicker() {
+        let slots = viewModel.emptyCellIndices.count
+        guard slots > 0 else { return }
+        var importProgress: ExportProgressViewController?
+        let picker = VideoSourcePicker(
+            selectionLimit: slots,
+            willTranscode: { [weak self] in
+                guard let self else { return }
+                let progressVC = ExportProgressViewController(title: String(localized: "Importing clips…"))
+                importProgress = progressVC
+                self.present(progressVC, animated: true)
+            },
+            completion: { [weak self] assets in
+                guard let self else { return }
+                self.videoPicker = nil
+                let finish = {
+                    let filled = self.viewModel.fillEmptyCells(with: assets)
+                    guard filled > 0 else { return }
+                    Haptics.success()
+                    self.showToast(filled == 1
+                        ? String(localized: "Added 1 clip")
+                        : String(localized: "Added \(filled) clips"))
+                }
+                if let importProgress {
+                    importProgress.dismiss(animated: true, completion: finish)
+                } else {
+                    finish()
+                }
+            })
+        videoPicker = picker
+        present(picker.makePicker(), animated: true)
+    }
+
     // MARK: - Per-cell controls (the Trim panel's "More Options" destination)
 
     private func presentCellControls(for index: Int) {
@@ -1420,7 +1573,9 @@ final class VideoEditorViewController: UIViewController {
         Haptics.tap()
         let overlay = TextOverlay(
             text: String(localized: "Your text"), colorHex: "#FFFFFF",
-            frame: CGRect(x: 0.12, y: 0.44, width: 0.76, height: 0.14))
+            frame: viewModel.layoutRect(
+                forVisibleRect: CGRect(x: 0.12, y: 0.44, width: 0.76, height: 0.14),
+                at: playheadTime, duration: canvasView.compositionDuration))
         let id = viewModel.addTextOverlay(overlay)
         presentTextStyleSheet(for: id)
     }
@@ -1429,8 +1584,15 @@ final class VideoEditorViewController: UIViewController {
         Haptics.tap()
         let picker = StickerPickerViewController.sheet { [weak self] entry in
             guard let self else { return }
+            // The default sticker — centred, 28% of the frame wide — placed in
+            // the frame the user is looking at, which on a panning strip is
+            // wherever the camera is. A zero-height rect: `minY` is the centre.
+            let placed = self.viewModel.layoutRect(
+                forVisibleRect: CGRect(x: 0.36, y: 0.5, width: 0.28, height: 0),
+                at: self.playheadTime, duration: self.canvasView.compositionDuration)
             let overlay = StickerOverlay(
-                stickerID: entry.id, symbolName: entry.symbol, colorHex: entry.colorHex)
+                stickerID: entry.id, symbolName: entry.symbol, colorHex: entry.colorHex,
+                center: CGPoint(x: placed.midX, y: placed.minY), sizeNorm: Double(placed.width))
             self.selectedStickerID = self.viewModel.addSticker(overlay)
             Haptics.success()
             self.showToast(String(localized: "Drag to position · double-tap to remove"))

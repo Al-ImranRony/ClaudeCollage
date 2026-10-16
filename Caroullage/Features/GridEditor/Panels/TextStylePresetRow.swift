@@ -227,7 +227,7 @@ final class TextStylePresetRow: UIView {
             let onInk = Theme.Color.textOnAccent.resolvedColor(with: traits).hexStringRGB
             let glyph: String
             switch kind {
-            case .pill, .highlight, .stroke: glyph = onInk
+            case .pill, .box, .highlight, .stroke: glyph = onInk
             case .plain, .shadow, .glow: glyph = ink
             }
             return TextOverlay(

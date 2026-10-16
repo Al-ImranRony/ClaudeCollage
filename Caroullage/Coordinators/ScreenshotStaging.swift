@@ -43,10 +43,12 @@ enum ScreenshotStaging {
         }
     }
 
-    /// Fills the video collage's slots with the bundled loops.
+    /// Fills the video collage's slots with the bundled loops, cycling through
+    /// them when a template has more slots than there are loops.
     static func seed(_ viewModel: VideoEditorViewModel) {
         let loops = ["sample_loop_duo", "sample_loop_solo", "sample_loop_quad"]
-        for (index, name) in loops.prefix(viewModel.cells.count).enumerated() {
+        for index in viewModel.cells.indices {
+            let name = loops[index % loops.count]
             guard let url = SampleContentCatalog.shared.videoURL(named: name) else { continue }
             viewModel.setVideo(assetID: UUID(), asset: AVURLAsset(url: url), forCellAt: index)
         }

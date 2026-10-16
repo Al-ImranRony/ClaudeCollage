@@ -47,6 +47,46 @@ public enum TextRendering {
 
     /// The attributed string the overlay draws, styled identically for preview and
     /// export. `fontScale` scales the point-based `fontSize` / `letterSpacing`.
+    ///
+    /// `animation`'s per-range alphas (word / character reveals) fade the glyphs,
+    /// their stroke and their shadow — but not a `.highlight` background, which is
+    /// the surface the words appear on. Layout never changes with the reveal: a
+    /// hidden word is transparent, not absent, so the caption does not reflow.
+    public static func attributedString(
+        for overlay: TextOverlay, fontScale: CGFloat, animation: TextAnimationFrame?
+    ) -> NSAttributedString {
+        let base = attributedString(for: overlay, fontScale: fontScale)
+        guard let animation, !animation.rangeAlphas.isEmpty else { return base }
+        let mutable = NSMutableAttributedString(attributedString: base)
+        let length = mutable.length
+        for entry in animation.rangeAlphas where entry.alpha < 1 {
+            let range = NSIntersectionRange(entry.range, NSRange(location: 0, length: length))
+            guard range.length > 0 else { continue }
+            let alpha = max(0, entry.alpha)
+            mutable.enumerateAttributes(in: range) { attributes, subrange, _ in
+                if let color = attributes[.foregroundColor] as? UIColor {
+                    mutable.addAttribute(.foregroundColor,
+                                         value: color.withAlphaComponent(color.cgColor.alpha * alpha),
+                                         range: subrange)
+                }
+                if let color = attributes[.strokeColor] as? UIColor {
+                    mutable.addAttribute(.strokeColor,
+                                         value: color.withAlphaComponent(color.cgColor.alpha * alpha),
+                                         range: subrange)
+                }
+                if let shadow = attributes[.shadow] as? NSShadow,
+                   let color = shadow.shadowColor as? UIColor {
+                    let faded = NSShadow()
+                    faded.shadowBlurRadius = shadow.shadowBlurRadius
+                    faded.shadowOffset = shadow.shadowOffset
+                    faded.shadowColor = color.withAlphaComponent(color.cgColor.alpha * alpha)
+                    mutable.addAttribute(.shadow, value: faded, range: subrange)
+                }
+            }
+        }
+        return mutable
+    }
+
     public static func attributedString(for overlay: TextOverlay, fontScale: CGFloat) -> NSAttributedString {
         let font = font(for: overlay, fontScale: fontScale)
 
@@ -85,6 +125,10 @@ public enum TextRendering {
         /// Pill: generous horizontal inset, tighter vertical, near-capsule corners.
         static let pillVerticalInset: CGFloat = 0.6
         static let pillCornerInset: CGFloat = 2
+        /// Box: a label — snug sides, taller top and bottom, barely rounded.
+        static let boxHorizontalInset: CGFloat = 0.6
+        static let boxVerticalInset: CGFloat = 0.9
+        static let boxCorner: CGFloat = 0.4
     }
 
     /// Applies the presentation treatment. Kept separate from typesetting so `.pill`
@@ -104,7 +148,7 @@ public enum TextRendering {
         let width = CGFloat(style.width) * fontScale
 
         switch style.kind {
-        case .plain, .pill:
+        case .plain, .pill, .box:
             break
 
         case .highlight:
@@ -143,14 +187,23 @@ public enum TextRendering {
     /// Draws the overlay into a Core Graphics context (export / thumbnail path),
     /// vertically centred within `absoluteFrame` and clipped to it — matching how a
     /// UILabel centres and clips its text on the live canvas.
+    ///
+    /// `animation` (from `TextAnimationMath`) is applied the way the live canvas's
+    /// `TextOverlayView` applies it: clip to the frame first, then transform about
+    /// the frame's centre, then fade the whole caption as ONE group (a
+    /// transparency layer, so a box and its text fade together rather than the
+    /// box showing through half-faded glyphs), then the per-range glyph alphas.
     public static func draw(
         _ overlay: TextOverlay,
         in absoluteFrame: CGRect,
         fontScale: CGFloat,
-        context cg: CGContext
+        context cg: CGContext,
+        animation: TextAnimationFrame? = nil
     ) {
         guard !overlay.text.isEmpty, absoluteFrame.width > 0, absoluteFrame.height > 0 else { return }
-        let attributed = attributedString(for: overlay, fontScale: fontScale)
+        let animation = animation.flatMap { $0.isRest ? nil : $0 }
+        if let animation, animation.isInvisible { return }
+        let attributed = attributedString(for: overlay, fontScale: fontScale, animation: animation)
 
         let measured = attributed.boundingRect(
             with: CGSize(width: absoluteFrame.width, height: .greatestFiniteMagnitude),
@@ -162,6 +215,14 @@ public enum TextRendering {
 
         cg.saveGState()
         cg.clip(to: absoluteFrame)
+        if let animation {
+            cg.translateBy(x: absoluteFrame.midX + animation.offset.dx * absoluteFrame.width,
+                           y: absoluteFrame.midY + animation.offset.dy * absoluteFrame.height)
+            cg.scaleBy(x: animation.scale, y: animation.scale)
+            cg.translateBy(x: -absoluteFrame.midX, y: -absoluteFrame.midY)
+            cg.setAlpha(min(1, max(0, animation.opacity)))
+            cg.beginTransparencyLayer(auxiliaryInfo: nil)
+        }
         if let background = backgroundRect(for: overlay, in: absoluteFrame, fontScale: fontScale) {
             cg.saveGState()
             cg.setFillColor(UIColor(hex: overlay.style.colorHex).cgColor)
@@ -172,6 +233,7 @@ public enum TextRendering {
                                      width: absoluteFrame.width, height: drawnHeight),
                         options: [.usesLineFragmentOrigin, .usesFontLeading],
                         context: nil)
+        if animation != nil { cg.endTransparencyLayer() }
         cg.restoreGState()
     }
 
@@ -209,7 +271,8 @@ public enum TextRendering {
         in absoluteFrame: CGRect,
         fontScale: CGFloat
     ) -> (rect: CGRect, cornerRadius: CGFloat)? {
-        guard overlay.style.kind == .pill, !overlay.text.isEmpty,
+        let kind = overlay.style.kind
+        guard kind == .pill || kind == .box, !overlay.text.isEmpty,
               absoluteFrame.width > 0, absoluteFrame.height > 0 else { return nil }
 
         let attributed = attributedString(for: overlay, fontScale: fontScale)
@@ -233,13 +296,18 @@ public enum TextRendering {
         let textRect = CGRect(x: originX, y: originY, width: textWidth, height: textHeight)
 
         let inset = CGFloat(overlay.style.width) * fontScale
-        let outset = textRect.insetBy(dx: -inset, dy: -inset * StyleRatio.pillVerticalInset)
+        let outset = kind == .box
+            ? textRect.insetBy(dx: -inset * StyleRatio.boxHorizontalInset,
+                               dy: -inset * StyleRatio.boxVerticalInset)
+            : textRect.insetBy(dx: -inset, dy: -inset * StyleRatio.pillVerticalInset)
         // The outward inset can overflow `absoluteFrame` (a large style width, or a
         // text box with little room to spare); clamp rather than let the caller's
         // rectangular clip crop the rounded corners into a flat notch.
         let rect = outset.intersection(absoluteFrame)
         guard rect.width > 0, rect.height > 0 else { return nil }
-        let radius = min(rect.height / 2, inset * StyleRatio.pillCornerInset)
+        let radius = kind == .box
+            ? min(rect.height / 2, inset * StyleRatio.boxCorner)
+            : min(rect.height / 2, inset * StyleRatio.pillCornerInset)
         return (rect, max(0, radius))
     }
 

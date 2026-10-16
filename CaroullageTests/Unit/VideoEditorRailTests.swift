@@ -384,8 +384,8 @@ final class VideoEditorRailTests: XCTestCase {
         editor.selectTextOverlayForTesting(id)
 
         XCTAssertEqual(
-            Array(try rail(in: editor).visibleToolIdentifiers.prefix(4)),
-            ["editTextTool", "styleTextTool", "timingTextTool", "deleteTextTool"])
+            Array(try rail(in: editor).visibleToolIdentifiers.prefix(5)),
+            ["editTextTool", "styleTextTool", "motionTextTool", "timingTextTool", "deleteTextTool"])
     }
 
     func testDeletingATextOverlayRemovesItAndClearsTheSelection() throws {
@@ -648,7 +648,7 @@ final class VideoEditorRailTests: XCTestCase {
         let rail = try rail(in: editor)
         XCTAssertFalse(try panel(in: editor).isPresenting, "The stale Clip panel must not survive")
         XCTAssertNil(rail.activeToolID)
-        XCTAssertEqual(Array(rail.visibleToolIdentifiers.prefix(4)),
-                       ["editTextTool", "styleTextTool", "timingTextTool", "deleteTextTool"])
+        XCTAssertEqual(Array(rail.visibleToolIdentifiers.prefix(5)),
+                       ["editTextTool", "styleTextTool", "motionTextTool", "timingTextTool", "deleteTextTool"])
     }
 }

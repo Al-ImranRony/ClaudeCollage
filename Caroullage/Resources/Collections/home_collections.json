@@ -163,7 +163,7 @@
       "titleKey": "Video Collages",
       "kind": "video",
       "isPillar": true,
-      "itemIDs": ["duo-motion", "quad-motion", "solo-motion"]
+      "itemIDs": ["tpl-caption-stack", "tpl-lyric-stack", "tpl-title-grid", "tpl-travel-filmstrip", "duo-motion", "quad-motion", "solo-motion"]
     },
     {
       "id": "carousels",

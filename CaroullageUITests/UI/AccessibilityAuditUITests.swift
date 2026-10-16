@@ -263,6 +263,10 @@ final class AccessibilityAuditUITests: XCTestCase {
         let video = app.buttons["videoCollageButton"]
         XCTAssertTrue(video.waitForExistence(timeout: 10))
         video.tap()
+        let blank = app.buttons["videoBlank-4:5"]
+        XCTAssertTrue(blank.waitForExistence(timeout: 8), "the new-video sheet opens first")
+        audit(app, "New video sheet")
+        blank.tap()
         XCTAssertTrue(app.navigationBars["Video Collage"].waitForExistence(timeout: 8))
         audit(app, "Video editor")
         app.buttons["videoTimelineChevron"].tap()

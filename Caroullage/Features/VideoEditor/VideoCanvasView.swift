@@ -28,6 +28,16 @@
 //    draws into a `CVPixelBuffer` where UIKit views can't run.
 //  • `cellViews` — selection chrome + "tap to add" placeholders for empty slots.
 //
+//  All three live inside `stripView`, which is the layout's own space: the
+//  canvas itself, or — when the collage pans (`CanvasPan`) — the whole strip,
+//  translated by the camera offset at the preview time. So a caption dragged on
+//  a panning collage is normalized against the strip and rides along with its
+//  panel, exactly as the export draws it, and a tap hit-tests through the offset.
+//
+//  Captions are animated (`TextAnimationMath`) from the same preview time while
+//  the player runs (`animatesCaptions`). A display link drives that time — the
+//  VC's 10 Hz observer is fine for in/out points, too coarse for motion.
+//
 
 import AVFoundation
 import UIKit
@@ -57,7 +67,28 @@ final class VideoCanvasView: UIView {
     var onCellActivated: ((Int) -> Void)?
 
     private var canvasSize: CGSize = CGSize(width: 1, height: 1)
+    /// The space `cellFrames` and the overlays are laid out in — `canvasSize`, or
+    /// the whole strip for a panning collage.
+    private var layoutSize: CGSize = CGSize(width: 1, height: 1)
+    private var pan: CanvasPan?
     private var cellFrames: [CGRect] = []
+    /// Hosts the cell chrome and overlays in layout space; offset by the camera.
+    private let stripView = UIView()
+    /// How long the composition runs — what the camera's progress is measured
+    /// against. Pushed by the VC whenever the composition is rebuilt.
+    var compositionDuration: Double = 0 {
+        didSet { if compositionDuration != oldValue { refreshTimedState() } }
+    }
+    /// Whether captions play their animation. The VC turns it on only while
+    /// the player runs: a paused preview shows every caption on screen in its
+    /// finished state, so a freshly opened template — paused at 0:00, where a
+    /// fade or a word reveal has not begun — never looks captionless, and the
+    /// caption being edited is never mid-reveal. Scrubbing still shows WHICH
+    /// captions are on screen at each moment; only the motion waits for Play.
+    var animatesCaptions = false {
+        didSet { if animatesCaptions != oldValue { refreshTimedState() } }
+    }
+    private var displayLink: CADisplayLink?
 
     // Interactive text/sticker overlay views (reused from the grid editor), layered
     // above the player — the only overlay rendering path in the preview; see the
@@ -95,6 +126,9 @@ final class VideoCanvasView: UIView {
 
         isAccessibilityElement = false
         accessibilityIdentifier = "videoCanvas"
+
+        stripView.backgroundColor = .clear
+        addSubview(stripView)
     }
 
     @available(*, unavailable)
@@ -102,12 +136,16 @@ final class VideoCanvasView: UIView {
 
     // MARK: - Configuration
 
-    /// Lays out the slot chrome. `frames` are in canvas pixels; they're scaled into
-    /// view space by `canvasToView`.
+    /// Lays out the slot chrome. `frames` are in canvas pixels of LAYOUT space
+    /// (`pan`'s strip when there is one); they're scaled into view space by
+    /// `canvasToView`.
     func configure(canvasSize: CGSize, cellFrames frames: [CGRect],
-                   filled: [Bool], selectedIndex: Int?) {
+                   filled: [Bool], selectedIndex: Int?, pan: CanvasPan? = nil) {
         self.canvasSize = canvasSize
+        self.pan = pan
+        self.layoutSize = pan?.stripSize(for: canvasSize) ?? canvasSize
         self.cellFrames = frames
+        updateMotionUpdates()
 
         // Rebuild the chrome views when the slot count changes (layout switch).
         if cellViews.count != frames.count {
@@ -117,7 +155,7 @@ final class VideoCanvasView: UIView {
                 view.onActivate = { [weak self] in self?.onCellActivated?(index) }
                 return view
             }
-            cellViews.forEach { addSubview($0) }
+            cellViews.forEach { stripView.insertSubview($0, at: 0) }
             refreshAccessibilityElements()
         }
 
@@ -161,19 +199,20 @@ final class VideoCanvasView: UIView {
                 view.onChanged = { [weak self] in self?.onTextChanged?($0) }
                 view.onCommitted = { [weak self] in self?.onTextCommitted?() }
                 view.onTapped = { [weak self] in self?.onTextTapped?($0) }
-                addSubview(view)
+                stripView.addSubview(view)
                 return view
             }
         }
         for (view, overlay) in zip(textViews, overlays) {
             view.isSelected = overlay.id == selected
         }
-        textViews.forEach { bringSubviewToFront($0) }
-        stickerViews.forEach { bringSubviewToFront($0) }   // stickers above text
+        textViews.forEach { stripView.bringSubviewToFront($0) }
+        stickerViews.forEach { stripView.bringSubviewToFront($0) }   // stickers above text
         setNeedsLayout()
+        updateMotionUpdates()
         // A freshly pooled view defaults to visible — refresh immediately so a
         // timed-out caption doesn't flash on screen before the next player tick.
-        refreshTextVisibility()
+        refreshTimedState()
         refreshAccessibilityElements()
     }
 
@@ -187,7 +226,7 @@ final class VideoCanvasView: UIView {
             view.onDeleted = { [weak self] in self?.onStickerDeleted?($0) }
             view.onSelected = { [weak self] in self?.onStickerSelected?($0) }
             view.isSelected = overlay.id == selected
-            addSubview(view)
+            stripView.addSubview(view)
             return view
         }
         setNeedsLayout()
@@ -206,8 +245,9 @@ final class VideoCanvasView: UIView {
     /// True when an interactive text/sticker view sits under the point — the VC uses
     /// this to skip cell-tap handling (the overlay's own gestures take the touch).
     func hasInteractiveOverlay(at point: CGPoint) -> Bool {
-        stickerViews.contains { $0.frame.contains(point) }
-            || textViews.contains { $0.frame.contains(point) }
+        let stripPoint = convert(point, to: stripView)
+        return stickerViews.contains { $0.frame.contains(stripPoint) }
+            || textViews.contains { !$0.isHidden && $0.frame.contains(stripPoint) }
     }
 
     // MARK: - Playback time
@@ -219,7 +259,7 @@ final class VideoCanvasView: UIView {
     func setPreviewTime(_ seconds: Double) {
         guard seconds != previewTime else { return }
         previewTime = seconds
-        refreshTextVisibility()
+        refreshTimedState()
     }
 
     /// Test seam: the pooled text overlay views, to assert visibility directly
@@ -230,16 +270,61 @@ final class VideoCanvasView: UIView {
     /// this synchronously — see `VideoEditorViewController.scrub(to:)`.
     var previewTimeForTesting: Double { previewTime }
 
-    private func refreshTextVisibility() {
+    /// Everything that follows the preview time: which captions are on screen,
+    /// how far into its animation each one is, and where the camera sits.
+    private func refreshTimedState() {
         for (view, overlay) in zip(textViews, textModels) {
-            view.isHidden = !overlay.isVisible(at: previewTime)
+            let visible = overlay.isVisible(at: previewTime)
+            view.isHidden = !visible
+            guard visible else { continue }
+            view.applyAnimation(animatesCaptions
+                ? TextAnimationMath.frame(for: overlay, at: previewTime) : nil)
         }
+        layoutStrip()
+    }
+
+    /// Test seam: where the camera currently sits, in view points.
+    var cameraOffsetForTesting: CGPoint { CGPoint(x: -stripView.frame.minX, y: -stripView.frame.minY) }
+
+    // MARK: - Motion updates
+
+    /// Whether anything on the canvas moves with time between the VC's coarse
+    /// ticks — a pan or an animated caption.
+    private var needsMotionUpdates: Bool {
+        (pan?.extent ?? 1) > 1 || textModels.contains { $0.animation != .none }
+    }
+
+    private func updateMotionUpdates() {
+        if needsMotionUpdates, window != nil {
+            guard displayLink == nil else { return }
+            let link = CADisplayLink(target: DisplayLinkProxy(self), selector: #selector(DisplayLinkProxy.tick))
+            link.add(to: .main, forMode: .common)
+            displayLink = link
+        } else {
+            displayLink?.invalidate()
+            displayLink = nil
+        }
+    }
+
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        updateMotionUpdates()
+    }
+
+    fileprivate func displayLinkFired() {
+        // Only while the player actually runs: a paused preview is moved by the
+        // VC's scrub/seek path, and re-reading an unchanged time is wasted work.
+        guard let player, player.rate != 0 else { return }
+        let seconds = player.currentTime().seconds
+        guard seconds.isFinite else { return }
+        setPreviewTime(seconds)
     }
 
     // MARK: - Layout
 
     override func layoutSubviews() {
         super.layoutSubviews()
+        layoutStrip()
         let transform = canvasToView()
         for (index, cellView) in cellViews.enumerated() where cellFrames.indices.contains(index) {
             cellView.frame = cellFrames[index].applying(transform)
@@ -254,13 +339,33 @@ final class VideoCanvasView: UIView {
     /// maps reference-canvas point sizes onto the on-screen size, matching export.
     private func layoutOverlays() {
         let fontScale = canvasSize.width > 0 ? bounds.width / canvasSize.width : 1
+        let stripSize = stripView.bounds.size
         for (index, overlay) in textModels.enumerated() where textViews.indices.contains(index) {
-            textViews[index].frame = TextRendering.frame(for: overlay, in: bounds.size)
+            // `bounds`/`center`, not `frame`: an animating caption carries a
+            // transform on its content, never on the view itself, but the view's
+            // own frame is still only meaningful at identity.
+            let frame = TextRendering.frame(for: overlay, in: stripSize)
+            textViews[index].bounds = CGRect(origin: .zero, size: frame.size)
+            textViews[index].center = CGPoint(x: frame.midX, y: frame.midY)
             textViews[index].configure(with: overlay, fontScale: fontScale)
         }
         for (index, overlay) in stickerModels.enumerated() where stickerViews.indices.contains(index) {
-            stickerViews[index].apply(overlay: overlay, in: bounds.size)
+            stickerViews[index].apply(overlay: overlay, in: stripSize)
         }
+    }
+
+    /// Sizes the strip to layout space and slides it by the camera offset at the
+    /// preview time. Identity (strip == canvas, no offset) when nothing pans.
+    private func layoutStrip() {
+        let scale = canvasSize.width > 0 ? bounds.width / canvasSize.width : 1
+        let size = CGSize(width: layoutSize.width * scale, height: layoutSize.height * scale)
+        let camera = pan?.cameraOffset(at: previewTime, duration: compositionDuration,
+                                       canvas: bounds.size) ?? .zero
+        let frame = CGRect(origin: CGPoint(x: -camera.x, y: -camera.y), size: size)
+        guard stripView.frame != frame else { return }
+        let resized = stripView.bounds.size != size
+        stripView.frame = frame
+        if resized { layoutOverlays() }
     }
 
     /// Maps canvas pixels → view points. The view is sized to the canvas aspect
@@ -276,8 +381,11 @@ final class VideoCanvasView: UIView {
     /// The layout slot under a point in this view's coordinates, or nil.
     func cellIndex(at point: CGPoint) -> Int? {
         guard canvasSize.width > 0, canvasSize.height > 0, bounds.width > 0 else { return nil }
-        let canvasPoint = CGPoint(x: point.x * canvasSize.width / bounds.width,
-                                  y: point.y * canvasSize.height / bounds.height)
+        // Through the strip, so a tap lands on the slot under the finger wherever
+        // the camera has travelled to.
+        let stripPoint = convert(point, to: stripView)
+        let canvasPoint = CGPoint(x: stripPoint.x * canvasSize.width / bounds.width,
+                                  y: stripPoint.y * canvasSize.height / bounds.height)
         return cellFrames.firstIndex { $0.contains(canvasPoint) }
     }
 
@@ -305,6 +413,14 @@ final class VideoCanvasView: UIView {
         ])
         return cellView
     }
+}
+
+/// `CADisplayLink` retains its target; this breaks the cycle so a canvas that
+/// leaves the screen is not kept alive by its own animation clock.
+private final class DisplayLinkProxy {
+    private weak var canvas: VideoCanvasView?
+    init(_ canvas: VideoCanvasView) { self.canvas = canvas }
+    @MainActor @objc func tick() { canvas?.displayLinkFired() }
 }
 
 /// A slot's chrome view, and its accessibility element. Activation routes out
