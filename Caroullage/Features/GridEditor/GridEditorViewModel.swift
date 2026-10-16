@@ -189,6 +189,13 @@ public final class GridEditorViewModel {
         return overlay.id
     }
 
+    /// Where a new caption goes: `preferred`, unless a caption already sits
+    /// there — then the nearest free band above or below (`CaptionPlacement`).
+    public func newCaptionFrame(preferred: CGRect) -> CGRect {
+        let candidates = CaptionPlacement.candidates(around: preferred)
+        return CaptionPlacement.firstFree(candidates, avoiding: textOverlays.map(\.frame)) ?? preferred
+    }
+
     /// Adds a fresh, editable text overlay at the canvas centre — the "add text"
     /// affordance (templates seed their own text zones). Undoable; returns its id.
     @discardableResult

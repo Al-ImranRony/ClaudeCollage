@@ -1659,11 +1659,11 @@ final class VideoEditorViewController: UIViewController {
         Haptics.tap()
         let overlay = TextOverlay(
             text: String(localized: "Your text"), colorHex: "#FFFFFF",
-            frame: viewModel.layoutRect(
-                forVisibleRect: CGRect(x: 0.12, y: 0.44, width: 0.76, height: 0.14),
+            frame: viewModel.newCaptionFrame(
+                preferredVisible: CGRect(x: 0.12, y: 0.44, width: 0.76, height: 0.14),
                 at: playheadTime, duration: canvasView.compositionDuration))
         let id = viewModel.addTextOverlay(overlay)
-        presentTextStyleSheet(for: id)
+        presentTextStyleSheet(for: id, isNew: true)
     }
 
     private func addStickerTapped() {
@@ -1686,10 +1686,11 @@ final class VideoEditorViewController: UIViewController {
         present(picker, animated: true)
     }
 
-    private func presentTextStyleSheet(for id: UUID) {
+    private func presentTextStyleSheet(for id: UUID, isNew: Bool = false) {
         guard let overlay = viewModel.textOverlay(id: id) else { return }
         let panel = TextStyleSheet(
             overlay: overlay,
+            isNew: isNew,
             onChange: { [weak self] updated in self?.viewModel.updateTextOverlayInteractive(updated) },
             onDone: { [weak self] in
                 self?.viewModel.commitInteractive()

@@ -502,9 +502,26 @@ final class VideoCanvasView: UIView {
 
     /// Slots in layout order, then captions, then stickers — the order the photo
     /// canvas uses. A caption hidden by its timing is skipped by VoiceOver on its
-    /// own (`isHidden`), so the list need not track the playhead.
+    /// own (`isHidden`).
+    ///
+    /// On a panning collage only what the camera currently shows is listed:
+    /// the strip's other panels — and the captions and stickers on them — sit
+    /// outside the canvas, clipped, and VoiceOver used to land on them anyway.
+    /// So the list follows the camera (`layoutStrip` calls back here), and is
+    /// only reassigned when what is visible actually changes.
     private func refreshAccessibilityElements() {
-        accessibilityElements = (cellViews as [UIView]) + (textViews as [UIView]) + (stickerViews as [UIView])
+        let all = (cellViews as [UIView]) + (textViews as [UIView]) + (stickerViews as [UIView])
+        let visible = all.filter { isOnCanvas($0) }
+        let current = (accessibilityElements as? [UIView]) ?? []
+        guard current.count != visible.count || !zip(current, visible).allSatisfy({ $0 === $1 }) else { return }
+        accessibilityElements = visible
+    }
+
+    /// Whether any of `view` falls inside the canvas the camera shows. Before
+    /// the first layout nothing has a frame yet, so everything counts.
+    private func isOnCanvas(_ view: UIView) -> Bool {
+        guard bounds.width > 0, bounds.height > 0, view.superview != nil else { return true }
+        return convert(view.frame, from: view.superview).intersects(bounds)
     }
 
     /// True when an interactive text/sticker view sits under the point — the VC uses
@@ -607,6 +624,7 @@ final class VideoCanvasView: UIView {
                 min(bounds.width, bounds.height)
         }
         layoutOverlays()
+        refreshAccessibilityElements()
     }
 
     /// Positions the interactive overlay views from their normalized models (bounds
@@ -646,6 +664,7 @@ final class VideoCanvasView: UIView {
         let resized = stripView.bounds.size != size
         stripView.frame = frame
         if resized { layoutOverlays() }
+        refreshAccessibilityElements()
     }
 
     /// Maps canvas pixels → view points. The view is sized to the canvas aspect

@@ -44,6 +44,15 @@ public enum SnapEngine {
         return result
     }
 
+    /// Keeps a dragged element's centre on the canvas, so at least half of it
+    /// always stays there. Without this a caption or sticker could be thrown
+    /// clean off the edge, where nothing but undo could reach it again.
+    /// Normalized, like everything here — for a panning video collage that is
+    /// the whole strip, not just the part the camera shows.
+    public static func clampedToCanvas(_ center: CGPoint) -> CGPoint {
+        CGPoint(x: min(max(center.x, 0), 1), y: min(max(center.y, 0), 1))
+    }
+
     /// The closest candidate to `value`, or `nil` if none is within `threshold`.
     static func nearest(to value: CGFloat, within threshold: CGFloat) -> CGFloat? {
         guard let best = candidates.min(by: { abs($0 - value) < abs($1 - value) }),

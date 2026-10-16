@@ -60,13 +60,21 @@ struct TextStyleSheet: View {
     @ScaledMetric(relativeTo: .callout) private var fontChipTextHeight: CGFloat = 22
     private let onChange: (TextOverlay) -> Void
     private let onDone: () -> Void
+    /// See `CaptionTextDraft`.
+    @State private var draft: CaptionTextDraft
+    @FocusState private var textFieldFocused: Bool
 
+    /// `isNew`: the caption was just added, so its text is the default
+    /// ("Your text") — shown as the field's placeholder rather than as content,
+    /// and the field takes focus so the keyboard is up at once.
     init(
         overlay: TextOverlay,
+        isNew: Bool = false,
         onChange: @escaping (TextOverlay) -> Void,
         onDone: @escaping () -> Void
     ) {
         _overlay = State(initialValue: overlay)
+        _draft = State(initialValue: CaptionTextDraft(showsPlaceholder: isNew))
         self.onChange = onChange
         self.onDone = onDone
     }
@@ -105,10 +113,13 @@ struct TextStyleSheet: View {
 
     private var textSection: some View {
         Section("Text") {
-            TextField("Enter text", text: binding(\.text), axis: .vertical)
+            TextField("Your text", text: textBinding, axis: .vertical)
                 .lineLimit(1...4)
                 .font(.themeBody)
+                .focused($textFieldFocused)
+                .accessibilityIdentifier("textStyleTextField")
         }
+        .onAppear { if draft.showsPlaceholder { textFieldFocused = true } }
     }
 
     private var fontSection: some View {
@@ -224,6 +235,17 @@ struct TextStyleSheet: View {
         )
     }
 
+    /// The text field's binding: the caption's text, or empty while a new
+    /// caption still shows its default (the placeholder stands in for it).
+    private var textBinding: Binding<String> {
+        Binding(
+            get: { draft.fieldText(for: overlay.text) },
+            set: { typed in
+                if let text = draft.edit(typed) { update { $0.text = text } }
+            }
+        )
+    }
+
     private var alignmentBinding: Binding<TextOverlay.Alignment> {
         Binding(
             get: { overlay.alignment },
@@ -241,5 +263,28 @@ struct TextStyleSheet: View {
     private func update(_ mutate: (inout TextOverlay) -> Void) {
         mutate(&overlay)
         onChange(overlay)
+    }
+}
+
+/// A new caption starts with a default text ("Your text") so it is visible on
+/// the canvas. In the field that default used to be real content: typing
+/// added to it ("QA captionYour text") and it had to be deleted by hand. Now
+/// the field shows it as the placeholder, and the first keystroke replaces it.
+struct CaptionTextDraft: Equatable {
+    /// True until the user types into a new caption.
+    private(set) var showsPlaceholder: Bool
+
+    /// What the field shows for the caption's stored text.
+    func fieldText(for stored: String) -> String {
+        showsPlaceholder ? "" : stored
+    }
+
+    /// The text to store for what the field now holds, or nil to leave the
+    /// caption as it is (the field reporting an empty value before anything
+    /// was typed, which would otherwise wipe the default off the canvas).
+    mutating func edit(_ typed: String) -> String? {
+        if showsPlaceholder && typed.isEmpty { return nil }
+        showsPlaceholder = false
+        return typed
     }
 }

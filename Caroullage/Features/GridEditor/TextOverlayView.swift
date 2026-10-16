@@ -176,6 +176,7 @@ final class TextOverlayView: UIView {
         let size = container.bounds.size
         center.x += direction.dx * Self.nudgeStep * size.width
         center.y += direction.dy * Self.nudgeStep * size.height
+        center = clampedToCanvas(center, in: size)
         emitChange(in: size)
         onCommitted?()
     }
@@ -236,6 +237,7 @@ final class TextOverlayView: UIView {
             gesture.setTranslation(.zero, in: container)
             dragRawCenter.x += translation.x
             dragRawCenter.y += translation.y
+            dragRawCenter = clampedToCanvas(dragRawCenter, in: container.bounds.size)
             center = snappedCenter(for: dragRawCenter, in: container.bounds.size)
             emitChange(in: container.bounds.size)
         case .ended, .cancelled, .failed:
@@ -254,6 +256,14 @@ final class TextOverlayView: UIView {
 
     /// Snaps a raw (unsnapped) centre to the alignment guides and returns the centre
     /// to display, reporting which guides engaged plus a light tick as one grabs.
+    /// Keeps the centre on the canvas (`SnapEngine.clampedToCanvas`), so the
+    /// view can never be dragged out of reach.
+    private func clampedToCanvas(_ point: CGPoint, in size: CGSize) -> CGPoint {
+        guard size.width > 0, size.height > 0 else { return point }
+        let clamped = SnapEngine.clampedToCanvas(CGPoint(x: point.x / size.width, y: point.y / size.height))
+        return CGPoint(x: clamped.x * size.width, y: clamped.y * size.height)
+    }
+
     private func snappedCenter(for raw: CGPoint, in size: CGSize) -> CGPoint {
         guard size.width > 0, size.height > 0 else { return raw }
         let normalized = CGPoint(x: raw.x / size.width, y: raw.y / size.height)

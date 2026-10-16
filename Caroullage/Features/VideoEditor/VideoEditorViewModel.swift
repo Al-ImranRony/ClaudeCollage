@@ -153,6 +153,17 @@ public final class VideoEditorViewModel {
                       width: absolute.width / layoutSize.width, height: absolute.height / layoutSize.height)
     }
 
+    /// Where a new caption goes: the band across the middle of the frame the
+    /// user is looking at, unless a caption on screen at `time` already sits
+    /// there — then the nearest free band above or below it (`CaptionPlacement`).
+    /// A caption timed out of `time` is not in the way: it is not on screen.
+    public func newCaptionFrame(preferredVisible: CGRect, at time: Double, duration: Double) -> CGRect {
+        let candidates = CaptionPlacement.candidates(around: preferredVisible)
+            .map { layoutRect(forVisibleRect: $0, at: time, duration: duration) }
+        let onScreen = textOverlays.filter { $0.isVisible(at: time) }.map(\.frame)
+        return CaptionPlacement.firstFree(candidates, avoiding: onScreen) ?? candidates[0]
+    }
+
     /// Absolute-pixel geometry of every slot, from the shared layout engine, in
     /// `layoutSize` space.
     public func cellFrames() -> [CellFrame] {

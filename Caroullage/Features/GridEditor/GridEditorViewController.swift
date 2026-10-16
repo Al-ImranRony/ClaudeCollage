@@ -823,10 +823,11 @@ final class GridEditorViewController: UIViewController {
     /// Opens the styling bottom sheet for the tapped text overlay. Live edits
     /// stream to the canvas via `previewTextOverlay`; dismissing commits one undo
     /// snapshot.
-    private func presentTextStyleSheet(for id: UUID) {
+    private func presentTextStyleSheet(for id: UUID, isNew: Bool = false) {
         guard let overlay = viewModel.textOverlay(id: id) else { return }
         let panel = TextStyleSheet(
             overlay: overlay,
+            isNew: isNew,
             onChange: { [weak self] updated in self?.viewModel.previewTextOverlay(updated) },
             onDone: { [weak self] in
                 self?.viewModel.commitInteractiveChange()
@@ -910,10 +911,10 @@ final class GridEditorViewController: UIViewController {
         let overlay = TextOverlay(
             text: String(localized: "Your text"),
             colorHex: onLightBackground ? "#1A1A1C" : "#FFFFFF",
-            frame: CGRect(x: 0.12, y: 0.42, width: 0.76, height: 0.16)
+            frame: viewModel.newCaptionFrame(preferred: CGRect(x: 0.12, y: 0.42, width: 0.76, height: 0.16))
         )
         let id = viewModel.addTextOverlay(overlay)
-        presentTextStyleSheet(for: id)
+        presentTextStyleSheet(for: id, isNew: true)
     }
 
     // MARK: - Drag and drop (Step 05 batch C)
