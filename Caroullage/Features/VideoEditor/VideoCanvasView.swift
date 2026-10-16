@@ -28,6 +28,13 @@
 //    draws into a `CVPixelBuffer` where UIKit views can't run.
 //  • `cellViews` — selection chrome + "tap to add" placeholders for empty slots.
 //
+//  And one thing sits BETWEEN the player and all of those: `VideoFreezeFrameView`,
+//  which holds the last frame while the player swaps items (the swap would
+//  otherwise blank the video) and carries a layout change as a glide from the
+//  old slots to the new ones. Overlays are pooled by identity, so an edit that
+//  arrives from anywhere but the finger — undo, a new sticker, a deletion —
+//  animates to its new state instead of popping.
+//
 
 import AVFoundation
 import UIKit
@@ -58,6 +65,11 @@ final class VideoCanvasView: UIView {
 
     private var canvasSize: CGSize = CGSize(width: 1, height: 1)
     private var cellFrames: [CGRect] = []
+    /// Which slots held a clip at the last `configure` — a layout morph carries
+    /// only those, since an empty slot has no video to move.
+    private var slotFilled: [Bool] = []
+    /// Created on first use, so a canvas that never swaps items never has one.
+    private var freezeFrameStorage: VideoFreezeFrameView?
 
     // Interactive text/sticker overlay views (reused from the grid editor), layered
     // above the player — the only overlay rendering path in the preview; see the
@@ -104,20 +116,41 @@ final class VideoCanvasView: UIView {
 
     /// Lays out the slot chrome. `frames` are in canvas pixels; they're scaled into
     /// view space by `canvasToView`.
+    ///
+    /// `animated` is for a LAYOUT change: the chrome glides to the new slots and
+    /// the video on screen is cut into its cells and glides with it (see
+    /// `VideoFreezeFrameView.morph`), held until the rebuilt composition draws.
+    /// Anything else that moves the slots — a border drag, a restore — snaps, as
+    /// it always has: a glide per slider tick would lag the finger.
     func configure(canvasSize: CGSize, cellFrames frames: [CGRect],
-                   filled: [Bool], selectedIndex: Int?) {
+                   filled: [Bool], selectedIndex: Int?, animated: Bool = false) {
+        // Where the filled slots sit is read BEFORE anything moves.
+        let morphs = animated && window != nil && bounds.width > 0
+            && !cellViews.isEmpty && frames != cellFrames
+        let morphSources = morphs ? filledSlotRects() : [:]
         self.canvasSize = canvasSize
         self.cellFrames = frames
+        slotFilled = filled
 
-        // Rebuild the chrome views when the slot count changes (layout switch).
+        // Match the chrome to the slot count (layout switch). Slots keep their
+        // index across a layout change — the model keeps each slot's clip — so
+        // the views for the slots both layouts share are kept and moved, and
+        // only the difference is added or retired.
+        var freshCellViews: [VideoCellChromeView] = []
         if cellViews.count != frames.count {
-            cellViews.forEach { $0.removeFromSuperview() }
-            cellViews = frames.indices.map { index in
+            if cellViews.count > frames.count {
+                let leaving = cellViews[frames.count...]
+                cellViews.removeLast(cellViews.count - frames.count)
+                leaving.forEach { retire($0, animated: morphs) }
+            }
+            while cellViews.count < frames.count {
+                let index = cellViews.count
                 let view = makeCellView()
                 view.onActivate = { [weak self] in self?.onCellActivated?(index) }
-                return view
+                addSubview(view)
+                cellViews.append(view)
+                freshCellViews.append(view)
             }
-            cellViews.forEach { addSubview($0) }
             refreshAccessibilityElements()
         }
 
@@ -139,7 +172,135 @@ final class VideoCanvasView: UIView {
                 chip.isHidden = isFilled
             }
         }
+        if morphs { morphLayout(from: morphSources, fresh: freshCellViews) }
         setNeedsLayout()
+    }
+
+    // MARK: - Layout morph + item swaps
+
+    private var freezeFrameView: VideoFreezeFrameView {
+        if let view = freezeFrameStorage { return view }
+        let view = VideoFreezeFrameView(frame: bounds)
+        freezeFrameStorage = view
+        keepFreezeFrameBelowContent()
+        return view
+    }
+
+    /// Slots the held frame directly under the canvas's first real subview.
+    ///
+    /// NOT `insertSubview(_:at: 0)` / `sendSubviewToBack`: `AVPlayerLayer` draws
+    /// its video in a private SUBLAYER of this backing layer, at the front of
+    /// the sublayer list, so index 0 is underneath the video. There the hold
+    /// only showed once the swap had emptied the video layer, and a layout
+    /// glide's pieces moved invisibly behind the old frame. Inserting below a
+    /// sibling view keeps it above that private layer and below the chrome.
+    private func keepFreezeFrameBelowContent() {
+        guard let freeze = freezeFrameStorage else { return }
+        if let lowest = subviews.first(where: { $0 !== freeze }) {
+            insertSubview(freeze, belowSubview: lowest)
+        } else if freeze.superview !== self {
+            addSubview(freeze)
+        }
+    }
+
+    /// Where the player draws the frame inside this view. The canvas is sized
+    /// to the composition's aspect, so this is the bounds in practice; the
+    /// layer's own answer is used when it has one, so a rounding difference
+    /// can't misalign a cut.
+    private var currentVideoRect: CGRect {
+        let rect = playerLayer.videoRect
+        return rect.width > 0 && rect.height > 0 ? rect : bounds
+    }
+
+    /// Call right before the player's item is replaced: holds the frame on
+    /// screen over the gap the swap leaves.
+    func holdFrameForItemSwap() {
+        freezeFrameView.hold(VideoFreezeFrameView.currentFrame(of: playerLayer),
+                             videoRect: currentVideoRect)
+        keepFreezeFrameBelowContent()
+    }
+
+    /// Call right after the swap: lets the held frame go once `item` is
+    /// drawing — at once when there is no item to wait for.
+    func releaseHeldFrame(once item: AVPlayerItem?) {
+        guard let freeze = freezeFrameStorage else { return }
+        guard let item else { return freeze.release { true } }
+        freeze.release { [weak self, weak item] in
+            guard let self, let item, self.player?.currentItem === item else { return true }
+            switch item.status {
+            case .readyToPlay: return self.playerLayer.isReadyForDisplay
+            case .failed: return true
+            default: return false
+            }
+        }
+    }
+
+    /// The filled slots' current rects in this view's space, by slot index.
+    private func filledSlotRects() -> [Int: CGRect] {
+        var rects: [Int: CGRect] = [:]
+        for (index, view) in cellViews.enumerated()
+        where slotFilled.indices.contains(index) && slotFilled[index] {
+            rects[index] = convert(view.frame, from: view.superview)
+        }
+        return rects
+    }
+
+    private func morphLayout(from sources: [Int: CGRect], fresh: [VideoCellChromeView]) {
+        let transform = canvasToView()
+        let targets = cellFrames.map { $0.applying(transform) }
+        let duration = Theme.Motion.duration(Theme.Motion.slow)
+
+        if Theme.Motion.isReduced {
+            // No travel under Reduce Motion — the old frame simply crossfades
+            // into the new layout once it draws.
+            holdFrameForItemSwap()
+        } else {
+            let pieceTargets = zip(cellViews, targets).map { view, rect in
+                convert(rect, from: view.superview)
+            }
+            freezeFrameView.morph(VideoFreezeFrameView.currentFrame(of: playerLayer),
+                                  videoRect: currentVideoRect,
+                                  from: sources, to: pieceTargets, duration: duration)
+            keepFreezeFrameBelowContent()
+        }
+
+        // A new slot fades in where it will be; the rest glide there.
+        for view in fresh {
+            view.frame = targets[cellViews.firstIndex(of: view) ?? 0]
+            view.alpha = 0
+        }
+        UIView.animate(
+            withDuration: duration, delay: 0,
+            usingSpringWithDamping: Theme.Motion.isReduced ? 1 : VideoFreezeFrameView.morphDamping,
+            initialSpringVelocity: 0,
+            options: [.beginFromCurrentState, .allowUserInteraction]
+        ) {
+            for (view, rect) in zip(self.cellViews, targets) {
+                view.frame = rect
+                view.alpha = 1
+                view.layoutIfNeeded()
+            }
+        }
+    }
+
+    /// Takes a view off the canvas — fading when the change is animated, so a
+    /// slot, caption or sticker that goes away leaves rather than vanishes. It
+    /// stops taking touches at once: it is no longer part of the document.
+    private func retire(_ view: UIView, animated: Bool) {
+        view.isUserInteractionEnabled = false
+        view.accessibilityElementsHidden = true
+        guard animated, window != nil else { return view.removeFromSuperview() }
+        UIView.animate(
+            withDuration: Theme.Motion.duration(Theme.Motion.quick), delay: 0,
+            options: [.beginFromCurrentState, .curveEaseIn]
+        ) {
+            view.alpha = 0
+            if !Theme.Motion.isReduced {
+                view.transform = view.transform.scaledBy(x: 0.85, y: 0.85)
+            }
+        } completion: { _ in
+            view.removeFromSuperview()
+        }
     }
 
     // MARK: - Interactive overlays
@@ -152,24 +313,41 @@ final class VideoCanvasView: UIView {
     /// is selected: `TextOverlayView` already carries the same persistent
     /// selection chrome `StickerOverlayView` does, so the tapped zone shows it
     /// on the canvas too.
+    ///
+    /// Each caption keeps ITS view across updates — matched by id, not by
+    /// position — so deleting one no longer hands its neighbour's view a new
+    /// caption (a visible jump), and a caption moved by undo glides back from
+    /// where it was. See `applyOverlayChange` for what animates.
     func updateTextOverlays(_ overlays: [TextOverlay], selected: UUID? = nil) {
+        let previous = textModels
+        var pool = Dictionary(zip(previous.map(\.id), textViews)) { first, _ in first }
+        var fresh: Set<ObjectIdentifier> = []
         textModels = overlays
-        if textViews.count != overlays.count {
-            textViews.forEach { $0.removeFromSuperview() }
-            textViews = overlays.map { _ in
-                let view = TextOverlayView()
-                view.onChanged = { [weak self] in self?.onTextChanged?($0) }
-                view.onCommitted = { [weak self] in self?.onTextCommitted?() }
-                view.onTapped = { [weak self] in self?.onTextTapped?($0) }
-                addSubview(view)
-                return view
-            }
+        textViews = overlays.map { overlay in
+            if let view = pool.removeValue(forKey: overlay.id) { return view }
+            let view = TextOverlayView()
+            view.onChanged = { [weak self] in self?.onTextChanged?($0) }
+            view.onCommitted = { [weak self] in self?.onTextCommitted?() }
+            view.onTapped = { [weak self] in self?.onTextTapped?($0) }
+            addSubview(view)
+            fresh.insert(ObjectIdentifier(view))
+            return view
         }
+        pool.values.forEach { retire($0, animated: true) }
         for (view, overlay) in zip(textViews, overlays) {
             view.isSelected = overlay.id == selected
         }
         textViews.forEach { bringSubviewToFront($0) }
         stickerViews.forEach { bringSubviewToFront($0) }   // stickers above text
+
+        let before = Dictionary(previous.map { ($0.id, $0) }) { first, _ in first }
+        for (view, overlay) in zip(textViews, overlays) {
+            applyOverlayChange(view, isNew: fresh.contains(ObjectIdentifier(view)),
+                               moved: before[overlay.id].map { $0 != overlay } ?? false,
+                               restyled: before[overlay.id].map { Self.isRestyle($0, overlay) } ?? false) {
+                self.place(view, for: overlay)
+            }
+        }
         setNeedsLayout()
         // A freshly pooled view defaults to visible — refresh immediately so a
         // timed-out caption doesn't flash on screen before the next player tick.
@@ -177,21 +355,106 @@ final class VideoCanvasView: UIView {
         refreshAccessibilityElements()
     }
 
+    /// Pooled by sticker id, like captions. A sticker used to be torn down and
+    /// rebuilt on EVERY document change — including each tick of its own drag,
+    /// which re-created the very view under the finger and re-rendered its
+    /// symbol sixty times a second.
     func updateStickerOverlays(_ overlays: [StickerOverlay], selected: UUID?) {
+        let before = Dictionary(stickerModels.map { ($0.id, $0) }) { first, _ in first }
+        var pool = Dictionary(stickerViews.map { ($0.stickerID, $0) }) { first, _ in first }
+        var fresh: Set<ObjectIdentifier> = []
         stickerModels = overlays
-        stickerViews.forEach { $0.removeFromSuperview() }
         stickerViews = overlays.map { overlay in
+            if let view = pool.removeValue(forKey: overlay.id) { return view }
             let view = StickerOverlayView(overlay: overlay)
             view.onChanged = { [weak self] in self?.onStickerChanged?($0) }
             view.onCommitted = { [weak self] in self?.onStickerCommitted?() }
             view.onDeleted = { [weak self] in self?.onStickerDeleted?($0) }
             view.onSelected = { [weak self] in self?.onStickerSelected?($0) }
-            view.isSelected = overlay.id == selected
             addSubview(view)
+            fresh.insert(ObjectIdentifier(view))
             return view
         }
+        pool.values.forEach { retire($0, animated: true) }
+        for (view, overlay) in zip(stickerViews, overlays) {
+            view.isSelected = overlay.id == selected
+            applyOverlayChange(view, isNew: fresh.contains(ObjectIdentifier(view)),
+                               moved: before[overlay.id].map { $0 != overlay } ?? false,
+                               restyled: false) {
+                self.place(view, for: overlay)
+            }
+        }
+        stickerViews.forEach { bringSubviewToFront($0) }
         setNeedsLayout()
         refreshAccessibilityElements()
+    }
+
+    /// How an overlay's view takes a document change:
+    ///
+    /// - **new** — placed, then pops in (fade + a small spring up to size);
+    /// - **moved by something other than the finger** (undo/redo, a nudge, a
+    ///   style sheet) — glides from where it is to where the document says;
+    /// - **restyled** — the old look crossfades into the new one;
+    /// - **under the finger** — placed directly: the view already moved itself,
+    ///   and animating toward where it already is would only lag the drag.
+    ///
+    /// Before the canvas has a size there is nothing to animate from, so
+    /// `layoutSubviews` places everything when it first lays out.
+    private func applyOverlayChange(_ view: UIView, isNew: Bool, moved: Bool, restyled: Bool,
+                                    place: @escaping () -> Void) {
+        guard bounds.width > 0, window != nil else { return }
+        if isNew {
+            place()
+            guard !Theme.Motion.isReduced else {
+                view.alpha = 0
+                UIView.animate(withDuration: Theme.Motion.duration(Theme.Motion.standard)) { view.alpha = 1 }
+                return
+            }
+            let rest = view.transform
+            view.alpha = 0
+            view.transform = rest.scaledBy(x: 0.6, y: 0.6)
+            UIView.animate(
+                withDuration: Theme.Motion.standard, delay: 0,
+                usingSpringWithDamping: Theme.Motion.springDamping,
+                initialSpringVelocity: Theme.Motion.springVelocity,
+                options: [.allowUserInteraction]
+            ) {
+                view.alpha = 1
+                view.transform = rest
+            }
+            return
+        }
+        guard moved else { return }
+        guard !Self.isUnderFinger(view) else { return place() }
+        if restyled {
+            UIView.transition(with: view, duration: Theme.Motion.duration(Theme.Motion.quick),
+                              options: [.transitionCrossDissolve, .allowUserInteraction],
+                              animations: place)
+            return
+        }
+        UIView.animate(
+            withDuration: Theme.Motion.duration(Theme.Motion.standard), delay: 0,
+            usingSpringWithDamping: Theme.Motion.effectiveSpringDamping, initialSpringVelocity: 0,
+            options: [.beginFromCurrentState, .allowUserInteraction]
+        ) {
+            place()
+            view.layoutIfNeeded()
+        }
+    }
+
+    /// Whether one of the view's own gestures is mid-flight.
+    private static func isUnderFinger(_ view: UIView) -> Bool {
+        view.gestureRecognizers?.contains { $0.state == .began || $0.state == .changed } ?? false
+    }
+
+    /// A change of look rather than of place or size — a discrete choice worth
+    /// a crossfade. Deliberately not the text or the font SIZE: those change
+    /// per keystroke and per slider tick in the style sheet, where a dissolve
+    /// on every one would smear the typing.
+    private static func isRestyle(_ old: TextOverlay, _ new: TextOverlay) -> Bool {
+        old.style != new.style || old.colorHex != new.colorHex || old.fontName != new.fontName
+            || old.isBold != new.isBold || old.isItalic != new.isItalic
+            || old.isUnderlined != new.isUnderlined || old.alignmentRaw != new.alignmentRaw
     }
 
     // MARK: - Accessibility (phase 6.5)
@@ -226,6 +489,15 @@ final class VideoCanvasView: UIView {
     /// rather than through screenshot comparison.
     var textOverlayViewsForTesting: [UIView] { textViews }
 
+    /// Test seam: the pooled sticker views, in model order.
+    var stickerOverlayViewsForTesting: [StickerOverlayView] { stickerViews }
+
+    /// Test seam: the view holding frames over item swaps, once one exists.
+    var freezeFrameViewForTesting: VideoFreezeFrameView? { freezeFrameStorage }
+
+    /// Test seam: the slot chrome, in slot order.
+    var cellChromeViewsForTesting: [UIView] { cellViews }
+
     /// The time captions are currently being shown against. A scrub must move
     /// this synchronously — see `VideoEditorViewController.scrub(to:)`.
     var previewTimeForTesting: Double { previewTime }
@@ -240,6 +512,7 @@ final class VideoCanvasView: UIView {
 
     override func layoutSubviews() {
         super.layoutSubviews()
+        freezeFrameStorage?.frame = bounds
         let transform = canvasToView()
         for (index, cellView) in cellViews.enumerated() where cellFrames.indices.contains(index) {
             cellView.frame = cellFrames[index].applying(transform)
@@ -253,14 +526,20 @@ final class VideoCanvasView: UIView {
     /// == the canvas, so 1:1 with the composited video the player shows). Font scale
     /// maps reference-canvas point sizes onto the on-screen size, matching export.
     private func layoutOverlays() {
+        for (view, overlay) in zip(textViews, textModels) { place(view, for: overlay) }
+        for (view, overlay) in zip(stickerViews, stickerModels) { place(view, for: overlay) }
+    }
+
+    /// Puts a caption's view where its model says, at the on-screen type scale.
+    /// The one placement both layout and the animated update paths use.
+    private func place(_ view: TextOverlayView, for overlay: TextOverlay) {
         let fontScale = canvasSize.width > 0 ? bounds.width / canvasSize.width : 1
-        for (index, overlay) in textModels.enumerated() where textViews.indices.contains(index) {
-            textViews[index].frame = TextRendering.frame(for: overlay, in: bounds.size)
-            textViews[index].configure(with: overlay, fontScale: fontScale)
-        }
-        for (index, overlay) in stickerModels.enumerated() where stickerViews.indices.contains(index) {
-            stickerViews[index].apply(overlay: overlay, in: bounds.size)
-        }
+        view.frame = TextRendering.frame(for: overlay, in: bounds.size)
+        view.configure(with: overlay, fontScale: fontScale)
+    }
+
+    private func place(_ view: StickerOverlayView, for overlay: StickerOverlay) {
+        view.apply(overlay: overlay, in: bounds.size)
     }
 
     /// Maps canvas pixels → view points. The view is sized to the canvas aspect

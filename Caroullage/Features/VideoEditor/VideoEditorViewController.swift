@@ -14,7 +14,8 @@
 //  `AVMutableComposition` + `AVVideoComposition` + `AVAudioMix` that the exporter
 //  writes, so per-cell layout, trim, loop, transitions, per-cell volume and the
 //  background music all play exactly as they will export. The composition is
-//  rebuilt (debounced) whenever the model changes.
+//  rebuilt (debounced) whenever the model changes something it renders — never
+//  for an overlay or a selection, which the canvas draws itself.
 //
 //  Plan-defect fix: Task 6 dropped the manual Play/Pause transport entirely —
 //  the preview played continuously (and loops, via `loopPlaybackForever`) with
@@ -54,6 +55,12 @@ final class VideoEditorViewController: UIViewController {
     private let toolRail = EditorToolRail()
     private let toolPanel = EditorPanel()
     private let videoTimeline = VideoTimeline()
+    /// Produces the timeline's pictures — clip frames, the collage filmstrip,
+    /// the music's waveform — off the main actor; see `refreshTimelineMedia`.
+    private let timelineMedia = VideoTimelineMediaLoader()
+    /// The composition length the timeline was last drawn against, which the
+    /// music waveform is cut to.
+    private var timelineDuration: Double = 0
     /// Whether the user has asked for playback — the INTENT, written only by
     /// `setPlaying(_:)`. Everything else in the timeline's model is derived from
     /// the document by `refreshTimeline()`, but this is the screen's own state:
@@ -77,6 +84,15 @@ final class VideoEditorViewController: UIViewController {
     private var pendingCellIndex: Int?
     /// Coalesces composition rebuilds while sliders are being dragged.
     private var rebuildTask: Task<Void, Never>?
+    /// The `compositionSignature` the player's item was built from — or, while a
+    /// rebuild is in flight, the one that rebuild will deliver. An edit whose
+    /// signature matches changes nothing the player renders, so it schedules no
+    /// rebuild; see `rebuildComposition`.
+    private var scheduledCompositionSignature: VideoEditorViewModel.Snapshot?
+    /// The layout the canvas last drew, so `refreshCanvas` can tell a layout
+    /// CHANGE (which glides) from any other refresh (which doesn't). Nil until
+    /// the first draw, which has nothing to glide from.
+    private var canvasLayout: CollageLayout?
     /// Drives the canvas's timed-text visibility from playback — see
     /// `startObservingPlaybackTime`. Removed in `viewDidDisappear` once the VC has
     /// truly left (not merely covered by a modal), so it can't outlive the screen
@@ -312,6 +328,7 @@ final class VideoEditorViewController: UIViewController {
         videoTimeline.onRetimeText = { [weak self] id, start, end, phase in
             self?.retimeTextFromTimeline(id: id, start: start, end: end, phase: phase)
         }
+        timelineMedia.onUpdate = { [weak self] in self?.refreshTimelineMedia() }
         refreshTimeline()
 
         let tap = UITapGestureRecognizer(target: self, action: #selector(canvasTapped(_:)))
@@ -838,9 +855,34 @@ final class VideoEditorViewController: UIViewController {
     /// `refreshCanvas` (every document change funnels through it) and from
     /// `setPlaying`, which owns the one piece of the model the document does not.
     private func refreshTimeline() {
-        videoTimeline.setModel(viewModel.timelineModel(
-            selectedTextID: selectedTextID, isPlaying: isPlayingIntent))
+        let model = viewModel.timelineModel(selectedTextID: selectedTextID, isPlaying: isPlayingIntent)
+        timelineDuration = model.duration
+        videoTimeline.setModel(model)
         videoTimeline.setPlayhead(playheadTime)
+        refreshTimelineMedia()
+    }
+
+    /// Hands the timeline whatever pictures exist for the current document and
+    /// asks for any still missing. Cheap to repeat: the loader caches by media
+    /// id and ignores a request already in flight, and calls back here when
+    /// something new lands.
+    private func refreshTimelineMedia() {
+        var filmstrips: [Int: VideoTimelineFilmstrip] = [:]
+        for (index, cell) in viewModel.cells.enumerated() {
+            guard let id = cell.videoID, let asset = viewModel.asset(for: id) else { continue }
+            timelineMedia.requestFilmstrip(videoID: id, asset: asset)
+            filmstrips[index] = timelineMedia.filmstrip(forVideoID: id)
+        }
+        var waveform: VideoTimelineWaveform?
+        if let music = viewModel.music, let musicID = music.musicID,
+           let asset = viewModel.backgroundMusic()?.asset {
+            timelineMedia.requestWaveform(musicID: musicID, asset: asset)
+            waveform = timelineMedia.waveform(musicID: musicID, trim: music.trim,
+                                              compositionDuration: timelineDuration)
+        }
+        videoTimeline.setMedia(clipFilmstrips: filmstrips,
+                               compositionFrames: timelineMedia.compositionFrames,
+                               musicWaveform: waveform)
     }
 
     /// Resolves source durations in the background and refreshes once they land.
@@ -1088,11 +1130,14 @@ final class VideoEditorViewController: UIViewController {
                   viewModel.cells[index].videoID != nil else { return nil }
             return index
         }
+        let layoutChanged = canvasLayout.map { $0 != viewModel.layout } ?? false
+        canvasLayout = viewModel.layout
         canvasView.configure(
             canvasSize: viewModel.canvasSize,
             cellFrames: viewModel.cellFrames().map(\.frame),
             filled: (0 ..< viewModel.cellCount).map { viewModel.cells[$0].videoID != nil },
-            selectedIndex: highlightIndex)
+            selectedIndex: highlightIndex,
+            animated: layoutChanged)
         canvasView.updateTextOverlays(viewModel.textOverlays, selected: selectedTextID)
         canvasView.updateStickerOverlays(viewModel.stickerOverlays, selected: selectedStickerID)
         undoItem.isEnabled = viewModel.canUndo
@@ -1101,16 +1146,43 @@ final class VideoEditorViewController: UIViewController {
     }
 
     /// Rebuilds the preview composition from the model (debounced — sliders fire fast).
+    ///
+    /// Only when the document changed something the composition renders. Every
+    /// edit reaches here through `viewModel.onChanged`, but a caption drag, a
+    /// sticker, a selection tap or an overlay-only undo leaves
+    /// `compositionSignature` untouched — and rebuilding anyway swapped the
+    /// player's item, which blanks the layer until the new item draws: the
+    /// blink on every overlay edit. The comparison is against what was last
+    /// SCHEDULED, not what is on screen, so an overlay edit landing inside a
+    /// real rebuild's debounce leaves that rebuild running instead of
+    /// cancelling it.
     private func rebuildComposition() {
+        let signature = viewModel.compositionSignature
+        guard signature != scheduledCompositionSignature else { return }
+        scheduledCompositionSignature = signature
         rebuildTask?.cancel()
         guard viewModel.hasContent else {
+            // The last clip went: let the frame fade out rather than vanish.
+            canvasView.holdFrameForItemSwap()
             player.replaceCurrentItem(with: nil)
+            canvasView.releaseHeldFrame(once: nil)
+            timelineMedia.clearCompositionFrames()
             return
         }
         rebuildTask = Task { @MainActor [weak self] in
             try? await Task.sleep(nanoseconds: 250_000_000)
             guard let self, !Task.isCancelled else { return }
-            guard let bundle = try? await self.viewModel.buildBundle() else { return }
+            guard let bundle = try? await self.viewModel.buildBundle() else {
+                // Nothing reached the player, so the next edit must be free to
+                // try again rather than match a signature that never landed.
+                if !Task.isCancelled {
+                    self.scheduledCompositionSignature = nil
+                    // A layout glide may be holding the old frame for this
+                    // rebuild; with nothing coming, show what the player has.
+                    self.canvasView.releaseHeldFrame(once: self.player.currentItem)
+                }
+                return
+            }
             guard !Task.isCancelled else { return }
             // Preserve the user's scrub position AND play state so tweaking a
             // control doesn't yank the preview back to 0:00 or restart playback
@@ -1130,12 +1202,23 @@ final class VideoEditorViewController: UIViewController {
             let item = AVPlayerItem(asset: bundle.composition)
             item.videoComposition = bundle.videoComposition
             item.audioMix = bundle.audioMix
+            // So the NEXT swap can hold this item's frame even while it plays.
+            item.add(VideoFreezeFrameView.makeFrameTap())
+            // The swap empties the player layer until the new item draws; the
+            // frame on screen is held over that gap and crossfades away once
+            // the new item is up, so an edit never flashes the background.
+            self.canvasView.holdFrameForItemSwap()
             self.player.replaceCurrentItem(with: item)
             if resumeTime.isNumeric, resumeTime > .zero {
                 let seekTime = CMTimeMinimum(resumeTime, bundle.duration)
+                // Paused, the new item must land on the very frame being held,
+                // or the crossfade out of it becomes a jump to the nearest
+                // keyframe; the hold covers the extra decode. Playing, the
+                // frame moves on anyway, so the cheap seek wins.
+                let tolerance: CMTime = wasPlaying ? .positiveInfinity : .zero
                 self.player.seek(to: seekTime,
-                                 toleranceBefore: .positiveInfinity,
-                                 toleranceAfter: .positiveInfinity) { _ in }
+                                 toleranceBefore: tolerance,
+                                 toleranceAfter: tolerance) { _ in }
                 // Push the seek straight into the canvas rather than waiting for the
                 // periodic observer. `addPeriodicTimeObserver` is only documented to
                 // fire during playback and across play/stop transitions — a seek while
@@ -1148,6 +1231,9 @@ final class VideoEditorViewController: UIViewController {
             // Resume ONLY if the old item was actually playing — never force
             // playback on someone who paused before this rebuild started.
             self.setPlaying(wasPlaying)
+            self.canvasView.releaseHeldFrame(once: item)
+            // The collapsed timeline's filmstrip is a picture of THIS collage.
+            self.timelineMedia.requestCompositionFrames(for: bundle)
             // No preview overlay image to set here: `canvasView` shows text/sticker
             // overlays through its own live, pooled views (kept current by
             // `refreshCanvas`), which already match `bundle.overlayImage` pixel-for-
