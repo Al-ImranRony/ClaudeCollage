@@ -13844,6 +13844,7 @@
       }
     },
     "Enter text" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
