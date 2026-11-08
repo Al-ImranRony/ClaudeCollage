@@ -140,6 +140,13 @@ final class ProBadgeButton: GradientLayerButton {
         // beside it was white. The floating "Start Editing" pill sets both for
         // the same reason.
         tintColor = Theme.Color.textOnAccent
+        // Out of tint dimming. When a sheet comes up (Settings, from the tile
+        // beside this button), UIKit dims the tint of everything behind it. The
+        // sparkle and the gradient are baked colours and ignore that, but the
+        // title followed it, so "Pro" alone faded to grey while the rest of the
+        // pill stayed bright, which read as a flicker. The sheet's own dimming
+        // overlay still darkens the whole pill, evenly.
+        tintAdjustmentMode = .normal
 
         // `.plain()`, not `.filled()`: the gradient IS the backing layer, so a
         // filled configuration only adds a background that has to be cleared
