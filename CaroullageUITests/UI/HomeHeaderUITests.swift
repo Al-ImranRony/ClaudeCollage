@@ -66,6 +66,53 @@ final class HomeHeaderUITests: XCTestCase {
                       "Closing the paywall returns to Home")
     }
 
+    /// Settings is the bar's leading control: a 44pt square (the tallest a
+    /// bar control can be on iOS 26) set flush against the screen's leading
+    /// edge, with the wordmark after it and Pro alone on the trailing side.
+    @MainActor
+    func testSettingsIsASquareFlushAgainstTheLeadingEdge() {
+        let app = launch()
+        let bar = app.navigationBars["Caroullage"]
+        let settings = bar.buttons["homeSettingsButton"]
+        XCTAssertTrue(settings.waitForExistence(timeout: 5))
+
+        let frame = settings.frame
+        XCTAssertEqual(frame.width, 44, accuracy: 1, "The tile is 44pt wide")
+        XCTAssertEqual(frame.height, 44, accuracy: 1, "and 44pt tall")
+        XCTAssertEqual(frame.minX, app.windows.firstMatch.frame.minX, accuracy: 0.5,
+                       "It meets the screen's edge with no margin")
+        XCTAssertTrue(settings.isHittable)
+
+        let wordmark = bar.staticTexts["homeBrandWordmark"]
+        XCTAssertTrue(wordmark.exists, "The wordmark follows")
+        XCTAssertLessThan(frame.maxX, wordmark.frame.minX, "Settings leads, the wordmark follows")
+        XCTAssertFalse(bar.images.matching(identifier: "BrandMark").firstMatch.exists)
+
+        let pro = bar.buttons["homeProButton"]
+        XCTAssertTrue(pro.waitForExistence(timeout: 5))
+        XCTAssertGreaterThan(pro.frame.minX, bar.frame.midX, "Pro stays on the trailing side")
+    }
+
+    /// The tile floats on the bar rather than being one of Home's bar items,
+    /// and the bar is shared with every editor pushed on top of Home — so it
+    /// has to leave with Home and come back with it.
+    @MainActor
+    func testSettingsLeavesWithHomeAndComesBack() {
+        let app = launch()
+        let settings = app.buttons["homeSettingsButton"]
+        XCTAssertTrue(settings.waitForExistence(timeout: 5))
+
+        app.buttons["newProjectButton"].tap()
+        let editorBar = app.navigationBars["Grid Collage"]
+        XCTAssertTrue(editorBar.waitForExistence(timeout: 8))
+        XCTAssertFalse(settings.isHittable, "No Settings tile over an editor's back button")
+
+        editorBar.buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(app.navigationBars["Caroullage"].waitForExistence(timeout: 5))
+        XCTAssertTrue(settings.waitForExistence(timeout: 5))
+        XCTAssertTrue(settings.isHittable, "…and it is back, and tappable, on Home")
+    }
+
     /// A "Pro" button that leads to a paywall you have already paid is a dead
     /// end, so premium users are not shown one.
     @MainActor

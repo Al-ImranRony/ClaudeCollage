@@ -11,10 +11,12 @@
 //  bar. This is the front door of a creative app, and it should say whose app
 //  it is and what the app sells.
 //
-//  Two pieces, both leaning on what the design system already has: the brand
-//  lockup (the icon's own mark and glyph, so the icon, the onboarding splash
-//  and the header agree), and the Pro button, which carries the brand gradient
-//  `GradientLayerButton` already knows how to paint and opens the paywall.
+//  Three pieces, all leaning on what the design system already has: the
+//  Settings tile (clear glass flush against the leading edge, indigo
+//  `line.3.horizontal`), the wordmark after it, and the Pro button, which
+//  carries the brand gradient `GradientLayerButton` already knows how to paint
+//  and opens the paywall. `BrandMarkView` — the icon's own mark — stays for
+//  screens that show it on its own; the header dropped it beside the tile.
 //
 
 import UIKit
@@ -67,14 +69,20 @@ final class BrandMarkView: UIImageView {
 
 // MARK: - Brand lockup
 
-/// Mark plus wordmark, for the navigation bar's leading side.
+/// The wordmark, for the navigation bar's leading side, after Settings.
 ///
-/// Read as one element by assistive technology: two labels ("Caroullage", and
-/// an unnamed image) would make the app's own name arrive twice.
+/// Wordmark only: beside the Settings square, the icon's mark made two tiles in
+/// a row and read as clutter. `BrandMarkView` stays for anywhere the mark
+/// belongs on its own.
 @MainActor
 final class BrandLockupView: UIView {
 
-    init(title: String) {
+    /// Room kept clear ahead of the wordmark — Home's Settings tile floats on
+    /// the bar there, outside the bar's item layout.
+    let leadingInset: CGFloat
+
+    init(title: String, leadingInset: CGFloat = 0) {
+        self.leadingInset = leadingInset
         super.init(frame: .zero)
 
         let wordmark = UILabel()
@@ -83,7 +91,7 @@ final class BrandLockupView: UIView {
         wordmark.textColor = Theme.Color.textPrimary
         wordmark.adjustsFontForContentSizeCategory = true
 
-        let stack = UIStackView(arrangedSubviews: [BrandMarkView(), wordmark])
+        let stack = UIStackView(arrangedSubviews: [wordmark])
         stack.axis = .horizontal
         stack.alignment = .center
         stack.spacing = Theme.Spacing.xs
@@ -92,13 +100,14 @@ final class BrandLockupView: UIView {
         NSLayoutConstraint.activate([
             stack.topAnchor.constraint(equalTo: topAnchor),
             stack.bottomAnchor.constraint(equalTo: bottomAnchor),
-            stack.leadingAnchor.constraint(equalTo: leadingAnchor),
+            stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: leadingInset),
             stack.trailingAnchor.constraint(equalTo: trailingAnchor),
         ])
 
-        isAccessibilityElement = true
-        accessibilityLabel = title
-        accessibilityTraits = .header
+        // The label, not the container, is the element: the container's frame
+        // includes the inset the Settings tile sits in.
+        wordmark.accessibilityTraits = .header
+        wordmark.accessibilityIdentifier = "homeBrandWordmark"
     }
 
     @available(*, unavailable)
@@ -209,4 +218,148 @@ final class ProBadgeButton: GradientLayerButton {
     @objc private func pressDown() { setPressed(true, scale: 0.94) }
 
     @objc private func pressUp() { setPressed(false, scale: 0.94) }
+}
+
+// MARK: - Settings button
+
+/// Settings, as the bar's leading control: a 44pt square of clear Liquid Glass
+/// set flush against the screen's leading edge — square where it meets the
+/// edge, rounded on its outer side, like a rubber block fixed to a wall —
+/// carrying `line.3.horizontal` in indigo.
+///
+/// The one chromatic thing in Home's chrome, on purpose: the way into Settings
+/// should be findable at a glance. The colour is `accent`, the indigo the design
+/// system already reserves for selection, rather than a new hue — it clears
+/// contrast in both appearances and stays clear of the red, green and amber that
+/// `critical`, `success` and `warning` own.
+///
+/// 44pt, not the bar's full 54: iOS 26 caps a bar item's height at 44, and the
+/// tile matches the bar's other controls.
+///
+/// The body is a `UIVisualEffectView` with an interactive `UIGlassEffect`, not
+/// the `.glass()` button configuration: the configuration's glass ignores
+/// per-corner shaping and draws a circle, and the square-to-the-wall shape is
+/// the point. `cornerConfiguration` is the API that shapes glass. Interactive
+/// glass sees the touch through its gesture recogniser even though the button
+/// inside it is what is hit, so the press still gets the system's own swell.
+/// iOS 17–18 have no glass: they get the chrome material and the app's press
+/// spring.
+@MainActor
+final class SettingsGlassTile: UIView {
+
+    static let side: CGFloat = 44
+    /// The outer corners' radius. The edge-side corners stay square.
+    private static let outerRadius: CGFloat = 14
+
+    let button: UIButton
+    private let body: UIVisualEffectView
+
+    init(action: @escaping () -> Void) {
+        let effect: UIVisualEffect
+        if #available(iOS 26.0, *) {
+            let glass = UIGlassEffect(style: .regular)
+            glass.isInteractive = true
+            effect = glass
+        } else {
+            effect = UIBlurEffect(style: .systemChromeMaterial)
+        }
+        body = UIVisualEffectView(effect: effect)
+
+        var config = UIButton.Configuration.plain()
+        config.contentInsets = .zero
+        button = UIButton(configuration: config)
+
+        super.init(frame: .zero)
+
+        body.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(body)
+        button.translatesAutoresizingMaskIntoConstraints = false
+        body.contentView.addSubview(button)
+        NSLayoutConstraint.activate([
+            widthAnchor.constraint(equalToConstant: Self.side),
+            heightAnchor.constraint(equalToConstant: Self.side),
+            body.topAnchor.constraint(equalTo: topAnchor),
+            body.bottomAnchor.constraint(equalTo: bottomAnchor),
+            body.leadingAnchor.constraint(equalTo: leadingAnchor),
+            body.trailingAnchor.constraint(equalTo: trailingAnchor),
+            button.topAnchor.constraint(equalTo: body.contentView.topAnchor),
+            button.bottomAnchor.constraint(equalTo: body.contentView.bottomAnchor),
+            button.leadingAnchor.constraint(equalTo: body.contentView.leadingAnchor),
+            button.trailingAnchor.constraint(equalTo: body.contentView.trailingAnchor),
+        ])
+
+        refreshGlyph()
+        refreshCorners()
+        registerForTraitChanges([UITraitUserInterfaceStyle.self,
+                                 UITraitAccessibilityContrast.self,
+                                 UITraitLayoutDirection.self]) { (tile: Self, _) in
+            tile.refreshGlyph()
+            tile.refreshCorners()
+        }
+
+        button.addAction(UIAction { _ in action() }, for: .touchUpInside)
+        button.addTarget(self, action: #selector(pressDown), for: [.touchDown, .touchDragEnter])
+        button.addTarget(self, action: #selector(pressUp),
+                         for: [.touchUpInside, .touchUpOutside, .touchCancel, .touchDragExit])
+
+        // iPad with a pointer: the tile lifts under the cursor — the hover half
+        // of the motion, where a device actually has hover.
+        button.isPointerInteractionEnabled = true
+        button.pointerStyleProvider = { [weak self] _, _, _ in
+            guard let self else { return nil }
+            return UIPointerStyle(effect: .lift(UITargetedPreview(view: self)))
+        }
+
+        button.accessibilityIdentifier = "homeSettingsButton"
+        button.accessibilityLabel = String(localized: "Settings")
+        // Bar controls do not grow with Dynamic Type, so at the accessibility
+        // sizes a long press shows the control enlarged instead.
+        button.showsLargeContentViewer = true
+        button.largeContentTitle = String(localized: "Settings")
+        button.largeContentImage = UIImage(systemName: "line.3.horizontal")
+        button.addInteraction(UILargeContentViewerInteraction())
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
+
+    /// `line.3.horizontal`, with its colour baked in rather than tinted, so it
+    /// keeps the indigo wherever it is hosted (a template symbol in the bar
+    /// comes out in the bar's ink — the Pro button's sparkle hit the same wall).
+    private func refreshGlyph() {
+        button.configuration?.image = UIImage(
+            systemName: "line.3.horizontal",
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: 18, weight: .bold)
+        )?.withTintColor(
+            Theme.Color.accent.resolvedColor(with: traitCollection),
+            renderingMode: .alwaysOriginal)
+    }
+
+    /// Square on the edge side, rounded on the outer side — mirrored for
+    /// right-to-left layouts, where the bar's leading edge is the right.
+    private func refreshCorners() {
+        let radius = Self.outerRadius
+        let leadingIsLeft = effectiveUserInterfaceLayoutDirection == .leftToRight
+        if #available(iOS 26.0, *) {
+            body.cornerConfiguration = leadingIsLeft
+                ? .uniformEdges(leftRadius: .fixed(0), rightRadius: .fixed(radius))
+                : .uniformEdges(leftRadius: .fixed(radius), rightRadius: .fixed(0))
+        } else {
+            body.clipsToBounds = true
+            body.layer.cornerRadius = radius
+            body.layer.cornerCurve = .continuous
+            body.layer.maskedCorners = leadingIsLeft
+                ? [.layerMaxXMinYCorner, .layerMaxXMaxYCorner]
+                : [.layerMinXMinYCorner, .layerMinXMaxYCorner]
+        }
+    }
+
+    @objc private func pressDown() {
+        Haptics.softTap()
+        if #unavailable(iOS 26.0) { setPressed(true, scale: 0.92) }
+    }
+
+    @objc private func pressUp() {
+        if #unavailable(iOS 26.0) { setPressed(false, scale: 0.92) }
+    }
 }

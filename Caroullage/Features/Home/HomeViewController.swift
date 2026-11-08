@@ -364,6 +364,12 @@ final class HomeViewController: UIViewController {
         reload()
         refreshProButton()
         setShowcaseActive(true)
+        setSettingsTileShown(true)
+    }
+
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        setSettingsTileShown(false)
     }
 
     override func viewDidDisappear(_ animated: Bool) {
@@ -648,7 +654,7 @@ final class HomeViewController: UIViewController {
         self?.presentPaywallFromHeader()
     }
 
-    /// Brand on the leading side, the paywall on the trailing side.
+    /// Settings and the brand on the leading side, the paywall on the trailing side.
     ///
     /// `navigationItem.title` stays set even though nothing draws it: the bar's
     /// accessibility identity comes from it, and every suite that waits for Home
@@ -657,32 +663,119 @@ final class HomeViewController: UIViewController {
     /// and once in the middle of the bar.
     private func setupNavigationBar() {
         navigationItem.titleView = UIView()
-        let brand = UIBarButtonItem(customView: BrandLockupView(title: "Caroullage"))
         let pro = UIBarButtonItem(customView: proButton)
         // iOS 26 gives every bar item its own glass capsule. That is the right
         // default for a system control and the wrong one for both of these: it
         // draws a pill around the Pro button's pill, and it makes the wordmark
         // look like something to tap. Each already carries its own shape — the
-        // gradient capsule and the mark — so the shared background comes off.
+        // gradient capsule, and plain type — so the shared background comes off.
         if #available(iOS 26.0, *) {
-            brand.hidesSharedBackground = true
             pro.hidesSharedBackground = true
         }
-        // The gear keeps the system's glass capsule — it IS a system control —
-        // and sits inboard of Pro, which stays at the edge where it has been.
-        let gear = UIBarButtonItem(
-            image: UIImage(systemName: "gearshape"),
-            primaryAction: UIAction { [weak self] _ in
-                Haptics.tap()
-                Analytics.track(.settingsOpened)
-                self?.onOpenSettings?()
-            })
-        gear.accessibilityIdentifier = "homeSettingsButton"
-        gear.accessibilityLabel = String(localized: "Settings")
-        gear.tintColor = Theme.Color.textPrimary
-        navigationItem.leftBarButtonItem = brand
-        navigationItem.rightBarButtonItems = [pro, gear]
+        // Settings floats on the bar (see `installSettingsTile`); the
+        // wordmark item keeps the room clear ahead of itself.
+        navigationItem.leftBarButtonItem = makeBrandItem()
+        navigationItem.rightBarButtonItem = pro
         refreshProButton()
+    }
+
+    /// Settings, flush against the screen's leading edge.
+    ///
+    /// Not a bar item: iOS 26 lays every item out inside the bar's margins and
+    /// ignores `directionalLayoutMargins`, so the nearest an item can sit is
+    /// 16pt in. Nudging the button out of its item would leave that 16pt strip
+    /// untappable — touches only reach a view inside its superview's bounds —
+    /// so the tile is the bar's own subview, pinned to its leading edge.
+    ///
+    /// The bar is shared with every editor pushed on top of Home, so the tile
+    /// fades with Home's own appearance (`setSettingsTileShown`).
+    private lazy var settingsTile = SettingsGlassTile { [weak self] in
+        Analytics.track(.settingsOpened)
+        self?.onOpenSettings?()
+    }
+
+    /// The wordmark's item, with room ahead of it for the Settings tile.
+    ///
+    /// Not a spacer item: iOS 26 holds every bar item to at least 44pt wide, so
+    /// a spacer starting at the bar's 16pt margin could not end before 60. The
+    /// lockup carries the inset itself instead. The bar sizes an item's view
+    /// once, when the item is set, so a new inset means a new item — solved in
+    /// `viewDidLayoutSubviews` against where the bar actually put it.
+    private var brandLeadingInset = SettingsGlassTile.side + Theme.Spacing.sm - Theme.Spacing.md
+    private var brandLockup: BrandLockupView?
+
+    private func makeBrandItem() -> UIBarButtonItem {
+        let lockup = BrandLockupView(title: "Caroullage", leadingInset: brandLeadingInset)
+        brandLockup = lockup
+        settingsTileCenterY?.isActive = false
+        settingsTileCenterY = nil
+        let item = UIBarButtonItem(customView: lockup)
+        if #available(iOS 26.0, *) {
+            item.hidesSharedBackground = true
+        }
+        return item
+    }
+
+    /// The tile rides level with the bar's items, which sit at the top of the
+    /// iOS 26 bar rather than its middle — so it follows the lockup, not the bar.
+    private var settingsTileCenterY: NSLayoutConstraint?
+
+    private func installSettingsTile() {
+        guard let bar = navigationController?.navigationBar,
+              settingsTile.superview !== bar else { return }
+        settingsTile.removeFromSuperview()
+        settingsTile.translatesAutoresizingMaskIntoConstraints = false
+        bar.addSubview(settingsTile)
+        // Level with the bar's items once there is an item to follow
+        // (`viewDidLayoutSubviews`); until then, the bar's middle.
+        let fallbackY = settingsTile.centerYAnchor.constraint(equalTo: bar.centerYAnchor)
+        fallbackY.priority = .defaultLow
+        NSLayoutConstraint.activate([
+            settingsTile.leadingAnchor.constraint(equalTo: bar.leadingAnchor),
+            fallbackY,
+        ])
+    }
+
+    /// Fades the tile in step with Home's push and pop, and puts it back if
+    /// an interactive back swipe is abandoned.
+    private func setSettingsTileShown(_ shown: Bool) {
+        installSettingsTile()
+        let tile = settingsTile
+        tile.isUserInteractionEnabled = shown
+        tile.accessibilityElementsHidden = !shown
+        guard let coordinator = transitionCoordinator, coordinator.isAnimated else {
+            tile.alpha = shown ? 1 : 0
+            return
+        }
+        coordinator.animate(alongsideTransition: { _ in
+            tile.alpha = shown ? 1 : 0
+        }, completion: { context in
+            guard context.isCancelled else { return }
+            tile.alpha = shown ? 0 : 1
+            tile.isUserInteractionEnabled = !shown
+            tile.accessibilityElementsHidden = shown
+        })
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        guard let bar = navigationController?.navigationBar,
+              let lockup = brandLockup, lockup.window != nil,
+              settingsTile.superview === bar else { return }
+        if settingsTileCenterY == nil {
+            let centerY = settingsTile.centerYAnchor.constraint(equalTo: lockup.centerYAnchor)
+            centerY.isActive = true
+            settingsTileCenterY = centerY
+        }
+        // The lockup starts at the bar's margin; its wordmark should start one
+        // gap after the tile ends, whatever that margin is on this device.
+        let frame = lockup.convert(lockup.bounds, to: bar)
+        let margin = bar.effectiveUserInterfaceLayoutDirection == .leftToRight
+            ? frame.minX : bar.bounds.width - frame.maxX
+        let inset = max(0, SettingsGlassTile.side + Theme.Spacing.sm - margin)
+        guard abs(inset - brandLeadingInset) > 0.5 else { return }
+        brandLeadingInset = inset
+        navigationItem.leftBarButtonItem = makeBrandItem()
     }
 
     /// Premium users do not get a button to buy premium.
