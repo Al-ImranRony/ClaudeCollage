@@ -171,6 +171,56 @@ public final class HomeCollectionCatalog {
         authored.isEmpty ? Self.fallback(from: sampleContent) : authored
     }
 
+    /// Exactly what Home shows below the hero on `now`: planned, then made
+    /// distinct so no card appears twice on the screen — the hero's pages are
+    /// claimed first and the pillars top up from the dressed catalog, featured
+    /// work first. See `HomeCollectionPlanner.distinct`.
+    func plannedForHome(
+        now: Date,
+        creatorKind: CreatorKind?,
+        sampleContent sample: SampleContentCatalog = .shared,
+        templates: TemplateService = .shared
+    ) -> [HomeCollection] {
+        let planned = HomeCollectionPlanner.plan(
+            collections(fallingBackTo: sample), now: now, creatorKind: creatorKind, maxStrips: .max)
+        return HomeCollectionPlanner.distinct(
+            planned, excluding: Self.heroItems(sample), pools: Self.pools(sample, templates))
+    }
+
+    /// The hero's pages by kind: the first place on Home each of them appears.
+    static func heroItems(_ sample: SampleContentCatalog) -> [HomeCollection.Kind: [String]] {
+        var hero: [HomeCollection.Kind: [String]] = [:]
+        for ref in sample.heroRefs {
+            let kind: HomeCollection.Kind
+            switch ref.kind {
+            case .template: kind = .photo
+            case .video: kind = .video
+            case .carousel: kind = .carousel
+            }
+            hero[kind, default: []].append(ref.id)
+        }
+        return hero
+    }
+
+    /// What a pillar tops up from: only dressed entries, since Home skips
+    /// anything without sample photography, featured work first.
+    static func pools(
+        _ sample: SampleContentCatalog, _ templates: TemplateService
+    ) -> [HomeCollection.Kind: [String]] {
+        let dressedTemplates = sample.manifest.map { Set($0.templates.keys) }
+        let featured = sample.featuredTemplateIDs
+        let templateIDs = templates.templates.map(\.id)
+            .filter { dressedTemplates?.contains($0) ?? true }
+        let dressedCarousels = Set(sample.manifest?.carousels.keys.map { $0 } ?? [])
+        let carouselIDs = sample.featuredCarouselIDs
+            + templates.carouselTemplates.map(\.id).filter { dressedCarousels.contains($0) }
+        return [
+            .photo: templateIDs.filter(featured.contains) + templateIDs.filter { !featured.contains($0) },
+            .carousel: carouselIDs,
+            .video: sample.videoShowcases.map(\.id),
+        ]
+    }
+
     /// Step 07's Home, as data.
     public static func fallback(from sampleContent: SampleContentCatalog) -> [HomeCollection] {
         [

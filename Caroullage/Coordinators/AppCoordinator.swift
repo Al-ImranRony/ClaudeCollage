@@ -332,10 +332,9 @@ final class AppCoordinator {
     // MARK: - Home collections and suggestions (Home retention, phase 2)
 
     /// What Home shows today: the bundled collections, planned against the
-    /// clock (or `-debug.homeDate`) and the onboarding answer.
+    /// clock (or `-debug.homeDate`) and the onboarding answer, each card once.
     private func plannedHomeCollections() -> [HomeCollection] {
-        HomeCollectionPlanner.plan(
-            HomeCollectionCatalog.shared.collections(fallingBackTo: SampleContentCatalog.shared),
+        HomeCollectionCatalog.shared.plannedForHome(
             now: HomeCollectionPlanner.overrideDate() ?? Date(),
             creatorKind: OnboardingViewModel.storedCreatorKind())
     }

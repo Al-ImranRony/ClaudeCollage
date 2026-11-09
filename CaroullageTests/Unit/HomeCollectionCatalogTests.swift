@@ -35,6 +35,41 @@ final class HomeCollectionCatalogTests: XCTestCase {
         XCTAssertEqual(Set(ids).count, ids.count)
     }
 
+    /// The real file, the real hero and the real catalog, on every week of a
+    /// year and for every onboarding answer: Home never shows a card twice,
+    /// stays short, and always closes on the three pillars.
+    func testHomeNeverShowsTheSameCardTwiceAllYear() throws {
+        let catalog = HomeCollectionCatalog(bundle: appBundle)
+        let service = makeTemplateService()
+        let sample = SampleContentCatalog(bundle: appBundle)
+        let hero = HomeCollectionCatalog.heroItems(sample)
+        let calendar = HomeCollectionPlanner.calendar
+        let start = try XCTUnwrap(calendar.date(from: DateComponents(year: 2026, month: 1, day: 1, hour: 12)))
+
+        for kind in [nil] + CreatorKind.allCases.map(Optional.some) {
+            for week in 0 ..< 53 {
+                let now = try XCTUnwrap(calendar.date(byAdding: .day, value: week * 7, to: start))
+                let plan = catalog.plannedForHome(
+                    now: now, creatorKind: kind, sampleContent: sample, templates: service)
+                let label = "week \(week), \(kind.map { "\($0)" } ?? "no answer")"
+
+                var seen = hero.mapValues(Set.init)
+                for collection in plan {
+                    for id in collection.itemIDs {
+                        XCTAssertTrue(seen[collection.kind, default: []].insert(id).inserted,
+                                      "\(label): \(id) repeats in \(collection.id)")
+                    }
+                }
+                XCTAssertEqual(plan.suffix(3).map(\.id), ["photo-collages", "video-collages", "carousels"],
+                               "\(label): the pillars close the screen")
+                XCTAssertLessThanOrEqual(plan.count, 6, "\(label): at most three curated strips")
+                XCTAssertGreaterThanOrEqual(plan.count, 5, "\(label): at least two curated strips")
+                XCTAssertTrue(plan.allSatisfy { $0.itemIDs.count >= 4 },
+                              "\(label): no strip is thinned to a stub")
+            }
+        }
+    }
+
     func testEveryItemResolvesToADressedCatalogEntry() throws {
         let catalog = HomeCollectionCatalog(bundle: appBundle)
         let service = makeTemplateService()

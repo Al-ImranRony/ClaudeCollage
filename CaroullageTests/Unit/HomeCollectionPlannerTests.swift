@@ -137,6 +137,59 @@ final class HomeCollectionPlannerTests: XCTestCase {
         XCTAssertEqual(plan.map(\.id), ["autumn", "new"])
     }
 
+    // MARK: - Distinct items
+
+    func testNoCardAppearsTwiceAndTheHeroClaimsFirst() {
+        let planned = [
+            collection("first", items: ["a", "b", "c", "d", "e"]),
+            collection("second", items: ["d", "e", "f", "g", "h", "i"]),
+        ]
+        let plan = HomeCollectionPlanner.distinct(
+            planned, excluding: [.photo: ["a"]], minimumItems: 3)
+        XCTAssertEqual(plan.map(\.itemIDs), [["b", "c", "d", "e"], ["f", "g", "h", "i"]])
+    }
+
+    func testAThinnedOutCollectionIsDroppedAndTheNextOnePromoted() {
+        let planned = [
+            collection("lead", items: ["a", "b", "c", "d"]),
+            collection("echo", items: ["a", "b", "c", "x"]),
+            collection("fresh", items: ["p", "q", "r", "s"]),
+            collection("spare", items: ["t", "u", "v", "w"]),
+        ]
+        let plan = HomeCollectionPlanner.distinct(planned, minimumItems: 4, maxStrips: 2)
+        XCTAssertEqual(plan.map(\.id), ["lead", "fresh"],
+                       "An echo of a strip above is dropped, and the cap still fills")
+    }
+
+    func testIDsAreClaimedPerKind() {
+        let planned = [
+            collection("photos", items: ["a", "b", "c"]),
+            collection("carousels", kind: .carousel, items: ["a", "b", "c"]),
+        ]
+        let plan = HomeCollectionPlanner.distinct(planned, minimumItems: 3)
+        XCTAssertEqual(plan.count, 2)
+    }
+
+    func testAPillarTopsUpWithUnseenCatalogCardsAndKeepsItsLength() {
+        let planned = [
+            collection("lead", items: ["a", "b", "c", "d"]),
+            collection("pillar", items: ["a", "b", "e", "f"], isPillar: true),
+        ]
+        let plan = HomeCollectionPlanner.distinct(
+            planned, pools: [.photo: ["a", "e", "g", "h", "i"]], minimumItems: 4)
+        XCTAssertEqual(plan.last?.itemIDs, ["e", "f", "g", "h"])
+    }
+
+    func testAPillarSurvivesEvenWhenItCannotBeToppedUp() {
+        let planned = [
+            collection("lead", items: ["a", "b", "c", "d"]),
+            collection("pillar", items: ["a", "b", "c", "e"], isPillar: true),
+        ]
+        let plan = HomeCollectionPlanner.distinct(planned, minimumItems: 4)
+        XCTAssertEqual(plan.last?.id, "pillar")
+        XCTAssertEqual(plan.last?.itemIDs, ["e"])
+    }
+
     // MARK: - Weekly picks
 
     func testAWeeklyPickSlicesADifferentSetEachWeek() {

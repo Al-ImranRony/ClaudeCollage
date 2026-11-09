@@ -63,6 +63,62 @@ enum HomeCollectionPlanner {
         return chosen + pillars
     }
 
+    // MARK: - Distinct items
+
+    /// The plan with every card shown ONCE on the whole screen.
+    ///
+    /// The file's collections overlap on purpose — a template can be both
+    /// "Clean & Minimal" and one of "This Week's Picks" — but Home showing the
+    /// same card in the hero, a curated strip and a pillar reads as a catalog
+    /// padded out, not curated. So the screen is walked top to bottom and each
+    /// card is claimed by the first place it appears:
+    ///
+    ///   1. `alreadyShown` — the hero's pages — claim theirs first;
+    ///   2. each chosen collection keeps only cards not yet claimed, and is
+    ///      dropped (claiming nothing) when fewer than `minimumItems` remain;
+    ///      the next candidate takes its place, up to `maxStrips`;
+    ///   3. each pillar keeps its unclaimed cards and is topped back up to its
+    ///      authored length from `pools` (the catalog, best first), so the
+    ///      closing strips show what the screen has not.
+    ///
+    /// Pass `plan(…, maxStrips: .max)` in, so a dropped collection has a
+    /// replacement to promote.
+    static func distinct(
+        _ planned: [HomeCollection],
+        excluding alreadyShown: [HomeCollection.Kind: [String]] = [:],
+        pools: [HomeCollection.Kind: [String]] = [:],
+        minimumItems: Int = 4,
+        maxStrips: Int = 3
+    ) -> [HomeCollection] {
+        var claimed: [HomeCollection.Kind: Set<String>] = alreadyShown.mapValues(Set.init)
+        func unclaimed(_ ids: [String], _ kind: HomeCollection.Kind) -> [String] {
+            var seen = claimed[kind] ?? []
+            return ids.filter { seen.insert($0).inserted }
+        }
+
+        var chosen: [HomeCollection] = []
+        for collection in planned where !collection.isPillar && chosen.count < maxStrips {
+            let items = unclaimed(collection.itemIDs, collection.kind)
+            guard items.count >= max(1, minimumItems) else { continue }
+            claimed[collection.kind, default: []].formUnion(items)
+            chosen.append(collection.with(itemIDs: items))
+        }
+
+        var pillars: [HomeCollection] = []
+        for pillar in planned where pillar.isPillar {
+            var items = unclaimed(pillar.itemIDs, pillar.kind)
+            if items.count < pillar.itemIDs.count {
+                let topUp = unclaimed(pools[pillar.kind] ?? [], pillar.kind)
+                    .filter { !items.contains($0) }
+                items += topUp.prefix(pillar.itemIDs.count - items.count)
+            }
+            guard !items.isEmpty else { continue }
+            claimed[pillar.kind, default: []].formUnion(items)
+            pillars.append(pillar.with(itemIDs: items))
+        }
+        return chosen + pillars
+    }
+
     // MARK: - Windows
 
     /// Whether `now` falls inside the window, inclusive at both ends. A window
