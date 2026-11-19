@@ -13,7 +13,14 @@ import UIKit
 
 public struct SampleContentManifest: Decodable, Sendable {
     public struct TemplateEntry: Decodable, Sendable { public let photos: [String] }
-    public struct CarouselEntry: Decodable, Sendable { public let framePhotos: [[String]] }
+    public struct CarouselEntry: Decodable, Sendable {
+        public let framePhotos: [[String]]
+        /// What each frame's text zones say in the showcase, in the frame's text
+        /// order. A template's own copy is placeholder ("Name 1", "Name 2") —
+        /// right for an editor the user is about to type into, wrong for a
+        /// finished-looking sample. Optional: an undressed frame keeps its copy.
+        public let frameTexts: [[String]]?
+    }
     public struct VideoShowcase: Decodable, Sendable {
         public let id: String
         public let loop: String
@@ -37,9 +44,26 @@ public struct SampleContentManifest: Decodable, Sendable {
         public var displayTitle: String { videoTemplate?.name ?? title }
     }
     public enum HeroKind: String, Decodable, Sendable, CaseIterable { case template, video, carousel }
+    /// How a hero page presents its artwork. See `HeroShowcaseView.Page.Stage`.
+    public enum HeroStage: String, Sendable {
+        /// Fill the card, or seat tall artwork on the story stage, by shape.
+        case automatic
+        /// A carousel's frames as a deck that swipes itself.
+        case deck
+        /// A before/after wipe over one photograph.
+        case compare
+    }
     public struct HeroRef: Decodable, Sendable {
         public let kind: HeroKind
         public let id: String
+        /// Raw rather than `HeroStage` so a manifest naming a stage this build
+        /// does not know still decodes — a decoding failure takes the whole
+        /// showcase down, not just the page.
+        public let stage: String?
+        /// The sample photo a `compare` page wipes across.
+        public let photo: String?
+
+        public var heroStage: HeroStage { stage.flatMap(HeroStage.init(rawValue:)) ?? .automatic }
     }
 
     public let version: Int
@@ -106,6 +130,12 @@ public final class SampleContentCatalog {
             out.append(images)
         }
         return out
+    }
+
+    /// The showcase copy for each frame's text zones, or nil when the manifest
+    /// leaves the template's own copy in place.
+    public func sampleFrameTexts(forCarouselID id: String) -> [[String]]? {
+        manifest?.carousels[id]?.frameTexts
     }
 
     public var videoShowcases: [SampleContentManifest.VideoShowcase] {

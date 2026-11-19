@@ -12,6 +12,12 @@
 //  that structure with the photo zones empty — the promise is structural, not
 //  aspirational.
 //
+//  Each page stands on the stage that presents its kind best — full bleed, a
+//  story frame, a self-swiping carousel deck, a before/after wipe — with the
+//  caption and position dots in the same bottom-leading place on all of them
+//  (see `Page.Stage` and HeroStageViews.swift). The rotation leads with video
+//  and spreads it through the run, because motion is what the eye catches.
+//
 //  Two decisions worth the ink:
 //
 //  1. The pager is a horizontally-scrolling collection view with `isPagingEnabled`
@@ -22,8 +28,8 @@
 //     paging scroll view gives programmatic advance, drag pause/resume and page
 //     sync for free.
 //  2. Motion is opt-in per page. Only the page that is actually on screen — and
-//     only while Home is on screen — is allowed to hold a video decoder; see
-//     `updateLoopPlayback()`.
+//     only while Home is on screen — is allowed to hold a video decoder or run
+//     its stage's animation; see `updateLoopPlayback()`.
 //
 
 import UIKit
@@ -31,41 +37,52 @@ import UIKit
 @MainActor
 final class HeroShowcaseView: UIView {
 
-    /// One full-bleed page of the hero.
+    /// One page of the hero.
     struct Page {
-        /// How the preview is fitted to the card.
-        ///
-        /// A carousel's showcase preview is a wide three-page strip; filling the
-        /// hero with it crops away everything except a sliver of the middle page,
-        /// which destroys the one thing the strip exists to say (that this is a
-        /// multi-page post). Those pages are fitted whole onto a blurred bed of
-        /// themselves instead — the letterboxing then reads as a deliberate
-        /// presentation rather than as a layout accident.
-        ///
-        /// The same argument turned out to apply to any artwork whose shape is
-        /// far from the card's, which is what `.automatic` — the default —
-        /// measures. See `HeroPageCell.fitting(for:artwork:card:)`.
-        enum Presentation { case fill, fitOnBlurredBed, automatic }
+        /// How the page presents its artwork. See `HeroStageViews.swift`.
+        enum Stage: Equatable {
+            /// Edge to edge, under a scrim. Landscape and near-square work.
+            case fill
+            /// Tall work (a 9:16 story or reel) standing whole as a story frame
+            /// on the trailing side of a lit stage. `aspect` is width / height.
+            case story(aspect: CGFloat)
+            /// A carousel's frames as a deck that swipes itself.
+            case deck
+            /// A before/after wipe. `frames` is `[before, after]`.
+            case compare
+
+            /// Fill unless the artwork is tall enough that filling the card
+            /// would show a crop of it rather than it: past 3:2 portrait, a fill
+            /// throws away more than half the height.
+            static func resolve(aspect: CGFloat) -> Stage {
+                guard aspect > 0 else { return .fill }
+                return 1 / aspect >= 1.5 ? .story(aspect: aspect) : .fill
+            }
+        }
 
         let title: String
         let subtitle: String
         let identifier: String
-        var presentation: Presentation = .automatic
+        var stage: Stage = .fill
         /// A video page's still frame, shown instantly and kept as the permanent
         /// state whenever motion is not allowed.
         var poster: UIImage?
         /// Non-nil only for video pages.
         var loopURL: URL?
-        /// Rendered lazily, off the first layout pass. A closure rather than an
-        /// image so a page that scrolls away before it is drawn costs nothing.
+        /// The still a `fill` or `story` page shows. Rendered lazily, off the
+        /// first layout pass, so a page that scrolls away before it is drawn
+        /// costs nothing.
         var preview: () -> CGImage? = { nil }
+        /// The images a `deck` or `compare` page deals out. Lazy for the same
+        /// reason. Empty falls back to `preview`, filled.
+        /// Async so the page can draw them off the main actor.
+        var frames: @MainActor () async -> [UIImage] = { [] }
         let onTap: () -> Void
     }
 
     /// The hero is a card, not a band: the corner radius and shadow are the same
     /// language the gallery's cards speak.
     private lazy var collectionView = makeCollectionView()
-    private let pageControl = UIPageControl()
     private var pages: [Page] = []
     private var rotation: HeroRotationController?
     /// Whether Home is on screen. Nothing rotates and nothing decodes while false.
@@ -81,24 +98,14 @@ final class HeroShowcaseView: UIView {
         collectionView.translatesAutoresizingMaskIntoConstraints = false
         addSubview(collectionView)
 
-        // Bottom-trailing, over the scrim: the scrim is the only part of an
-        // arbitrary photograph whose contrast is guaranteed, so it is the only
-        // place white dots are certain to be legible.
-        pageControl.currentPageIndicatorTintColor = Theme.Color.textOnToast
-        pageControl.pageIndicatorTintColor = Theme.Color.textOnToast.withAlphaComponent(0.4)
-        pageControl.hidesForSinglePage = true
-        pageControl.translatesAutoresizingMaskIntoConstraints = false
-        pageControl.addTarget(self, action: #selector(pageControlChanged), for: .valueChanged)
-        addSubview(pageControl)
+        // No page control on the card: each page draws its own position under
+        // its title (`HeroDotsView`), the one place every stage keeps dark.
 
         NSLayoutConstraint.activate([
             collectionView.topAnchor.constraint(equalTo: topAnchor),
             collectionView.leadingAnchor.constraint(equalTo: leadingAnchor),
             collectionView.trailingAnchor.constraint(equalTo: trailingAnchor),
             collectionView.bottomAnchor.constraint(equalTo: bottomAnchor),
-
-            pageControl.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -Theme.Spacing.xs),
-            pageControl.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -Theme.Spacing.xs),
         ])
     }
 
@@ -125,9 +132,6 @@ final class HeroShowcaseView: UIView {
         // content offset survives and the hero opens mid-page.
         collectionView.setContentOffset(.zero, animated: false)
 
-        pageControl.numberOfPages = pages.count
-        pageControl.currentPage = 0
-
         // A controller built for the previous page count would advance past the
         // end of the new one.
         rotation?.stop()
@@ -138,7 +142,9 @@ final class HeroShowcaseView: UIView {
         let controller = HeroRotationController(
             pageCount: pages.count,
             reduceMotion: { Theme.Motion.isReduced },
-            scheduler: HeroRotationController.timerScheduler()
+            // Five seconds, not four: the stages move on their own now, and a
+            // deck needs time for a couple of swipes before the page changes.
+            scheduler: HeroRotationController.timerScheduler(interval: Self.dwell)
         )
         controller.onAdvance = { [weak self] page in self?.advance(to: page) }
         rotation = controller
@@ -158,6 +164,10 @@ final class HeroShowcaseView: UIView {
         }
         updateLoopPlayback()
     }
+
+    /// How long each page stays up. The story frame's progress segment fills
+    /// over exactly this long.
+    static let dwell: TimeInterval = 5
 
     // MARK: - Paging
 
@@ -190,13 +200,11 @@ final class HeroShowcaseView: UIView {
         // Off screen, or mid-drag: no fade to see, and a finger owns the offset.
         guard window != nil, !collectionView.isDragging, !collectionView.isDecelerating else {
             collectionView.setContentOffset(target, animated: false)
-            pageControl.currentPage = page
             updateLoopPlayback()
             return
         }
 
         for case let cell as HeroPageCell in collectionView.visibleCells { cell.stop() }
-        pageControl.currentPage = page
         UIView.transition(
             with: collectionView,
             duration: Theme.Motion.duration(Theme.Motion.slow),
@@ -209,21 +217,16 @@ final class HeroShowcaseView: UIView {
         }
     }
 
-    @objc private func pageControlChanged() {
-        let page = pageControl.currentPage
-        guard pages.indices.contains(page) else { return }
-        rotation?.noteUserMoved(to: page)
-        collectionView.scrollToItem(
-            at: IndexPath(item: page, section: 0), at: .centeredHorizontally, animated: true)
-    }
-
     /// The user's finger landed somewhere: adopt that page as the one auto-advance
     /// continues from, rather than snapping back to where the timer thought it was.
     private func settle() {
         let page = currentPage
-        pageControl.currentPage = page
         rotation?.noteUserMoved(to: page)
-        rotation?.resume()
+        // A fresh period from where the finger landed: otherwise the timer keeps
+        // its old phase and the page the user just chose can leave a second later,
+        // halfway through its story progress.
+        rotation?.stop()
+        if isActive { rotation?.start() }
         updateLoopPlayback()
     }
 
@@ -287,7 +290,7 @@ extension HeroShowcaseView: UICollectionViewDataSource, UICollectionViewDelegate
         let cell = collectionView.dequeueReusableCell(
             withReuseIdentifier: HeroPageCell.reuseID, for: indexPath)
         if let heroCell = cell as? HeroPageCell, pages.indices.contains(indexPath.item) {
-            heroCell.configure(with: pages[indexPath.item])
+            heroCell.configure(with: pages[indexPath.item], index: indexPath.item, of: pages.count)
         }
         return cell
     }
@@ -320,11 +323,6 @@ extension HeroShowcaseView: UICollectionViewDataSource, UICollectionViewDelegate
         rotation?.pause()
     }
 
-    func scrollViewDidScroll(_ scrollView: UIScrollView) {
-        // The dot tracks the swipe rather than jumping once it ends.
-        pageControl.currentPage = currentPage
-    }
-
     func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
         if !decelerate { settle() }
     }
@@ -341,191 +339,162 @@ extension HeroShowcaseView: UICollectionViewDataSource, UICollectionViewDelegate
 
 // MARK: - Page cell
 
-/// One hero page: a photo-real still (or a silent looping video), a scrim, and
-/// the title/subtitle pair that names what tapping it will make.
+/// One hero page: a stage (see `Page.Stage`), and the title, subtitle and
+/// position dots that name what tapping it will make.
+///
+/// The caption sits bottom-leading on every stage. The stages vary a lot in
+/// what they show, so the type staying in one place is what keeps the hero
+/// reading as one component rather than five different cards.
 @MainActor
 private final class HeroPageCell: UICollectionViewCell {
     static let reuseID = "HeroPageCell"
 
-    /// How much of the card's height the caption's scrim covers. Taller than the
-    /// strip card's because the hero carries two lines of type, not one.
-    private static let scrimHeightRatio: CGFloat = 0.45
+    /// How much of the card's height the scrim covers on the full-bleed stages.
+    private static let scrimHeightRatio: CGFloat = 0.5
+    private static let inset = Theme.Spacing.md
 
-    /// How far a preview's proportions may stray from the card's before filling
-    /// stops showing a template and starts showing a crop.
-    ///
-    /// The hero card is about 1 : 0.84. Filling it with `story-caption-hero` —
-    /// a 9:16 template whose whole design is a photo above a caption band —
-    /// shows 47% of the artwork, which on this catalog's sample photography is
-    /// an extreme close-up of one face with the template's own composition
-    /// cropped away entirely. The hero then reads as a photo viewer, which is
-    /// the one thing it must not do. A 1:1 or 4:5 template loses only its
-    /// margins under the same crop and still reads whole.
-    ///
-    /// The line is drawn on the RATIO between the two aspect ratios rather than
-    /// on either one, so it keeps meaning the same thing if the card's
-    /// proportions change: fit when the artwork is more than 1.8x as elongated
-    /// as the card — equivalently, when filling would crop away more than 44%
-    /// of one axis. Against the shipped catalog that puts 1:1 (1.19), 4:5
-    /// (1.49) and 3:4 (1.59) on the fill side and 9:16 (2.12) and the
-    /// three-page carousel strip (2.02) on the fit side, with real air either
-    /// way rather than a boundary a new template could stumble across.
-    private static let fitDivergenceThreshold: CGFloat = 1.8
-
-    /// The shape a preview takes inside the card.
-    private enum Fitting {
-        /// Edge to edge, cropped to the card.
-        case fill
-        /// Whole, seated in the card's region ABOVE the caption, on a blurred
-        /// blow-up of itself.
-        ///
-        /// Above rather than behind, for both shapes of artwork. A wide strip
-        /// centred in the card would land exactly where the two lines of type
-        /// go; a tall template large enough to fill the card's height puts its
-        /// OWN authored caption band ("MOMENTS") under the hero's title, and two
-        /// captions in the same 40pt reads as a bug rather than as a poster.
-        case onBed
-    }
-
-    /// Resolves a page's declared presentation against what was actually
-    /// rendered. `artwork` is `.zero` before the render lands, which is why an
-    /// explicitly-fitted page still starts in the geometry it asked for.
-    private static func fitting(
-        for presentation: HeroShowcaseView.Page.Presentation,
-        artwork: CGSize, card: CGSize
-    ) -> Fitting {
-        switch presentation {
-        case .fill:
-            return .fill
-        case .fitOnBlurredBed:
-            return .onBed
-        case .automatic:
-            guard artwork.width > 0, artwork.height > 0, card.width > 0, card.height > 0
-            else { return .fill }
-            let artAspect = artwork.height / artwork.width
-            let cardAspect = card.height / card.width
-            let divergence = max(artAspect / cardAspect, cardAspect / artAspect)
-            return divergence > Self.fitDivergenceThreshold ? .onBed : .fill
-        }
-    }
-
-    private let bedImageView = UIImageView()
-    // Ultra-thin, not thick: the bed is meant to read as a soft, out-of-focus
-    // blow-up OF THE ARTWORK. A thick material buried it — the card came out a
-    // black box with a small picture floating in it.
-    private let bedBlur = UIVisualEffectView(effect: UIBlurEffect(style: .systemUltraThinMaterialDark))
+    private let backdrop = HeroStageBackdropView()
+    /// Hosts the shadow of a story frame; the clipping and rounding happen on
+    /// `mediaView` inside it, or the clip would cut the shadow away.
+    private let mediaFrame = UIView()
+    private let mediaView = UIView()
     private let imageView = UIImageView()
     private let playerView = LoopingPreviewPlayerView()
+    private let storyChrome = HeroStoryChromeView()
+    private let deckView = HeroDeckStageView()
+    private let compareView = HeroCompareStageView()
     private let scrim = ShowcaseScrimView()
     private let titleLabel = UILabel()
     private let subtitleLabel = UILabel()
+    private let dotsView = HeroDotsView()
     private let captionStack = UIStackView()
+
+    private var stage: HeroShowcaseView.Page.Stage = .fill
     private var previewTask: Task<Void, Never>?
-    /// The preview's two geometries, swapped by `apply(_:isVideo:)`.
-    private var edgeConstraints: [NSLayoutConstraint] = []
-    private var aboveCaptionConstraints: [NSLayoutConstraint] = []
+    /// Whether the hero wants this page moving. Content that lands after
+    /// `play()` (the deck's frames, rendered lazily) starts on arrival.
+    private var wantsMotion = false
+
+    private var fillConstraints: [NSLayoutConstraint] = []
+    private var storyConstraints: [NSLayoutConstraint] = []
+    private var storyAspect: NSLayoutConstraint?
+    private var captionWide: NSLayoutConstraint!
+    private var captionBesideStory: NSLayoutConstraint!
 
     override init(frame: CGRect) {
         super.init(frame: frame)
 
-        contentView.backgroundColor = Theme.Color.cellWell
+        contentView.backgroundColor = UIColor(white: 0.08, alpha: 1)
         contentView.clipsToBounds = true
 
-        // The bed is the same picture, blown up and blurred, so a fitted preview
-        // sits on something that belongs to it instead of on a flat grey box.
-        bedImageView.contentMode = .scaleAspectFill
-        bedImageView.clipsToBounds = true
-        bedImageView.isHidden = true
-        bedBlur.isHidden = true
+        mediaFrame.layer.shadowColor = UIColor.black.cgColor
+        mediaFrame.layer.shadowRadius = 18
+        mediaFrame.layer.shadowOffset = CGSize(width: 0, height: 10)
+
+        mediaView.clipsToBounds = true
+        mediaView.layer.cornerCurve = .continuous
+        mediaView.backgroundColor = Theme.Color.cellWell
 
         imageView.contentMode = .scaleAspectFill
         imageView.clipsToBounds = true
-
         playerView.isHidden = true
 
-        titleLabel.font = Theme.Typography.title2
         // White in both appearances: this type never touches an app surface — it
-        // is always over the scrim, which is always dark — so the surface tokens
-        // would flip it to near-black on black in light mode. `textOnToast` is
-        // the token for ink that floats over arbitrary content.
+        // always sits on the scrim or the dark stage — so the surface tokens
+        // would flip it to near-black on black in light mode.
+        titleLabel.font = Theme.Typography.title
         titleLabel.textColor = Theme.Color.textOnToast
         titleLabel.adjustsFontForContentSizeCategory = true
-        titleLabel.numberOfLines = 1
         titleLabel.lineBreakMode = .byTruncatingTail
-        // Half the catalog is authored on white; the scrim alone does not hold
-        // white type up over it. See `applyShowcaseCaptionShadow`.
         titleLabel.applyShowcaseCaptionShadow()
 
         subtitleLabel.font = Theme.Typography.subheadline
         subtitleLabel.textColor = Theme.Color.textOnToast.withAlphaComponent(0.85)
         subtitleLabel.adjustsFontForContentSizeCategory = true
-        subtitleLabel.numberOfLines = 1
         subtitleLabel.lineBreakMode = .byTruncatingTail
         subtitleLabel.applyShowcaseCaptionShadow()
 
-        // Stored rather than local now: the fitted geometry hangs off its top
-        // edge, so the image view has to be able to reach it.
-        captionStack.addArrangedSubview(titleLabel)
-        captionStack.addArrangedSubview(subtitleLabel)
         captionStack.axis = .vertical
+        captionStack.alignment = .leading
         captionStack.spacing = Theme.Spacing.xxs / 2
+        for view in [titleLabel, subtitleLabel, dotsView] { captionStack.addArrangedSubview(view) }
+        captionStack.setCustomSpacing(Theme.Spacing.sm, after: subtitleLabel)
 
-        for subview in [bedImageView, bedBlur, imageView, playerView, scrim, captionStack] {
+        for subview in [imageView, playerView, storyChrome] {
+            subview.translatesAutoresizingMaskIntoConstraints = false
+            mediaView.addSubview(subview)
+        }
+        mediaView.translatesAutoresizingMaskIntoConstraints = false
+        mediaFrame.addSubview(mediaView)
+        for subview in [backdrop, mediaFrame, deckView, compareView, scrim, captionStack] {
             subview.translatesAutoresizingMaskIntoConstraints = false
             contentView.addSubview(subview)
         }
 
+        let inset = Self.inset
         NSLayoutConstraint.activate([
-            bedImageView.topAnchor.constraint(equalTo: contentView.topAnchor),
-            bedImageView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
-            bedImageView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
-            bedImageView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
+            backdrop.topAnchor.constraint(equalTo: contentView.topAnchor),
+            backdrop.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            backdrop.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            backdrop.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
 
-            bedBlur.topAnchor.constraint(equalTo: contentView.topAnchor),
-            bedBlur.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
-            bedBlur.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
-            bedBlur.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
+            mediaView.topAnchor.constraint(equalTo: mediaFrame.topAnchor),
+            mediaView.leadingAnchor.constraint(equalTo: mediaFrame.leadingAnchor),
+            mediaView.trailingAnchor.constraint(equalTo: mediaFrame.trailingAnchor),
+            mediaView.bottomAnchor.constraint(equalTo: mediaFrame.bottomAnchor),
 
-            playerView.topAnchor.constraint(equalTo: contentView.topAnchor),
-            playerView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
-            playerView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
-            playerView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
+            imageView.topAnchor.constraint(equalTo: mediaView.topAnchor),
+            imageView.leadingAnchor.constraint(equalTo: mediaView.leadingAnchor),
+            imageView.trailingAnchor.constraint(equalTo: mediaView.trailingAnchor),
+            imageView.bottomAnchor.constraint(equalTo: mediaView.bottomAnchor),
+
+            playerView.topAnchor.constraint(equalTo: mediaView.topAnchor),
+            playerView.leadingAnchor.constraint(equalTo: mediaView.leadingAnchor),
+            playerView.trailingAnchor.constraint(equalTo: mediaView.trailingAnchor),
+            playerView.bottomAnchor.constraint(equalTo: mediaView.bottomAnchor),
+
+            storyChrome.topAnchor.constraint(equalTo: mediaView.topAnchor, constant: Theme.Spacing.xs),
+            storyChrome.leadingAnchor.constraint(equalTo: mediaView.leadingAnchor, constant: Theme.Spacing.xs),
+            storyChrome.trailingAnchor.constraint(equalTo: mediaView.trailingAnchor, constant: -Theme.Spacing.xs),
+            storyChrome.heightAnchor.constraint(equalToConstant: 3),
+
+            // The deck stands above the caption, never behind it.
+            deckView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: inset),
+            deckView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            deckView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            deckView.bottomAnchor.constraint(equalTo: captionStack.topAnchor, constant: -Theme.Spacing.md),
+
+            compareView.topAnchor.constraint(equalTo: contentView.topAnchor),
+            compareView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            compareView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            compareView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
 
             scrim.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
             scrim.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
             scrim.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
-            scrim.heightAnchor.constraint(
-                equalTo: contentView.heightAnchor, multiplier: Self.scrimHeightRatio),
+            scrim.heightAnchor.constraint(equalTo: contentView.heightAnchor, multiplier: Self.scrimHeightRatio),
 
-            captionStack.leadingAnchor.constraint(
-                equalTo: contentView.leadingAnchor, constant: Theme.Spacing.md),
-            captionStack.bottomAnchor.constraint(
-                equalTo: contentView.bottomAnchor, constant: -Theme.Spacing.md),
-            // Leaves the bottom-trailing corner to the page control, which lives
-            // on the hero rather than in the cell and so cannot be constrained to
-            // directly.
-            captionStack.widthAnchor.constraint(
-                lessThanOrEqualTo: contentView.widthAnchor, multiplier: 0.68),
+            captionStack.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: inset),
+            captionStack.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -inset),
         ])
 
-        // Two geometries for one image view: edge to edge, and the band above the
-        // caption. The second is anchored to the caption rather than set as a
-        // share of the card's height so that it still clears the type at the
-        // accessibility text sizes, where the two lines are twice as tall.
-        edgeConstraints = [
-            imageView.topAnchor.constraint(equalTo: contentView.topAnchor),
-            imageView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
-            imageView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
-            imageView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
+        fillConstraints = [
+            mediaFrame.topAnchor.constraint(equalTo: contentView.topAnchor),
+            mediaFrame.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            mediaFrame.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            mediaFrame.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
         ]
-        aboveCaptionConstraints = [
-            imageView.topAnchor.constraint(equalTo: contentView.topAnchor),
-            imageView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
-            imageView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
-            imageView.bottomAnchor.constraint(
-                equalTo: captionStack.topAnchor, constant: -Theme.Spacing.sm),
+        storyConstraints = [
+            mediaFrame.topAnchor.constraint(equalTo: contentView.topAnchor, constant: inset),
+            mediaFrame.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -inset),
+            mediaFrame.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -inset - Theme.Spacing.xs),
         ]
-        NSLayoutConstraint.activate(edgeConstraints)
+        captionWide = captionStack.widthAnchor.constraint(
+            lessThanOrEqualTo: contentView.widthAnchor, multiplier: 0.78)
+        captionBesideStory = captionStack.trailingAnchor.constraint(
+            lessThanOrEqualTo: mediaFrame.leadingAnchor, constant: -inset)
+        NSLayoutConstraint.activate(fillConstraints + [captionWide])
+        apply(.fill, hasVideo: false)
 
         isAccessibilityElement = true
         accessibilityTraits = .button
@@ -534,12 +503,32 @@ private final class HeroPageCell: UICollectionViewCell {
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
 
-    func configure(with page: HeroShowcaseView.Page) {
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        mediaFrame.layer.shadowPath = stage == .fill ? nil : UIBezierPath(
+            roundedRect: mediaFrame.bounds, cornerRadius: Theme.Radius.md).cgPath
+    }
+
+    // MARK: Configuration
+
+    func configure(with page: HeroShowcaseView.Page, index: Int, of count: Int) {
         titleLabel.text = page.title
-        subtitleLabel.text = page.subtitle
+        // Beside a story frame the column is too narrow for "kind · Tap to
+        // create" on one line, and letting it wrap breaks it mid-phrase. Break
+        // it where the copy already divides it instead.
+        if case .story = page.stage {
+            subtitleLabel.text = page.subtitle.replacingOccurrences(of: " · ", with: "\n")
+        } else {
+            subtitleLabel.text = page.subtitle
+        }
+        dotsView.configure(count: count, current: index)
         accessibilityIdentifier = page.identifier
         accessibilityLabel = page.title
-        accessibilityValue = page.subtitle
+        // The position the dots show, for VoiceOver: the card has no page
+        // control of its own any more.
+        accessibilityValue = count > 1
+            ? "\(page.subtitle), " + String(localized: "Page \(index + 1) of \(count)")
+            : page.subtitle
 
         let isVideo = page.loopURL != nil
         playerView.isHidden = !isVideo
@@ -547,70 +536,145 @@ private final class HeroPageCell: UICollectionViewCell {
         // Configured either way: passing nil is what releases a pipeline this
         // cell was holding for the video page it used to show.
         playerView.configure(loopURL: page.loopURL, poster: isVideo ? page.poster : nil)
-
-        // Nothing has been rendered yet, so this is only what the page DECLARES.
-        // It is re-resolved below against the artwork that actually arrives.
-        apply(
-            Self.fitting(for: page.presentation, artwork: .zero, card: contentView.bounds.size),
-            isVideo: isVideo)
+        apply(page.stage, hasVideo: isVideo)
+        if isVideo { light(from: page.poster?.cgImage) }
 
         previewTask?.cancel()
         guard !isVideo else { return }
         previewTask = Task { @MainActor [weak self] in
             guard !Task.isCancelled else { return }
-            let rendered = page.preview()
+            var stage = page.stage
+            var frames: [UIImage] = []
+            var still: UIImage?
+            switch stage {
+            case .deck, .compare:
+                frames = await page.frames()
+                guard !Task.isCancelled else { return }
+                let needed = stage == .compare ? 2 : 1
+                if frames.count < needed {
+                    // Nothing to deal out: the page is still worth showing whole.
+                    stage = .fill
+                    still = page.preview().map { UIImage(cgImage: $0) }
+                }
+            case .fill, .story:
+                still = page.preview().map { UIImage(cgImage: $0) }
+            }
             guard !Task.isCancelled, let self else { return }
-            let image = rendered.map { UIImage(cgImage: $0) }
-            // Measured now rather than inside the animation block, so it reads a
-            // settled layout rather than one mid-transition.
-            let fitting = Self.fitting(
-                for: page.presentation, artwork: image?.size ?? .zero,
-                card: self.contentView.bounds.size)
             // A fade, not a pop: the well → photograph swap is very visible at
-            // hero size, and the geometry can change with it (a tall template
-            // arriving on a card that had been laid out to fill). Reduce Motion
-            // shortens it rather than removing it — a cross-dissolve is not
-            // motion.
+            // hero size. A cross-dissolve is not motion, so Reduce Motion
+            // shortens it rather than removing it.
             UIView.transition(
                 with: self.contentView,
                 duration: Theme.Motion.duration(Theme.Motion.standard),
                 options: [.transitionCrossDissolve, .allowUserInteraction]
             ) {
-                self.apply(fitting, isVideo: isVideo)
-                self.imageView.image = image
-                self.bedImageView.image = fitting == .fill ? nil : image
+                self.apply(stage, hasVideo: false)
+                switch stage {
+                case .deck:
+                    self.deckView.configure(frames: frames)
+                    self.light(from: frames.first?.cgImage)
+                case .compare:
+                    self.compareView.configure(before: frames[0], after: frames[1])
+                case .fill, .story:
+                    self.imageView.image = still
+                    self.light(from: still?.cgImage)
+                }
                 self.contentView.layoutIfNeeded()
+            } completion: { _ in
+                if self.wantsMotion { self.startStageMotion() }
             }
         }
     }
 
-    /// Puts the image view into one of the two geometries and shows or hides the
-    /// blurred bed to match.
-    private func apply(_ fitting: Fitting, isVideo: Bool) {
-        let fits = fitting != .fill
-        imageView.contentMode = fits ? .scaleAspectFit : .scaleAspectFill
+    /// Puts the cell into a stage's geometry and shows only what that stage uses.
+    private func apply(_ stage: HeroShowcaseView.Page.Stage, hasVideo: Bool) {
+        self.stage = stage
+        let isStory: Bool
+        if case .story = stage { isStory = true } else { isStory = false }
 
-        NSLayoutConstraint.deactivate(fits ? edgeConstraints : aboveCaptionConstraints)
-        NSLayoutConstraint.activate(fits ? aboveCaptionConstraints : edgeConstraints)
+        storyAspect?.isActive = false
+        storyAspect = nil
+        NSLayoutConstraint.deactivate(fillConstraints + storyConstraints + [captionWide, captionBesideStory])
+        if case .story(let aspect) = stage {
+            // Clamped: a frame much narrower than 9:16 would leave the stage
+            // empty, and much wider is not a story.
+            let ratio = min(max(aspect, 0.45), 0.8)
+            let constraint = mediaFrame.widthAnchor.constraint(equalTo: mediaFrame.heightAnchor, multiplier: ratio)
+            storyAspect = constraint
+            NSLayoutConstraint.activate(storyConstraints + [constraint, captionBesideStory])
+        } else {
+            NSLayoutConstraint.activate(fillConstraints + [captionWide])
+        }
 
-        // A video page never grows a bed: it fills by construction, and there is
-        // no still to blow up behind it.
-        bedImageView.isHidden = fitting == .fill || isVideo
-        bedBlur.isHidden = bedImageView.isHidden
+        mediaFrame.isHidden = stage == .deck || stage == .compare
+        mediaView.layer.cornerRadius = isStory ? Theme.Radius.md : 0
+        mediaView.layer.borderWidth = isStory ? 0.5 : 0
+        mediaView.layer.borderColor = UIColor.white.withAlphaComponent(0.18).cgColor
+        mediaFrame.layer.shadowOpacity = isStory ? 0.5 : 0
+        storyChrome.isHidden = !isStory
+        deckView.isHidden = stage != .deck
+        compareView.isHidden = stage != .compare
+        backdrop.isHidden = stage == .fill || stage == .compare
+        scrim.isHidden = !(stage == .fill || stage == .compare)
+        // Beside a story frame the column is narrow; let the type wrap rather
+        // than truncate the name of the thing being sold.
+        titleLabel.numberOfLines = isStory ? 2 : 1
+        subtitleLabel.numberOfLines = isStory ? 2 : 1
+        setNeedsLayout()
     }
 
-    func play() { playerView.play() }
-    func stop() { playerView.stop() }
+    /// Lights the stage in the artwork's colour, the glow centred on where the
+    /// artwork stands.
+    private func light(from image: CGImage?) {
+        let center: CGPoint
+        switch stage {
+        case .story: center = CGPoint(x: 0.78, y: 0.45)
+        case .deck: center = CGPoint(x: 0.5, y: 0.32)
+        case .fill, .compare: return
+        }
+        backdrop.apply(tint: HeroStageTint.tint(of: image), glowCenter: center)
+    }
+
+    // MARK: Motion
+
+    func play() {
+        guard !wantsMotion else { return }
+        wantsMotion = true
+        playerView.play()
+        startStageMotion()
+    }
+
+    func stop() {
+        wantsMotion = false
+        playerView.stop()
+        storyChrome.stop()
+        deckView.stop()
+        compareView.stop()
+    }
+
+    private func startStageMotion() {
+        switch stage {
+        // A page reached by auto-advance starts playing once its cross-fade
+        // ends, which is that long into the timer's period; the segment should
+        // be full as the page leaves, not cut off just short of it.
+        case .story:
+            storyChrome.play(duration: HeroShowcaseView.dwell - Theme.Motion.duration(Theme.Motion.slow))
+        case .deck: deckView.play()
+        case .compare: compareView.play()
+        case .fill: break
+        }
+    }
 
     override func prepareForReuse() {
         super.prepareForReuse()
         // A render in flight belongs to the page this cell USED to show.
         previewTask?.cancel()
         previewTask = nil
-        playerView.stop()
+        stop()
         playerView.configure(loopURL: nil, poster: nil)
         imageView.image = nil
-        bedImageView.image = nil
+        deckView.configure(frames: [])
+        compareView.configure(before: nil, after: nil)
         titleLabel.text = nil
         subtitleLabel.text = nil
         accessibilityValue = nil

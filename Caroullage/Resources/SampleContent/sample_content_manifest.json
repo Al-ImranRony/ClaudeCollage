@@ -1,12 +1,12 @@
 {
-  "version": 3,
+  "version": 4,
   "templates": {
     "grid-4cell-square":    { "photos": ["sample_portrait_01", "sample_travel_01", "sample_couple_01", "sample_food_01"] },
     "grid-filmstrip":       { "photos": ["sample_friends_02", "sample_portrait_02", "sample_travel_02"] },
     "minimal-duo-offset":   { "photos": ["sample_portrait_04", "sample_portrait_06"] },
     "minimal-gallery-trio": { "photos": ["sample_seasonal_01", "sample_portrait_03", "sample_seasonal_03"] },
     "story-hero-strip":     { "photos": ["sample_couple_02", "sample_travel_03", "sample_portrait_05"] },
-    "story-caption-hero":   { "photos": ["sample_portrait_02"] },
+    "story-caption-hero":   { "photos": ["sample_seasonal_02"] },
     "travel-horizon-split": { "photos": ["sample_travel_04", "sample_travel_03", "sample_couple_03"] },
     "birthday-confetti":    { "photos": ["sample_friends_03"] },
     "seasonal-bloom":       { "photos": ["sample_seasonal_02", "sample_family_01", "sample_seasonal_03"] },
@@ -47,7 +47,8 @@
     "seasonal-bloom"
   ],
   "carousels": {
-    "carousel-matched-team":       { "framePhotos": [["sample_portrait_01"], ["sample_portrait_03"], ["sample_portrait_06"], ["sample_portrait_04"]] },
+    "carousel-matched-team":       { "framePhotos": [["sample_portrait_01"], ["sample_portrait_03"], ["sample_portrait_06"], ["sample_portrait_04"]],
+                                     "frameTexts": [["Zuri"], ["Amina"], ["Nia"], ["Mei"]] },
     "carousel-matched-menu":       { "framePhotos": [["sample_food_01"], ["sample_food_02"], ["sample_food_03"], ["sample_food_01"]] },
     "carousel-matched-tips":       { "framePhotos": [["sample_portrait_04"], ["sample_friends_01"], ["sample_portrait_02"], ["sample_seasonal_01"], ["sample_portrait_06"]] },
     "carousel-matched-steps":      { "framePhotos": [["sample_food_02"], ["sample_food_01"], ["sample_food_03"], ["sample_friends_01"], ["sample_family_02"]] },
@@ -86,10 +87,11 @@
     { "id": "solo-motion", "loop": "sample_loop_solo", "poster": "sample_loop_solo_poster", "title": "Spotlight",   "layout": "oneCell" }
   ],
   "hero": [
-    { "kind": "template", "id": "grid-4cell-square" },
-    { "kind": "video",    "id": "duo-motion" },
-    { "kind": "carousel", "id": "carousel-matched-team" },
+    { "kind": "video",    "id": "tpl-travel-filmstrip" },
+    { "kind": "carousel", "id": "carousel-matched-team", "stage": "deck" },
+    { "kind": "video",    "id": "tpl-title-grid" },
     { "kind": "template", "id": "story-caption-hero" },
-    { "kind": "carousel", "id": "carousel-story-beforeafter" }
+    { "kind": "video",    "id": "quad-motion" },
+    { "kind": "carousel", "id": "carousel-story-beforeafter", "stage": "compare", "photo": "sample_seasonal_01" }
   ]
 }

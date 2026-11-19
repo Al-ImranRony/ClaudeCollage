@@ -585,10 +585,16 @@ final class HomeViewController: UIViewController {
     /// The hero's pages, resolved from the manifest's ordered hero list against
     /// the three showcases. A reference that resolves to nothing is skipped rather
     /// than rendered as a blank page.
+    ///
+    /// Each page is put on the stage that presents its kind best (see
+    /// `HeroShowcaseView.Page.Stage`): video and photo work fills the card or
+    /// stands as a story frame by shape, carousels deal out as a swiping deck,
+    /// and a before/after carousel becomes a wipe.
     private func makeHeroPages() -> [HeroShowcaseView.Page] {
         let templates = featuredTemplatesProvider?() ?? []
         let videos = videoShowcasesProvider?() ?? []
         let carousels = carouselTemplatesProvider?() ?? []
+        let sampleContent = self.sampleContent
         // Leads with what the user said they make; the manifest's order
         // otherwise — see `HeroOrdering`.
         let refs = HeroOrdering.order(sampleContent.heroRefs, for: creatorKindProvider?())
@@ -597,10 +603,12 @@ final class HomeViewController: UIViewController {
             case .template:
                 guard let template = templates.first(where: { $0.id == ref.id })
                 else { return nil }
+                let canvas = CanvasSize.size(forAspectRatio: template.canvasAspectRatio)
                 return HeroShowcaseView.Page(
                     title: template.name,
                     subtitle: String(localized: "Photo collage · Tap to create"),
                     identifier: "heroPage-\(template.id)",
+                    stage: .resolve(aspect: canvas.width / max(canvas.height, 1)),
                     preview: {
                         TemplateService.shared.showcasePreview(for: template, maxDimension: 900)
                             ?? TemplateService.shared.thumbnail(for: template)
@@ -613,11 +621,14 @@ final class HomeViewController: UIViewController {
             case .video:
                 guard let showcase = videos.first(where: { $0.id == ref.id })
                 else { return nil }
+                let poster = sampleContent.image(named: showcase.poster)
+                let aspect = poster.map { $0.size.width / max($0.size.height, 1) } ?? 1
                 return HeroShowcaseView.Page(
                     title: showcase.displayTitle,
                     subtitle: String(localized: "Video collage · Tap to create"),
                     identifier: "heroPage-\(showcase.id)",
-                    poster: sampleContent.image(named: showcase.poster),
+                    stage: .resolve(aspect: aspect),
+                    poster: poster,
                     loopURL: sampleContent.videoURL(named: showcase.loop),
                     onTap: { [weak self] in
                         Analytics.track(.heroTapped(id: showcase.id))
@@ -627,16 +638,31 @@ final class HomeViewController: UIViewController {
             case .carousel:
                 guard let template = carousels.first(where: { $0.id == ref.id })
                 else { return nil }
+                let isCompare = ref.heroStage == .compare
                 return HeroShowcaseView.Page(
                     title: template.name,
                     subtitle: String(localized: "Carousel · Tap to create"),
                     identifier: "heroPage-\(template.id)",
-                    // A three-page strip fitted whole, not cropped to a sliver of
-                    // its middle page.
-                    presentation: .fitOnBlurredBed,
+                    stage: isCompare ? .compare : .deck,
+                    // The strip, for the fallback a deck without frames takes.
                     preview: {
                         TemplateService.shared.showcasePreview(
                             for: template, frameMaxDimension: 640)
+                    },
+                    frames: {
+                        if isCompare {
+                            // One photograph against its own unedited grade, so
+                            // the wipe compares like with like.
+                            let name = ref.photo
+                                ?? sampleContent.manifest?.carousels[template.id]?.framePhotos.first?.first
+                            guard let after = name.flatMap(sampleContent.image(named:)),
+                                  let before = await HeroCompareGrade.beforeInBackground(from: after)
+                            else { return [] }
+                            return [before, after]
+                        }
+                        return await TemplateService.shared
+                            .showcaseFramesInBackground(for: template, maxDimension: 480)
+                            .map { UIImage(cgImage: $0) }
                     },
                     onTap: { [weak self] in
                         Analytics.track(.heroTapped(id: template.id))

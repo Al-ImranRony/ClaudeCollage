@@ -287,11 +287,13 @@ public final class TemplateService {
 
         // The manifest authors its frame arrays in frame order, so sort by `index`
         // rather than trusting the JSON's array order.
+        let texts = sampleContent.sampleFrameTexts(forCarouselID: template.id)
         let frames = template.frames.sorted { $0.index < $1.index }.prefix(3)
         var rendered: [CGImage] = []
         for (offset, frame) in frames.enumerated() {
             guard offset < framePhotos.count,
                   let image = renderCarouselFrame(frame, photos: framePhotos[offset],
+                                                  texts: Self.copy(texts, at: offset),
                                                   of: template, maxDimension: frameMaxDimension)
             else { return nil }
             rendered.append(image)
@@ -333,11 +335,101 @@ public final class TemplateService {
         }
 
         guard let image = renderCarouselFrame(
-            frame, photos: first, of: template, maxDimension: maxDimension)
+            frame, photos: first,
+            texts: sampleContent.sampleFrameTexts(forCarouselID: template.id)?.first,
+            of: template, maxDimension: maxDimension)
         else { return nil }
         thumbnailCache.set(image, for: key)
         storeDiskThumbnail(image, key: key)
         return image
+    }
+
+    /// Every frame of the carousel, dressed and rendered separately, in frame
+    /// order — the Home hero's deck deals them out one card per frame.
+    ///
+    /// All or nothing, like `showcasePreview`: a deck with a missing card reads
+    /// as a broken carousel, so any frame that cannot be dressed empties the
+    /// result and the caller falls back to the strip.
+    public func showcaseFrames(
+        for template: CarouselTemplate,
+        sampleContent: SampleContentCatalog = .shared,
+        maxDimension: CGFloat = 480,
+        limit: Int = 5
+    ) -> [CGImage] {
+        guard let framePhotos = sampleContent.sampleFramePhotos(forCarouselID: template.id)
+        else { return [] }
+        let texts = sampleContent.sampleFrameTexts(forCarouselID: template.id)
+        let frames = template.frames.sorted { $0.index < $1.index }.prefix(limit)
+        var rendered: [CGImage] = []
+        for (offset, frame) in frames.enumerated() {
+            let key = "frame-carousel-\(template.id)-\(offset)"
+                + "-s\(sampleContent.version)-r\(Self.rendererRevision)@\(Int(maxDimension))"
+            if let cached = thumbnailCache.image(for: key) ?? loadDiskThumbnail(key: key) {
+                thumbnailCache.set(cached, for: key)
+                rendered.append(cached)
+                continue
+            }
+            guard offset < framePhotos.count,
+                  let image = renderCarouselFrame(
+                    frame, photos: framePhotos[offset], texts: Self.copy(texts, at: offset),
+                    of: template, maxDimension: maxDimension)
+            else { return [] }
+            thumbnailCache.set(image, for: key)
+            storeDiskThumbnail(image, key: key)
+            rendered.append(image)
+        }
+        return rendered
+    }
+
+    /// `showcaseFrames`, with the drawing done off the main actor.
+    ///
+    /// Same frames, same cache keys, same all-or-nothing rule: the requests are
+    /// built here (they read the manifest and the editor's layout mapper, both
+    /// main-actor state), only `CollageRenderer.render` — the expensive part,
+    /// and Sendable by design — moves to a background task. The Home hero calls
+    /// this so a cold cache never stalls the first screen.
+    public func showcaseFramesInBackground(
+        for template: CarouselTemplate,
+        sampleContent: SampleContentCatalog = .shared,
+        maxDimension: CGFloat = 480,
+        limit: Int = 5
+    ) async -> [CGImage] {
+        guard let framePhotos = sampleContent.sampleFramePhotos(forCarouselID: template.id)
+        else { return [] }
+        let texts = sampleContent.sampleFrameTexts(forCarouselID: template.id)
+        let frames = template.frames.sorted { $0.index < $1.index }.prefix(limit)
+        var resolved: [CGImage?] = []
+        var jobs: [(offset: Int, key: String, request: RenderRequest)] = []
+        for (offset, frame) in frames.enumerated() {
+            let key = "frame-carousel-\(template.id)-\(offset)"
+                + "-s\(sampleContent.version)-r\(Self.rendererRevision)@\(Int(maxDimension))"
+            if let cached = thumbnailCache.image(for: key) ?? loadDiskThumbnail(key: key) {
+                thumbnailCache.set(cached, for: key)
+                resolved.append(cached)
+                continue
+            }
+            guard offset < framePhotos.count,
+                  let request = carouselFrameRequest(
+                    frame, photos: framePhotos[offset], texts: Self.copy(texts, at: offset),
+                    of: template, maxDimension: maxDimension)
+            else { return [] }
+            resolved.append(nil)
+            jobs.append((offset, key, request))
+        }
+        guard !jobs.isEmpty else { return resolved.compactMap { $0 } }
+
+        let renderer = self.renderer
+        let requests = jobs.map(\.request)
+        let drawn = await Task.detached(priority: .userInitiated) {
+            requests.map { renderer.render($0, scale: 1) }
+        }.value
+        for (job, image) in zip(jobs, drawn) {
+            guard let image else { return [] }
+            thumbnailCache.set(image, for: job.key)
+            storeDiskThumbnail(image, key: job.key)
+            resolved[job.offset] = image
+        }
+        return resolved.compactMap { $0 }
     }
 
     /// The same first frame with its photo zones left as empty wells — the
@@ -380,9 +472,19 @@ public final class TemplateService {
     /// falls back to, and routing it through this method rather than a second
     /// drawing path is what keeps one answer to "where do a frame's cells go".
     private func renderCarouselFrame(
-        _ frame: CarouselTemplateFrame, photos: [UIImage]?,
+        _ frame: CarouselTemplateFrame, photos: [UIImage]?, texts: [String]? = nil,
         of template: CarouselTemplate, maxDimension: CGFloat
     ) -> CGImage? {
+        carouselFrameRequest(frame, photos: photos, texts: texts, of: template, maxDimension: maxDimension)
+            .flatMap { renderer.render($0, scale: 1) }
+    }
+
+    /// Everything `renderCarouselFrame` decides, short of drawing it: the request
+    /// is Sendable, so a caller may hand it to the renderer off the main actor.
+    private func carouselFrameRequest(
+        _ frame: CarouselTemplateFrame, photos: [UIImage]?, texts: [String]? = nil,
+        of template: CarouselTemplate, maxDimension: CGFloat
+    ) -> RenderRequest? {
         let native = CanvasSize.size(forAspectRatio: template.canvasAspectRatio)
         let longest = max(native.width, native.height, 1)
         let scale = maxDimension / longest
@@ -427,12 +529,29 @@ public final class TemplateService {
 
         // The frame's own captions and stickers ride along, so a previewed page
         // looks like the page the editor opens, not a bare photo grid.
-        let request = RenderRequest(
+        return RenderRequest(
             canvasSize: canvas, background: template.background, cells: cells,
-            textOverlays: frame.cells.compactMap(\.textStyle), textFontScale: scale,
+            textOverlays: Self.dressed(frame.cells.compactMap(\.textStyle), with: texts),
+            textFontScale: scale,
             stickerOverlays: Self.stickerOverlays(for: frame.cells)
         )
-        return renderer.render(request, scale: 1)
+    }
+
+    private static func copy(_ texts: [[String]]?, at frame: Int) -> [String]? {
+        guard let texts, texts.indices.contains(frame) else { return nil }
+        return texts[frame]
+    }
+
+    /// The frame's text overlays with the showcase's copy swapped in, in order.
+    /// Zones beyond the copy provided keep the template's own text.
+    private static func dressed(_ overlays: [TextOverlay], with texts: [String]?) -> [TextOverlay] {
+        guard let texts else { return overlays }
+        return overlays.enumerated().map { index, overlay in
+            guard index < texts.count else { return overlay }
+            var dressed = overlay
+            dressed.text = texts[index]
+            return dressed
+        }
     }
 
     /// Lays rendered frames out left to right with a small gap, every frame after
