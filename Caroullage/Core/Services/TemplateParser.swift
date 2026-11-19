@@ -151,10 +151,15 @@ struct TemplateBackground: Decodable {
     let color: String?
     let colors: [String]?
 
-    /// Maps to the app's `CollageBackground` (solid only in v1; gradients arrive
-    /// with the template system in Step 03).
+    let angle: Double?
+
+    /// Maps to the app's `CollageBackground`. A gradient with fewer than two
+    /// stops has nothing to blend, so it falls back to a solid of its one colour.
     var collageBackground: CollageBackground {
         if type == "solid", let color { return .solid(hex: color) }
+        if type == "gradient", let colors, colors.count >= 2 {
+            return .gradient(colors: colors, angle: angle ?? 0)
+        }
         if let first = colors?.first { return .solid(hex: first) }
         return .white
     }

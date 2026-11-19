@@ -65,6 +65,7 @@ public enum StyleChange: Equatable, Sendable {
     case font(String)          // PostScript font name applied to every text overlay
     case textColor(String)     // hex applied to every text overlay
     case borderWidth(Double)
+    case frameStyle(FrameStyle)  // margin, shadow and outline together
 }
 
 public struct CarouselService {
@@ -96,7 +97,8 @@ public struct CarouselService {
             layout: seed.layout,
             borderWidth: seed.borderWidth,
             cornerRadius: seed.cornerRadius,
-            background: seed.background
+            background: seed.background,
+            frameStyle: seed.frameStyle
         )
         var out = frames
         out.append(CarouselFrame(index: out.count, state: blank))
@@ -127,6 +129,8 @@ public struct CarouselService {
                 for i in f.state.textOverlays.indices { f.state.textOverlays[i].colorHex = hex }
             case let .borderWidth(width):
                 f.state.borderWidth = width
+            case let .frameStyle(style):
+                f.state.frameStyle = style
             }
             return f
         }

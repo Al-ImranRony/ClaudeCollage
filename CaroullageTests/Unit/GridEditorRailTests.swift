@@ -84,7 +84,7 @@ final class GridEditorRailTests: XCTestCase {
         let panel = try panel(in: editor)
         XCTAssertEqual(panel.currentTitle, "Frame")
         let sliders = panel.recursiveSubviews.compactMap { $0 as? UISlider }
-        XCTAssertEqual(sliders.count, 2, "Border and Corners")
+        XCTAssertEqual(sliders.count, 5, "Spacing, Margin, Corners, Shadow and Outline")
     }
 
     func testTappingTheSameToolTwiceClosesThePanel() throws {
@@ -127,7 +127,7 @@ final class GridEditorRailTests: XCTestCase {
 
         XCTAssertEqual(
             try rail(in: editor).visibleToolIdentifiers,
-            ["replacePhotoTool", "adjustPhotoTool", "liftSubjectAction", "magicEraserAction",
+            ["replacePhotoTool", "filtersPhotoTool", "adjustPhotoTool", "liftSubjectAction", "magicEraserAction",
              "clearCellTool",
              "layoutTool", "frameTool", "backgroundTool", "addTextButton", "addStickerButton"],
             "Document tools must survive a selection — they scroll, they do not vanish")

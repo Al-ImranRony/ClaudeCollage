@@ -171,6 +171,7 @@ public final class CarouselEditorViewModel {
         let source = frames[currentIndex].state
         var updated = service.syncEdit(change: .backgroundColor(source.background), to: frames)
         updated = service.syncEdit(change: .borderWidth(source.borderWidth), to: updated)
+        updated = service.syncEdit(change: .frameStyle(source.frameStyle), to: updated)
         if let type = source.textOverlays.first {
             updated = service.syncEdit(change: .font(type.fontName), to: updated)
             updated = service.syncEdit(change: .textColor(type.colorHex), to: updated)

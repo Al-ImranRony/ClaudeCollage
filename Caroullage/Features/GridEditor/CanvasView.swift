@@ -38,6 +38,10 @@ struct CanvasModel {
     /// Bitmaps for personal (image-backed) stickers, keyed by `imageID`. Resolved
     /// by the view model so this view never reaches into a store.
     var stickerImages: [UUID: CGImage] = [:]
+    /// The blurred backdrop for a `.photoBlur` background, resolved by the view model.
+    var backgroundPhoto: CGImage? = nil
+    /// Shadow and outline (the margin is already in the cell frames).
+    var frameStyle: FrameStyle = FrameStyle()
 }
 
 final class CanvasView: UIView {
@@ -45,6 +49,14 @@ final class CanvasView: UIView {
     /// The aspect-fit square the collage is drawn inside. Its background colour
     /// shows through the gaps between cells.
     private let contentContainer = UIView()
+    /// A drawn background (gradient / pattern / photo blur), rasterized through
+    /// `BackgroundRendering` — the export's own painter — once per change, not
+    /// per frame. Solid colours skip it and use the container's fill.
+    private let backgroundLayer = CALayer()
+    private var backgroundKey: BackgroundKey?
+    /// Casts every cell's drop shadow from one combined `shadowPath`. Sits under
+    /// the cells because a cell clips to its bounds and cannot draw its own.
+    private let cellShadowLayer = CALayer()
     private var cellViews: [CellContentView] = []
     /// Text zones, layered above the cells. Kept in a separate view array so text
     /// edits never rebuild the (heavier) photo cell views.
@@ -113,6 +125,13 @@ final class CanvasView: UIView {
         backgroundColor = .clear
         contentContainer.clipsToBounds = false
         addSubview(contentContainer)
+
+        // Inserted before any cell view exists, so every cell lands above them.
+        backgroundLayer.contentsGravity = .resize
+        contentContainer.layer.insertSublayer(backgroundLayer, at: 0)
+        cellShadowLayer.shadowColor = UIColor.black.cgColor
+        cellShadowLayer.isHidden = true
+        contentContainer.layer.insertSublayer(cellShadowLayer, above: backgroundLayer)
 
         snapGuideLayer.strokeColor = Theme.Color.accent.cgColor
         snapGuideLayer.lineWidth = 1
@@ -339,9 +358,11 @@ final class CanvasView: UIView {
         contentContainer.transform = .identity
         let square = AVMakeRect(aspectRatio: model.canvasSize, insideRect: bounds)
         contentContainer.frame = square
-        contentContainer.backgroundColor = UIColor(background: model.background)
         referenceScaleFactor = square.width / model.canvasSize.width
         let factor = referenceScaleFactor
+        updateBackground(model, factor: factor)
+        let outlineColor = UIColor(hex: model.frameStyle.outlineHex).cgColor
+        let outlineWidth = CGFloat(model.frameStyle.outlineWidth) * factor
 
         for (index, cell) in model.cells.enumerated() where cellViews.indices.contains(index) {
             let view = cellViews[index]
@@ -355,7 +376,74 @@ final class CanvasView: UIView {
             view.canvasShortSide = min(square.width, square.height)
             view.setClipShape(cell.clipShape, cornerRadius: cell.cornerRadius * factor)
             view.setGeometryTransform(cell.transform, factor: factor)
+            view.setFrameOutline(width: outlineWidth, color: outlineColor)
         }
+        updateCellShadow(model, factor: factor)
+    }
+
+    // MARK: - Background and frame chrome
+
+    /// Holds the backdrop image itself, not its address: a freed image's address
+    /// can be reused by the next backdrop, which would compare equal and leave
+    /// the canvas showing the old blur while the export drew the new one.
+    private struct BackgroundKey: Equatable {
+        let background: CollageBackground
+        let size: CGSize
+        let photo: CGImage?
+
+        static func == (lhs: Self, rhs: Self) -> Bool {
+            lhs.background == rhs.background && lhs.size == rhs.size && lhs.photo === rhs.photo
+        }
+    }
+
+    /// Paints the background. Re-rasterizes only when the background, the
+    /// on-screen size or the backdrop photo actually changed, so a border drag
+    /// (which runs this every tick) costs a struct comparison.
+    private func updateBackground(_ model: CanvasModel, factor: CGFloat) {
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        defer { CATransaction.commit() }
+        contentContainer.backgroundColor = UIColor(background: model.background)
+        backgroundLayer.frame = contentContainer.bounds
+        guard !model.background.isSolid else {
+            backgroundLayer.contents = nil
+            backgroundKey = nil
+            return
+        }
+        let key = BackgroundKey(background: model.background, size: contentContainer.bounds.size,
+                                photo: model.backgroundPhoto)
+        guard key != backgroundKey else { return }
+        backgroundKey = key
+        backgroundLayer.contents = BackgroundRendering.image(
+            model.background, canvasSize: model.canvasSize,
+            scale: factor * traitCollection.displayScale, photo: model.backgroundPhoto)
+    }
+
+    /// One shadow for all cells, traced from the same shape paths the cells clip
+    /// to. Geometry comes from `FrameStyle.shadowGeometry`, which the export
+    /// renderer also reads; CA's `shadowRadius` is half of CG's blur.
+    private func updateCellShadow(_ model: CanvasModel, factor: CGFloat) {
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        defer { CATransaction.commit() }
+        let shortSide = min(model.canvasSize.width, model.canvasSize.height)
+        guard let shadow = model.frameStyle.shadowGeometry(canvasShortSide: shortSide) else {
+            cellShadowLayer.isHidden = true
+            cellShadowLayer.shadowPath = nil
+            return
+        }
+        let path = CGMutablePath()
+        let scale = CGAffineTransform(scaleX: factor, y: factor)
+        for cell in model.cells where cell.frame.width > 0 && cell.frame.height > 0 {
+            path.addPath(cell.clipShape.path(in: cell.frame, cornerRadius: cell.cornerRadius), transform: scale)
+        }
+        cellShadowLayer.frame = contentContainer.bounds
+        cellShadowLayer.shadowPath = path
+        cellShadowLayer.shadowOpacity = Float(shadow.opacity)
+        cellShadowLayer.shadowRadius = shadow.blur * factor / 2
+        cellShadowLayer.shadowOffset = CGSize(width: shadow.offset.width * factor,
+                                              height: shadow.offset.height * factor)
+        cellShadowLayer.isHidden = false
     }
 
     // MARK: - Cell selection
@@ -611,6 +699,11 @@ final class CellContentView: UIView {
     /// Geometry comes from `EmptyCellChrome`, the same source the export renderer
     /// draws from, so an empty zone looks identical on the canvas and in the file.
     private let outlineLayer = CAShapeLayer()
+    /// The Frame panel's outline. Stroked at twice its width on the clip path so
+    /// the cell's own clip (bounds radius or shape mask) leaves exactly the inner
+    /// half — the same trick the export renderer uses.
+    private let frameOutlineLayer = CAShapeLayer()
+    private var frameOutlineWidth: CGFloat = 0
     private let chipLayer = CAShapeLayer()
     private let plusLayer = CAShapeLayer()
 
@@ -705,6 +798,10 @@ final class CellContentView: UIView {
         plusLayer.lineCap = .round
         layer.addSublayer(plusLayer)
 
+        frameOutlineLayer.fillColor = UIColor.clear.cgColor
+        frameOutlineLayer.isHidden = true
+        layer.addSublayer(frameOutlineLayer)
+
         refreshAccessibility()
     }
 
@@ -722,6 +819,33 @@ final class CellContentView: UIView {
 
         layoutEmptyChrome()
         updateMask()
+        layoutFrameOutline()
+    }
+
+    /// Sets the Frame panel outline, in on-screen points (0 hides it).
+    func setFrameOutline(width: CGFloat, color: CGColor) {
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        frameOutlineLayer.strokeColor = color
+        CATransaction.commit()
+        guard width != frameOutlineWidth else { return }
+        frameOutlineWidth = width
+        setNeedsLayout()
+    }
+
+    private func layoutFrameOutline() {
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        defer { CATransaction.commit() }
+        guard frameOutlineWidth > 0, bounds.width > 0 else {
+            frameOutlineLayer.isHidden = true
+            return
+        }
+        frameOutlineLayer.isHidden = false
+        frameOutlineLayer.frame = bounds
+        frameOutlineLayer.lineWidth = frameOutlineWidth * 2
+        frameOutlineLayer.path = clipShape.path(
+            in: bounds, cornerRadius: shapeCornerRadius.isZero ? layer.cornerRadius : shapeCornerRadius)
     }
 
     /// Re-traces the outline and the "+" chip for the current bounds. Runs inside

@@ -118,6 +118,34 @@ public final class GridEditorViewModel {
         commit { $0.background = background }
     }
 
+    /// Live Frame-panel edit (margin / shadow / outline slider): no undo snapshot,
+    /// geometry-only refresh. Released sliders commit via `commitInteractiveChange`.
+    public func previewFrameStyle(_ style: FrameStyle) {
+        var clamped = style
+        clamped.outerMargin = style.outerMargin.map { max(0, min(maxOuterMargin, $0)) }
+        clamped.shadow = max(0, min(1, style.shadow))
+        clamped.outlineWidth = max(0, min(maxOutlineWidth, style.outlineWidth))
+        guard clamped != state.frameStyle else { return }
+        state.frameStyle = clamped
+        onGeometryChange?()
+    }
+
+    /// A discrete Frame-panel edit (an outline colour tap). Undoable.
+    public func setFrameStyle(_ style: FrameStyle) {
+        guard style != state.frameStyle else { return }
+        commit { $0.frameStyle = style }
+    }
+
+    /// Upper bound for the outer margin, in reference-canvas points.
+    public var maxOuterMargin: Double {
+        Double(min(canvasSize.width, canvasSize.height)) * 0.12
+    }
+
+    /// Upper bound for the outline width, in reference-canvas points.
+    public var maxOutlineWidth: Double {
+        Double(min(canvasSize.width, canvasSize.height)) * 0.025
+    }
+
     // MARK: - Cell content edits
 
     public func setImage(_ image: CGImage, forCellAt index: Int) {
@@ -226,6 +254,32 @@ public final class GridEditorViewModel {
         commit { $0.textOverlays.removeAll { $0.id == id } }
     }
 
+    /// A discrete filter edit (a look tapped, Reset): applied and recorded as one
+    /// undo step.
+    public func setFilters(_ filters: CellFilters, forCellAt index: Int) {
+        guard state.cells.indices.contains(index), state.cells[index].filters != filters else { return }
+        previewFilters(filters, forCellAt: index)
+        commitInteractiveChange()
+    }
+
+    /// Copies one cell's filters to every filled cell — "Apply to All". Undoable.
+    public func applyFiltersToAllCells(from index: Int) {
+        guard state.cells.indices.contains(index) else { return }
+        let filters = state.cells[index].filters
+        let targets = state.cells.indices.filter {
+            state.cells[$0].imageID != nil && state.cells[$0].filters != filters
+        }
+        guard !targets.isEmpty else { return }
+        for target in targets { previewFilters(filters, forCellAt: target) }
+        commitInteractiveChange()
+    }
+
+    /// The unfiltered (downsampled) photo in a cell — what look previews start from.
+    public func sourceImage(forCellAt index: Int) -> CGImage? {
+        guard state.cells.indices.contains(index), let id = state.cells[index].imageID else { return nil }
+        return sourceImages[id]
+    }
+
     /// Live filter update from the filter panel — no undo snapshot; the filtered
     /// image is recomputed asynchronously and delivered via `onCellImageChanged`.
     public func previewFilters(_ filters: CellFilters, forCellAt index: Int) {
@@ -245,6 +299,9 @@ public final class GridEditorViewModel {
 
     /// One undo snapshot at the end of an interactive gesture (or slider drag).
     public func commitInteractiveChange() {
+        // A slider released where it started, or a Reset with nothing to reset,
+        // is not an edit: no empty undo step, no autosave.
+        guard state != undoStack.current else { return }
         undoStack.push(state)
         onCommit?(self)
     }
@@ -322,7 +379,7 @@ public final class GridEditorViewModel {
 
     /// The lightweight display model for the GPU canvas.
     func canvasModel() -> CanvasModel {
-        let frames = engine.layout(for: state.layout, canvasSize: canvasSize, borderWidth: CGFloat(state.borderWidth))
+        let frames = cellFrames()
         // Applies to every shape now: `CellClipShape.path` rounds polygon vertices
         // as well as rectangle corners.
         let radius = CGFloat(state.cornerRadius)
@@ -339,7 +396,9 @@ public final class GridEditorViewModel {
         return CanvasModel(canvasSize: canvasSize, background: state.background,
                            cells: cells, textOverlays: state.textOverlays,
                            stickerOverlays: state.stickerOverlays,
-                           stickerImages: resolvedStickerImages())
+                           stickerImages: resolvedStickerImages(),
+                           backgroundPhoto: backgroundPhoto(),
+                           frameStyle: state.frameStyle)
     }
 
     // MARK: - Rendering (one-shot only)
@@ -374,6 +433,38 @@ public final class GridEditorViewModel {
     /// themselves.
     public func thumbnailScale(maxDimension: CGFloat) -> CGFloat {
         canvasSize.width > 0 ? maxDimension / canvasSize.width : 1
+    }
+
+    /// Cell frames for the current layout, spacing and outer margin.
+    private func cellFrames() -> [CellFrame] {
+        engine.layout(for: state.layout, canvasSize: canvasSize,
+                      borderWidth: CGFloat(state.borderWidth),
+                      margin: state.frameStyle.outerMargin.map { CGFloat($0) })
+    }
+
+    /// The blurred backdrop for a `.photoBlur` background: the first filled
+    /// cell's photo. Built synchronously (it is a ~360 px GPU blur, a few ms) and
+    /// cached by image id, so a thumbnail or export taken straight after the
+    /// background changes can never race an async build and come out grey.
+    private func backgroundPhoto() -> CGImage? {
+        guard state.background.isPhotoBlur else { return nil }
+        return blurredBackdropPreview()
+    }
+
+    /// Keyed by the canvas size too: the backdrop is cropped to the canvas's
+    /// aspect when built, so a format change must rebuild it.
+    private var backdropCache: (id: UUID, canvasSize: CGSize, image: CGImage)?
+
+    /// The blurred first photo regardless of the current background — what the
+    /// Background panel's Blur cards preview. Nil when the collage has no photo.
+    public func blurredBackdropPreview() -> CGImage? {
+        guard let id = state.cells.lazy.compactMap(\.imageID).first, let source = sourceImages[id] else { return nil }
+        if let cached = backdropCache, cached.id == id, cached.canvasSize == canvasSize {
+            return cached.image
+        }
+        let image = BackgroundRendering.blurredBackdrop(from: source, canvasSize: canvasSize)
+        backdropCache = image.map { (id, canvasSize, $0) }
+        return image
     }
 
     /// Bitmaps for whatever personal stickers the current state references.
@@ -411,7 +502,7 @@ public final class GridEditorViewModel {
     }
 
     private func makeRenderRequest() -> RenderRequest {
-        let frames = engine.layout(for: state.layout, canvasSize: canvasSize, borderWidth: CGFloat(state.borderWidth))
+        let frames = cellFrames()
         let radius = CGFloat(state.cornerRadius)
         let cells: [RenderCell] = frames.enumerated().map { index, frame in
             let custom = index < state.cells.count ? state.cells[index].customClip : nil
@@ -429,7 +520,9 @@ public final class GridEditorViewModel {
         return RenderRequest(canvasSize: canvasSize, background: state.background,
                              cells: cells, textOverlays: state.textOverlays, textFontScale: 1,
                              stickerOverlays: state.stickerOverlays,
-                             stickerImages: resolvedStickerImages())
+                             stickerImages: resolvedStickerImages(),
+                             backgroundPhoto: backgroundPhoto(),
+                             frameStyle: state.frameStyle)
     }
 
     /// Recomputes filtered images for all cells after an undo/redo/restore.

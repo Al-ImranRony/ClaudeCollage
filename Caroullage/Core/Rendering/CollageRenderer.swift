@@ -55,6 +55,11 @@ public struct RenderRequest: Sendable {
     /// Bitmaps for personal (image-backed) stickers, keyed by `StickerOverlay.imageID`.
     /// Resolved by the caller so the renderer stays Sendable and off-actor.
     public let stickerImages: [UUID: CGImage]
+    /// The pre-blurred backdrop a `.photoBlur` background draws. Resolved by the
+    /// caller (the view model owns the photos), nil for every other background.
+    public let backgroundPhoto: CGImage?
+    /// Cell shadow and outline. Margin is already baked into the cell frames.
+    public let frameStyle: FrameStyle
 
     public init(
         canvasSize: CGSize,
@@ -63,7 +68,9 @@ public struct RenderRequest: Sendable {
         textOverlays: [TextOverlay] = [],
         textFontScale: CGFloat = 1,
         stickerOverlays: [StickerOverlay] = [],
-        stickerImages: [UUID: CGImage] = [:]
+        stickerImages: [UUID: CGImage] = [:],
+        backgroundPhoto: CGImage? = nil,
+        frameStyle: FrameStyle = FrameStyle()
     ) {
         self.canvasSize = canvasSize
         self.background = background
@@ -72,6 +79,8 @@ public struct RenderRequest: Sendable {
         self.textFontScale = textFontScale
         self.stickerOverlays = stickerOverlays
         self.stickerImages = stickerImages
+        self.backgroundPhoto = backgroundPhoto
+        self.frameStyle = frameStyle
     }
 }
 
@@ -94,10 +103,39 @@ public final class CollageRenderer: @unchecked Sendable {
             let cg = rendererContext.cgContext
 
             // Canvas background (also shows through the gaps between cells).
-            UIColor(background: request.background).setFill()
-            cg.fill(CGRect(origin: .zero, size: request.canvasSize))
+            BackgroundRendering.draw(request.background, canvasSize: request.canvasSize,
+                                     photo: request.backgroundPhoto, in: cg)
+
+            let shortSide = min(request.canvasSize.width, request.canvasSize.height)
+            let shadow = request.frameStyle.shadowGeometry(canvasShortSide: shortSide)
+            let outlineWidth = CGFloat(request.frameStyle.outlineWidth)
+
+            // One shadow for every cell, cast before any cell is drawn — the same
+            // single shadow the canvas casts from one combined path. Shadowing each
+            // cell as it is drawn would darken neighbours already painted.
+            //
+            // Reference-point geometry, NOT multiplied by the raster scale: the
+            // renderer's scale is part of the context's base space, which shadows
+            // do follow. Measured — a 0.5× thumbnail and a 1× export match within
+            // 4/255 this way, and scaling again halved the thumbnail's shadow
+            // (`testAThumbnailCarriesTheSameShadowAsTheExport`).
+            if let shadow {
+                cg.saveGState()
+                cg.setShadow(offset: shadow.offset, blur: shadow.blur,
+                             color: UIColor.black.withAlphaComponent(shadow.opacity).cgColor)
+                cg.beginTransparencyLayer(auxiliaryInfo: nil)
+                cg.setFillColor(Theme.Color.cellWell.cgColor)
+                for cell in request.cells where cell.frame.width > 0 && cell.frame.height > 0 {
+                    cg.addPath(cell.clipShape.path(in: cell.frame, cornerRadius: cell.cornerRadius))
+                }
+                cg.fillPath()
+                cg.endTransparencyLayer()
+                cg.restoreGState()
+            }
 
             for cell in request.cells where cell.frame.width > 0 && cell.frame.height > 0 {
+                let cellPath = cell.clipShape.path(in: cell.frame, cornerRadius: cell.cornerRadius)
+
                 cg.saveGState()
 
                 // Clip to the cell's shape (rectangle / rounded-rect / polygon /
@@ -120,6 +158,17 @@ public final class CollageRenderer: @unchecked Sendable {
                         canvasShortSide: min(request.canvasSize.width, request.canvasSize.height),
                         context: cg
                     )
+                }
+
+                // Inside the cell's clip, so a stroke twice the width leaves
+                // exactly `outlineWidth` visible — the same inner-half trick the
+                // canvas uses, which keeps polygon outlines exact without
+                // offsetting their paths.
+                if outlineWidth > 0 {
+                    cg.addPath(cellPath)
+                    cg.setStrokeColor(UIColor(hex: request.frameStyle.outlineHex).cgColor)
+                    cg.setLineWidth(outlineWidth * 2)
+                    cg.strokePath()
                 }
 
                 cg.restoreGState()

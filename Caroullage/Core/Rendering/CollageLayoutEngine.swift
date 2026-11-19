@@ -280,6 +280,31 @@ public struct CollageLayoutEngine: Sendable {
         }
     }
 
+    /// The layout with an explicit outer margin. Cells are laid out in a rect
+    /// inset from the canvas so that, after each cell's own `borderWidth / 2`
+    /// inset, the outermost cells sit exactly `margin` from the canvas edge.
+    /// `nil` margin is the plain layout (outer gap = half the inner spacing).
+    ///
+    /// Translating whole frames is safe because clip shapes are normalized to
+    /// their cell's frame (see `CellClipShape`).
+    public func layout(
+        for layout: CollageLayout,
+        canvasSize: CGSize,
+        borderWidth: CGFloat,
+        margin: CGFloat?
+    ) -> [CellFrame] {
+        guard let margin else {
+            return self.layout(for: layout, canvasSize: canvasSize, borderWidth: borderWidth)
+        }
+        let inset = max(0, margin) - max(0, borderWidth) / 2
+        let area = CGSize(width: max(1, canvasSize.width - inset * 2),
+                          height: max(1, canvasSize.height - inset * 2))
+        return self.layout(for: layout, canvasSize: area, borderWidth: borderWidth).map { cell in
+            CellFrame(id: cell.id, frame: cell.frame.offsetBy(dx: inset, dy: inset),
+                      shape: cell.shape, clipShape: cell.clipShape)
+        }
+    }
+
     /// Resolves any `CollageLayout` (grid or polygon) into absolute-pixel cells.
     public func layout(
         for layout: CollageLayout,

@@ -5,7 +5,7 @@
 //  Step 01 — the rectangular grid collage editor. UIKit-primary, programmatic
 //  Auto Layout, no storyboard. Hosts the Core Graphics canvas, composed
 //  pan/pinch/rotate gestures, layout/border/background controls, PHPicker photo
-//  import, the SwiftUI filter panel (via UIHostingController), and image export.
+//  import, the inline Filters / Adjust / Frame / Background panels, and image export.
 //
 
 import UIKit
@@ -40,6 +40,16 @@ final class GridEditorViewController: UIViewController {
     private lazy var backgroundPicker = BackgroundPickerView(selected: viewModel.state.background)
     private let borderSlider = UISlider()
     private let cornerSlider = UISlider()
+    private let marginSlider = UISlider()
+    private let shadowSlider = UISlider()
+    private let outlineSlider = UISlider()
+    private lazy var outlineColorRow = OutlineColorRow(
+        colors: FrameStyle.outlinePalette, selected: viewModel.state.frameStyle.outlineHex)
+    /// The open Background panel's drawn-background strip, re-synced on undo.
+    private weak var backgroundStrip: OptionCardStrip?
+    /// The open Filters / Adjust panels, re-synced from the document on change.
+    private weak var filterPanel: FilterLookPanelView?
+    private weak var adjustPanel: AdjustPanelView?
 
     private var undoItem: UIBarButtonItem?
     private var redoItem: UIBarButtonItem?
@@ -104,6 +114,20 @@ final class GridEditorViewController: UIViewController {
         bindViewModel()
         refreshToolbar()
         reconfigureCanvas()
+        // An open Background or Filters panel was built with the lock state of
+        // the moment it opened; a purchase from its paywall must clear the
+        // badges on every other Premium option still on screen.
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(entitlementsChanged),
+            name: EntitlementStore.didChangeNotification, object: nil)
+    }
+
+    @objc private func entitlementsChanged() {
+        let unlocked = EntitlementStore.shared.isPremiumUnlocked
+        backgroundStrip?.setLocked { id in
+            (BackgroundCatalog.option(id: id)?.isPremium ?? false) && !unlocked
+        }
+        filterPanel?.setPremiumUnlocked(unlocked)
     }
 
     // The interactive back-swipe fires from the screen's left edge, which overlaps the
@@ -142,6 +166,16 @@ final class GridEditorViewController: UIViewController {
         }
         managedPopRecognizers.removeAll()
         originalPopDelegates.removeAll()
+    }
+
+    /// Whether the touch landed on a `UISlider` (or inside one).
+    private static func touchBeganOnSlider(_ touch: UITouch) -> Bool {
+        var view = touch.view
+        while let current = view {
+            if current is UISlider { return true }
+            view = current.superview
+        }
+        return false
     }
 
     /// True for any nav back-swipe recognizer we've taken over.
@@ -252,6 +286,40 @@ final class GridEditorViewController: UIViewController {
         cornerSlider.addTarget(self, action: #selector(cornerChanged), for: .valueChanged)
         cornerSlider.addTarget(self, action: #selector(sliderReleased),
                                for: [.touchUpInside, .touchUpOutside, .touchCancel])
+        for slider in [marginSlider, shadowSlider, outlineSlider] {
+            slider.addTarget(self, action: #selector(frameStyleChanged(_:)), for: .valueChanged)
+            slider.addTarget(self, action: #selector(sliderReleased),
+                             for: [.touchUpInside, .touchUpOutside, .touchCancel])
+        }
+        borderSlider.accessibilityIdentifier = "frameSpacingSlider"
+        marginSlider.accessibilityIdentifier = "frameMarginSlider"
+        cornerSlider.accessibilityIdentifier = "frameCornerSlider"
+        shadowSlider.accessibilityIdentifier = "frameShadowSlider"
+        outlineSlider.accessibilityIdentifier = "frameOutlineSlider"
+        outlineColorRow.onSelect = { [weak self] hex in
+            guard let self else { return }
+            var style = self.viewModel.state.frameStyle
+            style.outlineHex = hex
+            // Picking a colour with the outline at zero would change nothing
+            // visible; give it a width so the tap has an effect.
+            if style.outlineWidth == 0 { style.outlineWidth = self.viewModel.maxOutlineWidth * 0.3 }
+            self.viewModel.setFrameStyle(style)
+            self.syncControls()
+        }
+
+        // The pickers' selection callbacks. These were dropped in 3aa7ea8 when the
+        // controls tray moved into panels (only the sliders' targets were
+        // restored), which left every layout, shape and colour tap inert.
+        layoutPicker.onSelect = { [weak self] template in
+            self?.viewModel.setLayout(.grid(template))
+        }
+        shapePicker.onSelect = { [weak self] polygon in
+            self?.viewModel.setLayout(.polygon(polygon))
+        }
+        backgroundPicker.onSelect = { [weak self] background in
+            self?.viewModel.setBackground(background)
+            self?.backgroundStrip?.setSelected(nil)
+        }
 
         var tools: [EditorTool] = []
         // A template defines its own geometry — offering a layout picker would claim
@@ -298,8 +366,14 @@ final class GridEditorViewController: UIViewController {
         case "sticker":     addStickerTapped()
         case "replace":
             selectedCellIndex.map { presentPhotoPicker(for: $0) }
+        case "filters":
+            if let index = selectedCellIndex {
+                openPanel(makeFilterPanel(for: index), title: String(localized: "Filters"), id: id)
+            }
         case "adjust":
-            selectedCellIndex.map { presentFilterPanel(for: $0) }
+            if let index = selectedCellIndex {
+                openPanel(makeAdjustPanel(for: index), title: String(localized: "Adjust"), id: id)
+            }
         case "lift":
             selectedCellIndex.map { liftSubject(fromCellAt: $0) }
         case "erase":
@@ -342,7 +416,9 @@ final class GridEditorViewController: UIViewController {
                    accessibilityIdentifier: "replacePhotoTool",
                    // The arrows slide, which is the gesture the tool performs.
                    emphasis: .wiggle),
-        EditorTool(id: "adjust", title: String(localized: "Adjust"), systemImage: "circle.lefthalf.filled",
+        EditorTool(id: "filters", title: String(localized: "Filters"), systemImage: "camera.filters",
+                   accessibilityIdentifier: "filtersPhotoTool"),
+        EditorTool(id: "adjust", title: String(localized: "Adjust"), systemImage: "slider.horizontal.3",
                    accessibilityIdentifier: "adjustPhotoTool"),
         // Identifiers preserved from the retired action sheet.
         EditorTool(id: "lift", title: String(localized: "Lift"), systemImage: "person.and.background.dotted",
@@ -451,7 +527,9 @@ final class GridEditorViewController: UIViewController {
         guard didClearSelection else { return }
 
         toolRail.setContext(nil)
-        if panels.openToolID == "styleText" {
+        // The selection-specific panels: text Style, and the photo's Filters and
+        // Adjust. A base panel (Frame / Layout / Background) is left alone.
+        if let open = panels.openToolID, ["styleText", "filters", "adjust"].contains(open) {
             closePanel()
         }
     }
@@ -471,9 +549,77 @@ final class GridEditorViewController: UIViewController {
     }
 
     private func makeFramePanel() -> UIView {
-        borderSlider.value = Float(normalizedBorder)
-        cornerSlider.value = Float(normalizedCorner)
-        return FramePanelView(borderSlider: borderSlider, cornerSlider: cornerSlider)
+        syncControls()
+        return FramePanelView(
+            spacingSlider: borderSlider, marginSlider: marginSlider, cornerSlider: cornerSlider,
+            shadowSlider: shadowSlider, outlineSlider: outlineSlider, outlineColors: outlineColorRow)
+    }
+
+    private func makeFilterPanel(for index: Int) -> UIView {
+        let filters = viewModel.state.cells[index].filters
+        let filledCells = viewModel.state.cells.filter { $0.imageID != nil }.count
+        let panel = FilterLookPanelView(
+            filters: filters, isPremiumUnlocked: EntitlementStore.shared.isPremiumUnlocked,
+            offersApplyToAll: filledCells > 1)
+        panel.onSelectLook = { [weak self] lookID in self?.selectLook(lookID, forCellAt: index) }
+        panel.onIntensityChanged = { [weak self] intensity, isFinal in
+            guard let self, self.viewModel.state.cells.indices.contains(index) else { return }
+            var filters = self.viewModel.state.cells[index].filters
+            filters.lookIntensity = intensity
+            self.viewModel.previewFilters(filters, forCellAt: index)
+            if isFinal {
+                self.viewModel.commitInteractiveChange()
+                self.refreshToolbar()
+            }
+        }
+        panel.onApplyToAll = { [weak self] in
+            self?.viewModel.applyFiltersToAllCells(from: index)
+            self?.showToast(String(localized: "Applied to all photos"))
+        }
+        if let source = viewModel.sourceImage(forCellAt: index) { panel.loadPreviews(from: source) }
+        filterPanel = panel
+        return panel
+    }
+
+    /// A look tap. A Premium look opens the paywall and is applied on unlock, the
+    /// same gate the custom shape uses. Choosing a look starts it at full
+    /// intensity; choosing None keeps the manual adjustments.
+    private func selectLook(_ lookID: String?, forCellAt index: Int) {
+        guard viewModel.state.cells.indices.contains(index) else { return }
+        if let lookID, let look = FilterLook.look(id: lookID), look.isPremium,
+           !EntitlementStore.shared.isPremiumUnlocked {
+            presentPaywall { [weak self] in self?.selectLook(lookID, forCellAt: index) }
+            return
+        }
+        var filters = viewModel.state.cells[index].filters
+        guard filters.lookID != lookID else { return }
+        filters.lookID = lookID
+        filters.lookIntensity = 1
+        viewModel.setFilters(filters, forCellAt: index)
+        refreshToolbar()
+    }
+
+    private func makeAdjustPanel(for index: Int) -> UIView {
+        let panel = AdjustPanelView(filters: viewModel.state.cells[index].filters)
+        panel.onChange = { [weak self] filters, isFinal in
+            guard let self, self.viewModel.state.cells.indices.contains(index) else { return }
+            self.viewModel.previewFilters(filters, forCellAt: index)
+            if isFinal {
+                self.viewModel.commitInteractiveChange()
+                self.refreshToolbar()
+            }
+        }
+        adjustPanel = panel
+        return panel
+    }
+
+    /// Keeps an open Filters / Adjust panel in step with the document — an undo
+    /// that reverts a look moves the outline and the sliders back.
+    private func syncPhotoPanels() {
+        guard let index = selectedCellIndex, viewModel.state.cells.indices.contains(index) else { return }
+        let filters = viewModel.state.cells[index].filters
+        filterPanel?.sync(to: filters)
+        adjustPanel?.sync(to: filters)
     }
 
     /// No generative chip: Image Playground has no sheet behind it yet, and an
@@ -481,7 +627,96 @@ final class GridEditorViewController: UIViewController {
     /// did not exist (removed before submission). It returns with the sheet —
     /// gated on `aiService.generativeBackgroundsAvailable` and on Premium.
     private func makeBackgroundPanel() -> UIView {
-        BackgroundPanelView(picker: backgroundPicker, generativeButton: nil)
+        let unlocked = EntitlementStore.shared.isPremiumUnlocked
+        let hasPhoto = viewModel.state.cells.contains { $0.imageID != nil }
+        let sections = BackgroundCatalog.sections.map { section in
+            OptionCardSection(title: section.title, items: section.options.enumerated().map { index, option in
+                OptionCardItem(id: "\(section.prefix)\(index)", title: option.name,
+                               isLocked: option.isPremium && !unlocked,
+                               placeholderSymbol: option.background.isPhotoBlur ? "photo" : nil)
+            })
+        }
+        let strip = OptionCardStrip(
+            sections: sections, selectedID: BackgroundCatalog.id(for: viewModel.state.background),
+            accessibilityPrefix: "background"
+        ) { [weak self] id in
+            self?.selectDrawnBackground(id: id)
+        }
+        loadBackgroundPreviews(into: strip, blurSource: hasPhoto ? viewModel.blurredBackdropPreview() : nil)
+        backgroundStrip = strip
+        return BackgroundPanelView(picker: backgroundPicker, styles: strip, generativeButton: nil)
+    }
+
+    /// Card previews of the drawn backgrounds, keyed by option id and scale. A
+    /// gradient or pattern never changes, so each is painted once per launch;
+    /// the blur cards are the user's own photo and are painted per open.
+    private static var backgroundPreviewCache: [String: UIImage] = [:]
+    private var backgroundPreviewTask: Task<Void, Never>?
+
+    /// Previews are the real painter at card size — and the blur cards show the
+    /// user's own first photo, which is the whole point of them. Painted off the
+    /// main thread (twenty-odd bitmaps, patterns of hundreds of paths each) so
+    /// opening the panel never waits on them; cached cards appear at once.
+    private func loadBackgroundPreviews(into strip: OptionCardStrip, blurSource: CGImage?) {
+        backgroundPreviewTask?.cancel()
+        let scale = traitCollection.displayScale
+        let canvas = CGSize(width: OptionCardStrip.cardSize, height: OptionCardStrip.cardSize)
+        var pending: [(id: String, cacheKey: String?, background: CollageBackground)] = []
+        for (id, option) in BackgroundCatalog.allItems() {
+            if option.background.isPhotoBlur {
+                if blurSource != nil { pending.append((id, nil, option.background)) }
+                continue
+            }
+            let key = "\(id)@\(scale)"
+            if let cached = Self.backgroundPreviewCache[key] {
+                strip.setImage(cached, for: id)
+            } else {
+                pending.append((id, key, option.background))
+            }
+        }
+        guard !pending.isEmpty else { return }
+        let photo = blurSource.map(SendablePreviewImage.init(image:))
+        let jobs = pending.map { (id: $0.id, background: $0.background) }
+        backgroundPreviewTask = Task { [weak self, weak strip] in
+            let render = Task.detached(priority: .userInitiated) { () -> [String: SendablePreviewImage] in
+                var out: [String: SendablePreviewImage] = [:]
+                for job in jobs {
+                    if Task.isCancelled { break }
+                    if let image = BackgroundRendering.image(job.background, canvasSize: canvas,
+                                                             scale: scale, photo: photo?.image) {
+                        out[job.id] = SendablePreviewImage(image: image)
+                    }
+                }
+                return out
+            }
+            let rendered = await withTaskCancellationHandler {
+                await render.value
+            } onCancel: {
+                render.cancel()
+            }
+            guard self != nil, !Task.isCancelled else { return }
+            for job in pending {
+                guard let image = rendered[job.id].map({ UIImage(cgImage: $0.image) }) else { continue }
+                if let key = job.cacheKey { Self.backgroundPreviewCache[key] = image }
+                strip?.setImage(image, for: job.id)
+            }
+        }
+    }
+
+    private func selectDrawnBackground(id: String) {
+        guard let option = BackgroundCatalog.option(id: id) else { return }
+        if option.background.isPhotoBlur, !viewModel.state.cells.contains(where: { $0.imageID != nil }) {
+            backgroundStrip?.setSelected(BackgroundCatalog.id(for: viewModel.state.background))
+            showToast(String(localized: "Add a photo first — the blur is made from it"))
+            return
+        }
+        if option.isPremium, !EntitlementStore.shared.isPremiumUnlocked {
+            presentPaywall { [weak self] in self?.selectDrawnBackground(id: id) }
+            return
+        }
+        viewModel.setBackground(option.background)
+        backgroundPicker.setSelected(option.background)
+        backgroundStrip?.setSelected(id)
     }
 
     private func setupGestures() {
@@ -529,6 +764,7 @@ final class GridEditorViewController: UIViewController {
             // against the fresh document rather than the one it just replaced.
             self?.revalidateSelection()
             self?.syncTextStylePresetRow()
+            self?.syncPhotoPanels()
         }
         viewModel.onCellImageChanged = { [weak self] index in
             guard let self else { return }
@@ -622,6 +858,15 @@ final class GridEditorViewController: UIViewController {
     private func syncControls() {
         borderSlider.value = Float(normalizedBorder)
         cornerSlider.value = Float(normalizedCorner)
+        let style = viewModel.state.frameStyle
+        let maxMargin = viewModel.maxOuterMargin
+        marginSlider.value = maxMargin > 0
+            ? Float(min(1, style.effectiveMargin(borderWidth: viewModel.state.borderWidth) / maxMargin)) : 0
+        shadowSlider.value = Float(style.shadow)
+        let maxOutline = viewModel.maxOutlineWidth
+        outlineSlider.value = maxOutline > 0 ? Float(min(1, style.outlineWidth / maxOutline)) : 0
+        outlineColorRow.setSelected(style.outlineHex)
+        backgroundStrip?.setSelected(BackgroundCatalog.id(for: viewModel.state.background))
         let layout = viewModel.state.layout
         layoutModeControl.selectedSegmentIndex = layout.isPolygon ? 1 : 0
         // Routed through the panel (a no-op when it isn't currently shown, rather
@@ -676,6 +921,20 @@ final class GridEditorViewController: UIViewController {
 
     @objc private func borderChanged() {
         viewModel.previewBorderWidth(Double(borderSlider.value) * viewModel.maxBorderWidth)
+    }
+
+    /// Margin, shadow and outline share one live path: read all three sliders
+    /// into the frame style and preview it (geometry-only, no undo step).
+    @objc private func frameStyleChanged(_ sender: UISlider) {
+        var style = viewModel.state.frameStyle
+        switch sender {
+        // Only the margin slider makes the margin explicit; until it is touched
+        // the margin keeps following the spacing, as it always has.
+        case marginSlider: style.outerMargin = Double(sender.value) * viewModel.maxOuterMargin
+        case shadowSlider: style.shadow = Double(sender.value)
+        default: style.outlineWidth = Double(sender.value) * viewModel.maxOutlineWidth
+        }
+        viewModel.previewFrameStyle(style)
     }
 
     @objc private func cornerChanged() {
@@ -793,29 +1052,6 @@ final class GridEditorViewController: UIViewController {
         canvasView.setSelectedCell(index)
         Haptics.impact()
         showToast(String(localized: "Tap another cell to swap"))
-    }
-
-    private func presentFilterPanel(for index: Int) {
-        guard viewModel.state.cells.indices.contains(index) else { return }
-        let current = viewModel.state.cells[index].filters
-        let panel = FilterStripView(
-            filters: current,
-            onChange: { [weak self] filters in
-                self?.viewModel.previewFilters(filters, forCellAt: index)
-            },
-            onDone: { [weak self] in
-                self?.viewModel.commitInteractiveChange()
-                self?.canvasView.setSelectedCell(nil)
-                self?.dismiss(animated: true)
-            }
-        )
-        let host = UIHostingController(rootView: panel)
-        host.modalPresentationStyle = .pageSheet
-        if let sheet = host.sheetPresentationController {
-            sheet.detents = Theme.Layout.sheetDetents(for: traitCollection)
-            sheet.prefersGrabberVisible = true
-        }
-        present(host, animated: true)
     }
 
     // MARK: - Text zones
@@ -1239,6 +1475,9 @@ extension GridEditorViewController: UIGestureRecognizerDelegate {
         let point = touch.location(in: canvasView)
 
         if isManagedPopRecognizer(gestureRecognizer) {
+            // A slider's thumb can sit inside the edge band (Adjust's slider runs
+            // from the panel margin): a drag that starts on one is the slider's.
+            guard !Self.touchBeganOnSlider(touch) else { return false }
             return backSwipeAllowed(fromScreenX: touch.location(in: view).x, canvasPoint: point)
         }
         guard gestureRecognizer === canvasZoomPinch else { return true }
