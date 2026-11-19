@@ -736,25 +736,40 @@ final class HomeViewController: UIViewController {
         ])
     }
 
-    /// Fades the tile in step with Home's push and pop, and puts it back if
-    /// an interactive back swipe is abandoned.
+    /// Fades the tile in step with Home's push and pop, and settles it from
+    /// where the navigation stack actually ended up.
+    ///
+    /// An abandoned back swipe runs BOTH of Home's callbacks on one cancelled
+    /// transition — `viewWillAppear` as the swipe starts, `viewWillDisappear` as
+    /// it is cancelled — and both completions then run. Each used to undo its own
+    /// change, so the second undo (of the hide) put the tile back on screen, over
+    /// the editor's back button. Settling from the stack makes the two completions
+    /// agree whatever order they run in.
     private func setSettingsTileShown(_ shown: Bool) {
         installSettingsTile()
-        let tile = settingsTile
-        tile.isUserInteractionEnabled = shown
-        tile.accessibilityElementsHidden = !shown
         guard let coordinator = transitionCoordinator, coordinator.isAnimated else {
-            tile.alpha = shown ? 1 : 0
+            applySettingsTile(visible: shown)
             return
         }
-        coordinator.animate(alongsideTransition: { _ in
-            tile.alpha = shown ? 1 : 0
-        }, completion: { context in
-            guard context.isCancelled else { return }
-            tile.alpha = shown ? 0 : 1
-            tile.isUserInteractionEnabled = !shown
-            tile.accessibilityElementsHidden = shown
+        settingsTile.isUserInteractionEnabled = shown
+        settingsTile.accessibilityElementsHidden = !shown
+        coordinator.animate(alongsideTransition: { [settingsTile] _ in
+            settingsTile.alpha = shown ? 1 : 0
+        }, completion: { [weak self] context in
+            guard let self else { return }
+            self.applySettingsTile(visible: context.isCancelled ? self.isTopOfVisibleStack : shown)
         })
+    }
+
+    /// Whether Home is what the shared bar is showing right now.
+    private var isTopOfVisibleStack: Bool {
+        isViewLoaded && view.window != nil && navigationController?.topViewController === self
+    }
+
+    private func applySettingsTile(visible: Bool) {
+        settingsTile.alpha = visible ? 1 : 0
+        settingsTile.isUserInteractionEnabled = visible
+        settingsTile.accessibilityElementsHidden = !visible
     }
 
     override func viewDidLayoutSubviews() {
