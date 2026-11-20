@@ -68,7 +68,7 @@ enum HomeCollectionPlanner {
     /// The plan with every card shown ONCE on the whole screen.
     ///
     /// The file's collections overlap on purpose — a template can be both
-    /// "Clean & Minimal" and one of "This Week's Picks" — but Home showing the
+    /// "Minimalist" and one of "Featured This Week" — but Home showing the
     /// same card in the hero, a curated strip and a pillar reads as a catalog
     /// padded out, not curated. So the screen is walked top to bottom and each
     /// card is claimed by the first place it appears:

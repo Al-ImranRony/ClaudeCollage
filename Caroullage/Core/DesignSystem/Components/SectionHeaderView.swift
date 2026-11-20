@@ -17,6 +17,7 @@ public final class SectionHeaderView: UIStackView {
     public init(
         title: String,
         titleIdentifier: String? = nil,
+        subtitle: String? = nil,
         badge: String? = nil,
         actionTitle: String? = nil,
         actionIdentifier: String? = nil,
@@ -52,9 +53,9 @@ public final class SectionHeaderView: UIStackView {
             titleRow.axis = .horizontal
             titleRow.alignment = .center
             titleRow.spacing = Theme.Spacing.xs
-            addArrangedSubview(titleRow)
+            addTitleBlock(titleRow, subtitle: subtitle, identifier: titleIdentifier)
         } else {
-            addArrangedSubview(titleLabel)
+            addTitleBlock(titleLabel, subtitle: subtitle, identifier: titleIdentifier)
         }
 
         if let actionTitle, let action {
@@ -78,7 +79,15 @@ public final class SectionHeaderView: UIStackView {
             addArrangedSubview(button)
         }
 
-        distribution = arrangedSubviews.count > 1 ? .equalSpacing : .fill
+        // The title block takes whatever the action leaves, rather than the
+        // stack sharing the slack out equally: under `.equalSpacing` a
+        // multi-line label has no width to wrap against, so a title that
+        // fitted easily ("For Reels & Stories") broke onto two lines at
+        // default type. The action hugs; the block fills.
+        distribution = .fill
+        spacing = Theme.Spacing.sm
+        arrangedSubviews.first?.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        arrangedSubviews.first?.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         // Title and action side by side; at accessibility sizes the action
         // drops under the title so neither squeezes the other mid-word.
         stackVerticallyAtAccessibilitySizes(verticalAlignment: .leading, horizontalAlignment: .firstBaseline)
@@ -90,6 +99,34 @@ public final class SectionHeaderView: UIStackView {
 
     @available(*, unavailable)
     required init(coder: NSCoder) { fatalError("init(coder:) is not used") }
+
+    /// The title, with the collection's one-line hook under it when it has one
+    /// (2026-11-20). The hook is what makes a strip read as curated rather
+    /// than as a category label: "Holiday Season" says what; "Sparkle for
+    /// every festive post" says why you would open it. The "See All" button
+    /// stays aligned with the TITLE's baseline, not the block's centre.
+    private func addTitleBlock(_ title: UIView, subtitle: String?, identifier: String?) {
+        guard let subtitle, !subtitle.isEmpty else {
+            addArrangedSubview(title)
+            return
+        }
+        let subtitleLabel = UILabel()
+        subtitleLabel.text = subtitle
+        subtitleLabel.font = Theme.Typography.caption
+        subtitleLabel.textColor = Theme.Color.textSecondary
+        subtitleLabel.adjustsFontForContentSizeCategory = true
+        subtitleLabel.numberOfLines = 0
+        // Not "sectionHeader-…": that prefix means a section TITLE to every
+        // suite that walks the headers.
+        subtitleLabel.accessibilityIdentifier = identifier.map {
+            $0.replacingOccurrences(of: "sectionHeader-", with: "sectionSubtitle-")
+        }
+        let block = UIStackView(arrangedSubviews: [title, subtitleLabel])
+        block.axis = .vertical
+        block.alignment = .leading
+        block.spacing = 2
+        addArrangedSubview(block)
+    }
 
     public var title: String? {
         get { titleLabel.text }

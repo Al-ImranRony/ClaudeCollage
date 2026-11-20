@@ -1,178 +1,292 @@
 {
-  "version": 1,
+  "version": 2,
   "collections": [
     {
       "id": "weekly-picks",
-      "titleKey": "This Week's Picks",
+      "titleKey": "Featured This Week",
+      "subtitleKey": "Hand-picked, fresh every Monday",
       "kind": "photo",
       "weeklyPick": 6,
       "galleryCategory": "All",
       "itemIDs": [
-        "minimal-duo-offset", "story-caption-hero", "grid-mosaic-four", "travel-horizon-split",
-        "minimal-gallery-trio", "story-stack-trio", "grid-six-airy", "minimal-frame-quote",
-        "travel-postcard-note", "story-split-tall", "minimal-solo-frame", "grid-filmstrip",
-        "seasonal-bloom", "story-quote-block", "minimal-split-air", "travel-panorama-row",
-        "grid-celebrate", "minimal-tower"
+        "minimal-duo-offset",
+        "story-caption-hero",
+        "grid-mosaic-four",
+        "travel-horizon-split",
+        "minimal-gallery-trio",
+        "story-stack-trio",
+        "grid-six-airy",
+        "minimal-frame-quote",
+        "travel-postcard-note",
+        "story-split-tall",
+        "minimal-solo-frame",
+        "grid-filmstrip",
+        "seasonal-bloom",
+        "story-quote-block",
+        "minimal-split-air",
+        "travel-panorama-row",
+        "grid-celebrate",
+        "minimal-tower"
       ]
     },
     {
       "id": "spring",
       "titleKey": "Spring",
+      "subtitleKey": "Soft light and fresh starts",
+      "style": "feature",
       "kind": "photo",
-      "window": { "start": "03-01", "end": "05-31" },
+      "window": {
+        "start": "03-01",
+        "end": "05-31"
+      },
       "galleryCategory": "Seasonal",
       "priority": 10,
       "itemIDs": [
-        "seasonal-bloom", "minimal-circle-focus", "minimal-gallery-trio",
-        "travel-postcard-note", "story-hero-strip", "minimal-split-air"
+        "seasonal-bloom",
+        "minimal-circle-focus",
+        "minimal-gallery-trio",
+        "travel-postcard-note",
+        "story-hero-strip",
+        "minimal-split-air"
       ]
     },
     {
       "id": "summer",
       "titleKey": "Summer",
+      "subtitleKey": "Sun, sea and long weekends",
+      "style": "feature",
       "kind": "photo",
-      "window": { "start": "06-01", "end": "08-31" },
+      "window": {
+        "start": "06-01",
+        "end": "08-31"
+      },
       "galleryCategory": "Travel",
       "priority": 10,
       "itemIDs": [
-        "travel-panorama-row", "travel-horizon-split", "travel-postcard",
-        "story-split-tall", "grid-six-airy", "travel-passport"
+        "travel-panorama-row",
+        "travel-horizon-split",
+        "travel-postcard",
+        "story-split-tall",
+        "grid-six-airy",
+        "travel-passport"
       ]
     },
     {
       "id": "autumn",
       "titleKey": "Autumn",
+      "subtitleKey": "Warm tones for golden days",
+      "style": "feature",
       "kind": "photo",
-      "window": { "start": "09-01", "end": "11-15" },
+      "window": {
+        "start": "09-01",
+        "end": "11-15"
+      },
       "galleryCategory": "Seasonal",
       "priority": 10,
       "itemIDs": [
-        "seasonal-thanks", "seasonal-quartet", "travel-horizon-split",
-        "minimal-frame-quote", "story-caption-hero", "seasonal-greeting"
+        "seasonal-thanks",
+        "seasonal-quartet",
+        "travel-horizon-split",
+        "minimal-frame-quote",
+        "story-caption-hero",
+        "seasonal-greeting"
       ]
     },
     {
       "id": "holiday",
       "titleKey": "Holiday Season",
+      "subtitleKey": "Sparkle for every festive post",
+      "style": "feature",
       "kind": "photo",
-      "window": { "start": "11-16", "end": "01-05" },
+      "window": {
+        "start": "11-16",
+        "end": "01-05"
+      },
       "galleryCategory": "Seasonal",
       "priority": 10,
       "itemIDs": [
-        "seasonal-sparkle", "seasonal-ornament", "seasonal-greeting",
-        "seasonal-thanks", "grid-celebrate", "birthday-confetti"
+        "seasonal-sparkle",
+        "seasonal-ornament",
+        "seasonal-greeting",
+        "seasonal-thanks",
+        "grid-celebrate",
+        "birthday-confetti"
       ]
     },
     {
       "id": "for-carousels",
-      "titleKey": "For Instagram Carousels",
+      "titleKey": "Instagram Carousels",
+      "subtitleKey": "Posts people swipe to the end",
       "kind": "carousel",
-      "creatorKinds": ["carousels"],
+      "creatorKinds": [
+        "carousels"
+      ],
       "carouselType": "matched",
       "itemIDs": [
-        "carousel-matched-team", "carousel-matched-tips", "carousel-matched-steps",
-        "carousel-story-beforeafter", "carousel-gridpreview-family", "carousel-matched-product"
+        "carousel-matched-team",
+        "carousel-matched-tips",
+        "carousel-matched-steps",
+        "carousel-story-beforeafter",
+        "carousel-gridpreview-family",
+        "carousel-matched-product"
       ]
     },
     {
       "id": "for-reels",
-      "titleKey": "For Reels & Stories",
+      "titleKey": "Stories & Reels",
+      "subtitleKey": "Full-screen 9:16, ready to post",
+      "style": "story",
       "kind": "photo",
-      "creatorKinds": ["reels"],
+      "creatorKinds": [
+        "reels"
+      ],
       "galleryCategory": "Story",
       "itemIDs": [
-        "story-caption-hero", "story-hero-strip", "story-stack-trio",
-        "story-split-tall", "story-quote-block", "story-moments"
+        "story-caption-hero",
+        "story-hero-strip",
+        "story-stack-trio",
+        "story-split-tall",
+        "story-quote-block",
+        "story-moments"
       ]
     },
     {
       "id": "pinterest-grids",
-      "titleKey": "Pinterest-Ready Grids",
+      "titleKey": "Pinterest Layouts",
+      "subtitleKey": "Tall pins that get saved",
       "kind": "photo",
-      "creatorKinds": ["pinterest"],
+      "creatorKinds": [
+        "pinterest"
+      ],
       "galleryCategory": "Grid",
       "itemIDs": [
-        "grid-4cell-square", "grid-mosaic-four", "grid-six-airy",
-        "minimal-tower", "minimal-gallery-trio", "grid-filmstrip"
+        "grid-4cell-square",
+        "grid-mosaic-four",
+        "grid-six-airy",
+        "minimal-tower",
+        "minimal-gallery-trio",
+        "grid-filmstrip"
       ]
     },
     {
       "id": "celebrations",
       "titleKey": "Celebrations",
+      "subtitleKey": "Birthdays, milestones, big days",
       "kind": "photo",
       "galleryCategory": "Birthday",
       "itemIDs": [
-        "birthday-bash", "birthday-confetti", "grid-celebrate",
-        "minimal-sticker-accent", "seasonal-greeting"
+        "birthday-bash",
+        "birthday-confetti",
+        "grid-celebrate",
+        "minimal-sticker-accent",
+        "seasonal-greeting"
       ]
     },
     {
       "id": "clean-minimal",
-      "titleKey": "Clean & Minimal",
+      "titleKey": "Minimalist",
+      "subtitleKey": "Let one photo breathe",
       "kind": "photo",
       "galleryCategory": "Minimal",
       "itemIDs": [
-        "minimal-duo-offset", "minimal-solo-frame", "minimal-split-air",
-        "minimal-tower", "minimal-circle-focus", "minimal-sticker-accent"
+        "minimal-duo-offset",
+        "minimal-solo-frame",
+        "minimal-split-air",
+        "minimal-tower",
+        "minimal-circle-focus",
+        "minimal-sticker-accent"
       ]
     },
     {
       "id": "travel-diaries",
-      "titleKey": "Travel Diaries",
+      "titleKey": "Travel",
+      "subtitleKey": "Every trip, one frame",
       "kind": "photo",
       "galleryCategory": "Travel",
       "itemIDs": [
-        "travel-horizon-split", "travel-postcard-note", "travel-panorama-row",
-        "travel-passport", "travel-postcard"
+        "travel-horizon-split",
+        "travel-postcard-note",
+        "travel-panorama-row",
+        "travel-passport",
+        "travel-postcard"
       ]
     },
     {
       "id": "tell-a-story",
-      "titleKey": "Tell a Story",
+      "titleKey": "Story Carousels",
+      "subtitleKey": "Slide by slide, start to finish",
       "kind": "carousel",
       "carouselType": "scrollThrough",
       "itemIDs": [
-        "carousel-story-lessons", "carousel-story-recipe", "carousel-story-tutorial",
-        "carousel-story-beforeafter", "carousel-story-travel"
+        "carousel-story-lessons",
+        "carousel-story-recipe",
+        "carousel-story-tutorial",
+        "carousel-story-beforeafter",
+        "carousel-story-travel"
       ]
     },
     {
       "id": "panoramic-swipes",
-      "titleKey": "Panoramic Swipes",
+      "titleKey": "Panoramic Carousels",
+      "subtitleKey": "One wide shot across every slide",
       "kind": "carousel",
       "carouselType": "panoramic",
       "itemIDs": [
-        "carousel-panoramic-sunset", "carousel-panoramic-beach", "carousel-panoramic-skyline",
-        "carousel-panoramic-travel", "carousel-panoramic-city"
+        "carousel-panoramic-sunset",
+        "carousel-panoramic-beach",
+        "carousel-panoramic-skyline",
+        "carousel-panoramic-travel",
+        "carousel-panoramic-city"
       ]
     },
     {
       "id": "photo-collages",
       "titleKey": "Photo Collages",
+      "subtitleKey": "Grids, splits and mosaics",
       "kind": "photo",
       "isPillar": true,
       "galleryCategory": "All",
       "itemIDs": [
-        "grid-4cell-square", "grid-filmstrip", "minimal-duo-offset", "minimal-gallery-trio",
-        "story-hero-strip", "story-caption-hero", "travel-horizon-split", "birthday-confetti",
-        "seasonal-bloom"
+        "grid-mosaic-four",
+        "minimal-duo-offset",
+        "travel-postcard-note",
+        "grid-six-airy",
+        "minimal-circle-focus",
+        "seasonal-bloom",
+        "grid-filmstrip",
+        "minimal-gallery-trio",
+        "birthday-confetti"
       ]
     },
     {
       "id": "video-collages",
       "titleKey": "Video Collages",
+      "subtitleKey": "Clips that play together",
       "kind": "video",
       "isPillar": true,
-      "itemIDs": ["tpl-caption-stack", "tpl-lyric-stack", "tpl-title-grid", "tpl-travel-filmstrip", "duo-motion", "quad-motion", "solo-motion"]
+      "itemIDs": [
+        "tpl-caption-stack",
+        "tpl-lyric-stack",
+        "solo-motion",
+        "duo-motion",
+        "tpl-title-grid",
+        "tpl-travel-filmstrip",
+        "quad-motion"
+      ]
     },
     {
       "id": "carousels",
       "titleKey": "Carousels",
+      "subtitleKey": "Swipe-ready posts, slide by slide",
       "kind": "carousel",
       "isPillar": true,
       "itemIDs": [
-        "carousel-matched-team", "carousel-matched-menu", "carousel-matched-tips",
-        "carousel-matched-steps", "carousel-story-beforeafter", "carousel-gridpreview-family"
+        "carousel-matched-menu",
+        "carousel-panoramic-sunset",
+        "carousel-story-recipe",
+        "carousel-matched-quotes",
+        "carousel-gridpreview-travel",
+        "carousel-matched-product"
       ]
     }
   ]

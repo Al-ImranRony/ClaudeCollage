@@ -72,13 +72,16 @@ public struct HomeCollection: Decodable, Sendable, Equatable, Identifiable {
     public let isPillar: Bool
     /// Ties between pinned collections break on this, higher first.
     public let priority: Int
+    /// How the strip's cards present their artwork (`HomeCardStyle` raw value).
+    /// Optional: absent, the kind decides — see `cardStyleName`.
+    public let style: String?
 
     public init(
         id: String, titleKey: String, subtitleKey: String? = nil, kind: Kind,
         itemIDs: [String], window: Window? = nil, isNew: Bool = false,
         creatorKinds: [String] = [], weeklyPick: Int? = nil,
         galleryCategory: String? = nil, carouselType: String? = nil,
-        isPillar: Bool = false, priority: Int = 0
+        isPillar: Bool = false, priority: Int = 0, style: String? = nil
     ) {
         self.id = id
         self.titleKey = titleKey
@@ -93,11 +96,12 @@ public struct HomeCollection: Decodable, Sendable, Equatable, Identifiable {
         self.carouselType = carouselType
         self.isPillar = isPillar
         self.priority = priority
+        self.style = style
     }
 
     private enum CodingKeys: String, CodingKey {
         case id, titleKey, subtitleKey, kind, itemIDs, window, isNew, creatorKinds
-        case weeklyPick, galleryCategory, carouselType, isPillar, priority
+        case weeklyPick, galleryCategory, carouselType, isPillar, priority, style
     }
 
     public init(from decoder: Decoder) throws {
@@ -115,6 +119,7 @@ public struct HomeCollection: Decodable, Sendable, Equatable, Identifiable {
         carouselType = try c.decodeIfPresent(String.self, forKey: .carouselType)
         isPillar = try c.decodeIfPresent(Bool.self, forKey: .isPillar) ?? false
         priority = try c.decodeIfPresent(Int.self, forKey: .priority) ?? 0
+        style = try c.decodeIfPresent(String.self, forKey: .style)
     }
 
     /// The same collection with a different item list — what the weekly pick
@@ -124,7 +129,7 @@ public struct HomeCollection: Decodable, Sendable, Equatable, Identifiable {
             id: id, titleKey: titleKey, subtitleKey: subtitleKey, kind: kind,
             itemIDs: itemIDs, window: window, isNew: isNew, creatorKinds: creatorKinds,
             weeklyPick: weeklyPick, galleryCategory: galleryCategory,
-            carouselType: carouselType, isPillar: isPillar, priority: priority)
+            carouselType: carouselType, isPillar: isPillar, priority: priority, style: style)
     }
 
     /// The display title, from the catalog.
@@ -134,6 +139,23 @@ public struct HomeCollection: Decodable, Sendable, Equatable, Identifiable {
 
     public var subtitle: String? {
         subtitleKey.map { String(localized: String.LocalizationValue($0)) }
+    }
+
+    /// The card style this strip uses: the authored `style`, else the kind's
+    /// native shape — a photo collage is a poster, a video a reel, a carousel
+    /// a deck. An unknown authored value falls back the same way.
+    public var cardStyleName: String {
+        let native: String
+        switch kind {
+        case .photo: native = "poster"
+        case .video: native = "reel"
+        case .carousel: native = "deck"
+        }
+        guard let style else { return native }
+        switch (kind, style) {
+        case (.photo, "poster"), (.photo, "feature"), (.photo, "story"): return style
+        default: return native
+        }
     }
 }
 

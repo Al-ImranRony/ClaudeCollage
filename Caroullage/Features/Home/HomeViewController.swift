@@ -87,20 +87,10 @@ final class HomeViewController: UIViewController {
 
     // MARK: - Showcase geometry
 
-    /// A showcase card is portrait-ish (4:5), which is what most of the catalog
-    /// is. 176pt is inherited from the pre-reorder fold budget, not derived from
-    /// the one in `heroAspectRatio` below — it was sized as what was left for a
-    /// complete card once the hero had taken its share, back when the first
-    /// strip still lived above the fold. The strips moved below the fold in the
-    /// reorder; this number did not need to move with them, so the catalog kept
-    /// the size it was tuned to before.
+    /// Collection strips size themselves from their card style — see
+    /// `HomeCardStyle.artworkSize` (2026-11-20). They all sit below the fold,
+    /// so none of those sizes is part of the fold budget below.
     ///
-    /// Phase 2 of the retention work grew the cards to 160 × 200 — the size the
-    /// showcase spec asked for — because at 140 wide half the catalog's names
-    /// truncated ("4-Up Square G…", "Caption He…"). Every strip is below the
-    /// fold, so the fold budget did not move.
-    private static let cardHeight: CGFloat = 200
-    private static let cardWidth: CGFloat = 160
     /// "Continue editing" cards: the Projects tab's own cell at the width the
     /// strips used to have, and the height the fold budget was measured with —
     /// see `heroAspectRatio` for why 176 is the constraint, not a choice.
@@ -146,12 +136,6 @@ final class HomeViewController: UIViewController {
     /// copy changes. `testTheCatalogHeaderClearsTheStartEditingPill` is what
     /// catches it if they do.
     private static let suggestionsContentHeight: CGFloat = 83
-    /// A carousel's preview is three pages laid side by side, so its card is
-    /// half again as wide — width is what a fitted strip turns into page size.
-    /// The card seats that strip whole on a blurred bed (`.fitOnBlurredBed`)
-    /// rather than cropping to its middle, so 240 buys three ~78pt-wide pages
-    /// instead of one page and two slivers.
-    private static let carouselCardWidth: CGFloat = 240
 
     /// The hero's height as a share of its width.
     ///
@@ -262,6 +246,9 @@ final class HomeViewController: UIViewController {
         let section: UIStackView
         let strip: UICollectionView
         var items: Items
+
+        /// How this strip's cards present their artwork.
+        var style: HomeCardStyle { HomeCardStyle(rawValue: collection.cardStyleName) ?? .poster }
     }
 
     private var strips: [CollectionStrip] = []
@@ -391,7 +378,7 @@ final class HomeViewController: UIViewController {
     private func setShowcaseActive(_ active: Bool) {
         heroView.setActive(active)
         for info in strips {
-            for case let cell as ShowcaseVideoCell in info.strip.visibleCells {
+            for case let cell as HomeCardCell in info.strip.visibleCells {
                 if active { cell.play() } else { cell.stop() }
             }
         }
@@ -488,9 +475,11 @@ final class HomeViewController: UIViewController {
             id: "saved-carousel", titleKey: "Saved Carousels", kind: .carousel, itemIDs: [])
         savedStrips = [photo, carousel].map { collection in
             let strip = makeStrip(for: collection)
+            let style = HomeCardStyle(rawValue: collection.cardStyleName) ?? .poster
             let section = makeStripSection(
                 title: collection.title, titleIdentifier: "sectionHeader-\(collection.id)",
-                strip: strip, height: Self.cardHeight, actionIdentifier: nil, action: nil)
+                subtitle: String(localized: "The ones you kept"),
+                strip: strip, height: style.cellSize.height, actionIdentifier: nil, action: nil)
             section.isHidden = true
             contentStack.addArrangedSubview(section)
             return CollectionStrip(collection: collection, section: section, strip: strip, items: .photo([]))
@@ -527,20 +516,13 @@ final class HomeViewController: UIViewController {
         case (true, .carousel): identifier = "carouselShowcaseStrip"
         default: identifier = "collectionStrip-\(collection.kind.rawValue)-\(collection.id)"
         }
-        switch collection.kind {
-        case .photo:
-            return makeShowcaseStrip(
-                identifier: identifier, itemWidth: Self.cardWidth, height: Self.cardHeight,
-                cellClass: ShowcaseTemplateCell.self, reuseID: ShowcaseTemplateCell.reuseID)
-        case .video:
-            return makeShowcaseStrip(
-                identifier: identifier, itemWidth: Self.cardWidth, height: Self.cardHeight,
-                cellClass: ShowcaseVideoCell.self, reuseID: ShowcaseVideoCell.reuseID)
-        case .carousel:
-            return makeShowcaseStrip(
-                identifier: identifier, itemWidth: Self.carouselCardWidth, height: Self.cardHeight,
-                cellClass: ShowcaseTemplateCell.self, reuseID: ShowcaseTemplateCell.reuseID)
-        }
+        // Every collection strip is built from the one card, in the shape its
+        // style names — see `HomeCardCell`.
+        let size = (HomeCardStyle(rawValue: collection.cardStyleName) ?? .poster).cellSize
+        return makeShowcaseStrip(
+            identifier: identifier, itemWidth: size.width, height: size.height,
+            cellClass: HomeCardCell.self, reuseID: HomeCardCell.reuseID,
+            spacing: Theme.Spacing.md)
     }
 
     private func makeCollectionSection(
@@ -574,11 +556,13 @@ final class HomeViewController: UIViewController {
                 self?.onBrowseCollection?(collection)
             }
         }
+        let style = HomeCardStyle(rawValue: collection.cardStyleName) ?? .poster
         return makeStripSection(
             title: collection.title,
             titleIdentifier: "sectionHeader-\(collection.id)",
+            subtitle: collection.subtitle,
             badge: collection.isNew ? String(localized: "NEW") : nil,
-            strip: strip, height: Self.cardHeight,
+            strip: strip, height: style.cellSize.height,
             actionIdentifier: actionIdentifier, action: action)
     }
 
@@ -1018,7 +1002,9 @@ final class HomeViewController: UIViewController {
         // The planned collections, then the three pillars — filled by
         // `rebuildCollectionsIfNeeded` on every reload.
         collectionsStack.axis = .vertical
-        collectionsStack.spacing = Theme.Spacing.xl
+        // More air than the sections above: each strip is now a different
+        // shape, and the pause is what lets each one read as its own.
+        collectionsStack.spacing = Theme.Spacing.xxl
         collectionsStack.accessibilityIdentifier = "homeCollections"
         contentStack.addArrangedSubview(collectionsStack)
 
@@ -1063,13 +1049,15 @@ final class HomeViewController: UIViewController {
     }
 
     private func makeStripSection(
-        title: String, titleIdentifier: String? = nil, badge: String? = nil,
+        title: String, titleIdentifier: String? = nil, subtitle: String? = nil,
+        badge: String? = nil,
         strip: UICollectionView, height: CGFloat,
         actionIdentifier: String?, action: (() -> Void)?
     ) -> UIStackView {
         let header = sectionHeader(
             title,
             titleIdentifier: titleIdentifier,
+            subtitle: subtitle,
             badge: badge,
             actionTitle: action == nil ? nil : String(localized: "See All"),
             actionIdentifier: actionIdentifier,
@@ -1163,18 +1151,19 @@ final class HomeViewController: UIViewController {
     }
 
     private func sectionHeader(
-        _ title: String, titleIdentifier: String? = nil, badge: String? = nil,
+        _ title: String, titleIdentifier: String? = nil, subtitle: String? = nil,
+        badge: String? = nil,
         actionTitle: String? = nil, actionIdentifier: String? = nil,
         action: (() -> Void)? = nil
     ) -> SectionHeaderView {
         SectionHeaderView(
-            title: title, titleIdentifier: titleIdentifier, badge: badge,
+            title: title, titleIdentifier: titleIdentifier, subtitle: subtitle, badge: badge,
             actionTitle: actionTitle, actionIdentifier: actionIdentifier, action: action)
     }
 
     private func makeShowcaseStrip(
         identifier: String, itemWidth: CGFloat, height: CGFloat,
-        cellClass: AnyClass, reuseID: String
+        cellClass: AnyClass, reuseID: String, spacing: CGFloat = Theme.Spacing.sm
     ) -> UICollectionView {
         let item = NSCollectionLayoutItem(
             layoutSize: NSCollectionLayoutSize(
@@ -1188,7 +1177,7 @@ final class HomeViewController: UIViewController {
         )
         let section = NSCollectionLayoutSection(group: group)
         section.orthogonalScrollingBehavior = .continuous
-        section.interGroupSpacing = Theme.Spacing.sm
+        section.interGroupSpacing = spacing
         section.contentInsets = NSDirectionalEdgeInsets(
             top: 0, leading: Theme.Spacing.md, bottom: 0, trailing: Theme.Spacing.md)
         let layout = UICollectionViewCompositionalLayout(section: section)
@@ -1247,7 +1236,7 @@ extension HomeViewController: UICollectionViewDataSource, UICollectionViewDelega
             return carouselCard(collectionView, at: indexPath, templates: templates)
         case nil:
             return collectionView.dequeueReusableCell(
-                withReuseIdentifier: ShowcaseTemplateCell.reuseID, for: indexPath)
+                withReuseIdentifier: HomeCardCell.reuseID, for: indexPath)
         }
     }
 
@@ -1255,23 +1244,26 @@ extension HomeViewController: UICollectionViewDataSource, UICollectionViewDelega
         _ collectionView: UICollectionView, at indexPath: IndexPath, templates: [CollageTemplate]
     ) -> UICollectionViewCell {
         let cell = collectionView.dequeueReusableCell(
-            withReuseIdentifier: ShowcaseTemplateCell.reuseID, for: indexPath)
-        guard let card = cell as? ShowcaseTemplateCell,
+            withReuseIdentifier: HomeCardCell.reuseID, for: indexPath)
+        guard let card = cell as? HomeCardCell,
               templates.indices.contains(indexPath.item) else { return cell }
         let template = templates[indexPath.item]
         let item = FavoritesStore.Item(kind: .photo, id: template.id)
-        card.configure(
+        let photoZones = template.cells.filter { $0.zoneType == .photo }.count
+        card.configure(HomeCardCell.Content(
             name: template.name,
+            meta: HomeCardMeta.photos(photoZones, ratio: template.canvasAspectRatio),
             identifier: "showcaseTemplate-\(template.id)",
-            locked: !TemplateService.shared.canOpen(template),
-            saved: favorites.isSaved(item),
+            style: stripInfo(for: collectionView)?.style ?? .poster,
             // The schematic is the fallback, not the plan: it only appears for a
             // template the manifest does not dress, which today means only when
             // the manifest itself failed to load.
-            preview: {
+            artwork: .still {
                 TemplateService.shared.showcasePreview(for: template)
                     ?? TemplateService.shared.thumbnail(for: template)
-            })
+            },
+            locked: !TemplateService.shared.canOpen(template),
+            saved: favorites.isSaved(item)))
         card.accessibilityCustomActions = [FavouriteContextMenu.customAction(for: item) {}]
         return cell
     }
@@ -1281,15 +1273,17 @@ extension HomeViewController: UICollectionViewDataSource, UICollectionViewDelega
         showcases: [SampleContentManifest.VideoShowcase]
     ) -> UICollectionViewCell {
         let cell = collectionView.dequeueReusableCell(
-            withReuseIdentifier: ShowcaseVideoCell.reuseID, for: indexPath)
-        guard let card = cell as? ShowcaseVideoCell,
+            withReuseIdentifier: HomeCardCell.reuseID, for: indexPath)
+        guard let card = cell as? HomeCardCell,
               showcases.indices.contains(indexPath.item) else { return cell }
         let showcase = showcases[indexPath.item]
-        card.configure(
+        let poster = sampleContent.image(named: showcase.poster)
+        card.configure(HomeCardCell.Content(
             name: showcase.displayTitle,
+            meta: HomeCardMeta.video(size: poster?.size),
             identifier: "showcaseVideo-\(showcase.id)",
-            poster: sampleContent.image(named: showcase.poster),
-            loopURL: sampleContent.videoURL(named: showcase.loop))
+            style: .reel,
+            artwork: .video(poster: poster, loop: sampleContent.videoURL(named: showcase.loop))))
         return cell
     }
 
@@ -1297,30 +1291,29 @@ extension HomeViewController: UICollectionViewDataSource, UICollectionViewDelega
         _ collectionView: UICollectionView, at indexPath: IndexPath, templates: [CarouselTemplate]
     ) -> UICollectionViewCell {
         let cell = collectionView.dequeueReusableCell(
-            withReuseIdentifier: ShowcaseTemplateCell.reuseID, for: indexPath)
-        guard let card = cell as? ShowcaseTemplateCell,
+            withReuseIdentifier: HomeCardCell.reuseID, for: indexPath)
+        guard let card = cell as? HomeCardCell,
               templates.indices.contains(indexPath.item) else { return cell }
         let template = templates[indexPath.item]
         let item = FavoritesStore.Item(kind: .carousel, id: template.id)
-        card.configure(
+        card.configure(HomeCardCell.Content(
             name: template.name,
-            identifier: "showcaseCarousel-\(template.id)",
             // How many pages the post has is the one fact the picture cannot
-            // state, and the one a user comparing carousels wants first. Stated
-            // as dots rather than as the "5 frames" caption this used to carry:
-            // the strips sell a photograph, and a sentence stapled to the corner
-            // of one is the register of a spec sheet.
-            pages: template.frameCount,
-            // Fitted, not cropped. `showcasePreview` composites three pages side
-            // by side into a ~2.4:1 strip; filling a 1.2:1 card with it scales it
-            // to the card's height and then discards half its width, so a
-            // five-page template arrived as one page and two slivers.
-            presentation: .fitOnBlurredBed,
+            // state, and the one a user comparing carousels wants first.
+            meta: HomeCardMeta.pages(template.frameCount, ratio: template.canvasAspectRatio),
+            identifier: "showcaseCarousel-\(template.id)",
+            style: .deck,
+            // The first three slides, each rendered at its true shape and dealt
+            // as a stack — not composited into one strip and fitted on a blur.
+            // Drawn off the main actor, like the hero's deck.
+            artwork: .slides {
+                await TemplateService.shared.showcaseFramesInBackground(for: template, limit: 3)
+            },
             // Until Step 07 there was no `canOpen` overload to ask, so four
             // premium carousels wore no lock and opened free.
             locked: !TemplateService.shared.canOpen(template),
             saved: favorites.isSaved(item),
-            preview: { TemplateService.shared.showcasePreview(for: template) })
+            pages: template.frameCount))
         card.accessibilityCustomActions = [FavouriteContextMenu.customAction(for: item) {}]
         return cell
     }
@@ -1427,7 +1420,7 @@ extension HomeViewController: UICollectionViewDataSource, UICollectionViewDelega
         _ collectionView: UICollectionView, willDisplay cell: UICollectionViewCell,
         forItemAt indexPath: IndexPath
     ) {
-        guard isVisible, let card = cell as? ShowcaseVideoCell else { return }
+        guard isVisible, let card = cell as? HomeCardCell else { return }
         card.play()
     }
 
@@ -1435,6 +1428,6 @@ extension HomeViewController: UICollectionViewDataSource, UICollectionViewDelega
         _ collectionView: UICollectionView, didEndDisplaying cell: UICollectionViewCell,
         forItemAt indexPath: IndexPath
     ) {
-        (cell as? ShowcaseVideoCell)?.stop()
+        (cell as? HomeCardCell)?.stop()
     }
 }

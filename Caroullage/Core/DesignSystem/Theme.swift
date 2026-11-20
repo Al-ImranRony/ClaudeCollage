@@ -207,6 +207,13 @@ public enum Theme {
         public static var cellWellChip: UIColor { rgb(0x3F3F46).withAlphaComponent(0.92) }
         public static var cellWellChipInk: UIColor { UIColor.white }
 
+        /// The mat a Home card's artwork is mounted on before its own tint is
+        /// known (and the fill of a full-bleed card while it loads). Follows the
+        /// appearance, unlike `cellWell`: it is chrome, never composited into a
+        /// file. `artworkMatDeep` is one step down, for slides stacked on a mat.
+        public static var artworkMat: UIColor { dynamic(light: 0xF3F3F5, dark: 0x1C1C20) }
+        public static var artworkMatDeep: UIColor { dynamic(light: 0xE7E7EB, dark: 0x26262B) }
+
         // Lines & fills.
         /// Border. Load-bearing now that the canvas and cards are both
         /// near-white — this hairline is what separates them, not a fill step.
