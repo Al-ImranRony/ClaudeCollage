@@ -147,6 +147,12 @@ final class CarouselTabUITests: XCTestCase {
     func testTappingAFreeTemplateOpensTheCarouselEditor() {
         let app = launch()
         openCarouselTab(app)
+        // Matched, not the first card on the tab: Panoramic sorts first, and a
+        // panoramic template opens the photo picker for its wide source photo
+        // before the editor, by design.
+        let matched = app.collectionViews["carouselTypeChips"].staticTexts["Matched"]
+        XCTAssertTrue(matched.waitForExistence(timeout: 8))
+        matched.tap()
 
         let free = app.collectionViews["carouselTemplateGrid"]
             .cells.matching(identifier: "carouselTemplateCard.free").element(boundBy: 0)
@@ -172,7 +178,11 @@ final class CarouselTabUITests: XCTestCase {
         // reason, as `PaywallUITests.launchAndOpenPaywall`.
         let locked = app.cells.matching(identifier: "carouselTemplateCard.premium").firstMatch
         var scrolls = 0
-        while !locked.exists, scrolls < 8 {
+        // Clear of the floating pill, not merely present: a card peeking out
+        // from under the tab bar is in the tree, XCUI calls it hittable, and
+        // tapping its centre taps the bar instead.
+        let pillTop = app.buttons["startEditingButton"].frame.minY
+        while !(locked.exists && locked.frame.maxY < pillTop), scrolls < 8 {
             grid.swipeUp()
             scrolls += 1
         }

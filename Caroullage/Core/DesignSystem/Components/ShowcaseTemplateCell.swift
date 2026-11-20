@@ -84,6 +84,16 @@ extension UILabel {
         layer.shadowOpacity = 0.55
         layer.shadowRadius = 3
         layer.shadowOffset = CGSize(width: 0, height: 1)
+        // A shadow on text has no path to give it, so Core Animation re-derives
+        // it from the glyphs' alpha in an OFFSCREEN pass — every frame, for
+        // every caption on screen, while the strip scrolls. Rasterizing caches
+        // the shadowed caption as one bitmap that is redrawn only when its text
+        // changes, which for a card is once per reuse.
+        layer.shouldRasterize = true
+        layer.rasterizationScale = traitCollection.displayScale > 0 ? traitCollection.displayScale : 3
+        registerForTraitChanges([UITraitDisplayScale.self]) { (label: UILabel, _) in
+            label.layer.rasterizationScale = label.traitCollection.displayScale
+        }
     }
 }
 

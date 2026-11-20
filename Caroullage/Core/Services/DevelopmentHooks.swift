@@ -38,6 +38,27 @@ enum DevelopmentHooks {
         #endif
     }
 
+    /// `-ColdPreviewCache`: launch with no rendered previews on disk, so the
+    /// scroll-performance suite measures the first-launch worst case — every
+    /// card rendered from sample photography — rather than a warm cache.
+    static var startsWithColdPreviewCache: Bool {
+        #if DEBUG
+        return ProcessInfo.processInfo.arguments.contains("-ColdPreviewCache")
+        #else
+        return false
+        #endif
+    }
+
+    /// `-FrameProbe`: install `FrameDropProbe`, which publishes dropped-frame
+    /// totals for the scroll-performance suite to read.
+    static var installsFrameProbe: Bool {
+        #if DEBUG
+        return ProcessInfo.processInfo.arguments.contains("-FrameProbe")
+        #else
+        return false
+        #endif
+    }
+
     /// `debug.premiumUnlocked`: premium flows on a machine that cannot buy.
     static func isPremiumOverridden(in defaults: UserDefaults = .standard) -> Bool {
         #if DEBUG

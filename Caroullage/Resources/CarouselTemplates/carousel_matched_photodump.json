@@ -1,0 +1,170 @@
+{
+  "id": "carousel-matched-photodump",
+  "name": "Photo Dump",
+  "category": "aesthetic",
+  "isPremium": false,
+  "carouselType": "matched",
+  "canvasAspectRatio": "4:5",
+  "frameCount": 3,
+  "frames": [
+    {
+      "index": 0,
+      "cells": [
+        {
+          "type": "photo",
+          "shape": "rectangle",
+          "frame": {
+            "x": 0.0,
+            "y": 0.0,
+            "width": 0.4926,
+            "height": 0.56
+          }
+        },
+        {
+          "type": "photo",
+          "shape": "rectangle",
+          "frame": {
+            "x": 0.0,
+            "y": 0.5719,
+            "width": 0.4926,
+            "height": 0.4281
+          }
+        },
+        {
+          "type": "photo",
+          "shape": "rectangle",
+          "frame": {
+            "x": 0.5074,
+            "y": 0.0,
+            "width": 0.4926,
+            "height": 0.32
+          }
+        },
+        {
+          "type": "photo",
+          "shape": "rectangle",
+          "frame": {
+            "x": 0.5074,
+            "y": 0.3319,
+            "width": 0.4926,
+            "height": 0.3304
+          }
+        },
+        {
+          "type": "photo",
+          "shape": "rectangle",
+          "frame": {
+            "x": 0.5074,
+            "y": 0.6741,
+            "width": 0.4926,
+            "height": 0.3259
+          }
+        }
+      ]
+    },
+    {
+      "index": 1,
+      "cells": [
+        {
+          "type": "photo",
+          "shape": "rectangle",
+          "frame": {
+            "x": 0.0,
+            "y": 0.0,
+            "width": 1.0,
+            "height": 0.4148
+          }
+        },
+        {
+          "type": "photo",
+          "shape": "rectangle",
+          "frame": {
+            "x": 0.0,
+            "y": 0.4267,
+            "width": 0.4926,
+            "height": 0.2815
+          }
+        },
+        {
+          "type": "photo",
+          "shape": "rectangle",
+          "frame": {
+            "x": 0.0,
+            "y": 0.72,
+            "width": 0.4926,
+            "height": 0.28
+          }
+        },
+        {
+          "type": "photo",
+          "shape": "rectangle",
+          "frame": {
+            "x": 0.5074,
+            "y": 0.4267,
+            "width": 0.4926,
+            "height": 0.5733
+          }
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "cells": [
+        {
+          "type": "photo",
+          "shape": "rectangle",
+          "frame": {
+            "x": 0.5074,
+            "y": 0.0,
+            "width": 0.4926,
+            "height": 0.56
+          }
+        },
+        {
+          "type": "photo",
+          "shape": "rectangle",
+          "frame": {
+            "x": 0.5074,
+            "y": 0.5719,
+            "width": 0.4926,
+            "height": 0.4281
+          }
+        },
+        {
+          "type": "photo",
+          "shape": "rectangle",
+          "frame": {
+            "x": 0.0,
+            "y": 0.0,
+            "width": 0.4926,
+            "height": 0.32
+          }
+        },
+        {
+          "type": "photo",
+          "shape": "rectangle",
+          "frame": {
+            "x": 0.0,
+            "y": 0.3319,
+            "width": 0.4926,
+            "height": 0.3304
+          }
+        },
+        {
+          "type": "photo",
+          "shape": "rectangle",
+          "frame": {
+            "x": 0.0,
+            "y": 0.6741,
+            "width": 0.4926,
+            "height": 0.3259
+          }
+        }
+      ]
+    }
+  ],
+  "background": {
+    "type": "solid",
+    "color": "#FFFFFF"
+  }
+}

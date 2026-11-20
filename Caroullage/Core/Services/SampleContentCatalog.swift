@@ -177,6 +177,26 @@ public final class SampleContentCatalog {
         return image
     }
 
+    /// Decodes the named bundled images OFF the main thread and caches them
+    /// decoded, so the first time a card or the hero shows one there is no
+    /// JPEG decode left to do at draw time. For display images only (video
+    /// posters): render inputs stay lazy, because the renderer decodes them on
+    /// its own background thread anyway.
+    public func prewarmDecoded(_ names: [String]) async {
+        let pending = names.filter { imageCache.object(forKey: $0 as NSString) == nil }
+            .compactMap { name in bundle.url(forResource: name, withExtension: "jpg").map { (name, $0) } }
+        guard !pending.isEmpty else { return }
+        let decoded = await Task.detached(priority: .utility) {
+            pending.compactMap { name, url -> (String, UIImage)? in
+                guard let image = UIImage(contentsOfFile: url.path) else { return nil }
+                return (name, image.preparingForDisplay() ?? image)
+            }
+        }.value
+        for (name, image) in decoded where imageCache.object(forKey: name as NSString) == nil {
+            imageCache.setObject(image, forKey: name as NSString)
+        }
+    }
+
     public func videoURL(named name: String) -> URL? {
         bundle.url(forResource: name, withExtension: "mp4")
     }

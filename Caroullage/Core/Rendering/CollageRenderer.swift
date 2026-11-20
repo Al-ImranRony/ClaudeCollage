@@ -103,8 +103,19 @@ public final class CollageRenderer: @unchecked Sendable {
             let cg = rendererContext.cgContext
 
             // Canvas background (also shows through the gaps between cells).
+            //
+            // A `.photoBlur` request may arrive without its backdrop: preview
+            // requests leave it to the renderer so the Core Image blur runs
+            // here, on the render's background thread, instead of on the main
+            // actor while the request is built. Same rule the editor applies —
+            // the first cell that has a photo.
+            let backdrop = request.backgroundPhoto ?? (request.background.isPhotoBlur
+                ? request.cells.lazy.compactMap(\.image).first.flatMap {
+                    BackgroundRendering.blurredBackdrop(from: $0, canvasSize: request.canvasSize)
+                }
+                : nil)
             BackgroundRendering.draw(request.background, canvasSize: request.canvasSize,
-                                     photo: request.backgroundPhoto, in: cg)
+                                     photo: backdrop, in: cg)
 
             let shortSide = min(request.canvasSize.width, request.canvasSize.height)
             let shadow = request.frameStyle.shadowGeometry(canvasShortSide: shortSide)

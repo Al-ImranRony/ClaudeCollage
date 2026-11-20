@@ -822,6 +822,20 @@ final class AppCoordinator {
             return
         }
 
+        // A panoramic card previews ONE photograph cut across its slides, so it
+        // must open the same way: ask for the wide photo and slice it. Building
+        // it from the template's frames instead gave N unrelated empty cells —
+        // a carousel that could never look like the card the user tapped.
+        if template.carouselType == .panoramic {
+            pickPanoramicSource(
+                config: CarouselStartConfig(
+                    type: .panoramic, frameCount: template.frameCount,
+                    splitAxis: template.panoramicSource?.splitAxis ?? .horizontal,
+                    aspectRatio: template.canvasAspectRatio),
+                canvasSize: CanvasSize.size(forAspectRatio: template.canvasAspectRatio))
+            return
+        }
+
         let frames = CarouselService().buildCarousel(from: template)
         // A template that parses to no frames has nothing to open — bail rather
         // than pushing an empty editor.

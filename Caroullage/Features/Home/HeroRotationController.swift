@@ -119,12 +119,19 @@ final class HeroRotationController {
     func pause() { paused = true }
     func resume() { paused = false }
 
+    /// Asked on every tick; while it answers true the page holds. A question,
+    /// not a flag, so nothing can be left set: Home answers "is my scroll
+    /// view being dragged or decelerating right now", and a deceleration
+    /// stopped by a tap — which delivers no end-of-scroll callback — simply
+    /// stops answering yes.
+    var isHeld: () -> Bool = { false }
+
     /// The user swiped manually; future auto-advances continue from where
     /// they landed rather than snapping back to the pre-swipe page.
     func noteUserMoved(to page: Int) { currentPage = page }
 
     private func tick() {
-        guard !paused, pageCount > 1, !reduceMotion() else { return }
+        guard !paused, !isHeld(), pageCount > 1, !reduceMotion() else { return }
         currentPage = (currentPage + 1) % pageCount
         onAdvance?(currentPage)
     }

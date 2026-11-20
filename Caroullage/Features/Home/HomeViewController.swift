@@ -246,6 +246,10 @@ final class HomeViewController: UIViewController {
         let section: UIStackView
         let strip: UICollectionView
         var items: Items
+        /// `signature(of: items)` as of the last reload. Stored, not recomputed:
+        /// the old items evaluated now would read the CURRENT lock and heart
+        /// state, and an unlock would never register as a change.
+        var shownSignature: [String] = []
 
         /// How this strip's cards present their artwork.
         var style: HomeCardStyle { HomeCardStyle(rawValue: collection.cardStyleName) ?? .poster }
@@ -289,6 +293,10 @@ final class HomeViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        // Video posters are shown as-is, so decode them in the background now
+        // rather than on the main thread the first time a reel card draws.
+        let posters = sampleContent.videoShowcases.map(\.poster)
+        Task { [sampleContent] in await sampleContent.prewarmDecoded(posters) }
         // `navigationItem.title`, NOT `title`: setting `title` on a tab root also
         // rewrites its tab bar label, so this screen would sit under a tab reading
         // "Caroullage" instead of "Home".
@@ -354,6 +362,13 @@ final class HomeViewController: UIViewController {
         setSettingsTileShown(true)
     }
 
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        // A second look once the transition has landed and every frame is
+        // final; a no-op when nothing changed since `viewWillAppear`.
+        updateViewportPlayback()
+    }
+
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
         setSettingsTileShown(false)
@@ -376,10 +391,52 @@ final class HomeViewController: UIViewController {
 
     /// Starts or stops everything that moves.
     private func setShowcaseActive(_ active: Bool) {
-        heroView.setActive(active)
-        for info in strips {
+        guard active else {
+            heroView.setActive(false)
+            for info in strips + savedStrips {
+                for case let cell as HomeCardCell in info.strip.visibleCells { cell.stop() }
+            }
+            playingStrips = []
+            return
+        }
+        // Re-evaluated from scratch: whatever is in the viewport plays. Laid
+        // out first, so the strips nested in the scroll view have real frames
+        // to test — measured before that, every strip reads as off screen and
+        // nothing would start until the first scroll.
+        playingStrips = []
+        view.layoutIfNeeded()
+        updateViewportPlayback()
+    }
+
+    // MARK: - Viewport-aware playback
+
+    /// Strips whose video cards are allowed to play: on screen, on a visible
+    /// Home. A strip scrolled out of the viewport used to keep every visible
+    /// card decoding video — CPU and memory spent on pictures nobody could see,
+    /// competing with the scroll that moved them away.
+    private var playingStrips: Set<ObjectIdentifier> = []
+
+    private func isInViewport(_ view: UIView) -> Bool {
+        // No `window` requirement: during a navigation transition back to
+        // Home the view is not in a window yet when `viewWillAppear` asks,
+        // and the answer must still be "the hero is on screen". `isVisible`
+        // is what says Home is showing.
+        guard !view.isHidden, scrollView.bounds.height > 0 else { return false }
+        return view.convert(view.bounds, to: scrollView).intersects(scrollView.bounds)
+    }
+
+    /// Plays what entered the viewport and stops what left it — the hero and
+    /// every strip. Cheap (a rect test per strip), and a no-op when nothing
+    /// crossed the edge, so it is safe to call on every scroll frame.
+    private func updateViewportPlayback() {
+        heroView.setActive(isVisible && isInViewport(heroView))
+        for info in strips + savedStrips {
+            let id = ObjectIdentifier(info.strip)
+            let shouldPlay = isVisible && isInViewport(info.strip)
+            guard shouldPlay != playingStrips.contains(id) else { continue }
+            if shouldPlay { playingStrips.insert(id) } else { playingStrips.remove(id) }
             for case let cell as HomeCardCell in info.strip.visibleCells {
-                if active { cell.play() } else { cell.stop() }
+                if shouldPlay { cell.play() } else { cell.stop() }
             }
         }
     }
@@ -444,6 +501,9 @@ final class HomeViewController: UIViewController {
         for old in strips {
             collectionsStack.removeArrangedSubview(old.section)
             old.section.removeFromSuperview()
+            // Forgotten with the strip: a new strip allocated at the freed
+            // address would otherwise inherit "already playing".
+            playingStrips.remove(ObjectIdentifier(old.strip))
         }
         strips = planned.compactMap { collection in
             let items = resolve(collection)
@@ -454,15 +514,45 @@ final class HomeViewController: UIViewController {
             let section = makeCollectionSection(collection, strip: strip)
             collectionsStack.addArrangedSubview(section)
             Analytics.track(.homeSectionShown(id: collection.id))
-            return CollectionStrip(collection: collection, section: section, strip: strip, items: items)
+            return CollectionStrip(collection: collection, section: section, strip: strip, items: items,
+                                   shownSignature: signature(of: items))
         }
         collectionsStack.isHidden = strips.isEmpty
     }
 
+    /// Refreshes each strip only if what it shows actually changed.
+    ///
+    /// Home calls this on every appearance. Reloading unconditionally re-ran
+    /// every visible card and, worse, stopped and restarted every playing
+    /// video card — a flash across the screen each time the user came back
+    /// from an editor, for a screen whose contents had not moved.
     private func reloadStrips() {
         for index in strips.indices {
-            strips[index].items = resolve(strips[index].collection)
+            let items = resolve(strips[index].collection)
+            let shown = signature(of: items)
+            strips[index].items = items
+            guard shown != strips[index].shownSignature else { continue }
+            strips[index].shownSignature = shown
             strips[index].strip.reloadData()
+        }
+    }
+
+    /// What a strip's cards state: which items, in which order, and the two
+    /// facts a card can change while Home is off screen — its lock and its
+    /// heart.
+    private func signature(of items: CollectionStrip.Items) -> [String] {
+        let service = TemplateService.shared
+        switch items {
+        case let .photo(templates):
+            return templates.map {
+                "\($0.id)|\(service.canOpen($0))|\(favorites.isSaved(.init(kind: .photo, id: $0.id)))"
+            }
+        case let .video(showcases):
+            return showcases.map(\.id)
+        case let .carousel(templates):
+            return templates.map {
+                "\($0.id)|\(service.canOpen($0))|\(favorites.isSaved(.init(kind: .carousel, id: $0.id)))"
+            }
         }
     }
 
@@ -491,8 +581,13 @@ final class HomeViewController: UIViewController {
             let kind: FavoritesStore.Kind = savedStrips[index].collection.kind == .photo ? .photo : .carousel
             let ids = favorites.savedIDs(kind: kind)
             let collection = savedStrips[index].collection.with(itemIDs: ids)
-            savedStrips[index].items = resolve(collection)
-            savedStrips[index].strip.reloadData()
+            let items = resolve(collection)
+            let shown = signature(of: items)
+            savedStrips[index].items = items
+            if shown != savedStrips[index].shownSignature {
+                savedStrips[index].shownSignature = shown
+                savedStrips[index].strip.reloadData()
+            }
             savedStrips[index].section.isHidden = savedStrips[index].items.count == 0
         }
     }
@@ -594,8 +689,7 @@ final class HomeViewController: UIViewController {
                     identifier: "heroPage-\(template.id)",
                     stage: .resolve(aspect: canvas.width / max(canvas.height, 1)),
                     preview: {
-                        TemplateService.shared.showcasePreview(for: template, maxDimension: 900)
-                            ?? TemplateService.shared.thumbnail(for: template)
+                        await TemplateService.shared.loadShowcasePreview(for: template, maxDimension: 900)
                     },
                     onTap: { [weak self] in
                         Analytics.track(.heroTapped(id: template.id))
@@ -630,7 +724,7 @@ final class HomeViewController: UIViewController {
                     stage: isCompare ? .compare : .deck,
                     // The strip, for the fallback a deck without frames takes.
                     preview: {
-                        TemplateService.shared.showcasePreview(
+                        await TemplateService.shared.loadShowcaseStrip(
                             for: template, frameMaxDimension: 640)
                     },
                     frames: {
@@ -784,6 +878,8 @@ final class HomeViewController: UIViewController {
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
+        // The first real frames arrive here, after `viewWillAppear` asked.
+        updateViewportPlayback()
         guard let bar = navigationController?.navigationBar,
               let lockup = brandLockup, lockup.window != nil,
               settingsTile.superview === bar else { return }
@@ -960,6 +1056,15 @@ final class HomeViewController: UIViewController {
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         scrollView.showsVerticalScrollIndicator = false
         scrollView.alwaysBounceVertical = true
+        // Home's own scroll drives viewport-aware playback (see below). The
+        // strips report their scrolls through the same delegate methods, so
+        // each one checks which scroll view is talking.
+        scrollView.delegate = self
+        // The hero holds its page while Home is moving under the thumb.
+        heroView.holdsPage = { [weak scrollView] in
+            guard let scrollView else { return false }
+            return scrollView.isDragging || scrollView.isDecelerating
+        }
 
         // First, deliberately. This is an editor, not a feed: the four doors into
         // a format lead, and the showcase argues its case immediately below them.
@@ -1187,6 +1292,8 @@ final class HomeViewController: UIViewController {
         view.showsHorizontalScrollIndicator = false
         view.dataSource = self
         view.delegate = self
+        // The next cards along are drawn before the strip scrolls them in.
+        view.prefetchDataSource = self
         view.accessibilityIdentifier = identifier
         view.register(cellClass, forCellWithReuseIdentifier: reuseID)
         return view
@@ -1258,10 +1365,9 @@ extension HomeViewController: UICollectionViewDataSource, UICollectionViewDelega
             // The schematic is the fallback, not the plan: it only appears for a
             // template the manifest does not dress, which today means only when
             // the manifest itself failed to load.
-            artwork: .still {
-                TemplateService.shared.showcasePreview(for: template)
-                    ?? TemplateService.shared.thumbnail(for: template)
-            },
+            artwork: .still(
+                cached: TemplateService.shared.cachedShowcasePreview(for: template),
+                load: { await TemplateService.shared.loadShowcasePreview(for: template) }),
             locked: !TemplateService.shared.canOpen(template),
             saved: favorites.isSaved(item)))
         card.accessibilityCustomActions = [FavouriteContextMenu.customAction(for: item) {}]
@@ -1306,9 +1412,10 @@ extension HomeViewController: UICollectionViewDataSource, UICollectionViewDelega
             // The first three slides, each rendered at its true shape and dealt
             // as a stack — not composited into one strip and fitted on a blur.
             // Drawn off the main actor, like the hero's deck.
-            artwork: .slides {
-                await TemplateService.shared.showcaseFramesInBackground(for: template, limit: 3)
-            },
+            artwork: .slides(
+                cached: TemplateService.shared.cachedShowcaseFrames(
+                    for: template, limit: 3, allowsSchematic: false),
+                load: { await TemplateService.shared.showcaseFramesInBackground(for: template, limit: 3) }),
             // Until Step 07 there was no `canOpen` overload to ask, so four
             // premium carousels wore no lock and opened free.
             locked: !TemplateService.shared.canOpen(template),
@@ -1420,7 +1527,8 @@ extension HomeViewController: UICollectionViewDataSource, UICollectionViewDelega
         _ collectionView: UICollectionView, willDisplay cell: UICollectionViewCell,
         forItemAt indexPath: IndexPath
     ) {
-        guard isVisible, let card = cell as? HomeCardCell else { return }
+        guard isVisible, playingStrips.contains(ObjectIdentifier(collectionView)),
+              let card = cell as? HomeCardCell else { return }
         card.play()
     }
 
@@ -1429,5 +1537,33 @@ extension HomeViewController: UICollectionViewDataSource, UICollectionViewDelega
         forItemAt indexPath: IndexPath
     ) {
         (cell as? HomeCardCell)?.stop()
+    }
+}
+
+// MARK: - Home's own scroll
+
+extension HomeViewController {
+    func scrollViewDidScroll(_ scrollView: UIScrollView) {
+        guard scrollView === self.scrollView else { return }
+        updateViewportPlayback()
+    }
+
+}
+
+// MARK: - Prefetching
+
+extension HomeViewController: UICollectionViewDataSourcePrefetching {
+    func collectionView(_ collectionView: UICollectionView, prefetchItemsAt indexPaths: [IndexPath]) {
+        let items = indexPaths.map(\.item)
+        switch stripInfo(for: collectionView)?.items {
+        case let .photo(templates)?:
+            TemplateService.shared.prefetchPreviews(
+                for: items.filter(templates.indices.contains).map { templates[$0] })
+        case let .carousel(templates)?:
+            TemplateService.shared.prefetchFrames(
+                for: items.filter(templates.indices.contains).map { templates[$0] }, limit: 3)
+        default:
+            break
+        }
     }
 }

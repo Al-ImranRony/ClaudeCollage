@@ -69,10 +69,11 @@ final class HeroShowcaseView: UIView {
         var poster: UIImage?
         /// Non-nil only for video pages.
         var loopURL: URL?
-        /// The still a `fill` or `story` page shows. Rendered lazily, off the
-        /// first layout pass, so a page that scrolls away before it is drawn
-        /// costs nothing.
-        var preview: () -> CGImage? = { nil }
+        /// The still a `fill` or `story` page shows. Rendered lazily and off
+        /// the main thread (it is the largest render on Home, at 900 px), so a
+        /// page that scrolls away before it is drawn costs nothing and one that
+        /// is drawn never stalls the scroll.
+        var preview: @MainActor () async -> CGImage? = { nil }
         /// The images a `deck` or `compare` page deals out. Lazy for the same
         /// reason. Empty falls back to `preview`, filled.
         /// Async so the page can draw them off the main actor.
@@ -124,6 +125,15 @@ final class HeroShowcaseView: UIView {
     /// Replaces the hero's contents. Hides the whole card when there is nothing
     /// to show — a hero with no pages is worse than no hero.
     func configure(pages: [Page]) {
+        // Home calls this on every appearance. When the pages are the same
+        // ones, leave the hero exactly where it is: reloading would snap back
+        // to the first page, restart its video and re-fade its artwork — a
+        // visible jolt every time the user comes back from an editor.
+        let identifiers = pages.map(\.identifier)
+        if identifiers == self.pages.map(\.identifier), !identifiers.isEmpty {
+            self.pages = pages
+            return
+        }
         self.pages = pages
         isHidden = pages.isEmpty
 
@@ -147,6 +157,7 @@ final class HeroShowcaseView: UIView {
             scheduler: HeroRotationController.timerScheduler(interval: Self.dwell)
         )
         controller.onAdvance = { [weak self] page in self?.advance(to: page) }
+        controller.isHeld = { [weak self] in self?.holdsPage() ?? false }
         rotation = controller
         if isActive { controller.start() }
         updateLoopPlayback()
@@ -163,6 +174,13 @@ final class HeroShowcaseView: UIView {
             rotation?.stop()
         }
         updateLoopPlayback()
+    }
+
+    /// While this answers true the hero holds its page: the timer must not
+    /// swap the page, and spin up its video, under a moving thumb. Home sets
+    /// it to "my scroll view is moving".
+    var holdsPage: () -> Bool = { false } {
+        didSet { rotation?.isHeld = holdsPage }
     }
 
     /// How long each page stays up. The story frame's progress segment fills
@@ -554,10 +572,10 @@ private final class HeroPageCell: UICollectionViewCell {
                 if frames.count < needed {
                     // Nothing to deal out: the page is still worth showing whole.
                     stage = .fill
-                    still = page.preview().map { UIImage(cgImage: $0) }
+                    still = await page.preview().map { UIImage(cgImage: $0) }
                 }
             case .fill, .story:
-                still = page.preview().map { UIImage(cgImage: $0) }
+                still = await page.preview().map { UIImage(cgImage: $0) }
             }
             guard !Task.isCancelled, let self else { return }
             // A fade, not a pop: the well → photograph swap is very visible at

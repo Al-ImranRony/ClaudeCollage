@@ -1,0 +1,110 @@
+{
+  "id": "carousel-matched-framedmoments",
+  "name": "Framed Moments",
+  "category": "aesthetic",
+  "isPremium": true,
+  "carouselType": "matched",
+  "canvasAspectRatio": "4:5",
+  "frameCount": 6,
+  "frames": [
+    {
+      "index": 0,
+      "cells": [
+        {
+          "type": "photo",
+          "shape": "rectangle",
+          "frame": {
+            "x": 0.18,
+            "y": 0.15,
+            "width": 0.64,
+            "height": 0.7
+          }
+        }
+      ]
+    },
+    {
+      "index": 1,
+      "cells": [
+        {
+          "type": "photo",
+          "shape": "rectangle",
+          "frame": {
+            "x": 0.09,
+            "y": 0.27,
+            "width": 0.82,
+            "height": 0.46
+          }
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "cells": [
+        {
+          "type": "photo",
+          "shape": "rectangle",
+          "frame": {
+            "x": 0.18,
+            "y": 0.15,
+            "width": 0.64,
+            "height": 0.7
+          }
+        }
+      ]
+    },
+    {
+      "index": 3,
+      "cells": [
+        {
+          "type": "photo",
+          "shape": "rectangle",
+          "frame": {
+            "x": 0.09,
+            "y": 0.27,
+            "width": 0.82,
+            "height": 0.46
+          }
+        }
+      ]
+    },
+    {
+      "index": 4,
+      "cells": [
+        {
+          "type": "photo",
+          "shape": "rectangle",
+          "frame": {
+            "x": 0.18,
+            "y": 0.15,
+            "width": 0.64,
+            "height": 0.7
+          }
+        }
+      ]
+    },
+    {
+      "index": 5,
+      "cells": [
+        {
+          "type": "photo",
+          "shape": "rectangle",
+          "frame": {
+            "x": 0.09,
+            "y": 0.27,
+            "width": 0.82,
+            "height": 0.46
+          }
+        }
+      ]
+    }
+  ],
+  "background": {
+    "type": "photoBlur",
+    "dim": 0.12
+  },
+  "frameStyle": {
+    "outlineWidth": 26,
+    "outlineHex": "#FFFFFF",
+    "shadow": 0.55
+  }
+}

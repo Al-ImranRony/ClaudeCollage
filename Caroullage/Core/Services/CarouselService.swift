@@ -193,7 +193,8 @@ public struct CarouselService {
                     borderWidth: frame.cells.first.map { max($0.borderWidth, 0) } ?? 0,
                     background: template.background,
                     textOverlays: frame.cells.compactMap(\.textStyle),
-                    stickerOverlays: TemplateService.stickerOverlays(for: frame.cells)
+                    stickerOverlays: TemplateService.stickerOverlays(for: frame.cells),
+                    frameStyle: template.frameStyle
                 )
                 return CarouselFrame(index: position, state: state)
             }

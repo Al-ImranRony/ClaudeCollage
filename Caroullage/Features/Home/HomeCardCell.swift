@@ -74,10 +74,12 @@ final class HomeCardCell: UICollectionViewCell {
 
     /// What fills the artwork.
     enum Artwork {
-        /// One rendered still (a collage). Rendered lazily, off the scroll.
-        case still(() async -> CGImage?)
-        /// A carousel's slides, in order.
-        case slides(() async -> [CGImage])
+        /// One rendered still (a collage). `cached` is the memory cache's
+        /// answer, shown in the same frame; `load` runs only on a miss, off the
+        /// scroll, and only its late arrival is crossfaded.
+        case still(cached: CGImage?, load: @MainActor () async -> CGImage?)
+        /// A carousel's slides, in order, split the same way.
+        case slides(cached: [CGImage]?, load: @MainActor () async -> [CGImage])
         /// A looping video with its poster.
         case video(poster: UIImage?, loop: URL?)
     }
@@ -270,17 +272,25 @@ final class HomeCardCell: UICollectionViewCell {
         loadTask?.cancel()
         loadTask = nil
         switch content.artwork {
-        case let .still(render):
-            loadTask = Task { @MainActor [weak self] in
-                let image = await render()
-                guard !Task.isCancelled, let self else { return }
-                self.show(still: image)
+        case let .still(cached, load):
+            if let cached {
+                show(still: cached, animated: false)
+                break
             }
-        case let .slides(render):
             loadTask = Task { @MainActor [weak self] in
-                let slides = await render()
+                let image = await load()
                 guard !Task.isCancelled, let self else { return }
-                self.show(slides: slides, total: content.pages ?? slides.count)
+                self.show(still: image, animated: true)
+            }
+        case let .slides(cached, load):
+            if let cached, !cached.isEmpty {
+                show(slides: cached, total: content.pages ?? cached.count, animated: false)
+                break
+            }
+            loadTask = Task { @MainActor [weak self] in
+                let slides = await load()
+                guard !Task.isCancelled, let self else { return }
+                self.show(slides: slides, total: content.pages ?? slides.count, animated: true)
             }
         case let .video(poster, loop):
             playerView.configure(loopURL: loop, poster: poster)
@@ -291,22 +301,23 @@ final class HomeCardCell: UICollectionViewCell {
     /// Whether the artwork is mounted on the mat rather than filling it.
     private var mounts: Bool { style == .poster || style == .feature }
 
-    private func show(still: CGImage?) {
+    private func show(still: CGImage?, animated: Bool) {
         let image = still.map { UIImage(cgImage: $0) }
         if let still { artworkAspect = CGFloat(still.width) / CGFloat(max(still.height, 1)) }
         let tint = mounts ? HomeCardTint.mat(from: still) : Theme.Color.artworkMat
         setNeedsLayout()
         layoutIfNeeded()
-        UIView.transition(
-            with: mat, duration: Theme.Motion.duration(Theme.Motion.quick),
-            options: [.transitionCrossDissolve, .allowUserInteraction]
-        ) {
+        let changes = {
             self.imageView.image = image
             self.mat.backgroundColor = tint
         }
+        guard animated else { return changes() }
+        UIView.transition(
+            with: mat, duration: Theme.Motion.duration(Theme.Motion.quick),
+            options: [.transitionCrossDissolve, .allowUserInteraction], animations: changes)
     }
 
-    private func show(slides: [CGImage], total: Int) {
+    private func show(slides: [CGImage], total: Int, animated: Bool) {
         if let first = slides.first {
             artworkAspect = CGFloat(first.width) / CGFloat(max(first.height, 1))
         }
@@ -315,16 +326,17 @@ final class HomeCardCell: UICollectionViewCell {
         counter.isHidden = slides.count < 2
         setNeedsLayout()
         layoutIfNeeded()
-        UIView.transition(
-            with: mat, duration: Theme.Motion.duration(Theme.Motion.quick),
-            options: [.transitionCrossDissolve, .allowUserInteraction]
-        ) {
+        let changes = {
             for (index, view) in self.slideImages.enumerated() {
                 view.image = slides.indices.contains(index) ? UIImage(cgImage: slides[index]) : nil
                 self.slideCards[index].isHidden = !slides.indices.contains(index)
             }
             self.mat.backgroundColor = tint
         }
+        guard animated else { return changes() }
+        UIView.transition(
+            with: mat, duration: Theme.Motion.duration(Theme.Motion.quick),
+            options: [.transitionCrossDissolve, .allowUserInteraction], animations: changes)
     }
 
     func play() { if !playerView.isHidden { playerView.play() } }
@@ -364,6 +376,9 @@ final class HomeCardCell: UICollectionViewCell {
             y: savedBadge.isHidden ? inset : inset + side + Theme.Spacing.xxs,
             width: side, height: side)
         storyChrome.frame = CGRect(x: 10, y: 10, width: bounds.width - 20, height: 3)
+        // An explicit path: without one, the segments' shadow is re-derived
+        // from their alpha in an offscreen pass on every scroll frame.
+        storyChrome.layer.shadowPath = UIBezierPath(rect: storyChrome.bounds).cgPath
         // Badges sit under the story segments, never on them.
         if style == .story {
             lockBadge.frame.origin.y += 8

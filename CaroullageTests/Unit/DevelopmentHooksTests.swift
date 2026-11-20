@@ -25,7 +25,10 @@ final class DevelopmentHooksTests: XCTestCase {
     /// backticks, which is why only the quoted form counts. (`deepLink` is not
     /// listed: it is also the reminder notification's real userInfo key. Its
     /// launch-argument form is read only behind `-UITestMode`, which is.)
-    private static let hookPatterns = [#""-UITestMode""#, #""-ScreenshotMode""#, #""debug."#]
+    private static let hookPatterns = [
+        #""-UITestMode""#, #""-ScreenshotMode""#, #""-ColdPreviewCache""#, #""-FrameProbe""#,
+        #""debug."#,
+    ]
 
     private static let hooksFile = "DevelopmentHooks.swift"
 

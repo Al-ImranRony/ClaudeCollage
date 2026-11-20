@@ -1,0 +1,258 @@
+{
+  "id": "carousel-matched-contactsheet",
+  "name": "Contact Sheet",
+  "category": "film",
+  "isPremium": true,
+  "carouselType": "matched",
+  "canvasAspectRatio": "4:5",
+  "frameCount": 3,
+  "frames": [
+    {
+      "index": 0,
+      "cells": [
+        {
+          "type": "photo",
+          "shape": "rectangle",
+          "frame": {
+            "x": 0.07,
+            "y": 0.085,
+            "width": 0.415,
+            "height": 0.255
+          }
+        },
+        {
+          "type": "photo",
+          "shape": "rectangle",
+          "frame": {
+            "x": 0.515,
+            "y": 0.085,
+            "width": 0.415,
+            "height": 0.255
+          }
+        },
+        {
+          "type": "photo",
+          "shape": "rectangle",
+          "frame": {
+            "x": 0.07,
+            "y": 0.37,
+            "width": 0.415,
+            "height": 0.255
+          }
+        },
+        {
+          "type": "photo",
+          "shape": "rectangle",
+          "frame": {
+            "x": 0.515,
+            "y": 0.37,
+            "width": 0.415,
+            "height": 0.255
+          }
+        },
+        {
+          "type": "photo",
+          "shape": "rectangle",
+          "frame": {
+            "x": 0.07,
+            "y": 0.655,
+            "width": 0.415,
+            "height": 0.255
+          }
+        },
+        {
+          "type": "photo",
+          "shape": "rectangle",
+          "frame": {
+            "x": 0.515,
+            "y": 0.655,
+            "width": 0.415,
+            "height": 0.255
+          }
+        },
+        {
+          "type": "text",
+          "shape": "rectangle",
+          "frame": {
+            "x": 0.07,
+            "y": 0.935,
+            "width": 0.86,
+            "height": 0.04
+          },
+          "text": "KODAK 400  12A",
+          "fontName": "Courier-Bold",
+          "fontSize": 24,
+          "color": "#F2B544",
+          "alignment": "left",
+          "letterSpacing": 4
+        }
+      ]
+    },
+    {
+      "index": 1,
+      "cells": [
+        {
+          "type": "photo",
+          "shape": "rectangle",
+          "frame": {
+            "x": 0.07,
+            "y": 0.085,
+            "width": 0.415,
+            "height": 0.255
+          }
+        },
+        {
+          "type": "photo",
+          "shape": "rectangle",
+          "frame": {
+            "x": 0.515,
+            "y": 0.085,
+            "width": 0.415,
+            "height": 0.255
+          }
+        },
+        {
+          "type": "photo",
+          "shape": "rectangle",
+          "frame": {
+            "x": 0.07,
+            "y": 0.37,
+            "width": 0.415,
+            "height": 0.255
+          }
+        },
+        {
+          "type": "photo",
+          "shape": "rectangle",
+          "frame": {
+            "x": 0.515,
+            "y": 0.37,
+            "width": 0.415,
+            "height": 0.255
+          }
+        },
+        {
+          "type": "photo",
+          "shape": "rectangle",
+          "frame": {
+            "x": 0.07,
+            "y": 0.655,
+            "width": 0.415,
+            "height": 0.255
+          }
+        },
+        {
+          "type": "photo",
+          "shape": "rectangle",
+          "frame": {
+            "x": 0.515,
+            "y": 0.655,
+            "width": 0.415,
+            "height": 0.255
+          }
+        },
+        {
+          "type": "text",
+          "shape": "rectangle",
+          "frame": {
+            "x": 0.07,
+            "y": 0.935,
+            "width": 0.86,
+            "height": 0.04
+          },
+          "text": "KODAK 400  18A",
+          "fontName": "Courier-Bold",
+          "fontSize": 24,
+          "color": "#F2B544",
+          "alignment": "left",
+          "letterSpacing": 4
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "cells": [
+        {
+          "type": "photo",
+          "shape": "rectangle",
+          "frame": {
+            "x": 0.07,
+            "y": 0.085,
+            "width": 0.415,
+            "height": 0.255
+          }
+        },
+        {
+          "type": "photo",
+          "shape": "rectangle",
+          "frame": {
+            "x": 0.515,
+            "y": 0.085,
+            "width": 0.415,
+            "height": 0.255
+          }
+        },
+        {
+          "type": "photo",
+          "shape": "rectangle",
+          "frame": {
+            "x": 0.07,
+            "y": 0.37,
+            "width": 0.415,
+            "height": 0.255
+          }
+        },
+        {
+          "type": "photo",
+          "shape": "rectangle",
+          "frame": {
+            "x": 0.515,
+            "y": 0.37,
+            "width": 0.415,
+            "height": 0.255
+          }
+        },
+        {
+          "type": "photo",
+          "shape": "rectangle",
+          "frame": {
+            "x": 0.07,
+            "y": 0.655,
+            "width": 0.415,
+            "height": 0.255
+          }
+        },
+        {
+          "type": "photo",
+          "shape": "rectangle",
+          "frame": {
+            "x": 0.515,
+            "y": 0.655,
+            "width": 0.415,
+            "height": 0.255
+          }
+        },
+        {
+          "type": "text",
+          "shape": "rectangle",
+          "frame": {
+            "x": 0.07,
+            "y": 0.935,
+            "width": 0.86,
+            "height": 0.04
+          },
+          "text": "KODAK 400  24A",
+          "fontName": "Courier-Bold",
+          "fontSize": 24,
+          "color": "#F2B544",
+          "alignment": "left",
+          "letterSpacing": 4
+        }
+      ]
+    }
+  ],
+  "background": {
+    "type": "solid",
+    "color": "#141414"
+  }
+}

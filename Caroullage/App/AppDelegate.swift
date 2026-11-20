@@ -23,6 +23,7 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
     ) -> Bool {
         configureAppearance()
         UNUserNotificationCenter.current().delegate = self
+        if DevelopmentHooks.startsWithColdPreviewCache { TemplateService.purgePreviewDiskCache() }
         return true
     }
 

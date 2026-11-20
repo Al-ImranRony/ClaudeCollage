@@ -45,7 +45,9 @@ final class FeaturedCarouselsTests: XCTestCase {
         // Home renders in this order, so it is data, not a set.
         let catalog = makeCatalog()
         let ids = catalog.featuredCarouselIDs
-        XCTAssertEqual(ids.first, "carousel-matched-team",
+        // Film Frames since 2026-11-20: the strip leads with the SCRL-style
+        // templates, and the first of them is the feed's signature look.
+        XCTAssertEqual(ids.first, "carousel-matched-filmframes",
                        "the strip's first card is authored, not incidental")
         XCTAssertEqual(Set(ids).count, ids.count, "a duplicate would render the same card twice")
     }

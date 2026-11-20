@@ -77,6 +77,7 @@ public struct TemplateCell: Sendable, Equatable, Decodable {
     private enum CodingKeys: String, CodingKey {
         case id, type, frame, shape, borderWidth, cornerRadius
         case text, fontName, fontSize, color, alignment, stickerID
+        case letterSpacing, lineHeight
     }
 
     public init(from decoder: Decoder) throws {
@@ -115,6 +116,15 @@ public struct TemplateCell: Sendable, Equatable, Decodable {
             if let color = try? c.decodeIfPresent(String.self, forKey: .color) {
                 overlay.colorHex = color
             }
+            // Tracking and leading are what separate an editorial caption from a
+            // label — small tracked capitals ("VOL. 01") read as design, the
+            // same string untracked reads as a placeholder.
+            if let spacing = try? c.decodeIfPresent(Double.self, forKey: .letterSpacing) {
+                overlay.letterSpacing = spacing
+            }
+            if let leading = try? c.decodeIfPresent(Double.self, forKey: .lineHeight), leading > 0 {
+                overlay.lineHeight = leading
+            }
             self.textStyle = overlay
         } else {
             self.textStyle = nil
@@ -152,14 +162,30 @@ struct TemplateBackground: Decodable {
     let colors: [String]?
 
     let angle: Double?
+    /// `pattern` only: which motif, drawn in `ink` over `paper`.
+    let pattern: String?
+    let ink: String?
+    let paper: String?
+    /// `photoBlur` only: how far the blurred backdrop is darkened, 0…1.
+    let dim: Double?
 
     /// Maps to the app's `CollageBackground`. A gradient with fewer than two
     /// stops has nothing to blend, so it falls back to a solid of its one colour.
+    /// An unknown pattern name degrades to its paper colour rather than failing
+    /// the whole template.
     var collageBackground: CollageBackground {
         if type == "solid", let color { return .solid(hex: color) }
         if type == "gradient", let colors, colors.count >= 2 {
             return .gradient(colors: colors, angle: angle ?? 0)
         }
+        if type == "pattern" {
+            let paperHex = paper ?? color ?? "#FFFFFF"
+            guard let kind = pattern.flatMap(BackgroundPattern.init(rawValue:)) else {
+                return .solid(hex: paperHex)
+            }
+            return .pattern(kind, ink: ink ?? "#000000", paper: paperHex)
+        }
+        if type == "photoBlur" { return .photoBlur(dim: min(max(dim ?? 0.2, 0), 1)) }
         if let first = colors?.first { return .solid(hex: first) }
         return .white
     }

@@ -29,10 +29,14 @@ public struct CarouselTemplate: Sendable, Equatable, Decodable {
     /// Present only for panoramic carousels — how a wide source is sliced.
     public let panoramicSource: PanoramicSource?
     public let background: CollageBackground
+    /// Outline, shadow and outer margin applied to every frame's photo cells —
+    /// the white mat around a print, a black film border. Absent → no styling,
+    /// which is how every template authored before this key looked.
+    public let frameStyle: FrameStyle
 
     private enum CodingKeys: String, CodingKey {
         case id, name, category, isPremium, carouselType
-        case canvasAspectRatio, frameCount, frames, panoramicSource, background
+        case canvasAspectRatio, frameCount, frames, panoramicSource, background, frameStyle
     }
 
     public init(from decoder: Decoder) throws {
@@ -53,6 +57,10 @@ public struct CarouselTemplate: Sendable, Equatable, Decodable {
         self.panoramicSource = try c.decodeIfPresent(PanoramicSource.self, forKey: .panoramicSource)
         self.background = (try? c.decodeIfPresent(TemplateBackground.self, forKey: .background))?
             .collageBackground ?? .white
+        // `FrameStyle`'s own decoder defaults every missing field, so a partial
+        // object ("just an outline") is fine; a malformed one is ignored rather
+        // than failing the template.
+        self.frameStyle = (try? c.decodeIfPresent(FrameStyle.self, forKey: .frameStyle)) ?? FrameStyle()
     }
 }
 

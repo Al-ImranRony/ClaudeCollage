@@ -54,3 +54,83 @@ final class PerformanceUITests: XCTestCase {
         }
     }
 }
+
+// MARK: - Scrolling (2026-11-20)
+//
+// Hitch time ratio while flinging the two browse surfaces, from a COLD preview
+// cache (`-ColdPreviewCache`): the first iteration renders every card it meets
+// from sample photography, which is the first-launch experience. Later
+// iterations measure the warm path. Lower is better; Apple's guidance is
+// < 5 ms/s "good", > 10 ms/s "critical".
+extension PerformanceUITests {
+
+    @MainActor
+    private func launchCold() -> XCUIApplication {
+        let app = XCUIApplication.underTest()
+        app.launchArguments += ["-ColdPreviewCache", "1", "-FrameProbe", "1"]
+        app.launch()
+        XCTAssertTrue(app.navigationBars["Caroullage"].waitForExistence(timeout: 10))
+        return app
+    }
+
+    /// Taps the probe, which drives the screen's main scroll view down and
+    /// back up by itself (no XCUITest activity inside the measured window),
+    /// waits it out, and returns the probe's report.
+    @MainActor
+    private func drive(_ app: XCUIApplication) -> [String: Double] {
+        let probe = app.buttons["frameDropProbe"]
+        XCTAssertTrue(probe.waitForExistence(timeout: 5))
+        probe.tap()
+        sleep(9)   // longer than the longest drive
+        var raw = probe.value as? String ?? ""
+        for _ in 0..<10 where !raw.hasPrefix("done") {
+            sleep(2)
+            raw = probe.value as? String ?? ""
+        }
+        XCTAssertTrue(raw.hasPrefix("done"), "probe never finished: \(raw)")
+        var out: [String: Double] = [:]
+        for pair in raw.split(separator: " ") {
+            let parts = pair.split(separator: "=")
+            if parts.count == 2, let value = Double(parts[1]) { out[String(parts[0])] = value }
+        }
+        return out
+    }
+
+    /// Drive 0 runs on a cold preview cache (the down pass renders every card
+    /// it meets); drives 1–2 are warm. The up pass of every drive is warm.
+    @MainActor
+    private func measureDrives(in app: XCUIApplication, label: String) {
+        var lines: [String] = []
+        for round in 0..<3 {
+            sleep(round == 0 ? 2 : 1)
+            let r = drive(app)
+            lines.append(String(
+                format: "%@ drive %d: down %.0f ms hitch / %.0f frames (%.0f severe), up %.0f ms / %.0f frames (%.0f severe)",
+                label, round, r["downHitchMs"] ?? -1, r["downFrames"] ?? -1, r["downSevere"] ?? -1,
+                r["upHitchMs"] ?? -1, r["upFrames"] ?? -1, r["upSevere"] ?? -1))
+        }
+        let report = lines.joined(separator: "\n")
+        print("FRAMEPROBE\n" + report)
+        let attachment = XCTAttachment(string: report)
+        attachment.name = "\(label) frame probe"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+
+    @MainActor
+    func testCarouselTabScrollHitches() throws {
+        let app = launchCold()
+        app.buttons["carouselButton"].tap()
+        let grid = app.collectionViews["carouselTemplateGrid"]
+        XCTAssertTrue(grid.waitForExistence(timeout: 8))
+        measureDrives(in: app, label: "Carousel tab")
+    }
+
+    @MainActor
+    func testHomeScrollHitches() throws {
+        let app = launchCold()
+        let collections = app.otherElements["homeCollections"]
+        XCTAssertTrue(collections.waitForExistence(timeout: 8))
+        measureDrives(in: app, label: "Home")
+    }
+}

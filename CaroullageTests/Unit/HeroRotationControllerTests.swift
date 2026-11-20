@@ -42,6 +42,25 @@ final class HeroRotationControllerTests: XCTestCase {
         )
     }
 
+    /// Home holds the hero while its scroll view moves. A live question, not
+    /// a latch: the moment it stops answering yes, rotation carries on — so a
+    /// deceleration stopped by a tap (no end-of-scroll callback) cannot leave
+    /// the hero frozen.
+    func testHoldsWhileAskedAndResumesTheMomentItIsNot() {
+        let (controller, tick, _, advanced) = makeController(count: 3)
+        var held = true
+        controller.isHeld = { held }
+        controller.start()
+
+        tick()
+        tick()
+        XCTAssertEqual(advanced(), [], "no page change under a moving thumb")
+
+        held = false
+        tick()
+        XCTAssertEqual(advanced(), [1], "continues from the same page, without skipping")
+    }
+
     func testAdvancesAndWraps() {
         let (controller, tick, _, advanced) = makeController(count: 3)
         controller.start()

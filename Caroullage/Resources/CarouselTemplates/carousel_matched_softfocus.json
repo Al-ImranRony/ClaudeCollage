@@ -1,0 +1,85 @@
+{
+  "id": "carousel-matched-softfocus",
+  "name": "Soft Focus",
+  "category": "aesthetic",
+  "isPremium": false,
+  "carouselType": "matched",
+  "canvasAspectRatio": "4:5",
+  "frameCount": 3,
+  "frames": [
+    {
+      "index": 0,
+      "cells": [
+        {
+          "type": "photo",
+          "shape": "rectangle",
+          "frame": {
+            "x": 0.2,
+            "y": 0.12,
+            "width": 0.6,
+            "height": 0.76
+          }
+        }
+      ]
+    },
+    {
+      "index": 1,
+      "cells": [
+        {
+          "type": "photo",
+          "shape": "rectangle",
+          "frame": {
+            "x": 0.07,
+            "y": 0.24,
+            "width": 0.42,
+            "height": 0.52
+          }
+        },
+        {
+          "type": "photo",
+          "shape": "rectangle",
+          "frame": {
+            "x": 0.51,
+            "y": 0.24,
+            "width": 0.42,
+            "height": 0.52
+          }
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "cells": [
+        {
+          "type": "photo",
+          "shape": "rectangle",
+          "frame": {
+            "x": 0.07,
+            "y": 0.14,
+            "width": 0.42,
+            "height": 0.52
+          }
+        },
+        {
+          "type": "photo",
+          "shape": "rectangle",
+          "frame": {
+            "x": 0.51,
+            "y": 0.34,
+            "width": 0.42,
+            "height": 0.52
+          }
+        }
+      ]
+    }
+  ],
+  "background": {
+    "type": "photoBlur",
+    "dim": 0.22
+  },
+  "frameStyle": {
+    "outlineWidth": 18,
+    "outlineHex": "#FFFFFF",
+    "shadow": 0.4
+  }
+}

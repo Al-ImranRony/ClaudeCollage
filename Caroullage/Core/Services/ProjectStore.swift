@@ -102,10 +102,30 @@ final class ProjectStore {
         ProjectSummary(
             id: project.id,
             updatedAt: project.updatedAt,
-            thumbnail: project.previewThumbnail.flatMap(UIImage.init(data:)),
+            thumbnail: decodedThumbnail(of: project),
             mode: project.mode,
             name: project.name
         )
+    }
+
+    /// Decoded thumbnails, by project and revision. Home lists the recents on
+    /// every appearance; without this each one was re-decoded from its blob
+    /// each time — and decoded lazily, at the first draw, on the main thread
+    /// mid-transition. An edit bumps `updatedAt`, which is the invalidation.
+    private static let decodedThumbnails: NSCache<NSString, UIImage> = {
+        let cache = NSCache<NSString, UIImage>()
+        cache.countLimit = 200
+        return cache
+    }()
+
+    private static func decodedThumbnail(of project: CollageProject) -> UIImage? {
+        guard let data = project.previewThumbnail else { return nil }
+        let key = "\(project.id.uuidString)-\(project.updatedAt.timeIntervalSinceReferenceDate)" as NSString
+        if let hit = decodedThumbnails.object(forKey: key) { return hit }
+        guard let image = UIImage(data: data) else { return nil }
+        let prepared = image.preparingForDisplay() ?? image
+        decodedThumbnails.setObject(prepared, forKey: key)
+        return prepared
     }
 
     // MARK: - Export bookkeeping (Home retention)

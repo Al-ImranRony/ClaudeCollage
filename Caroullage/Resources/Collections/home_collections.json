@@ -123,6 +123,12 @@
       ],
       "carouselType": "matched",
       "itemIDs": [
+        "carousel-matched-filmframes",
+        "carousel-matched-framedmoments",
+        "carousel-matched-photodump",
+        "carousel-matched-softfocus",
+        "carousel-matched-cleantrio",
+        "carousel-matched-gallerywall",
         "carousel-matched-team",
         "carousel-matched-tips",
         "carousel-matched-steps",
@@ -218,6 +224,7 @@
       "kind": "carousel",
       "carouselType": "scrollThrough",
       "itemIDs": [
+        "carousel-story-editorial",
         "carousel-story-lessons",
         "carousel-story-recipe",
         "carousel-story-tutorial",
@@ -281,7 +288,10 @@
       "kind": "carousel",
       "isPillar": true,
       "itemIDs": [
+        "carousel-matched-filmframes",
         "carousel-matched-menu",
+        "carousel-matched-contactsheet",
+        "carousel-story-editorial",
         "carousel-panoramic-sunset",
         "carousel-story-recipe",
         "carousel-matched-quotes",

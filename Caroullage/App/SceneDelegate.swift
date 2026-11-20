@@ -36,6 +36,9 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         AppAppearance.apply(to: window)
         window.rootViewController = tabBarController
         window.makeKeyAndVisible()
+        #if DEBUG
+        if DevelopmentHooks.installsFrameProbe { FrameDropProbe.shared.install(in: window) }
+        #endif
 
         Haptics.prepare()
 

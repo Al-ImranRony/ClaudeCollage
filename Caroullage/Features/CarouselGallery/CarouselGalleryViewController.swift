@@ -163,6 +163,9 @@ final class CarouselGalleryViewController: UIViewController {
 
         service.loadBundledCarouselTemplates()
         applyFilters(animated: false)
+        // What this first build already reflects, so the `viewWillAppear` that
+        // follows does not rebuild the grid a second time.
+        lastLockSignature = lockSignature()
     }
 
     /// Re-asks the entitlement, so an unlock is reflected without a relaunch.
@@ -175,7 +178,21 @@ final class CarouselGalleryViewController: UIViewController {
     /// thing they just paid for still wearing a padlock.
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
+        // Only when a lock actually changed. Rebuilding the grid on every
+        // return to the tab re-ran every visible card for nothing, and is the
+        // kind of work that makes a tab switch feel heavy.
+        let locks = lockSignature()
+        guard locks != lastLockSignature else { return }
+        lastLockSignature = locks
         applyFilters(animated: false)
+    }
+
+    /// Which templates are locked right now. Changes when Premium is bought or
+    /// restored — the one thing that must redraw the grid on return.
+    private var lastLockSignature: [Bool] = []
+
+    private func lockSignature() -> [Bool] {
+        service.carouselTemplates.map { service.canOpen($0) }
     }
 
     override func viewDidLayoutSubviews() {
@@ -356,6 +373,8 @@ final class CarouselGalleryViewController: UIViewController {
         view.showsVerticalScrollIndicator = false
         view.dataSource = self
         view.delegate = self
+        // Covers for the cards just below the fold are drawn before they arrive.
+        view.prefetchDataSource = self
         view.accessibilityIdentifier = "carouselTemplateGrid"
         view.register(
             BrowseTemplateCell.self,
@@ -387,7 +406,7 @@ final class CarouselGalleryViewController: UIViewController {
             columns: Theme.Layout.galleryColumns(for: environment.traitCollection),
             containerWidth: width,
             spacing: Self.cardSpacing,
-            captionHeight: BrowseTemplateCell.captionHeight)
+            captionHeight: BrowseTemplateCell.captionHeight(pages: true))
 
         // A custom group is clipped to its declared size, so the height must be
         // the measured total rather than an estimate. `max(1,…)` keeps an empty
@@ -471,12 +490,19 @@ extension CarouselGalleryViewController: UICollectionViewDataSource, UICollectio
                 locked: locked,
                 identifier: locked ? "carouselTemplateCard.premium" : "carouselTemplateCard.free",
                 saved: FavoritesStore.shared.isSaved(.init(kind: .carousel, id: template.id))),
-            preview: { [service] in
-                // Photo-real first; the wireframe is what stops a card in a LIST
-                // ever coming back blank.
-                service.showcaseCover(for: template) ?? service.schematicCover(for: template)
-            })
-        card.accessibilityCustomActions = [
+            // Photo-real first; the wireframe is what stops a card in a LIST
+            // ever coming back blank. Memory first, then off the main thread.
+            artwork: .init(
+                cached: service.cachedShowcaseCover(for: template),
+                load: { [service] in await service.loadShowcaseCover(for: template) }),
+            // Every slide, so the card swipes through the post it makes. At
+            // utility priority: the covers of the cards around it come first.
+            pages: .init(
+                cached: service.cachedShowcaseFrames(for: template),
+                load: { [service] in
+                    await service.loadShowcaseFrames(for: template, priority: .utility)
+                }))
+        card.accessibilityCustomActions = card.pagingAccessibilityActions + [
             FavouriteContextMenu.customAction(for: .init(kind: .carousel, id: template.id)) {},
         ]
         return cell
@@ -561,6 +587,15 @@ extension CarouselGalleryViewController: UICollectionViewDataSource, UICollectio
               sections[indexPath.section].templates.indices.contains(indexPath.item)
         else { return nil }
         return sections[indexPath.section].templates[indexPath.item]
+    }
+}
+
+// MARK: - Prefetching
+
+extension CarouselGalleryViewController: UICollectionViewDataSourcePrefetching {
+    func collectionView(_ collectionView: UICollectionView, prefetchItemsAt indexPaths: [IndexPath]) {
+        guard collectionView === gridView else { return }
+        service.prefetchCovers(for: indexPaths.compactMap(template(at:)))
     }
 }
 

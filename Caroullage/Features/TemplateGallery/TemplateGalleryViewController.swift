@@ -325,6 +325,8 @@ final class TemplateGalleryViewController: UIViewController {
         view.backgroundColor = Theme.Color.background
         view.showsVerticalScrollIndicator = false
         view.delegate = self
+        // Previews for the cards just below the fold are drawn before they arrive.
+        view.prefetchDataSource = self
         view.accessibilityIdentifier = "templateGalleryGrid"
         return view
     }
@@ -350,12 +352,14 @@ final class TemplateGalleryViewController: UIViewController {
                     locked: !self.service.canOpen(template),
                     identifier: isPremium ? "templateCard.premium" : "templateCard.free",
                     saved: FavoritesStore.shared.isSaved(.init(kind: .photo, id: template.id))),
-                preview: { [service = self.service] in
-                    // Photo-real first, schematic second — the same fallback the
-                    // Carousel tab uses, and the reason a card in a browse LIST
-                    // can never come back blank.
-                    service.showcasePreview(for: template) ?? service.thumbnail(for: template)
-                })
+                // Photo-real first, schematic second — the same fallback the
+                // Carousel tab uses, and the reason a card in a browse LIST can
+                // never come back blank. Memory first, then off the main thread.
+                artwork: .init(
+                    cached: self.service.cachedShowcasePreview(for: template),
+                    load: { [service = self.service] in
+                        await service.loadShowcasePreview(for: template)
+                    }))
             cell.accessibilityCustomActions = [
                 FavouriteContextMenu.customAction(for: .init(kind: .photo, id: template.id)) {},
             ]
@@ -447,6 +451,15 @@ extension TemplateGalleryViewController: UICollectionViewDataSource, UICollectio
 }
 
 // MARK: - Search
+
+extension TemplateGalleryViewController: UICollectionViewDataSourcePrefetching {
+    func collectionView(_ collectionView: UICollectionView, prefetchItemsAt indexPaths: [IndexPath]) {
+        guard collectionView === gridView else { return }
+        service.prefetchPreviews(for: indexPaths.compactMap {
+            dataSource.itemIdentifier(for: $0).flatMap { templatesByID[$0] }
+        })
+    }
+}
 
 extension TemplateGalleryViewController: UISearchResultsUpdating {
     func updateSearchResults(for searchController: UISearchController) {

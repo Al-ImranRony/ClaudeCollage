@@ -31,41 +31,16 @@
 //  rather than shown at true proportion. That is why the image view fills rather
 //  than fits: it is filling a box that is deliberately not always its shape.
 //
+//  2026-11-20 — the carousel card PAGES. Its artwork is a `PagedArtworkView`
+//  holding every rendered slide, swiped sideways the way SCRL's feed and the
+//  finished Instagram post both page, and the dots now sit UNDER the artwork
+//  and follow the page that is showing. (They were a fixed pill over the cover
+//  that marked page one forever — a promise of pages the card could not show.)
+//  Under, not over, for the reason they left the bottom of the art before:
+//  half the catalog burns its own page label into that band.
+//
 
 import UIKit
-
-/// A view that keeps itself a capsule.
-///
-/// Exists because the radius arithmetic was in the wrong place and the pill came
-/// out a rectangle. The cell used to round it from its OWN `layoutSubviews`:
-///
-///     override func layoutSubviews() {
-///         super.layoutSubviews()
-///         dotsPill.layer.cornerRadius = dotsPill.bounds.height / 2
-///     }
-///
-/// which reads a bounds that has not been set yet. A view's `layoutSubviews`
-/// positions its immediate subviews; `dotsPill` is a subview of `contentView`,
-/// so its frame is applied one level further down the recursion — after the
-/// cell's override has already run and rounded a zero-height box to zero.
-///
-/// It came out a rectangle only SOMETIMES, which is what made it read as random.
-/// A recycled cell still carries the previous card's 15pt pill, so it rounds off
-/// bounds that are stale but the right size; and any second layout pass fixes it
-/// too — the async preview landing invalidates the image view and usually
-/// supplies one. What was left square was the first screenful: cells built from
-/// nothing whose artwork happened to arrive before their first layout.
-///
-/// So the arithmetic moves to the only place the bounds are certainly current —
-/// the view's own `layoutSubviews`, which is where `ProBadgeButton` already does
-/// this and what this type exists to make the default.
-@MainActor
-final class PillView: UIView {
-    override func layoutSubviews() {
-        super.layoutSubviews()
-        layer.cornerRadius = bounds.height / 2
-    }
-}
 
 @MainActor
 final class BrowseTemplateCell: UICollectionViewCell {
@@ -98,17 +73,23 @@ final class BrowseTemplateCell: UICollectionViewCell {
     /// a row even though the thumbnails above them do not.
     static let captionHeight: CGFloat = 44
 
-    /// More dots than this and they stop being countable, so the row truncates.
-    /// 7 is the longest bundled carousel (Grid Reveal 6), so nothing truncates
-    /// today — this is the guard for a template authored longer later.
-    private static let maxPageDots = 7
+    /// The page-dot row under a paged card's artwork, dots plus breathing room.
+    static let pageDotsRowHeight: CGFloat = 16
+
+    /// What `MasonryLayout` must reserve under a card's artwork: the caption,
+    /// plus the dot row when the card pages.
+    static func captionHeight(pages: Bool) -> CGFloat {
+        captionHeight + (pages ? pageDotsRowHeight : 0)
+    }
+
+    /// `CarouselService.maxFrames` is 10; every page gets a dot up to there.
+    private static let maxPages = 10
 
     private static let lockBadgeSide: CGFloat = 24
-    private static let dotSize: CGFloat = 5
 
-    private let imageView = UIImageView()
-    private let dotsPill = PillView()
-    private let dotsRow = UIStackView()
+    private let artwork = PagedArtworkView()
+    private let pageDots = PageDotsView()
+    private var pageDotsHeight: NSLayoutConstraint!
     private let lockBadge = UIImageView()
     /// A heart beside the lock, for a saved template (phase 4). The two share
     /// a row so a hidden one leaves no gap.
@@ -124,38 +105,27 @@ final class BrowseTemplateCell: UICollectionViewCell {
 
         // The artwork clips; the cell does not, so the caption below it is not
         // trimmed by the artwork's corner radius.
-        imageView.contentMode = .scaleAspectFill
-        imageView.clipsToBounds = true
-        imageView.layer.cornerRadius = Theme.Radius.lg
-        imageView.layer.cornerCurve = .continuous
+        artwork.layer.cornerRadius = Theme.Radius.lg
+        artwork.layer.cornerCurve = .continuous
         // The same well the canvas and the exporter paint, so a card whose
         // preview has not landed yet still looks intentional rather than blank.
-        imageView.backgroundColor = Theme.Color.cellWell
+        artwork.backgroundColor = Theme.Color.cellWell
         // A hairline, because a good part of the catalog is authored on a WHITE
         // background — the minimal templates especially — and a white render on
-        // the app's near-white ground is a card with no edge at all. On the
-        // Carousel tab, where every cover happened to be an edge-to-edge
-        // photograph, this was invisible and its absence went unnoticed; the
-        // Collage tab is where it shows. Cheaper and quieter than a shadow,
-        // which is what the old schematic card reached for.
-        imageView.layer.borderWidth = 1
-        imageView.layer.borderColor = Theme.Color.separator.cgColor
-        imageView.translatesAutoresizingMaskIntoConstraints = false
+        // the app's near-white ground is a card with no edge at all. Cheaper
+        // and quieter than a shadow, which is what the old schematic card
+        // reached for.
+        artwork.layer.borderWidth = 1
+        artwork.layer.borderColor = Theme.Color.separator.cgColor
+        artwork.translatesAutoresizingMaskIntoConstraints = false
+        artwork.onDragBegan = { [weak self] in self?.startSlides() }
+        artwork.onPageChange = { [weak self] page in
+            guard let self else { return }
+            self.pageDots.setCurrentPage(page, animated: true)
+            self.updatePageAccessibility()
+        }
 
-        // Smoked glass rather than a UI chip, so the dots belong to the picture.
-        // `toast` is the right family — fixed dark ground, white ink, floats over
-        // anything — re-alpha'd because a badge over photography wants to let the
-        // image through where a toast does not.
-        dotsPill.backgroundColor = Theme.Color.toast.withAlphaComponent(0.55)
-        dotsPill.layer.cornerCurve = .continuous
-        dotsPill.clipsToBounds = true
-        dotsPill.isUserInteractionEnabled = false
-        dotsPill.translatesAutoresizingMaskIntoConstraints = false
-
-        dotsRow.axis = .horizontal
-        dotsRow.spacing = 4
-        dotsRow.alignment = .center
-        dotsRow.translatesAutoresizingMaskIntoConstraints = false
+        pageDots.translatesAutoresizingMaskIntoConstraints = false
 
         lockBadge.contentMode = .center
         lockBadge.tintColor = Theme.Color.textOnAccent
@@ -205,19 +175,20 @@ final class BrowseTemplateCell: UICollectionViewCell {
         metaLabel.lineBreakMode = .byTruncatingTail
         metaLabel.translatesAutoresizingMaskIntoConstraints = false
 
-        dotsPill.addSubview(dotsRow)
-        contentView.addSubview(imageView)
-        contentView.addSubview(dotsPill)
+        contentView.addSubview(artwork)
+        contentView.addSubview(pageDots)
         contentView.addSubview(badgeRow)
         contentView.addSubview(nameLabel)
         contentView.addSubview(metaLabel)
 
+        pageDotsHeight = pageDots.heightAnchor.constraint(equalToConstant: 0)
         NSLayoutConstraint.activate([
-            imageView.topAnchor.constraint(equalTo: contentView.topAnchor),
-            imageView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
-            imageView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            artwork.topAnchor.constraint(equalTo: contentView.topAnchor),
+            artwork.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            artwork.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
             // The caption block pins the bottom, and the artwork ends where the
-            // caption begins — NOT at a fixed inset from the bottom.
+            // dot row (or, unpaged, the caption) begins — NOT at a fixed inset
+            // from the bottom.
             //
             // `captionHeight` is what `MasonryLayout` RESERVES, which is only the
             // right height at the default text size. Pinning the artwork to
@@ -228,39 +199,22 @@ final class BrowseTemplateCell: UICollectionViewCell {
             // the masonry column. Hanging the artwork off the caption instead
             // lets growing type steal from the picture, which is the trade
             // `ProjectCardCell` makes and documents.
-            imageView.bottomAnchor.constraint(
-                equalTo: nameLabel.topAnchor, constant: -Theme.Spacing.xxs),
+            artwork.bottomAnchor.constraint(equalTo: pageDots.topAnchor),
 
-            // Top-leading, opposite the lock — NOT bottom-centre, where these
-            // sat until they were seen against the real catalog. Better than
-            // half the bundled carousels burn a page label into the bottom of
-            // their first frame ("Step 1", "Day 1", "Lesson 1", "Phase 1"), and
-            // a cover thumbnail renders that label exactly where a bottom-centre
-            // pill lands: the dots and the template's own typography came out on
-            // top of each other. Nudging sideways does not fix it either — the
-            // labels are variously centred and trailing, and one template puts
-            // "Phase 2" in the bottom-right corner — but every one of them is in
-            // the bottom band, so the top of the card is the only region that
-            // clears all twenty. Vertically centred on the lock rather than
-            // sharing its top inset, so the two chips read as a pair despite
-            // being 15 and 24pt tall; the lock's own frame is fixed and valid
-            // whether or not it is hidden.
-            dotsPill.leadingAnchor.constraint(
-                equalTo: imageView.leadingAnchor, constant: Theme.Spacing.xs),
-            dotsPill.centerYAnchor.constraint(equalTo: badgeRow.centerYAnchor),
-
-            dotsRow.topAnchor.constraint(equalTo: dotsPill.topAnchor, constant: 5),
-            dotsRow.bottomAnchor.constraint(equalTo: dotsPill.bottomAnchor, constant: -5),
-            dotsRow.leadingAnchor.constraint(equalTo: dotsPill.leadingAnchor, constant: 7),
-            dotsRow.trailingAnchor.constraint(equalTo: dotsPill.trailingAnchor, constant: -7),
+            // Centred under the artwork; zero-height (and so invisible) on a
+            // card with one page.
+            pageDots.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            pageDots.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            pageDotsHeight,
+            nameLabel.topAnchor.constraint(
+                equalTo: pageDots.bottomAnchor, constant: Theme.Spacing.xxs),
 
             badgeRow.topAnchor.constraint(
-                equalTo: imageView.topAnchor, constant: Theme.Spacing.xs),
+                equalTo: artwork.topAnchor, constant: Theme.Spacing.xs),
             badgeRow.trailingAnchor.constraint(
-                equalTo: imageView.trailingAnchor, constant: -Theme.Spacing.xs),
+                equalTo: artwork.trailingAnchor, constant: -Theme.Spacing.xs),
             // The row keeps the badge height even with both badges hidden — a
-            // stack with every child hidden collapses to nothing, which put the
-            // page dots (centred on it) against the card's top edge.
+            // stack with every child hidden collapses to nothing.
             badgeRow.heightAnchor.constraint(equalToConstant: Self.lockBadgeSide),
             lockBadge.widthAnchor.constraint(equalToConstant: Self.lockBadgeSide),
             lockBadge.heightAnchor.constraint(equalToConstant: Self.lockBadgeSide),
@@ -287,7 +241,7 @@ final class BrowseTemplateCell: UICollectionViewCell {
         // whatever shade it was born in unless it is re-resolved when light/dark
         // flips. Same registration every other component in this directory uses.
         registerForTraitChanges([UITraitUserInterfaceStyle.self]) { (cell: Self, _) in
-            cell.imageView.layer.borderColor = Theme.Color.separator.cgColor
+            cell.artwork.layer.borderColor = Theme.Color.separator.cgColor
         }
     }
 
@@ -302,12 +256,33 @@ final class BrowseTemplateCell: UICollectionViewCell {
         }
     }
 
+    /// A picture the card shows: what the memory cache already holds, and how
+    /// to get it otherwise.
+    ///
+    /// The split is the whole smoothness story. `cached` is answered in
+    /// `cellForItemAt` and put up in the same frame, so a card scrolled back
+    /// into view — or redrawn by a reload — never flashes its well or fades
+    /// in again. `load` runs only on a miss, entirely off the scroll (see
+    /// `TemplateService`'s async preview pipeline), and only what it brings in
+    /// late is crossfaded.
+    struct Artwork {
+        var cached: CGImage?
+        var load: @MainActor () async -> CGImage?
+    }
+
+    /// Every slide of a paging card, split the same way.
+    struct Slides {
+        var cached: [CGImage]?
+        var load: @MainActor () async -> [CGImage]
+    }
+
     /// - Parameters:
-    ///   - preview: invoked off the first layout pass. A closure rather than an
-    ///     image so a cold render — which composites real photographs through
-    ///     `CollageRenderer` — is never paid for by a cell that has already been
-    ///     recycled before it runs.
-    func configure(_ content: Content, preview: @escaping () -> CGImage?) {
+    ///   - artwork: the cover (page 0).
+    ///   - pages: every slide, in order, for a card that pages. Loaded after the
+    ///     cover has landed, so the first screenful is never held up by slides
+    ///     nobody has swiped to yet. `nil` — or a template with one page — is a
+    ///     still card, as on the Collage tab.
+    func configure(_ content: Content, artwork cover: Artwork, pages slides: Slides? = nil) {
         nameLabel.text = content.name
 
         let ratio = content.ratio
@@ -331,7 +306,11 @@ final class BrowseTemplateCell: UICollectionViewCell {
 
         lockBadge.isHidden = !locked
         savedBadge.isHidden = !content.saved
-        setPageDots(pages)
+
+        let pageCount = resolvedPageCount(paging: slides != nil, content.pages)
+        artwork.setPageCount(pageCount)
+        pageDots.configure(numberOfPages: pageCount > 1 ? pageCount : 0)
+        pageDotsHeight.constant = pageCount > 1 ? Self.pageDotsRowHeight : 0
 
         accessibilityIdentifier = content.identifier
         accessibilityLabel = content.name
@@ -345,22 +324,120 @@ final class BrowseTemplateCell: UICollectionViewCell {
         if let pages { spoken.append(String(localized: "\(pages) pages")) }
         if locked { spoken.append(String(localized: "premium")) }
         if content.saved { spoken.append(String(localized: "saved")) }
-        accessibilityValue = spoken.joined(separator: ", ")
+        baseAccessibilityValue = spoken.joined(separator: ", ")
+        updatePageAccessibility()
 
         previewTask?.cancel()
-        previewTask = Task { @MainActor [weak self] in
+        previewTask = nil
+        slidesTask?.cancel()
+        slidesTask = nil
+        pendingSlides = nil
+
+        // Whatever is already in memory goes up now, unanimated.
+        if let image = cover.cached {
+            artwork.setImage(UIImage(cgImage: image), at: 0, animated: false)
+        }
+        let cachedSlides = pageCount > 1 ? slides?.cached : nil
+        if let cachedSlides {
+            for (index, slide) in cachedSlides.enumerated() where index < pageCount {
+                artwork.setImage(UIImage(cgImage: slide), at: index, animated: false)
+            }
+        }
+
+        let needsCover = cover.cached == nil && cachedSlides == nil
+        let pagesToLoad = pageCount > 1 && cachedSlides == nil ? slides : nil
+        guard needsCover || pagesToLoad != nil else { return }
+
+        if needsCover {
+            previewTask = Task { @MainActor [weak self] in
+                let image = await cover.load()
+                guard !Task.isCancelled, let self else { return }
+                self.artwork.setImage(image.map { UIImage(cgImage: $0) }, at: 0)
+            }
+        }
+        guard let pagesToLoad else { return }
+        // The other slides wait until the card has SETTLED on screen. A card a
+        // fast fling only passes through is recycled inside this window, its
+        // wait is cancelled, and none of its slides are ever drawn — where
+        // before every card the fling touched rendered all of them. A finger
+        // on the artwork skips the wait (`onDragBegan`).
+        pendingSlides = (pagesToLoad, pageCount)
+        slidesTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: Self.slideSettleDelay)
             guard !Task.isCancelled else { return }
-            let rendered = preview()
+            self?.startSlides()
+        }
+    }
+
+    /// How long a card must stay on screen before its other slides load.
+    static let slideSettleDelay: Duration = .milliseconds(300)
+
+    private var pendingSlides: (slides: Slides, pageCount: Int)?
+    private var slidesTask: Task<Void, Never>?
+
+    /// Loads the waiting slides now. Idempotent: only the first call loads.
+    private func startSlides() {
+        guard let pending = pendingSlides else { return }
+        pendingSlides = nil
+        slidesTask?.cancel()
+        slidesTask = Task { @MainActor [weak self] in
+            let loaded = await pending.slides.load()
             guard !Task.isCancelled, let self else { return }
-            UIView.transition(
-                with: self.imageView,
-                duration: Theme.Motion.duration(Theme.Motion.quick),
-                options: [.transitionCrossDissolve, .allowUserInteraction]
-            ) {
-                self.imageView.image = rendered.map { UIImage(cgImage: $0) }
+            // Page 0 keeps the cover it already shows (the same render); the
+            // rest arrive together. A slide that could not be drawn stays an
+            // empty well rather than repeating another page's picture.
+            for (index, slide) in loaded.enumerated() where index > 0 && index < pending.pageCount {
+                self.artwork.setImage(UIImage(cgImage: slide), at: index)
             }
         }
     }
+
+    /// How many pages the card shows: the template's page count when there is
+    /// something to page through, else one.
+    private func resolvedPageCount(paging: Bool, _ count: Int?) -> Int {
+        guard paging, let count, count > 1 else { return 1 }
+        return min(count, Self.maxPages)
+    }
+
+    /// The facts the card states, before the page it is on is added.
+    private var baseAccessibilityValue = ""
+
+    /// "Portrait, 13 photos, 4 pages, page 2 of 4". The page is spoken because
+    /// a swipe changes what the card shows, and VoiceOver must hear that too.
+    private func updatePageAccessibility() {
+        guard artwork.pageCount > 1 else {
+            accessibilityValue = baseAccessibilityValue
+            return
+        }
+        let page = String(localized: "Page \(artwork.currentPage + 1) of \(artwork.pageCount)")
+        accessibilityValue = [baseAccessibilityValue, page].joined(separator: ", ")
+    }
+
+    /// Next/previous page for VoiceOver, where there is no finger to swipe the
+    /// artwork. Empty for a card that does not page; the caller appends its own
+    /// actions (save) after these.
+    var pagingAccessibilityActions: [UIAccessibilityCustomAction] {
+        guard artwork.pageCount > 1 else { return [] }
+        return [
+            UIAccessibilityCustomAction(name: String(localized: "Next page")) { [weak self] _ in
+                guard let self, self.artwork.currentPage < self.artwork.pageCount - 1 else { return false }
+                self.artwork.scroll(to: self.artwork.currentPage + 1, animated: true)
+                return true
+            },
+            UIAccessibilityCustomAction(name: String(localized: "Previous page")) { [weak self] _ in
+                guard let self, self.artwork.currentPage > 0 else { return false }
+                self.artwork.scroll(to: self.artwork.currentPage - 1, animated: true)
+                return true
+            },
+        ]
+    }
+
+    /// The page the artwork is showing. Exposed for tests.
+    var currentPage: Int { artwork.currentPage }
+    /// How many pages the artwork holds. Exposed for tests.
+    var pageCount: Int { artwork.pageCount }
+    /// What a page shows right now. Exposed for tests.
+    func pageImage(at index: Int) -> UIImage? { artwork.image(at: index) }
 
     /// "Portrait  ⧉5  ▤3" — ratio as a word, counts behind their glyphs.
     ///
@@ -406,47 +483,23 @@ final class BrowseTemplateCell: UICollectionViewCell {
         return out
     }
 
-    private func setPageDots(_ count: Int?) {
-        dotsRow.arrangedSubviews.forEach {
-            dotsRow.removeArrangedSubview($0)
-            $0.removeFromSuperview()
-        }
-        let shown = min(max(count ?? 0, 0), Self.maxPageDots)
-        // One page is not a carousel, and `nil` is not a carousel at all, so in
-        // both cases there is nothing for dots to say.
-        dotsPill.isHidden = shown < 2
-        guard shown >= 2 else { return }
-
-        for index in 0..<shown {
-            let dot = UIView()
-            dot.translatesAutoresizingMaskIntoConstraints = false
-            dot.backgroundColor = Theme.Color.textOnToast
-                .withAlphaComponent(index == 0 ? 1 : 0.45)
-            dot.layer.cornerRadius = Self.dotSize / 2
-            NSLayoutConstraint.activate([
-                dot.widthAnchor.constraint(equalToConstant: Self.dotSize),
-                dot.heightAnchor.constraint(equalToConstant: Self.dotSize),
-            ])
-            dotsRow.addArrangedSubview(dot)
-        }
-    }
-
     override func prepareForReuse() {
         super.prepareForReuse()
         // A render in flight belongs to the template this cell USED to show;
         // letting it land would paint the wrong photograph on the new one.
         previewTask?.cancel()
         previewTask = nil
-        imageView.image = nil
+        slidesTask?.cancel()
+        slidesTask = nil
+        pendingSlides = nil
+        artwork.reset()
+        pageDots.configure(numberOfPages: 0)
+        pageDotsHeight.constant = 0
         nameLabel.text = nil
         metaLabel.attributedText = nil
         lockBadge.isHidden = true
-        // Hidden here as well as re-decided in `setPageDots`. `configure` always
-        // follows a dequeue today, so this is belt and braces — but a cell that
-        // cleared its caption and kept the previous template's page count would
-        // be a very quiet lie, and the sibling cell hides its badge here too.
-        dotsPill.isHidden = true
         accessibilityValue = nil
+        baseAccessibilityValue = ""
         savedBadge.isHidden = true
         accessibilityCustomActions = nil
     }
