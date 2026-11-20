@@ -119,9 +119,11 @@ final class AppCoordinator {
 
         tabBarController.setTabs([
             // Home is the one tab a user returns to rather than visits, so it
-            // gets the outline-to-filled treatment: a plain house that fills in
-            // when you are there. The rest stay filled — one moving part, not four.
-            (home, tabItem(String(localized: "Home"), "house", selected: "house.fill", "homeTab")),
+            // gets the outline-to-filled treatment: a house that fills in when
+            // you are there. The rest stay filled — one moving part, not four.
+            // Home and Collage are drawn glyphs (TabGlyphs.swift), not SF
+            // Symbols; the symbol names stay as the fallback description.
+            (home, tabItem(String(localized: "Home"), "house", selected: "house.fill", "homeTab", glyph: .home)),
             // "Collage", not "Templates". The tab beside it is named for a
             // FORMAT while both of these are template galleries — named on two
             // different axes they cannot be read as a set, and nothing told a
@@ -140,7 +142,7 @@ final class AppCoordinator {
             // is not user-visible, and renaming it (plus the matching
             // `seeAllTemplatesButton` in HomeViewController.swift:563) would
             // touch roughly eight test files for no behavioural gain.
-            (templates, tabItem(String(localized: "Collage"), "rectangle.3.group.fill", "templatesButton")),
+            (templates, tabItem(String(localized: "Collage"), "rectangle.3.group.fill", "templatesButton", glyph: .collage)),
             // Carousel sits mid-bar, where the thumb lands, because it is the
             // app's signature format. Projects is the archive you visit least, so
             // it takes the edge.
@@ -409,9 +411,12 @@ final class AppCoordinator {
     }
 
     private func tabItem(
-        _ title: String, _ symbol: String, selected: String? = nil, _ identifier: String
+        _ title: String, _ symbol: String, selected: String? = nil, _ identifier: String,
+        glyph: TabGlyph? = nil
     ) -> TabDescriptor {
-        TabDescriptor(title: title, symbol: symbol, selectedSymbol: selected, identifier: identifier)
+        var descriptor = TabDescriptor(title: title, symbol: symbol, selectedSymbol: selected, identifier: identifier)
+        descriptor.glyph = glyph
+        return descriptor
     }
 
     // MARK: - Galleries

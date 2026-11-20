@@ -35,10 +35,13 @@
 import UIKit
 
 /// What a tab is, before UIKit's `UITabBarItem` is built from it. Keeps the
-/// symbol name and the accessibility identifier together at the call site.
+/// glyph and the accessibility identifier together at the call site.
 struct TabDescriptor {
     let title: String
     let symbol: String
+    /// A drawn glyph that replaces `symbol` (see `TabGlyphs.swift`). Outline
+    /// when unselected, solid when selected.
+    var glyph: TabGlyph?
     /// Drawn while the tab is selected. Defaults to `symbol`, so a tab only
     /// carries two glyphs when the change is worth making.
     let selectedSymbol: String?
@@ -147,10 +150,21 @@ final class AppTabBarController: UITabBarController {
             let nav = UINavigationController(rootViewController: entry.root)
             // The system item still exists — the hidden bar and the controller's
             // own bookkeeping read it — but nothing draws from it.
-            let item = UITabBarItem(
-                title: entry.item.title,
-                image: UIImage(systemName: entry.item.symbol),
-                selectedImage: UIImage(systemName: entry.item.selectedSymbol ?? entry.item.symbol))
+            let item: UITabBarItem
+            if let glyph = entry.item.glyph {
+                item = UITabBarItem(
+                    title: entry.item.title,
+                    image: glyph.image(filled: glyph == .collage),
+                    selectedImage: glyph.image(filled: true))
+                // Long-press a tab at accessibility text sizes shows this; a
+                // rendition drawn at 3× stays crisp where an upscale would blur.
+                item.largeContentSizeImage = glyph.image(filled: true, scale: 3)
+            } else {
+                item = UITabBarItem(
+                    title: entry.item.title,
+                    image: UIImage(systemName: entry.item.symbol),
+                    selectedImage: UIImage(systemName: entry.item.selectedSymbol ?? entry.item.symbol))
+            }
             item.accessibilityIdentifier = entry.item.identifier
             nav.tabBarItem = item
             // Watched so the floating "+" disappears the moment an editor is pushed.
