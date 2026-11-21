@@ -116,7 +116,7 @@ final class HomeCollectionCatalogTests: XCTestCase {
                 XCTAssertEqual(collection.kind, .photo, "\(collection.id): only photo collections land on the Collage tab")
                 XCTAssertTrue(
                     TemplateGalleryViewController.categories.contains {
-                        $0.caseInsensitiveCompare(category) == .orderedSame
+                        $0.name.caseInsensitiveCompare(category) == .orderedSame
                     }, "\(collection.id): \"\(category)\" is not a Collage tab chip")
             }
             if let type = collection.carouselType {

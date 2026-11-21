@@ -83,9 +83,7 @@ final class AccessibilityWalkthroughUITests: XCTestCase {
         tabBar.buttons["templatesButton"].tap()
         let gallery = app.collectionViews["templateGalleryGrid"]
         XCTAssertTrue(gallery.waitForExistence(timeout: 10))
-        let locked = app.cells.matching(identifier: "templateCard.premium").firstMatch
-        var scrolls = 0
-        while !locked.exists, scrolls < 12 { gallery.swipeUp(); scrolls += 1 }
+        let locked = app.lockedCollageTemplateCard(maxScrolls: 12)
         XCTAssertTrue(locked.waitForExistence(timeout: 3), "a locked template card")
         locked.tap()
         XCTAssertTrue(app.buttons["paywallCloseButton"].waitForExistence(timeout: 8), "the paywall's close is still reachable")

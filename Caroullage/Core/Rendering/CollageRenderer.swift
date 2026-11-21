@@ -60,6 +60,8 @@ public struct RenderRequest: Sendable {
     public let backgroundPhoto: CGImage?
     /// Cell shadow and outline. Margin is already baked into the cell frames.
     public let frameStyle: FrameStyle
+    /// The template's cards and bands, drawn over the background, under the cells.
+    public let decorations: [CanvasDecoration]
 
     public init(
         canvasSize: CGSize,
@@ -70,7 +72,8 @@ public struct RenderRequest: Sendable {
         stickerOverlays: [StickerOverlay] = [],
         stickerImages: [UUID: CGImage] = [:],
         backgroundPhoto: CGImage? = nil,
-        frameStyle: FrameStyle = FrameStyle()
+        frameStyle: FrameStyle = FrameStyle(),
+        decorations: [CanvasDecoration] = []
     ) {
         self.canvasSize = canvasSize
         self.background = background
@@ -81,6 +84,7 @@ public struct RenderRequest: Sendable {
         self.stickerImages = stickerImages
         self.backgroundPhoto = backgroundPhoto
         self.frameStyle = frameStyle
+        self.decorations = decorations
     }
 }
 
@@ -116,6 +120,9 @@ public final class CollageRenderer: @unchecked Sendable {
                 : nil)
             BackgroundRendering.draw(request.background, canvasSize: request.canvasSize,
                                      photo: backdrop, in: cg)
+            // Over the background, under the cells' shadow — a print's card sits
+            // on the table, and the photo sits on the card.
+            DecorationRendering.draw(request.decorations, canvasSize: request.canvasSize, in: cg)
 
             let shortSide = min(request.canvasSize.width, request.canvasSize.height)
             let shadow = request.frameStyle.shadowGeometry(canvasShortSide: shortSide)

@@ -1,0 +1,72 @@
+{
+  "id": "seasonal-cozy",
+  "name": "Cozy Season",
+  "category": "seasonal",
+  "isPremium": false,
+  "canvasAspectRatio": "4:5",
+  "style": {
+    "spacing": 18,
+    "cornerRadius": 24,
+    "outerMargin": 60,
+    "shadow": 0.5,
+    "outlineWidth": 10,
+    "outlineHex": "#FFFFFF"
+  },
+  "cells": [
+    {
+      "id": "text-1",
+      "type": "text",
+      "frame": {
+        "x": 0.05,
+        "y": 0.0156,
+        "width": 0.9,
+        "height": 0.1289
+      },
+      "shape": "rectangle",
+      "text": "cozy season",
+      "fontName": "SnellRoundhand-Bold",
+      "fontSize": 120,
+      "color": "#9C2A2A",
+      "alignment": "center"
+    },
+    {
+      "id": "photo-1",
+      "type": "photo",
+      "frame": {
+        "x": 0,
+        "y": 0.14,
+        "width": 1,
+        "height": 0.5
+      },
+      "shape": "rectangle"
+    },
+    {
+      "id": "photo-2",
+      "type": "photo",
+      "frame": {
+        "x": 0,
+        "y": 0.64,
+        "width": 0.5,
+        "height": 0.36
+      },
+      "shape": "rectangle"
+    },
+    {
+      "id": "photo-3",
+      "type": "photo",
+      "frame": {
+        "x": 0.5,
+        "y": 0.64,
+        "width": 0.5,
+        "height": 0.36
+      },
+      "shape": "rectangle"
+    }
+  ],
+  "background": {
+    "type": "pattern",
+    "pattern": "gingham",
+    "ink": "#EBC1BD",
+    "paper": "#FFF7F2"
+  }
+}

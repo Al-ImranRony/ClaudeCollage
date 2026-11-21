@@ -1,0 +1,170 @@
+{
+  "version": 1,
+  "spotlight": [
+    "instant-trio",
+    "editorial-issue",
+    "dump-nine",
+    "film-contact-roll",
+    "grid-soft-four",
+    "story-day-in-my-life"
+  ],
+  "newTemplateIDs": [
+    "instant-trio",
+    "editorial-issue",
+    "dump-nine",
+    "film-contact-roll",
+    "grid-soft-four",
+    "story-day-in-my-life",
+    "seasonal-friendsgiving",
+    "instant-solo",
+    "dump-weekend-recap",
+    "editorial-cover",
+    "instant-booth",
+    "minimal-bubbles",
+    "film-strip-story",
+    "grid-rounded-trio",
+    "travel-boarding-pass",
+    "dump-moodboard",
+    "seasonal-cozy",
+    "seasonal-holiday-booth",
+    "dump-year-in-frames",
+    "instant-taped",
+    "film-negative-duo",
+    "editorial-the-edit",
+    "editorial-before-after",
+    "grid-airy-nine",
+    "minimal-cameo",
+    "minimal-white-space"
+  ],
+  "shelves": [
+    {
+      "id": "holiday",
+      "titleKey": "Holiday Season",
+      "subtitleKey": "Cozy layouts for the festive weeks",
+      "category": "seasonal",
+      "months": [
+        11,
+        12,
+        1
+      ],
+      "templateIDs": [
+        "seasonal-friendsgiving",
+        "seasonal-cozy",
+        "seasonal-holiday-booth",
+        "dump-year-in-frames",
+        "seasonal-ornament",
+        "seasonal-sparkle",
+        "seasonal-greeting",
+        "seasonal-thanks",
+        "seasonal-quartet"
+      ]
+    },
+    {
+      "id": "trending",
+      "titleKey": "Trending Now",
+      "subtitleKey": "What everyone is posting this week",
+      "templateIDs": [
+        "instant-solo",
+        "dump-weekend-recap",
+        "editorial-cover",
+        "instant-booth",
+        "minimal-bubbles",
+        "film-strip-story",
+        "grid-rounded-trio",
+        "travel-boarding-pass",
+        "dump-moodboard"
+      ]
+    },
+    {
+      "id": "instant",
+      "titleKey": "Instant & Booth",
+      "subtitleKey": "Prints, strips and taped snapshots",
+      "category": "instant"
+    },
+    {
+      "id": "film",
+      "titleKey": "Shot on Film",
+      "subtitleKey": "Sprockets, frame numbers, analog warmth",
+      "category": "film"
+    },
+    {
+      "id": "editorial",
+      "titleKey": "Editorial",
+      "subtitleKey": "Magazine covers for your everyday",
+      "category": "editorial"
+    },
+    {
+      "id": "dump",
+      "titleKey": "Photo Dump",
+      "subtitleKey": "The whole weekend in one post",
+      "category": "dump"
+    },
+    {
+      "id": "stories",
+      "titleKey": "Made for Stories",
+      "subtitleKey": "Full-screen 9:16 layouts",
+      "category": "story",
+      "tall": true,
+      "templateIDs": [
+        "story-day-in-my-life",
+        "dump-weekend-recap",
+        "instant-booth",
+        "film-strip-story",
+        "editorial-the-edit",
+        "story-caption-hero",
+        "story-hero-strip",
+        "story-moments",
+        "story-quote-block",
+        "story-split-tall",
+        "story-stack-trio"
+      ]
+    },
+    {
+      "id": "clean",
+      "titleKey": "Clean Grids",
+      "subtitleKey": "Even gutters, soft corners",
+      "category": "grid",
+      "templateIDs": [
+        "grid-soft-four",
+        "grid-airy-nine",
+        "grid-rounded-trio",
+        "minimal-white-space",
+        "grid-mosaic-four",
+        "grid-six-airy",
+        "grid-4cell-square",
+        "grid-2up-horizontal",
+        "grid-filmstrip"
+      ]
+    },
+    {
+      "id": "shapes",
+      "titleKey": "Circles & Cameos",
+      "subtitleKey": "Soft shapes for portraits",
+      "category": "minimal",
+      "templateIDs": [
+        "minimal-bubbles",
+        "minimal-cameo",
+        "minimal-circle-focus",
+        "minimal-duo-offset",
+        "seasonal-bloom"
+      ]
+    },
+    {
+      "id": "celebrate",
+      "titleKey": "Celebrate",
+      "subtitleKey": "Birthdays, parties, big days",
+      "category": "birthday",
+      "templateIDs": [
+        "birthday-bash",
+        "birthday-confetti",
+        "grid-celebrate"
+      ]
+    },
+    {
+      "id": "travel",
+      "titleKey": "Wanderlust",
+      "subtitleKey": "Postcards from wherever you were",
+      "category": "travel"
+    }
+  ]
+}

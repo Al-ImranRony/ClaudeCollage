@@ -1,0 +1,83 @@
+{
+  "id": "editorial-issue",
+  "name": "Issue 01",
+  "category": "editorial",
+  "isPremium": false,
+  "canvasAspectRatio": "4:5",
+  "style": {
+    "spacing": 0
+  },
+  "cells": [
+    {
+      "id": "text-1",
+      "type": "text",
+      "frame": {
+        "x": 0.04,
+        "y": 0.0024,
+        "width": 0.92,
+        "height": 0.1611
+      },
+      "shape": "rectangle",
+      "text": "MOMENTS",
+      "fontName": "Didot-Bold",
+      "fontSize": 150,
+      "color": "#151515",
+      "alignment": "center",
+      "letterSpacing": 14
+    },
+    {
+      "id": "text-2",
+      "type": "text",
+      "frame": {
+        "x": 0.04,
+        "y": 0.138,
+        "width": 0.92,
+        "height": 0.04
+      },
+      "shape": "rectangle",
+      "text": "VOL. 01 — NOVEMBER",
+      "fontName": "AvenirNext-DemiBold",
+      "fontSize": 28,
+      "color": "#151515",
+      "alignment": "center",
+      "letterSpacing": 8
+    },
+    {
+      "id": "photo-1",
+      "type": "photo",
+      "frame": {
+        "x": 0.06,
+        "y": 0.2,
+        "width": 0.88,
+        "height": 0.52
+      },
+      "shape": "rectangle"
+    },
+    {
+      "id": "photo-2",
+      "type": "photo",
+      "frame": {
+        "x": 0.06,
+        "y": 0.74,
+        "width": 0.43,
+        "height": 0.215
+      },
+      "shape": "rectangle"
+    },
+    {
+      "id": "photo-3",
+      "type": "photo",
+      "frame": {
+        "x": 0.51,
+        "y": 0.74,
+        "width": 0.43,
+        "height": 0.215
+      },
+      "shape": "rectangle"
+    }
+  ],
+  "background": {
+    "type": "solid",
+    "color": "#EFEBE5"
+  }
+}

@@ -1,0 +1,78 @@
+{
+  "id": "seasonal-friendsgiving",
+  "name": "Friendsgiving",
+  "category": "seasonal",
+  "isPremium": false,
+  "canvasAspectRatio": "1:1",
+  "style": {
+    "spacing": 16,
+    "cornerRadius": 20,
+    "outerMargin": 50
+  },
+  "cells": [
+    {
+      "id": "text-1",
+      "type": "text",
+      "frame": {
+        "x": 0.05,
+        "y": 0.0132,
+        "width": 0.9,
+        "height": 0.1235
+      },
+      "shape": "rectangle",
+      "text": "friendsgiving",
+      "fontName": "Georgia-BoldItalic",
+      "fontSize": 92,
+      "color": "#7A3E1D",
+      "alignment": "center"
+    },
+    {
+      "id": "photo-1",
+      "type": "photo",
+      "frame": {
+        "x": 0.0,
+        "y": 0.13,
+        "width": 0.5,
+        "height": 0.435
+      },
+      "shape": "rectangle"
+    },
+    {
+      "id": "photo-2",
+      "type": "photo",
+      "frame": {
+        "x": 0.5,
+        "y": 0.13,
+        "width": 0.5,
+        "height": 0.435
+      },
+      "shape": "rectangle"
+    },
+    {
+      "id": "photo-3",
+      "type": "photo",
+      "frame": {
+        "x": 0.0,
+        "y": 0.565,
+        "width": 0.5,
+        "height": 0.435
+      },
+      "shape": "rectangle"
+    },
+    {
+      "id": "photo-4",
+      "type": "photo",
+      "frame": {
+        "x": 0.5,
+        "y": 0.565,
+        "width": 0.5,
+        "height": 0.435
+      },
+      "shape": "rectangle"
+    }
+  ],
+  "background": {
+    "type": "solid",
+    "color": "#F3E3CF"
+  }
+}

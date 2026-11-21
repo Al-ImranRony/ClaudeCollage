@@ -1,0 +1,109 @@
+{
+  "id": "travel-boarding-pass",
+  "name": "Boarding Pass",
+  "category": "travel",
+  "isPremium": true,
+  "canvasAspectRatio": "4:5",
+  "style": {
+    "spacing": 0
+  },
+  "cells": [
+    {
+      "id": "photo-1",
+      "type": "photo",
+      "frame": {
+        "x": 0.11,
+        "y": 0.115,
+        "width": 0.78,
+        "height": 0.5
+      },
+      "shape": "rectangle"
+    },
+    {
+      "id": "photo-2",
+      "type": "photo",
+      "frame": {
+        "x": 0.11,
+        "y": 0.645,
+        "width": 0.3,
+        "height": 0.24
+      },
+      "shape": "rectangle"
+    },
+    {
+      "id": "text-1",
+      "type": "text",
+      "frame": {
+        "x": 0.45,
+        "y": 0.6446,
+        "width": 0.44,
+        "height": 0.0709
+      },
+      "shape": "rectangle",
+      "text": "LIS → NYC",
+      "fontName": "Courier-Bold",
+      "fontSize": 66,
+      "color": "#1E2F44",
+      "alignment": "leading"
+    },
+    {
+      "id": "text-2",
+      "type": "text",
+      "frame": {
+        "x": 0.45,
+        "y": 0.725,
+        "width": 0.44,
+        "height": 0.04
+      },
+      "shape": "rectangle",
+      "text": "GATE 12 · SEAT 4A",
+      "fontName": "Courier-Bold",
+      "fontSize": 30,
+      "color": "#4A5A6E",
+      "alignment": "leading",
+      "letterSpacing": 2
+    },
+    {
+      "id": "text-3",
+      "type": "text",
+      "frame": {
+        "x": 0.45,
+        "y": 0.78,
+        "width": 0.44,
+        "height": 0.05
+      },
+      "shape": "rectangle",
+      "text": "boarding 07:45",
+      "fontName": "BradleyHandITCTT-Bold",
+      "fontSize": 46,
+      "color": "#B3261E",
+      "alignment": "leading"
+    }
+  ],
+  "background": {
+    "type": "solid",
+    "color": "#2E4C6D"
+  },
+  "decorations": [
+    {
+      "frame": {
+        "x": 0.07,
+        "y": 0.08,
+        "width": 0.86,
+        "height": 0.84
+      },
+      "color": "#FBF8F3",
+      "cornerRadius": 0.03,
+      "shadow": 0.6
+    },
+    {
+      "frame": {
+        "x": 0.11,
+        "y": 0.905,
+        "width": 0.78,
+        "height": 0.003
+      },
+      "color": "#D5CFC5"
+    }
+  ]
+}

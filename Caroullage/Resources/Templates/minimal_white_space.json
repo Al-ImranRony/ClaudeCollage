@@ -1,0 +1,55 @@
+{
+  "id": "minimal-white-space",
+  "name": "White Space",
+  "category": "minimal",
+  "isPremium": false,
+  "canvasAspectRatio": "4:5",
+  "style": {
+    "spacing": 0
+  },
+  "cells": [
+    {
+      "id": "photo-1",
+      "type": "photo",
+      "frame": {
+        "x": 0.08,
+        "y": 0.16,
+        "width": 0.4,
+        "height": 0.62
+      },
+      "shape": "rectangle"
+    },
+    {
+      "id": "photo-2",
+      "type": "photo",
+      "frame": {
+        "x": 0.52,
+        "y": 0.16,
+        "width": 0.4,
+        "height": 0.62
+      },
+      "shape": "rectangle"
+    },
+    {
+      "id": "text-1",
+      "type": "text",
+      "frame": {
+        "x": 0.1,
+        "y": 0.84,
+        "width": 0.8,
+        "height": 0.045
+      },
+      "shape": "rectangle",
+      "text": "a quiet sunday",
+      "fontName": "AvenirNext-Medium",
+      "fontSize": 34,
+      "color": "#8A8A8A",
+      "alignment": "center",
+      "letterSpacing": 6
+    }
+  ],
+  "background": {
+    "type": "solid",
+    "color": "#FFFFFF"
+  }
+}

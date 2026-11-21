@@ -26,9 +26,15 @@ public struct CollageTemplate: Sendable, Equatable, Decodable {
     public let canvasAspectRatio: String
     public let cells: [TemplateCell]
     public let background: CollageBackground
+    /// Spacing, corner radius and frame chrome the editor opens with. `nil` for
+    /// the legacy catalog, which keeps its original edge-to-edge previews and
+    /// per-cell border seeding untouched.
+    public let style: TemplateStyle?
+    /// Cards, bands and tape under the photos — see `CanvasDecoration`.
+    public let decorations: [CanvasDecoration]
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, category, isPremium, canvasAspectRatio, cells, background
+        case id, name, category, isPremium, canvasAspectRatio, cells, background, style, decorations
     }
 
     public init(from decoder: Decoder) throws {
@@ -42,6 +48,49 @@ public struct CollageTemplate: Sendable, Equatable, Decodable {
         self.cells = try c.decodeIfPresent([TemplateCell].self, forKey: .cells) ?? []
         self.background = (try? c.decodeIfPresent(TemplateBackground.self, forKey: .background))?
             .collageBackground ?? .white
+        self.style = try? c.decodeIfPresent(TemplateStyle.self, forKey: .style)
+        self.decorations = (try? c.decodeIfPresent([CanvasDecoration].self, forKey: .decorations)) ?? []
+    }
+
+    /// The number of photos the template asks for — what the gallery's photo
+    /// filter and every card's caption state.
+    public var photoCount: Int { cells.filter { $0.zoneType == .photo }.count }
+}
+
+/// A styled template's look, in reference-canvas points (short side 1080) —
+/// exactly the units of the editor's Spacing, Corners and Frame controls, so a
+/// template opens with those controls already where its preview left them.
+///
+/// With a style, a template's cell frames are authored EDGE TO EDGE (as tiles
+/// of the canvas) and the spacing and margin carve the gaps, through the same
+/// `CollageLayoutEngine` call the editor makes. That is what makes the preview
+/// and the opened project the same picture rather than two approximations.
+/// A template with decorations usually wants `spacing: 0` and no margin, so its
+/// photos land exactly on the cards authored for them.
+public struct TemplateStyle: Sendable, Equatable, Decodable {
+    public let spacing: Double
+    public let cornerRadius: Double
+    public let frameStyle: FrameStyle
+
+    private enum CodingKeys: String, CodingKey {
+        case spacing, cornerRadius, outerMargin, shadow, outlineWidth, outlineHex
+    }
+
+    public init(spacing: Double = 0, cornerRadius: Double = 0, frameStyle: FrameStyle = FrameStyle()) {
+        self.spacing = spacing
+        self.cornerRadius = cornerRadius
+        self.frameStyle = frameStyle
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        spacing = max(0, try c.decodeIfPresent(Double.self, forKey: .spacing) ?? 0)
+        cornerRadius = max(0, try c.decodeIfPresent(Double.self, forKey: .cornerRadius) ?? 0)
+        frameStyle = FrameStyle(
+            outerMargin: try c.decodeIfPresent(Double.self, forKey: .outerMargin).map { max(0, $0) },
+            shadow: min(max(try c.decodeIfPresent(Double.self, forKey: .shadow) ?? 0, 0), 1),
+            outlineWidth: max(0, try c.decodeIfPresent(Double.self, forKey: .outlineWidth) ?? 0),
+            outlineHex: try c.decodeIfPresent(String.self, forKey: .outlineHex) ?? "#FFFFFF")
     }
 }
 

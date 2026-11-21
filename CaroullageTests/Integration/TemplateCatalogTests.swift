@@ -20,6 +20,7 @@ final class TemplateCatalogTests: XCTestCase {
     /// The gallery's category chips — every bundled template must belong to one.
     private let knownCategories: Set<String> = [
         "minimal", "story", "grid", "travel", "seasonal", "birthday",
+        "instant", "film", "editorial", "dump",
     ]
 
     func testBundledCatalogIntegrity() {

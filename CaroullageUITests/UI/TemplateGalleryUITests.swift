@@ -2,9 +2,10 @@
 //  TemplateGalleryUITests.swift
 //  CaroullageUITests
 //
-//  Step 03a slice 2 — drives the template gallery end to end: entry from Home,
-//  canvas-size filtering (Story is empty until the 30-template catalog lands),
-//  and the free-template → grid-editor route. Screenshots attached for review.
+//  The Collage tab end to end (re-imagined 2026-11-21): it browses as a
+//  spotlight plus themed shelves, any chip/filter/search collapses it to one
+//  results grid, a dead end offers Clear Filters, and every door — spotlight,
+//  shelf, grid — opens the editor. Screenshots attached for review.
 //
 
 import XCTest
@@ -16,41 +17,14 @@ final class TemplateGalleryUITests: XCTestCase {
     }
 
     @MainActor
-    func testTheFilterRowIsASingleRow() {
-        // The search bar used to be followed by a full-width ratio segmented
-        // control AND a category chip row — two stacked bands of what read as the
-        // same kind of control, before any content. They are not the same kind:
-        // a category is a tag, the ratio is a mode that reshapes every card.
+    private func openGallery() -> XCUIApplication {
         let app = XCUIApplication.underTest()
         app.launch()
-        app.buttons["templatesButton"].tap()
+        let tab = app.buttons["templatesButton"]
+        XCTAssertTrue(tab.waitForExistence(timeout: 8), "the Collage tab is in the tab bar")
+        tab.tap()
         XCTAssertTrue(app.navigationBars["Collage Templates"].waitForExistence(timeout: 8))
-
-        XCTAssertFalse(app.segmentedControls["canvasPresetControl"].exists,
-                       "The stacked ratio segmented control is gone")
-
-        let ratio = app.buttons["canvasRatioChip"]
-        let chips = app.collectionViews["categoryChips"]
-        XCTAssertTrue(ratio.waitForExistence(timeout: 5), "Ratio is a chip in the filter row")
-        XCTAssertTrue(chips.exists)
-        XCTAssertLessThan(
-            abs(ratio.frame.midY - chips.frame.midY), 12,
-            "Ratio and the category chips share one row, rather than stacking")
-    }
-
-    /// Picks a canvas ratio from the filter row's menu chip.
-    ///
-    /// Matched with BEGINSWITH because the menu items carry the aspect as a
-    /// subtitle, which UIKit may fold into the element's label. The category chips
-    /// are static texts rather than buttons, so a title like "Story" does not
-    /// collide here.
-    @MainActor
-    private func selectRatio(_ app: XCUIApplication, _ name: String) {
-        app.buttons["canvasRatioChip"].tap()
-        let option = app.buttons
-            .matching(NSPredicate(format: "label BEGINSWITH %@", name)).firstMatch
-        XCTAssertTrue(option.waitForExistence(timeout: 5), "Ratio menu offers \(name)")
-        option.tap()
+        return app
     }
 
     @MainActor
@@ -62,66 +36,93 @@ final class TemplateGalleryUITests: XCTestCase {
     }
 
     @MainActor
-    func testGalleryFiltersAndOpensFreeTemplate() throws {
-        let app = XCUIApplication.underTest()
-        app.launch()
-
-        // Enter the gallery from Home.
-        let templatesButton = app.buttons["templatesButton"]
-        XCTAssertTrue(templatesButton.waitForExistence(timeout: 8), "Home shows the Collage tab")
-        templatesButton.tap()
-        XCTAssertTrue(app.navigationBars["Collage Templates"].waitForExistence(timeout: 5),
-                      "Gallery pushes")
-
-        // Square (default) shows the bundled 1:1 grid templates.
-        let grid = app.collectionViews["templateGalleryGrid"]
-        XCTAssertTrue(grid.cells.firstMatch.waitForExistence(timeout: 5), "Gallery shows template cards")
-        attach("01_gallery_square")
-
-        // The ratio is a menu chip now, not a segmented control.
-        selectRatio(app, "Story")
-        XCTAssertTrue(grid.cells.firstMatch.waitForExistence(timeout: 3), "Story preset shows templates")
-        attach("02_gallery_story")
-
-        // Story ∩ Minimal is an impossible combination → explanatory empty state.
-        let minimalChip = app.collectionViews["categoryChips"].staticTexts["Minimal"]
-        XCTAssertTrue(minimalChip.waitForExistence(timeout: 3), "Minimal chip present")
-        minimalChip.tap()
-        let emptyLabel = app.staticTexts["galleryEmptyLabel"]
-        XCTAssertTrue(emptyLabel.waitForExistence(timeout: 3), "Empty state when filters match nothing")
-
-        // Back to Square + All; the grid templates return.
-        app.collectionViews["categoryChips"].staticTexts["All"].tap()
-        selectRatio(app, "Square")
-        XCTAssertTrue(grid.cells.firstMatch.waitForExistence(timeout: 3), "Square templates return")
-
-        // Tapping a free grid template routes into the grid editor.
-        grid.cells.firstMatch.tap()
-        XCTAssertTrue(app.navigationBars["Grid Collage"].waitForExistence(timeout: 5),
-                      "Free grid template opens the grid editor")
-        attach("03_template_opened_in_editor")
+    func testTheFilterRowIsASingleRow() {
+        let app = openGallery()
+        let filter = app.buttons["collageFilterChip"]
+        let chips = app.collectionViews["categoryChips"]
+        XCTAssertTrue(filter.waitForExistence(timeout: 5), "filters are a chip in the row")
+        XCTAssertTrue(chips.exists)
+        XCTAssertLessThan(abs(filter.frame.midY - chips.frame.midY), 12,
+                          "the filter chip and the category chips share one row")
+        XCTAssertFalse(app.buttons["canvasRatioChip"].exists,
+                       "the hard ratio chip is gone — ratio is an optional filter now")
     }
 
     @MainActor
-    func testNonGridTemplateOpensViaTemplateLayout() throws {
-        let app = XCUIApplication.underTest()
-        app.launch()
+    func testItBrowsesAsASpotlightAndShelves() {
+        let app = openGallery()
+        let spotlight = app.cells.matching(identifier: "templateSpotlightCard.free").firstMatch
+        XCTAssertTrue(spotlight.waitForExistence(timeout: 8), "a spotlight card leads the tab")
+        XCTAssertTrue(app.staticTexts["collageShelfTitle-spotlight"].exists)
 
-        app.buttons["templatesButton"].tap()
-        XCTAssertTrue(app.navigationBars["Collage Templates"].waitForExistence(timeout: 5),
-                      "Gallery pushes")
-
-        // The Minimal chip isolates the offset-duo design, which doesn't match
-        // any stock grid — it must open through the `.template` layout path.
-        let minimalChip = app.collectionViews["categoryChips"].staticTexts["Minimal"]
-        XCTAssertTrue(minimalChip.waitForExistence(timeout: 5), "Minimal chip present")
-        minimalChip.tap()
+        let shelfTitles = app.staticTexts.matching(
+            NSPredicate(format: "identifier BEGINSWITH 'collageShelfTitle-' AND identifier != 'collageShelfTitle-spotlight'"))
         let grid = app.collectionViews["templateGalleryGrid"]
-        XCTAssertTrue(grid.cells.firstMatch.waitForExistence(timeout: 5), "Minimal category has a template")
-        grid.cells.firstMatch.tap()
+        var scrolls = 0
+        while shelfTitles.count < 2, scrolls < 4 { grid.swipeUp(); scrolls += 1 }
+        XCTAssertGreaterThanOrEqual(shelfTitles.count, 2, "themed shelves follow the spotlight")
+        attach("01_collage_browse")
+    }
 
+    @MainActor
+    func testAShelfsSeeAllSelectsItsChip() {
+        let app = openGallery()
+        let grid = app.collectionViews["templateGalleryGrid"]
+        let seeAll = app.buttons["collageShelfSeeAll-instant"]
+        var scrolls = 0
+        while !(seeAll.exists && seeAll.isHittable), scrolls < 8 { grid.swipeUp(); scrolls += 1 }
+        XCTAssertTrue(seeAll.isHittable, "the Instant shelf offers See All")
+        seeAll.tap()
+
+        let chip = app.staticTexts["categoryChip-Instant"]
+        XCTAssertTrue(chip.waitForExistence(timeout: 3))
+        XCTAssertTrue(chip.isSelected, "See All lands on the shelf's chip")
+        XCTAssertTrue(app.cells.matching(identifier: "templateCard.free").firstMatch.waitForExistence(timeout: 5),
+                      "…as a results grid")
+        attach("02_collage_instant_results")
+    }
+
+    @MainActor
+    func testFiltersNarrowAndClearFiltersRestoresTheBrowse() {
+        let app = openGallery()
+        app.staticTexts["categoryChip-Film"].tap()
+        app.buttons["collageFilterChip"].tap()
+        let sixPlus = app.buttons["6+ Photos"]
+        XCTAssertTrue(sixPlus.waitForExistence(timeout: 5), "the filter menu asks how many photos")
+        sixPlus.tap()
+
+        // No film template takes six or more photos: a dead end, with a way out.
+        XCTAssertTrue(app.staticTexts["galleryEmptyLabel"].waitForExistence(timeout: 3))
+        attach("03_collage_empty_state")
+        app.buttons["galleryClearFiltersButton"].tap()
+
+        XCTAssertTrue(app.cells.matching(identifier: "templateSpotlightCard.free").firstMatch
+            .waitForExistence(timeout: 5), "clearing returns to the browse")
+        XCTAssertTrue(app.staticTexts["categoryChip-All"].isSelected)
+    }
+
+    @MainActor
+    func testTheSpotlightOpensTheEditor() {
+        let app = openGallery()
+        let spotlight = app.cells.matching(identifier: "templateSpotlightCard.free").firstMatch
+        XCTAssertTrue(spotlight.waitForExistence(timeout: 8))
+        spotlight.tap()
         XCTAssertTrue(app.navigationBars["Grid Collage"].waitForExistence(timeout: 5),
-                      "Non-grid template opens in the editor via .template layout")
-        attach("04_template_layout_in_editor")
+                      "a spotlight template opens in the editor")
+        attach("04_spotlight_template_in_editor")
+    }
+
+    @MainActor
+    func testANonGridTemplateOpensViaTemplateLayout() {
+        let app = openGallery()
+        // Editorial's first result is "Issue 01": free, with text zones, which
+        // can only open through the `.template` layout path.
+        app.staticTexts["categoryChip-Editorial"].tap()
+        let card = app.cells.matching(identifier: "templateCard.free").firstMatch
+        XCTAssertTrue(card.waitForExistence(timeout: 5))
+        card.tap()
+        XCTAssertTrue(app.navigationBars["Grid Collage"].waitForExistence(timeout: 5),
+                      "a non-grid template opens in the editor via .template layout")
+        attach("05_template_layout_in_editor")
     }
 }

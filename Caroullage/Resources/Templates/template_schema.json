@@ -10,7 +10,7 @@
     "name": { "type": "string", "minLength": 1 },
     "category": {
       "type": "string",
-      "enum": ["story", "grid", "minimal", "seasonal", "travel", "moodboard", "birthday"]
+      "enum": ["story", "grid", "minimal", "seasonal", "travel", "moodboard", "birthday", "instant", "film", "editorial", "dump"]
     },
     "isPremium": { "type": "boolean" },
     "canvasAspectRatio": {
@@ -22,7 +22,34 @@
       "minItems": 1,
       "items": { "$ref": "#/$defs/cell" }
     },
-    "background": { "$ref": "#/$defs/background" }
+    "background": { "$ref": "#/$defs/background" },
+    "style": {
+      "type": "object",
+      "description": "Reference-point spacing, cornerRadius and outerMargin, plus 0-1 shadow and outlineWidth/outlineHex — what the editor's Spacing, Corners and Frame controls open at. With a style, cell frames tile the canvas edge to edge and the layout engine carves the gaps.",
+      "properties": {
+        "spacing": { "type": "number", "minimum": 0 },
+        "cornerRadius": { "type": "number", "minimum": 0 },
+        "outerMargin": { "type": "number", "minimum": 0 },
+        "shadow": { "type": "number", "minimum": 0, "maximum": 1 },
+        "outlineWidth": { "type": "number", "minimum": 0 },
+        "outlineHex": { "type": "string" }
+      }
+    },
+    "decorations": {
+      "type": "array",
+      "description": "Flat shapes painted between the background and the photos: instant-print cards, film bands and sprocket holes, tape.",
+      "items": {
+        "type": "object",
+        "required": ["frame"],
+        "properties": {
+          "frame": { "type": "object" },
+          "shape": { "type": "string", "enum": ["rectangle", "ellipse"] },
+          "color": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$" },
+          "cornerRadius": { "type": "number", "minimum": 0, "description": "fraction of the canvas short side" },
+          "shadow": { "type": "number", "minimum": 0, "maximum": 1 }
+        }
+      }
+    }
   },
   "$defs": {
     "cell": {
@@ -59,7 +86,7 @@
       "type": "object",
       "required": ["type"],
       "properties": {
-        "type": { "type": "string", "enum": ["solid", "gradient", "texture"] },
+        "type": { "type": "string", "enum": ["solid", "gradient", "texture", "pattern", "photoBlur"] },
         "color": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
         "colors": {
           "type": "array",

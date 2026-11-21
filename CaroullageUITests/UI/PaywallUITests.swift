@@ -42,16 +42,11 @@ final class PaywallUITests: XCTestCase {
         let grid = app.collectionViews["templateGalleryGrid"]
         XCTAssertTrue(grid.waitForExistence(timeout: 10), "the template grid never appeared")
 
-        // Only visible cells exist in the accessibility tree, and free templates
-        // sort first, so scroll until a locked card comes into view.
-        let locked = app.cells.matching(identifier: "templateCard.premium").firstMatch
-        var scrolls = 0
-        while !locked.exists, scrolls < 8 {
-            grid.swipeUp()
-            scrolls += 1
-        }
+        // Only visible cells exist in the accessibility tree; the helper narrows
+        // the tab to a grid and scrolls until a locked card comes into view.
+        let locked = app.lockedCollageTemplateCard()
         guard locked.waitForExistence(timeout: 3) else {
-            XCTFail("no locked template card after \(scrolls) scrolls")
+            XCTFail("no locked template card on the Collage tab")
             return app
         }
         locked.tap()

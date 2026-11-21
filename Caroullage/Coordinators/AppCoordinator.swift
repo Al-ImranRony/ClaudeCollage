@@ -788,12 +788,19 @@ final class AppCoordinator {
         // Text + sticker zones become editable overlays layered on the same editor
         // (Step 03a slices 5–6). Their styling / symbols + normalized frames come
         // from the parser and the sticker catalog.
+        // A styled template opens with the editor's Spacing, Corners and Frame
+        // controls exactly where its preview set them; the legacy catalog keeps
+        // seeding its border from the first cell, as it always did.
         let state = GridEditorState(
             layout: layout,
-            borderWidth: template.cells.first.map { max($0.borderWidth, 0) } ?? 8,
+            borderWidth: template.style?.spacing
+                ?? template.cells.first.map { max($0.borderWidth, 0) } ?? 8,
+            cornerRadius: template.style?.cornerRadius ?? 0,
             background: template.background,
             textOverlays: template.cells.compactMap(\.textStyle),
-            stickerOverlays: TemplateService.stickerOverlays(for: template)
+            stickerOverlays: TemplateService.stickerOverlays(for: template),
+            frameStyle: template.style?.frameStyle ?? FrameStyle(),
+            decorations: template.decorations
         )
         let viewModel = GridEditorViewModel(
             canvasSize: CanvasSize.size(forAspectRatio: template.canvasAspectRatio),

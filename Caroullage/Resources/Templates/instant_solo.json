@@ -1,0 +1,58 @@
+{
+  "id": "instant-solo",
+  "name": "Instant Print",
+  "category": "instant",
+  "isPremium": false,
+  "canvasAspectRatio": "4:5",
+  "style": {
+    "spacing": 0
+  },
+  "cells": [
+    {
+      "id": "photo-1",
+      "type": "photo",
+      "frame": {
+        "x": 0.2037,
+        "y": 0.1369,
+        "width": 0.5927,
+        "height": 0.4741
+      },
+      "shape": "rectangle"
+    },
+    {
+      "id": "text-1",
+      "type": "text",
+      "frame": {
+        "x": 0.17,
+        "y": 0.6231,
+        "width": 0.66,
+        "height": 0.111
+      },
+      "shape": "rectangle",
+      "text": "golden hour",
+      "fontName": "BradleyHandITCTT-Bold",
+      "fontSize": 68,
+      "color": "#2B2B2B",
+      "alignment": "center"
+    }
+  ],
+  "background": {
+    "type": "pattern",
+    "pattern": "grid",
+    "ink": "#DCD5C8",
+    "paper": "#F5F1E9"
+  },
+  "decorations": [
+    {
+      "frame": {
+        "x": 0.17,
+        "y": 0.11,
+        "width": 0.66,
+        "height": 0.642
+      },
+      "color": "#FFFFFF",
+      "cornerRadius": 0.004,
+      "shadow": 0.55
+    }
+  ]
+}

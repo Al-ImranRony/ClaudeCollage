@@ -308,9 +308,7 @@ final class AccessibilityAuditUITests: XCTestCase {
         app.tabBars["mainTabBar"].buttons["templatesButton"].tap()
         let grid = app.collectionViews["templateGalleryGrid"]
         XCTAssertTrue(grid.waitForExistence(timeout: 10))
-        let locked = app.cells.matching(identifier: "templateCard.premium").firstMatch
-        var scrolls = 0
-        while !locked.exists, scrolls < 8 { grid.swipeUp(); scrolls += 1 }
+        let locked = app.lockedCollageTemplateCard()
         XCTAssertTrue(locked.waitForExistence(timeout: 3), "a locked template card")
         locked.tap()
         XCTAssertTrue(app.buttons["paywallCloseButton"].waitForExistence(timeout: 8))

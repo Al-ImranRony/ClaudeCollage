@@ -398,7 +398,8 @@ public final class GridEditorViewModel {
                            stickerOverlays: state.stickerOverlays,
                            stickerImages: resolvedStickerImages(),
                            backgroundPhoto: backgroundPhoto(),
-                           frameStyle: state.frameStyle)
+                           frameStyle: state.frameStyle,
+                           decorations: state.decorations)
     }
 
     // MARK: - Rendering (one-shot only)
@@ -522,7 +523,8 @@ public final class GridEditorViewModel {
                              stickerOverlays: state.stickerOverlays,
                              stickerImages: resolvedStickerImages(),
                              backgroundPhoto: backgroundPhoto(),
-                             frameStyle: state.frameStyle)
+                             frameStyle: state.frameStyle,
+                             decorations: state.decorations)
     }
 
     /// Recomputes filtered images for all cells after an undo/redo/restore.

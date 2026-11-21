@@ -32,3 +32,26 @@ extension XCUIApplication {
         return app
     }
 }
+
+extension XCUIApplication {
+
+    /// A locked card on the Collage tab, ready to tap.
+    ///
+    /// The tab browses as shelves, whose cards are `templateShelfCard.*` (a card
+    /// half off-screen in a sideways shelf is not tappable), and its vertical
+    /// grid of `templateCard.*` closes the page far below. The Instant chip
+    /// collapses the tab to a results grid with a premium print near the top.
+    @MainActor
+    func lockedCollageTemplateCard(maxScrolls: Int = 8) -> XCUIElement {
+        let chip = staticTexts["categoryChip-Instant"]
+        if chip.waitForExistence(timeout: 5) { chip.tap() }
+        let grid = collectionViews["templateGalleryGrid"]
+        let locked = cells.matching(identifier: "templateCard.premium").firstMatch
+        var scrolls = 0
+        while !locked.exists, scrolls < maxScrolls {
+            grid.swipeUp()
+            scrolls += 1
+        }
+        return locked
+    }
+}

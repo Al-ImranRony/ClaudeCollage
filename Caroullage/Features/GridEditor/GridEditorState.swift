@@ -100,6 +100,10 @@ public struct GridEditorState: Equatable, Sendable, Codable {
     public var stickerOverlays: [StickerOverlay]
     /// Margin, shadow and outline (Frame panel). Absent in older blobs → defaults.
     public var frameStyle: FrameStyle
+    /// The template's cards, bands and tape, painted between the background and
+    /// the cells (2026-11-21). Seeded from a template, never edited. Absent in
+    /// older blobs → none.
+    public var decorations: [CanvasDecoration]
 
     /// Border applied to a newly created collage, in reference-canvas points
     /// (~2.2% of a 1080 canvas). The old default of 8 was 0.74% — visible only
@@ -117,7 +121,8 @@ public struct GridEditorState: Equatable, Sendable, Codable {
         cells: [EditorCellState]? = nil,
         textOverlays: [TextOverlay] = [],
         stickerOverlays: [StickerOverlay] = [],
-        frameStyle: FrameStyle = FrameStyle()
+        frameStyle: FrameStyle = FrameStyle(),
+        decorations: [CanvasDecoration] = []
     ) {
         self.layout = layout
         self.borderWidth = borderWidth
@@ -127,6 +132,7 @@ public struct GridEditorState: Equatable, Sendable, Codable {
         self.textOverlays = textOverlays
         self.stickerOverlays = stickerOverlays
         self.frameStyle = frameStyle
+        self.decorations = decorations
     }
 
     /// Convenience for grid callers / tests.
@@ -146,6 +152,11 @@ public struct GridEditorState: Equatable, Sendable, Codable {
         } else if cells.count > targetCount {
             cells.removeLast(cells.count - targetCount)
         }
+        // Decorations (print cards, film bands, sprockets) are drawn for the
+        // template's own cells; under a different layout they would sit where
+        // no cell is. Text and stickers float freely, so they stay. A commit
+        // carries this, so undo brings the decorations back with the layout.
+        if newLayout != layout { decorations = [] }
         layout = newLayout
     }
 
@@ -153,6 +164,7 @@ public struct GridEditorState: Equatable, Sendable, Codable {
 
     private enum CodingKeys: String, CodingKey {
         case layout, template, borderWidth, cornerRadius, background, cells, textOverlays, stickerOverlays, frameStyle
+        case decorations
     }
 
     public init(from decoder: Decoder) throws {
@@ -179,6 +191,7 @@ public struct GridEditorState: Equatable, Sendable, Codable {
         // Absent before slice 6 → no stickers, so pre-sticker projects keep loading.
         self.stickerOverlays = try container.decodeIfPresent([StickerOverlay].self, forKey: .stickerOverlays) ?? []
         self.frameStyle = try container.decodeIfPresent(FrameStyle.self, forKey: .frameStyle) ?? FrameStyle()
+        self.decorations = try container.decodeIfPresent([CanvasDecoration].self, forKey: .decorations) ?? []
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -191,6 +204,9 @@ public struct GridEditorState: Equatable, Sendable, Codable {
         try container.encode(textOverlays, forKey: .textOverlays)
         try container.encode(stickerOverlays, forKey: .stickerOverlays)
         try container.encode(frameStyle, forKey: .frameStyle)
+        // Omitted when empty, so a plain collage's blob is byte-for-byte what it
+        // was before decorations existed.
+        if !decorations.isEmpty { try container.encode(decorations, forKey: .decorations) }
     }
 }
 

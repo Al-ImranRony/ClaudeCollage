@@ -1,0 +1,116 @@
+{
+  "id": "grid-airy-nine",
+  "name": "Airy Nine",
+  "category": "grid",
+  "isPremium": false,
+  "canvasAspectRatio": "1:1",
+  "style": {
+    "spacing": 12,
+    "outerMargin": 12
+  },
+  "cells": [
+    {
+      "id": "photo-1",
+      "type": "photo",
+      "frame": {
+        "x": 0.0,
+        "y": 0.0,
+        "width": 0.3333,
+        "height": 0.3333
+      },
+      "shape": "rectangle"
+    },
+    {
+      "id": "photo-2",
+      "type": "photo",
+      "frame": {
+        "x": 0.3333,
+        "y": 0.0,
+        "width": 0.3333,
+        "height": 0.3333
+      },
+      "shape": "rectangle"
+    },
+    {
+      "id": "photo-3",
+      "type": "photo",
+      "frame": {
+        "x": 0.6667,
+        "y": 0.0,
+        "width": 0.3333,
+        "height": 0.3333
+      },
+      "shape": "rectangle"
+    },
+    {
+      "id": "photo-4",
+      "type": "photo",
+      "frame": {
+        "x": 0.0,
+        "y": 0.3333,
+        "width": 0.3333,
+        "height": 0.3333
+      },
+      "shape": "rectangle"
+    },
+    {
+      "id": "photo-5",
+      "type": "photo",
+      "frame": {
+        "x": 0.3333,
+        "y": 0.3333,
+        "width": 0.3333,
+        "height": 0.3333
+      },
+      "shape": "rectangle"
+    },
+    {
+      "id": "photo-6",
+      "type": "photo",
+      "frame": {
+        "x": 0.6667,
+        "y": 0.3333,
+        "width": 0.3333,
+        "height": 0.3333
+      },
+      "shape": "rectangle"
+    },
+    {
+      "id": "photo-7",
+      "type": "photo",
+      "frame": {
+        "x": 0.0,
+        "y": 0.6667,
+        "width": 0.3333,
+        "height": 0.3333
+      },
+      "shape": "rectangle"
+    },
+    {
+      "id": "photo-8",
+      "type": "photo",
+      "frame": {
+        "x": 0.3333,
+        "y": 0.6667,
+        "width": 0.3333,
+        "height": 0.3333
+      },
+      "shape": "rectangle"
+    },
+    {
+      "id": "photo-9",
+      "type": "photo",
+      "frame": {
+        "x": 0.6667,
+        "y": 0.6667,
+        "width": 0.3333,
+        "height": 0.3333
+      },
+      "shape": "rectangle"
+    }
+  ],
+  "background": {
+    "type": "solid",
+    "color": "#FFFFFF"
+  }
+}

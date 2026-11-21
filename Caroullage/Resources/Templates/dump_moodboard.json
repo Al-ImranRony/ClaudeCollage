@@ -1,0 +1,83 @@
+{
+  "id": "dump-moodboard",
+  "name": "Mood Board",
+  "category": "dump",
+  "isPremium": true,
+  "canvasAspectRatio": "1:1",
+  "style": {
+    "spacing": 14,
+    "outerMargin": 36
+  },
+  "cells": [
+    {
+      "id": "photo-1",
+      "type": "photo",
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "width": 0.5,
+        "height": 0.62
+      },
+      "shape": "rectangle"
+    },
+    {
+      "id": "photo-2",
+      "type": "photo",
+      "frame": {
+        "x": 0.5,
+        "y": 0,
+        "width": 0.5,
+        "height": 0.3
+      },
+      "shape": "rectangle"
+    },
+    {
+      "id": "photo-3",
+      "type": "photo",
+      "frame": {
+        "x": 0.5,
+        "y": 0.3,
+        "width": 0.25,
+        "height": 0.32
+      },
+      "shape": "rectangle"
+    },
+    {
+      "id": "photo-4",
+      "type": "photo",
+      "frame": {
+        "x": 0.75,
+        "y": 0.3,
+        "width": 0.25,
+        "height": 0.32
+      },
+      "shape": "rectangle"
+    },
+    {
+      "id": "photo-5",
+      "type": "photo",
+      "frame": {
+        "x": 0,
+        "y": 0.62,
+        "width": 0.35,
+        "height": 0.38
+      },
+      "shape": "rectangle"
+    },
+    {
+      "id": "photo-6",
+      "type": "photo",
+      "frame": {
+        "x": 0.35,
+        "y": 0.62,
+        "width": 0.65,
+        "height": 0.38
+      },
+      "shape": "rectangle"
+    }
+  ],
+  "background": {
+    "type": "solid",
+    "color": "#F1ECE4"
+  }
+}

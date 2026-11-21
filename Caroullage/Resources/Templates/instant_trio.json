@@ -1,0 +1,134 @@
+{
+  "id": "instant-trio",
+  "name": "Instant Trio",
+  "category": "instant",
+  "isPremium": false,
+  "canvasAspectRatio": "4:5",
+  "style": {
+    "spacing": 0
+  },
+  "cells": [
+    {
+      "id": "photo-1",
+      "type": "photo",
+      "frame": {
+        "x": 0.0704,
+        "y": 0.0563,
+        "width": 0.3592,
+        "height": 0.2874
+      },
+      "shape": "rectangle"
+    },
+    {
+      "id": "text-1",
+      "type": "text",
+      "frame": {
+        "x": 0.05,
+        "y": 0.3497,
+        "width": 0.4,
+        "height": 0.0714
+      },
+      "shape": "rectangle",
+      "text": "sun",
+      "fontName": "BradleyHandITCTT-Bold",
+      "fontSize": 46,
+      "color": "#2B2B2B",
+      "alignment": "center"
+    },
+    {
+      "id": "photo-2",
+      "type": "photo",
+      "frame": {
+        "x": 0.5704,
+        "y": 0.1663,
+        "width": 0.3592,
+        "height": 0.2874
+      },
+      "shape": "rectangle"
+    },
+    {
+      "id": "text-2",
+      "type": "text",
+      "frame": {
+        "x": 0.55,
+        "y": 0.4597,
+        "width": 0.4,
+        "height": 0.0714
+      },
+      "shape": "rectangle",
+      "text": "sea",
+      "fontName": "BradleyHandITCTT-Bold",
+      "fontSize": 46,
+      "color": "#2B2B2B",
+      "alignment": "center"
+    },
+    {
+      "id": "photo-3",
+      "type": "photo",
+      "frame": {
+        "x": 0.3104,
+        "y": 0.6013,
+        "width": 0.3592,
+        "height": 0.2874
+      },
+      "shape": "rectangle"
+    },
+    {
+      "id": "text-3",
+      "type": "text",
+      "frame": {
+        "x": 0.29,
+        "y": 0.8947,
+        "width": 0.4,
+        "height": 0.0714
+      },
+      "shape": "rectangle",
+      "text": "us",
+      "fontName": "BradleyHandITCTT-Bold",
+      "fontSize": 46,
+      "color": "#2B2B2B",
+      "alignment": "center"
+    }
+  ],
+  "background": {
+    "type": "pattern",
+    "pattern": "dots",
+    "ink": "#E2D8C8",
+    "paper": "#F7F2EA"
+  },
+  "decorations": [
+    {
+      "frame": {
+        "x": 0.05,
+        "y": 0.04,
+        "width": 0.4,
+        "height": 0.3891
+      },
+      "color": "#FFFFFF",
+      "cornerRadius": 0.004,
+      "shadow": 0.55
+    },
+    {
+      "frame": {
+        "x": 0.55,
+        "y": 0.15,
+        "width": 0.4,
+        "height": 0.3891
+      },
+      "color": "#FFFFFF",
+      "cornerRadius": 0.004,
+      "shadow": 0.55
+    },
+    {
+      "frame": {
+        "x": 0.29,
+        "y": 0.585,
+        "width": 0.4,
+        "height": 0.3891
+      },
+      "color": "#FFFFFF",
+      "cornerRadius": 0.004,
+      "shadow": 0.55
+    }
+  ]
+}

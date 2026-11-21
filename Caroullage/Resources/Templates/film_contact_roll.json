@@ -1,0 +1,682 @@
+{
+  "id": "film-contact-roll",
+  "name": "Contact Roll",
+  "category": "film",
+  "isPremium": false,
+  "canvasAspectRatio": "16:9",
+  "style": {
+    "spacing": 0
+  },
+  "cells": [
+    {
+      "id": "photo-1",
+      "type": "photo",
+      "frame": {
+        "x": 0.035,
+        "y": 0.2,
+        "width": 0.3,
+        "height": 0.6
+      },
+      "shape": "rectangle"
+    },
+    {
+      "id": "photo-2",
+      "type": "photo",
+      "frame": {
+        "x": 0.35,
+        "y": 0.2,
+        "width": 0.3,
+        "height": 0.6
+      },
+      "shape": "rectangle"
+    },
+    {
+      "id": "photo-3",
+      "type": "photo",
+      "frame": {
+        "x": 0.665,
+        "y": 0.2,
+        "width": 0.3,
+        "height": 0.6
+      },
+      "shape": "rectangle"
+    },
+    {
+      "id": "text-1",
+      "type": "text",
+      "frame": {
+        "x": 0.035,
+        "y": 0.125,
+        "width": 0.3,
+        "height": 0.06
+      },
+      "shape": "rectangle",
+      "text": "▸ 24A",
+      "fontName": "Courier-Bold",
+      "fontSize": 30,
+      "color": "#F29A38",
+      "alignment": "leading",
+      "letterSpacing": 3
+    },
+    {
+      "id": "text-2",
+      "type": "text",
+      "frame": {
+        "x": 0.665,
+        "y": 0.125,
+        "width": 0.3,
+        "height": 0.06
+      },
+      "shape": "rectangle",
+      "text": "ISO 400",
+      "fontName": "Courier-Bold",
+      "fontSize": 30,
+      "color": "#F29A38",
+      "alignment": "trailing",
+      "letterSpacing": 3
+    },
+    {
+      "id": "text-3",
+      "type": "text",
+      "frame": {
+        "x": 0.035,
+        "y": 0.815,
+        "width": 0.93,
+        "height": 0.06
+      },
+      "shape": "rectangle",
+      "text": "25        26        27",
+      "fontName": "Courier-Bold",
+      "fontSize": 28,
+      "color": "#F29A38",
+      "alignment": "center",
+      "letterSpacing": 6
+    }
+  ],
+  "background": {
+    "type": "solid",
+    "color": "#141210"
+  },
+  "decorations": [
+    {
+      "frame": {
+        "x": 0.012,
+        "y": 0.055,
+        "width": 0.014,
+        "height": 0.036
+      },
+      "color": "#EDE7DC",
+      "cornerRadius": 0.003
+    },
+    {
+      "frame": {
+        "x": 0.046,
+        "y": 0.055,
+        "width": 0.014,
+        "height": 0.036
+      },
+      "color": "#EDE7DC",
+      "cornerRadius": 0.003
+    },
+    {
+      "frame": {
+        "x": 0.08,
+        "y": 0.055,
+        "width": 0.014,
+        "height": 0.036
+      },
+      "color": "#EDE7DC",
+      "cornerRadius": 0.003
+    },
+    {
+      "frame": {
+        "x": 0.114,
+        "y": 0.055,
+        "width": 0.014,
+        "height": 0.036
+      },
+      "color": "#EDE7DC",
+      "cornerRadius": 0.003
+    },
+    {
+      "frame": {
+        "x": 0.148,
+        "y": 0.055,
+        "width": 0.014,
+        "height": 0.036
+      },
+      "color": "#EDE7DC",
+      "cornerRadius": 0.003
+    },
+    {
+      "frame": {
+        "x": 0.182,
+        "y": 0.055,
+        "width": 0.014,
+        "height": 0.036
+      },
+      "color": "#EDE7DC",
+      "cornerRadius": 0.003
+    },
+    {
+      "frame": {
+        "x": 0.216,
+        "y": 0.055,
+        "width": 0.014,
+        "height": 0.036
+      },
+      "color": "#EDE7DC",
+      "cornerRadius": 0.003
+    },
+    {
+      "frame": {
+        "x": 0.25,
+        "y": 0.055,
+        "width": 0.014,
+        "height": 0.036
+      },
+      "color": "#EDE7DC",
+      "cornerRadius": 0.003
+    },
+    {
+      "frame": {
+        "x": 0.284,
+        "y": 0.055,
+        "width": 0.014,
+        "height": 0.036
+      },
+      "color": "#EDE7DC",
+      "cornerRadius": 0.003
+    },
+    {
+      "frame": {
+        "x": 0.318,
+        "y": 0.055,
+        "width": 0.014,
+        "height": 0.036
+      },
+      "color": "#EDE7DC",
+      "cornerRadius": 0.003
+    },
+    {
+      "frame": {
+        "x": 0.352,
+        "y": 0.055,
+        "width": 0.014,
+        "height": 0.036
+      },
+      "color": "#EDE7DC",
+      "cornerRadius": 0.003
+    },
+    {
+      "frame": {
+        "x": 0.386,
+        "y": 0.055,
+        "width": 0.014,
+        "height": 0.036
+      },
+      "color": "#EDE7DC",
+      "cornerRadius": 0.003
+    },
+    {
+      "frame": {
+        "x": 0.42,
+        "y": 0.055,
+        "width": 0.014,
+        "height": 0.036
+      },
+      "color": "#EDE7DC",
+      "cornerRadius": 0.003
+    },
+    {
+      "frame": {
+        "x": 0.454,
+        "y": 0.055,
+        "width": 0.014,
+        "height": 0.036
+      },
+      "color": "#EDE7DC",
+      "cornerRadius": 0.003
+    },
+    {
+      "frame": {
+        "x": 0.488,
+        "y": 0.055,
+        "width": 0.014,
+        "height": 0.036
+      },
+      "color": "#EDE7DC",
+      "cornerRadius": 0.003
+    },
+    {
+      "frame": {
+        "x": 0.522,
+        "y": 0.055,
+        "width": 0.014,
+        "height": 0.036
+      },
+      "color": "#EDE7DC",
+      "cornerRadius": 0.003
+    },
+    {
+      "frame": {
+        "x": 0.556,
+        "y": 0.055,
+        "width": 0.014,
+        "height": 0.036
+      },
+      "color": "#EDE7DC",
+      "cornerRadius": 0.003
+    },
+    {
+      "frame": {
+        "x": 0.59,
+        "y": 0.055,
+        "width": 0.014,
+        "height": 0.036
+      },
+      "color": "#EDE7DC",
+      "cornerRadius": 0.003
+    },
+    {
+      "frame": {
+        "x": 0.624,
+        "y": 0.055,
+        "width": 0.014,
+        "height": 0.036
+      },
+      "color": "#EDE7DC",
+      "cornerRadius": 0.003
+    },
+    {
+      "frame": {
+        "x": 0.658,
+        "y": 0.055,
+        "width": 0.014,
+        "height": 0.036
+      },
+      "color": "#EDE7DC",
+      "cornerRadius": 0.003
+    },
+    {
+      "frame": {
+        "x": 0.692,
+        "y": 0.055,
+        "width": 0.014,
+        "height": 0.036
+      },
+      "color": "#EDE7DC",
+      "cornerRadius": 0.003
+    },
+    {
+      "frame": {
+        "x": 0.726,
+        "y": 0.055,
+        "width": 0.014,
+        "height": 0.036
+      },
+      "color": "#EDE7DC",
+      "cornerRadius": 0.003
+    },
+    {
+      "frame": {
+        "x": 0.76,
+        "y": 0.055,
+        "width": 0.014,
+        "height": 0.036
+      },
+      "color": "#EDE7DC",
+      "cornerRadius": 0.003
+    },
+    {
+      "frame": {
+        "x": 0.794,
+        "y": 0.055,
+        "width": 0.014,
+        "height": 0.036
+      },
+      "color": "#EDE7DC",
+      "cornerRadius": 0.003
+    },
+    {
+      "frame": {
+        "x": 0.828,
+        "y": 0.055,
+        "width": 0.014,
+        "height": 0.036
+      },
+      "color": "#EDE7DC",
+      "cornerRadius": 0.003
+    },
+    {
+      "frame": {
+        "x": 0.862,
+        "y": 0.055,
+        "width": 0.014,
+        "height": 0.036
+      },
+      "color": "#EDE7DC",
+      "cornerRadius": 0.003
+    },
+    {
+      "frame": {
+        "x": 0.896,
+        "y": 0.055,
+        "width": 0.014,
+        "height": 0.036
+      },
+      "color": "#EDE7DC",
+      "cornerRadius": 0.003
+    },
+    {
+      "frame": {
+        "x": 0.93,
+        "y": 0.055,
+        "width": 0.014,
+        "height": 0.036
+      },
+      "color": "#EDE7DC",
+      "cornerRadius": 0.003
+    },
+    {
+      "frame": {
+        "x": 0.964,
+        "y": 0.055,
+        "width": 0.014,
+        "height": 0.036
+      },
+      "color": "#EDE7DC",
+      "cornerRadius": 0.003
+    },
+    {
+      "frame": {
+        "x": 0.012,
+        "y": 0.909,
+        "width": 0.014,
+        "height": 0.036
+      },
+      "color": "#EDE7DC",
+      "cornerRadius": 0.003
+    },
+    {
+      "frame": {
+        "x": 0.046,
+        "y": 0.909,
+        "width": 0.014,
+        "height": 0.036
+      },
+      "color": "#EDE7DC",
+      "cornerRadius": 0.003
+    },
+    {
+      "frame": {
+        "x": 0.08,
+        "y": 0.909,
+        "width": 0.014,
+        "height": 0.036
+      },
+      "color": "#EDE7DC",
+      "cornerRadius": 0.003
+    },
+    {
+      "frame": {
+        "x": 0.114,
+        "y": 0.909,
+        "width": 0.014,
+        "height": 0.036
+      },
+      "color": "#EDE7DC",
+      "cornerRadius": 0.003
+    },
+    {
+      "frame": {
+        "x": 0.148,
+        "y": 0.909,
+        "width": 0.014,
+        "height": 0.036
+      },
+      "color": "#EDE7DC",
+      "cornerRadius": 0.003
+    },
+    {
+      "frame": {
+        "x": 0.182,
+        "y": 0.909,
+        "width": 0.014,
+        "height": 0.036
+      },
+      "color": "#EDE7DC",
+      "cornerRadius": 0.003
+    },
+    {
+      "frame": {
+        "x": 0.216,
+        "y": 0.909,
+        "width": 0.014,
+        "height": 0.036
+      },
+      "color": "#EDE7DC",
+      "cornerRadius": 0.003
+    },
+    {
+      "frame": {
+        "x": 0.25,
+        "y": 0.909,
+        "width": 0.014,
+        "height": 0.036
+      },
+      "color": "#EDE7DC",
+      "cornerRadius": 0.003
+    },
+    {
+      "frame": {
+        "x": 0.284,
+        "y": 0.909,
+        "width": 0.014,
+        "height": 0.036
+      },
+      "color": "#EDE7DC",
+      "cornerRadius": 0.003
+    },
+    {
+      "frame": {
+        "x": 0.318,
+        "y": 0.909,
+        "width": 0.014,
+        "height": 0.036
+      },
+      "color": "#EDE7DC",
+      "cornerRadius": 0.003
+    },
+    {
+      "frame": {
+        "x": 0.352,
+        "y": 0.909,
+        "width": 0.014,
+        "height": 0.036
+      },
+      "color": "#EDE7DC",
+      "cornerRadius": 0.003
+    },
+    {
+      "frame": {
+        "x": 0.386,
+        "y": 0.909,
+        "width": 0.014,
+        "height": 0.036
+      },
+      "color": "#EDE7DC",
+      "cornerRadius": 0.003
+    },
+    {
+      "frame": {
+        "x": 0.42,
+        "y": 0.909,
+        "width": 0.014,
+        "height": 0.036
+      },
+      "color": "#EDE7DC",
+      "cornerRadius": 0.003
+    },
+    {
+      "frame": {
+        "x": 0.454,
+        "y": 0.909,
+        "width": 0.014,
+        "height": 0.036
+      },
+      "color": "#EDE7DC",
+      "cornerRadius": 0.003
+    },
+    {
+      "frame": {
+        "x": 0.488,
+        "y": 0.909,
+        "width": 0.014,
+        "height": 0.036
+      },
+      "color": "#EDE7DC",
+      "cornerRadius": 0.003
+    },
+    {
+      "frame": {
+        "x": 0.522,
+        "y": 0.909,
+        "width": 0.014,
+        "height": 0.036
+      },
+      "color": "#EDE7DC",
+      "cornerRadius": 0.003
+    },
+    {
+      "frame": {
+        "x": 0.556,
+        "y": 0.909,
+        "width": 0.014,
+        "height": 0.036
+      },
+      "color": "#EDE7DC",
+      "cornerRadius": 0.003
+    },
+    {
+      "frame": {
+        "x": 0.59,
+        "y": 0.909,
+        "width": 0.014,
+        "height": 0.036
+      },
+      "color": "#EDE7DC",
+      "cornerRadius": 0.003
+    },
+    {
+      "frame": {
+        "x": 0.624,
+        "y": 0.909,
+        "width": 0.014,
+        "height": 0.036
+      },
+      "color": "#EDE7DC",
+      "cornerRadius": 0.003
+    },
+    {
+      "frame": {
+        "x": 0.658,
+        "y": 0.909,
+        "width": 0.014,
+        "height": 0.036
+      },
+      "color": "#EDE7DC",
+      "cornerRadius": 0.003
+    },
+    {
+      "frame": {
+        "x": 0.692,
+        "y": 0.909,
+        "width": 0.014,
+        "height": 0.036
+      },
+      "color": "#EDE7DC",
+      "cornerRadius": 0.003
+    },
+    {
+      "frame": {
+        "x": 0.726,
+        "y": 0.909,
+        "width": 0.014,
+        "height": 0.036
+      },
+      "color": "#EDE7DC",
+      "cornerRadius": 0.003
+    },
+    {
+      "frame": {
+        "x": 0.76,
+        "y": 0.909,
+        "width": 0.014,
+        "height": 0.036
+      },
+      "color": "#EDE7DC",
+      "cornerRadius": 0.003
+    },
+    {
+      "frame": {
+        "x": 0.794,
+        "y": 0.909,
+        "width": 0.014,
+        "height": 0.036
+      },
+      "color": "#EDE7DC",
+      "cornerRadius": 0.003
+    },
+    {
+      "frame": {
+        "x": 0.828,
+        "y": 0.909,
+        "width": 0.014,
+        "height": 0.036
+      },
+      "color": "#EDE7DC",
+      "cornerRadius": 0.003
+    },
+    {
+      "frame": {
+        "x": 0.862,
+        "y": 0.909,
+        "width": 0.014,
+        "height": 0.036
+      },
+      "color": "#EDE7DC",
+      "cornerRadius": 0.003
+    },
+    {
+      "frame": {
+        "x": 0.896,
+        "y": 0.909,
+        "width": 0.014,
+        "height": 0.036
+      },
+      "color": "#EDE7DC",
+      "cornerRadius": 0.003
+    },
+    {
+      "frame": {
+        "x": 0.93,
+        "y": 0.909,
+        "width": 0.014,
+        "height": 0.036
+      },
+      "color": "#EDE7DC",
+      "cornerRadius": 0.003
+    },
+    {
+      "frame": {
+        "x": 0.964,
+        "y": 0.909,
+        "width": 0.014,
+        "height": 0.036
+      },
+      "color": "#EDE7DC",
+      "cornerRadius": 0.003
+    }
+  ]
+}

@@ -1,0 +1,78 @@
+{
+  "id": "seasonal-holiday-booth",
+  "name": "Holiday Booth",
+  "category": "seasonal",
+  "isPremium": true,
+  "canvasAspectRatio": "9:16",
+  "style": {
+    "spacing": 0
+  },
+  "cells": [
+    {
+      "id": "photo-1",
+      "type": "photo",
+      "frame": {
+        "x": 0.2796,
+        "y": 0.0667,
+        "width": 0.4407,
+        "height": 0.2479
+      },
+      "shape": "rectangle"
+    },
+    {
+      "id": "photo-2",
+      "type": "photo",
+      "frame": {
+        "x": 0.2796,
+        "y": 0.3271,
+        "width": 0.4407,
+        "height": 0.2479
+      },
+      "shape": "rectangle"
+    },
+    {
+      "id": "photo-3",
+      "type": "photo",
+      "frame": {
+        "x": 0.2796,
+        "y": 0.5875,
+        "width": 0.4407,
+        "height": 0.2479
+      },
+      "shape": "rectangle"
+    },
+    {
+      "id": "text-1",
+      "type": "text",
+      "frame": {
+        "x": 0.25,
+        "y": 0.8474,
+        "width": 0.5,
+        "height": 0.0906
+      },
+      "shape": "rectangle",
+      "text": "happy holidays ✶",
+      "fontName": "BradleyHandITCTT-Bold",
+      "fontSize": 60,
+      "color": "#B3261E",
+      "alignment": "center"
+    }
+  ],
+  "background": {
+    "type": "solid",
+    "color": "#1F3B2D"
+  },
+  "decorations": [
+    {
+      "frame": {
+        "x": 0.25,
+        "y": 0.05,
+        "width": 0.5,
+        "height": 0.9
+      },
+      "color": "#FFFFFF",
+      "cornerRadius": 0.004,
+      "shadow": 0.6
+    }
+  ]
+}

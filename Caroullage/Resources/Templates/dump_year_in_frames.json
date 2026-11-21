@@ -1,0 +1,116 @@
+{
+  "id": "dump-year-in-frames",
+  "name": "2026 in Frames",
+  "category": "dump",
+  "isPremium": true,
+  "canvasAspectRatio": "4:5",
+  "style": {
+    "spacing": 12,
+    "cornerRadius": 10,
+    "outerMargin": 48
+  },
+  "cells": [
+    {
+      "id": "text-1",
+      "type": "text",
+      "frame": {
+        "x": 0.05,
+        "y": 0.0,
+        "width": 0.9,
+        "height": 0.2041
+      },
+      "shape": "rectangle",
+      "text": "2026",
+      "fontName": "Futura-Bold",
+      "fontSize": 190,
+      "color": "#1C1C1C",
+      "alignment": "leading"
+    },
+    {
+      "id": "text-2",
+      "type": "text",
+      "frame": {
+        "x": 0.06,
+        "y": 0.1392,
+        "width": 0.88,
+        "height": 0.0516
+      },
+      "shape": "rectangle",
+      "text": "a year in six frames",
+      "fontName": "Didot-Italic",
+      "fontSize": 48,
+      "color": "#5A5148",
+      "alignment": "leading"
+    },
+    {
+      "id": "photo-1",
+      "type": "photo",
+      "frame": {
+        "x": 0,
+        "y": 0.2,
+        "width": 0.5,
+        "height": 0.4
+      },
+      "shape": "rectangle"
+    },
+    {
+      "id": "photo-2",
+      "type": "photo",
+      "frame": {
+        "x": 0.5,
+        "y": 0.2,
+        "width": 0.5,
+        "height": 0.2
+      },
+      "shape": "rectangle"
+    },
+    {
+      "id": "photo-3",
+      "type": "photo",
+      "frame": {
+        "x": 0.5,
+        "y": 0.4,
+        "width": 0.5,
+        "height": 0.2
+      },
+      "shape": "rectangle"
+    },
+    {
+      "id": "photo-4",
+      "type": "photo",
+      "frame": {
+        "x": 0,
+        "y": 0.6,
+        "width": 0.34,
+        "height": 0.4
+      },
+      "shape": "rectangle"
+    },
+    {
+      "id": "photo-5",
+      "type": "photo",
+      "frame": {
+        "x": 0.34,
+        "y": 0.6,
+        "width": 0.33,
+        "height": 0.4
+      },
+      "shape": "rectangle"
+    },
+    {
+      "id": "photo-6",
+      "type": "photo",
+      "frame": {
+        "x": 0.67,
+        "y": 0.6,
+        "width": 0.33,
+        "height": 0.4
+      },
+      "shape": "rectangle"
+    }
+  ],
+  "background": {
+    "type": "solid",
+    "color": "#EFE8DD"
+  }
+}

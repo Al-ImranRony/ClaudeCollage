@@ -40,11 +40,17 @@ def main():
         assert not missing, f"{key!r} lacks {missing}"
         assert key not in existing or not existing[key].get('localizations'), f"{key!r} already localized"
         stub = f'    {esc(key)} : {{}},'
+        # Xcode also writes an empty stub across lines: `"Key" : {\n\n    },`.
+        spread = f'    {esc(key)} : {{\n\n    }},'
         if stub in raw:
             raw = raw.replace(stub, block(key, locs) + ',')
+        elif spread in raw:
+            raw = raw.replace(spread, block(key, locs) + ',')
         else:
-            tail = '\n  },\n  "version" : "1.0"\n}\n'
-            assert raw.endswith(tail), "unexpected file tail"
+            # xcstringstool writes no trailing newline; Xcode's own save does.
+            tail = next((t for t in ('\n  },\n  "version" : "1.0"\n}\n', '\n  },\n  "version" : "1.0"\n}')
+                         if raw.endswith(t)), None)
+            assert tail, "unexpected file tail"
             raw = raw[:-len(tail)] + ',\n' + block(key, locs) + tail
     json.loads(raw)
     open(path, 'w').write(raw)

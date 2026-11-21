@@ -274,8 +274,15 @@ final class ShowcasePreviewTests: XCTestCase {
             return Self.pixel(source, x: source.width / 2, y: source.height / 2)
         }
 
-        let travelCenter = try sourceCenterPixel("sample_travel_01")
-        let foodCenter = try sourceCenterPixel("sample_food_01")
+        // The 2nd and 4th photos grid-4cell-square is dressed with, read from
+        // the manifest so re-dressing the template (as the 2026-11-21 photo
+        // pool did) cannot leave this test checking for files it no longer uses.
+        // The names below keep their original meaning: "travel" is the 2nd
+        // photo, "food" the 4th.
+        let dressing = try XCTUnwrap(catalog.manifest?.templates["grid-4cell-square"]?.photos)
+        XCTAssertEqual(dressing.count, 4, "grid-4cell-square is dressed with four photos")
+        let travelCenter = try sourceCenterPixel(dressing[1])
+        let foodCenter = try sourceCenterPixel(dressing[3])
 
         // Sanity: if these two references were not visually distinct, no
         // assertion below could actually distinguish "landed correctly" from

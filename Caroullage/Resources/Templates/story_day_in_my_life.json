@@ -1,0 +1,78 @@
+{
+  "id": "story-day-in-my-life",
+  "name": "Day in My Life",
+  "category": "story",
+  "isPremium": false,
+  "canvasAspectRatio": "9:16",
+  "style": {
+    "spacing": 20,
+    "cornerRadius": 28,
+    "outerMargin": 56
+  },
+  "cells": [
+    {
+      "id": "text-1",
+      "type": "text",
+      "frame": {
+        "x": 0.05,
+        "y": 0.0263,
+        "width": 0.9,
+        "height": 0.0725
+      },
+      "shape": "rectangle",
+      "text": "a day in my life",
+      "fontName": "BradleyHandITCTT-Bold",
+      "fontSize": 96,
+      "color": "#2B2622",
+      "alignment": "center"
+    },
+    {
+      "id": "photo-1",
+      "type": "photo",
+      "frame": {
+        "x": 0,
+        "y": 0.1,
+        "width": 1,
+        "height": 0.42
+      },
+      "shape": "rectangle"
+    },
+    {
+      "id": "photo-2",
+      "type": "photo",
+      "frame": {
+        "x": 0,
+        "y": 0.52,
+        "width": 0.5,
+        "height": 0.48
+      },
+      "shape": "rectangle"
+    },
+    {
+      "id": "photo-3",
+      "type": "photo",
+      "frame": {
+        "x": 0.5,
+        "y": 0.52,
+        "width": 0.5,
+        "height": 0.24
+      },
+      "shape": "rectangle"
+    },
+    {
+      "id": "photo-4",
+      "type": "photo",
+      "frame": {
+        "x": 0.5,
+        "y": 0.76,
+        "width": 0.5,
+        "height": 0.24
+      },
+      "shape": "rectangle"
+    }
+  ],
+  "background": {
+    "type": "solid",
+    "color": "#F7F3EE"
+  }
+}

@@ -1,0 +1,100 @@
+{
+  "id": "dump-weekend-recap",
+  "name": "Weekend Recap",
+  "category": "dump",
+  "isPremium": false,
+  "canvasAspectRatio": "9:16",
+  "style": {
+    "spacing": 14,
+    "cornerRadius": 22,
+    "outerMargin": 44
+  },
+  "cells": [
+    {
+      "id": "text-1",
+      "type": "text",
+      "frame": {
+        "x": 0.06,
+        "y": 0.0248,
+        "width": 0.88,
+        "height": 0.0665
+      },
+      "shape": "rectangle",
+      "text": "weekend recap",
+      "fontName": "AvenirNext-Bold",
+      "fontSize": 88,
+      "color": "#FFFFFF",
+      "alignment": "leading"
+    },
+    {
+      "id": "photo-1",
+      "type": "photo",
+      "frame": {
+        "x": 0,
+        "y": 0.1,
+        "width": 0.5,
+        "height": 0.3
+      },
+      "shape": "rectangle"
+    },
+    {
+      "id": "photo-2",
+      "type": "photo",
+      "frame": {
+        "x": 0.5,
+        "y": 0.1,
+        "width": 0.5,
+        "height": 0.3
+      },
+      "shape": "rectangle"
+    },
+    {
+      "id": "photo-3",
+      "type": "photo",
+      "frame": {
+        "x": 0,
+        "y": 0.4,
+        "width": 0.5,
+        "height": 0.3
+      },
+      "shape": "rectangle"
+    },
+    {
+      "id": "photo-4",
+      "type": "photo",
+      "frame": {
+        "x": 0.5,
+        "y": 0.4,
+        "width": 0.5,
+        "height": 0.3
+      },
+      "shape": "rectangle"
+    },
+    {
+      "id": "photo-5",
+      "type": "photo",
+      "frame": {
+        "x": 0,
+        "y": 0.7,
+        "width": 0.5,
+        "height": 0.3
+      },
+      "shape": "rectangle"
+    },
+    {
+      "id": "photo-6",
+      "type": "photo",
+      "frame": {
+        "x": 0.5,
+        "y": 0.7,
+        "width": 0.5,
+        "height": 0.3
+      },
+      "shape": "rectangle"
+    }
+  ],
+  "background": {
+    "type": "solid",
+    "color": "#111214"
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "id": "grid-rounded-trio",
+  "name": "Rounded Trio",
+  "category": "grid",
+  "isPremium": false,
+  "canvasAspectRatio": "4:5",
+  "style": {
+    "spacing": 24,
+    "cornerRadius": 36,
+    "outerMargin": 48
+  },
+  "cells": [
+    {
+      "id": "photo-1",
+      "type": "photo",
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "width": 1,
+        "height": 0.55
+      },
+      "shape": "rectangle"
+    },
+    {
+      "id": "photo-2",
+      "type": "photo",
+      "frame": {
+        "x": 0,
+        "y": 0.55,
+        "width": 0.5,
+        "height": 0.45
+      },
+      "shape": "rectangle"
+    },
+    {
+      "id": "photo-3",
+      "type": "photo",
+      "frame": {
+        "x": 0.5,
+        "y": 0.55,
+        "width": 0.5,
+        "height": 0.45
+      },
+      "shape": "rectangle"
+    }
+  ],
+  "background": {
+    "type": "solid",
+    "color": "#F2F2F0"
+  }
+}

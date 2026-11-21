@@ -66,6 +66,9 @@ final class BrowseTemplateCell: UICollectionViewCell {
         /// A template the user saved (phase 4). Defaulted so the two galleries'
         /// existing call sites read unchanged.
         var saved: Bool = false
+        /// A short tag over the artwork's top-leading corner ("New"). Only the
+        /// Collage tab's fresh templates carry one; nil draws nothing.
+        var tag: String? = nil
     }
 
     /// Room under the artwork for the name and the metadata row. Fixed, and
@@ -97,6 +100,7 @@ final class BrowseTemplateCell: UICollectionViewCell {
     private let badgeRow = UIStackView()
     private let nameLabel = UILabel()
     private let metaLabel = UILabel()
+    private let tagLabel = TagPillLabel()
 
     private var previewTask: Task<Void, Never>?
 
@@ -175,9 +179,13 @@ final class BrowseTemplateCell: UICollectionViewCell {
         metaLabel.lineBreakMode = .byTruncatingTail
         metaLabel.translatesAutoresizingMaskIntoConstraints = false
 
+        tagLabel.setTitle(nil)
+        tagLabel.translatesAutoresizingMaskIntoConstraints = false
+
         contentView.addSubview(artwork)
         contentView.addSubview(pageDots)
         contentView.addSubview(badgeRow)
+        contentView.addSubview(tagLabel)
         contentView.addSubview(nameLabel)
         contentView.addSubview(metaLabel)
 
@@ -208,6 +216,13 @@ final class BrowseTemplateCell: UICollectionViewCell {
             pageDotsHeight,
             nameLabel.topAnchor.constraint(
                 equalTo: pageDots.bottomAnchor, constant: Theme.Spacing.xxs),
+
+            tagLabel.topAnchor.constraint(
+                equalTo: artwork.topAnchor, constant: Theme.Spacing.xs),
+            tagLabel.leadingAnchor.constraint(
+                equalTo: artwork.leadingAnchor, constant: Theme.Spacing.xs),
+            tagLabel.trailingAnchor.constraint(
+                lessThanOrEqualTo: badgeRow.leadingAnchor, constant: -Theme.Spacing.xxs),
 
             badgeRow.topAnchor.constraint(
                 equalTo: artwork.topAnchor, constant: Theme.Spacing.xs),
@@ -306,6 +321,7 @@ final class BrowseTemplateCell: UICollectionViewCell {
 
         lockBadge.isHidden = !locked
         savedBadge.isHidden = !content.saved
+        tagLabel.setTitle(content.tag)
 
         let pageCount = resolvedPageCount(paging: slides != nil, content.pages)
         artwork.setPageCount(pageCount)
@@ -324,6 +340,7 @@ final class BrowseTemplateCell: UICollectionViewCell {
         if let pages { spoken.append(String(localized: "\(pages) pages")) }
         if locked { spoken.append(String(localized: "premium")) }
         if content.saved { spoken.append(String(localized: "saved")) }
+        if let tag = content.tag { spoken.insert(tag, at: 0) }
         baseAccessibilityValue = spoken.joined(separator: ", ")
         updatePageAccessibility()
 
@@ -501,6 +518,7 @@ final class BrowseTemplateCell: UICollectionViewCell {
         accessibilityValue = nil
         baseAccessibilityValue = ""
         savedBadge.isHidden = true
+        tagLabel.setTitle(nil)
         accessibilityCustomActions = nil
     }
 }

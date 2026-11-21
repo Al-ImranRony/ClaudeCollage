@@ -279,7 +279,8 @@ public final class TemplateService {
         return RenderRequest(
             canvasSize: request.canvasSize, background: request.background, cells: dressed,
             textOverlays: request.textOverlays, textFontScale: request.textFontScale,
-            stickerOverlays: request.stickerOverlays, stickerImages: request.stickerImages
+            stickerOverlays: request.stickerOverlays, stickerImages: request.stickerImages,
+            frameStyle: request.frameStyle, decorations: request.decorations
         )
     }
 
@@ -963,6 +964,10 @@ public final class TemplateService {
         let canvas = CGSize(width: (native.width * scale).rounded(),
                             height: (native.height * scale).rounded())
 
+        if let style = template.style {
+            return styledRenderRequest(for: template, style: style, canvas: canvas, scale: scale)
+        }
+
         let cells: [RenderCell] = template.cells
             .filter { $0.zoneType == .photo || $0.zoneType == .art }
             .map { cell in
@@ -987,7 +992,38 @@ public final class TemplateService {
 
         return RenderRequest(canvasSize: canvas, background: template.background,
                              cells: cells, textOverlays: textOverlays, textFontScale: scale,
-                             stickerOverlays: Self.stickerOverlays(for: template))
+                             stickerOverlays: Self.stickerOverlays(for: template),
+                             decorations: template.decorations)
+    }
+
+    /// A styled template's request: its cells laid out by the editor's own
+    /// `CollageLayoutEngine` call, with the style's spacing, margin and corner
+    /// radius scaled from reference points to this canvas. The project the
+    /// template opens is therefore the picture its card showed, not a cousin of it.
+    private func styledRenderRequest(
+        for template: CollageTemplate, style: TemplateStyle, canvas: CGSize, scale: CGFloat
+    ) -> RenderRequest {
+        let layout = CollageLayout.template(Self.editorLayout(for: template))
+        let frames = CollageLayoutEngine().layout(
+            for: layout, canvasSize: canvas,
+            borderWidth: CGFloat(style.spacing) * scale,
+            margin: style.frameStyle.outerMargin.map { CGFloat($0) * scale })
+        let cells = frames.map { frame in
+            RenderCell(
+                frame: frame.frame, image: nil,
+                transform: CellTransform(panX: 0, panY: 0, zoom: 1, rotationRadians: 0),
+                cornerRadius: CGFloat(style.cornerRadius) * scale,
+                clipShape: frame.clipShape)
+        }
+        // Outline width is in reference points like everything else; shadow
+        // geometry is already relative to the canvas.
+        var frameStyle = style.frameStyle
+        frameStyle.outlineWidth *= Double(scale)
+        return RenderRequest(canvasSize: canvas, background: template.background,
+                             cells: cells, textOverlays: template.cells.compactMap(\.textStyle),
+                             textFontScale: scale,
+                             stickerOverlays: Self.stickerOverlays(for: template),
+                             frameStyle: frameStyle, decorations: template.decorations)
     }
 
     // MARK: - Sticker seeding
@@ -1061,6 +1097,11 @@ public final class TemplateService {
         }
         mix(template.canvasAspectRatio)
         mix(String(describing: template.background))
+        // Styled templates lay out through the engine and paint decorations, so
+        // both must move the digest. Absent for the legacy catalog, whose keys
+        // therefore stay exactly as they were — no needless re-render.
+        if let style = template.style { mix("style:\(style)") }
+        if !template.decorations.isEmpty { mix("deco:\(template.decorations)") }
         for cell in template.cells {
             mix("\(cell.type)|\(cell.shape.rawValue)|\(cell.cornerRadius)|\(cell.stickerID ?? "")|")
             mix("\(cell.frame.minX),\(cell.frame.minY),\(cell.frame.width),\(cell.frame.height);")

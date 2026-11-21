@@ -126,6 +126,18 @@ extension PerformanceUITests {
         measureDrives(in: app, label: "Carousel tab")
     }
 
+    /// The Collage tab browses as a spotlight and sideways shelves over a
+    /// vertical page (2026-11-21) — the drive scrolls the page through all of
+    /// them and into the catalog grid, cold caches first.
+    @MainActor
+    func testCollageTabScrollHitches() throws {
+        let app = launchCold()
+        app.buttons["templatesButton"].tap()
+        let grid = app.collectionViews["templateGalleryGrid"]
+        XCTAssertTrue(grid.waitForExistence(timeout: 8))
+        measureDrives(in: app, label: "Collage tab")
+    }
+
     @MainActor
     func testHomeScrollHitches() throws {
         let app = launchCold()

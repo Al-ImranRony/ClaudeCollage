@@ -1,0 +1,65 @@
+{
+  "id": "minimal-bubbles",
+  "name": "Bubbles",
+  "category": "minimal",
+  "isPremium": true,
+  "canvasAspectRatio": "1:1",
+  "style": {
+    "spacing": 0,
+    "shadow": 0.45,
+    "outlineWidth": 10,
+    "outlineHex": "#FFFFFF"
+  },
+  "cells": [
+    {
+      "id": "photo-1",
+      "type": "photo",
+      "frame": {
+        "x": 0.08,
+        "y": 0.08,
+        "width": 0.58,
+        "height": 0.58
+      },
+      "shape": "circle"
+    },
+    {
+      "id": "photo-2",
+      "type": "photo",
+      "frame": {
+        "x": 0.66,
+        "y": 0.06,
+        "width": 0.28,
+        "height": 0.28
+      },
+      "shape": "circle"
+    },
+    {
+      "id": "photo-3",
+      "type": "photo",
+      "frame": {
+        "x": 0.6,
+        "y": 0.56,
+        "width": 0.34,
+        "height": 0.34
+      },
+      "shape": "circle"
+    },
+    {
+      "id": "photo-4",
+      "type": "photo",
+      "frame": {
+        "x": 0.14,
+        "y": 0.68,
+        "width": 0.26,
+        "height": 0.26
+      },
+      "shape": "circle"
+    }
+  ],
+  "background": {
+    "type": "pattern",
+    "pattern": "dots",
+    "ink": "#EADFCB",
+    "paper": "#FAF6EF"
+  }
+}

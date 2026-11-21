@@ -42,6 +42,8 @@ struct CanvasModel {
     var backgroundPhoto: CGImage? = nil
     /// Shadow and outline (the margin is already in the cell frames).
     var frameStyle: FrameStyle = FrameStyle()
+    /// The template's cards and bands, painted between background and cells.
+    var decorations: [CanvasDecoration] = []
 }
 
 final class CanvasView: UIView {
@@ -53,6 +55,11 @@ final class CanvasView: UIView {
     /// `BackgroundRendering` — the export's own painter — once per change, not
     /// per frame. Solid colours skip it and use the container's fill.
     private let backgroundLayer = CALayer()
+    /// The template's decorations, rasterized through `DecorationRendering` —
+    /// the export's own painter — only when they or the on-screen size change.
+    /// They never change during an edit, so a border drag never re-draws them.
+    private let decorationLayer = CALayer()
+    private var decorationKey: DecorationKey?
     private var backgroundKey: BackgroundKey?
     /// Casts every cell's drop shadow from one combined `shadowPath`. Sits under
     /// the cells because a cell clips to its bounds and cannot draw its own.
@@ -129,9 +136,11 @@ final class CanvasView: UIView {
         // Inserted before any cell view exists, so every cell lands above them.
         backgroundLayer.contentsGravity = .resize
         contentContainer.layer.insertSublayer(backgroundLayer, at: 0)
+        decorationLayer.contentsGravity = .resize
+        contentContainer.layer.insertSublayer(decorationLayer, above: backgroundLayer)
         cellShadowLayer.shadowColor = UIColor.black.cgColor
         cellShadowLayer.isHidden = true
-        contentContainer.layer.insertSublayer(cellShadowLayer, above: backgroundLayer)
+        contentContainer.layer.insertSublayer(cellShadowLayer, above: decorationLayer)
 
         snapGuideLayer.strokeColor = Theme.Color.accent.cgColor
         snapGuideLayer.lineWidth = 1
@@ -361,6 +370,7 @@ final class CanvasView: UIView {
         referenceScaleFactor = square.width / model.canvasSize.width
         let factor = referenceScaleFactor
         updateBackground(model, factor: factor)
+        updateDecorations(model, factor: factor)
         let outlineColor = UIColor(hex: model.frameStyle.outlineHex).cgColor
         let outlineWidth = CGFloat(model.frameStyle.outlineWidth) * factor
 
@@ -417,6 +427,24 @@ final class CanvasView: UIView {
         backgroundLayer.contents = BackgroundRendering.image(
             model.background, canvasSize: model.canvasSize,
             scale: factor * traitCollection.displayScale, photo: model.backgroundPhoto)
+    }
+
+    private struct DecorationKey: Equatable {
+        let decorations: [CanvasDecoration]
+        let size: CGSize
+    }
+
+    private func updateDecorations(_ model: CanvasModel, factor: CGFloat) {
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        defer { CATransaction.commit() }
+        decorationLayer.frame = contentContainer.bounds
+        let key = DecorationKey(decorations: model.decorations, size: contentContainer.bounds.size)
+        guard key != decorationKey else { return }
+        decorationKey = key
+        decorationLayer.contents = DecorationRendering.image(
+            model.decorations, canvasSize: model.canvasSize,
+            scale: factor * traitCollection.displayScale)
     }
 
     /// One shadow for all cells, traced from the same shape paths the cells clip

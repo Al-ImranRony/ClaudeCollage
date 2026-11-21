@@ -1,0 +1,66 @@
+{
+  "id": "grid-soft-four",
+  "name": "Soft Grid",
+  "category": "grid",
+  "isPremium": false,
+  "canvasAspectRatio": "1:1",
+  "style": {
+    "spacing": 30,
+    "cornerRadius": 40,
+    "outerMargin": 60
+  },
+  "cells": [
+    {
+      "id": "photo-1",
+      "type": "photo",
+      "frame": {
+        "x": 0.0,
+        "y": 0.0,
+        "width": 0.5,
+        "height": 0.5
+      },
+      "shape": "rectangle"
+    },
+    {
+      "id": "photo-2",
+      "type": "photo",
+      "frame": {
+        "x": 0.5,
+        "y": 0.0,
+        "width": 0.5,
+        "height": 0.5
+      },
+      "shape": "rectangle"
+    },
+    {
+      "id": "photo-3",
+      "type": "photo",
+      "frame": {
+        "x": 0.0,
+        "y": 0.5,
+        "width": 0.5,
+        "height": 0.5
+      },
+      "shape": "rectangle"
+    },
+    {
+      "id": "photo-4",
+      "type": "photo",
+      "frame": {
+        "x": 0.5,
+        "y": 0.5,
+        "width": 0.5,
+        "height": 0.5
+      },
+      "shape": "rectangle"
+    }
+  ],
+  "background": {
+    "type": "gradient",
+    "colors": [
+      "#F6D9E3",
+      "#DCE6F7"
+    ],
+    "angle": 135
+  }
+}

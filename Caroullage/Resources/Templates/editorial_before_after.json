@@ -1,0 +1,72 @@
+{
+  "id": "editorial-before-after",
+  "name": "Before & After",
+  "category": "editorial",
+  "isPremium": false,
+  "canvasAspectRatio": "4:5",
+  "style": {
+    "spacing": 12
+  },
+  "cells": [
+    {
+      "id": "photo-1",
+      "type": "photo",
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "width": 0.5,
+        "height": 1
+      },
+      "shape": "rectangle"
+    },
+    {
+      "id": "photo-2",
+      "type": "photo",
+      "frame": {
+        "x": 0.5,
+        "y": 0,
+        "width": 0.5,
+        "height": 1
+      },
+      "shape": "rectangle"
+    },
+    {
+      "id": "text-1",
+      "type": "text",
+      "frame": {
+        "x": 0.0,
+        "y": 0.905,
+        "width": 0.5,
+        "height": 0.05
+      },
+      "shape": "rectangle",
+      "text": "BEFORE",
+      "fontName": "AvenirNext-Bold",
+      "fontSize": 40,
+      "color": "#FFFFFF",
+      "alignment": "center",
+      "letterSpacing": 10
+    },
+    {
+      "id": "text-2",
+      "type": "text",
+      "frame": {
+        "x": 0.5,
+        "y": 0.905,
+        "width": 0.5,
+        "height": 0.05
+      },
+      "shape": "rectangle",
+      "text": "AFTER",
+      "fontName": "AvenirNext-Bold",
+      "fontSize": 40,
+      "color": "#FFFFFF",
+      "alignment": "center",
+      "letterSpacing": 10
+    }
+  ],
+  "background": {
+    "type": "solid",
+    "color": "#FFFFFF"
+  }
+}
