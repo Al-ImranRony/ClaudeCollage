@@ -58,6 +58,23 @@ final class HeroShowcaseView: UIView {
                 guard aspect > 0 else { return .fill }
                 return 1 / aspect >= 1.5 ? .story(aspect: aspect) : .fill
             }
+
+            /// A designed collage is a composition, not footage: its prints,
+            /// tape and mastheads sit at the edges, and the landscape card's
+            /// fill crops a 4:5 post by over a third, which cuts off exactly
+            /// those. So portrait collages (4:5 and taller) stand whole. Square
+            /// and landscape ones still fill.
+            static func resolveComposition(aspect: CGFloat) -> Stage {
+                guard aspect > 0 else { return .fill }
+                return 1 / aspect >= 1.2 ? .story(aspect: aspect) : .fill
+            }
+
+            /// Whether a story-stage frame really is a story, so it wears the
+            /// segment chrome. A 4:5 post standing whole is not one.
+            var isNineSixteenStory: Bool {
+                if case .story(let aspect) = self { return aspect <= 0.62 }
+                return false
+            }
         }
 
         let title: String
@@ -629,7 +646,7 @@ private final class HeroPageCell: UICollectionViewCell {
         mediaView.layer.borderWidth = isStory ? 0.5 : 0
         mediaView.layer.borderColor = UIColor.white.withAlphaComponent(0.18).cgColor
         mediaFrame.layer.shadowOpacity = isStory ? 0.5 : 0
-        storyChrome.isHidden = !isStory
+        storyChrome.isHidden = !stage.isNineSixteenStory
         deckView.isHidden = stage != .deck
         compareView.isHidden = stage != .compare
         backdrop.isHidden = stage == .fill || stage == .compare

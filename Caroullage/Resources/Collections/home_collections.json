@@ -1,34 +1,6 @@
 {
-  "version": 2,
+  "version": 3,
   "collections": [
-    {
-      "id": "weekly-picks",
-      "titleKey": "Featured This Week",
-      "subtitleKey": "Hand-picked, fresh every Monday",
-      "kind": "photo",
-      "weeklyPick": 6,
-      "galleryCategory": "All",
-      "itemIDs": [
-        "minimal-duo-offset",
-        "story-caption-hero",
-        "grid-mosaic-four",
-        "travel-horizon-split",
-        "minimal-gallery-trio",
-        "story-stack-trio",
-        "grid-six-airy",
-        "minimal-frame-quote",
-        "travel-postcard-note",
-        "story-split-tall",
-        "minimal-solo-frame",
-        "grid-filmstrip",
-        "seasonal-bloom",
-        "story-quote-block",
-        "minimal-split-air",
-        "travel-panorama-row",
-        "grid-celebrate",
-        "minimal-tower"
-      ]
-    },
     {
       "id": "spring",
       "titleKey": "Spring",
@@ -43,9 +15,10 @@
       "priority": 10,
       "itemIDs": [
         "seasonal-bloom",
+        "minimal-cameo",
         "minimal-circle-focus",
         "minimal-gallery-trio",
-        "travel-postcard-note",
+        "minimal-bubbles",
         "story-hero-strip",
         "minimal-split-air"
       ]
@@ -64,7 +37,9 @@
       "priority": 10,
       "itemIDs": [
         "travel-panorama-row",
+        "travel-boarding-pass",
         "travel-horizon-split",
+        "dump-weekend-recap",
         "travel-postcard",
         "story-split-tall",
         "grid-six-airy",
@@ -84,6 +59,8 @@
       "galleryCategory": "Seasonal",
       "priority": 10,
       "itemIDs": [
+        "seasonal-friendsgiving",
+        "seasonal-cozy",
         "seasonal-thanks",
         "seasonal-quartet",
         "travel-horizon-split",
@@ -105,12 +82,45 @@
       "galleryCategory": "Seasonal",
       "priority": 10,
       "itemIDs": [
+        "seasonal-friendsgiving",
+        "seasonal-cozy",
+        "seasonal-holiday-booth",
+        "dump-year-in-frames",
         "seasonal-sparkle",
-        "seasonal-ornament",
         "seasonal-greeting",
+        "seasonal-ornament",
         "seasonal-thanks",
-        "grid-celebrate",
-        "birthday-confetti"
+        "grid-celebrate"
+      ]
+    },
+    {
+      "id": "trending",
+      "titleKey": "Trending Now",
+      "subtitleKey": "What everyone is posting this week",
+      "kind": "photo",
+      "isNew": true,
+      "priority": 5,
+      "weeklyPick": 6,
+      "galleryCategory": "All",
+      "itemIDs": [
+        "instant-trio",
+        "dump-nine",
+        "editorial-cover",
+        "film-contact-roll",
+        "instant-taped",
+        "story-day-in-my-life",
+        "editorial-issue",
+        "instant-solo",
+        "film-strip-story",
+        "dump-weekend-recap",
+        "minimal-bubbles",
+        "film-negative-duo",
+        "instant-booth",
+        "editorial-the-edit",
+        "dump-moodboard",
+        "editorial-before-after",
+        "travel-boarding-pass",
+        "grid-airy-nine"
       ]
     },
     {
@@ -148,6 +158,10 @@
       ],
       "galleryCategory": "Story",
       "itemIDs": [
+        "story-day-in-my-life",
+        "editorial-the-edit",
+        "instant-booth",
+        "film-strip-story",
         "story-caption-hero",
         "story-hero-strip",
         "story-stack-trio",
@@ -166,12 +180,74 @@
       ],
       "galleryCategory": "Grid",
       "itemIDs": [
-        "grid-4cell-square",
+        "grid-airy-nine",
         "grid-mosaic-four",
         "grid-six-airy",
         "minimal-tower",
         "minimal-gallery-trio",
-        "grid-filmstrip"
+        "grid-4cell-square",
+        "dump-nine"
+      ]
+    },
+    {
+      "id": "instant-booth",
+      "titleKey": "Instant & Booth",
+      "subtitleKey": "Prints, strips and taped snapshots",
+      "kind": "photo",
+      "galleryCategory": "Instant",
+      "itemIDs": [
+        "instant-trio",
+        "instant-solo",
+        "instant-booth",
+        "instant-taped",
+        "seasonal-holiday-booth",
+        "film-strip-story",
+        "minimal-sticker-accent"
+      ]
+    },
+    {
+      "id": "shot-on-film",
+      "titleKey": "Shot on Film",
+      "subtitleKey": "Sprockets, frame numbers, analog warmth",
+      "kind": "photo",
+      "galleryCategory": "Film",
+      "itemIDs": [
+        "film-contact-roll",
+        "film-negative-duo",
+        "film-strip-story",
+        "grid-filmstrip",
+        "instant-taped",
+        "travel-horizon-split"
+      ]
+    },
+    {
+      "id": "editorial",
+      "titleKey": "Editorial",
+      "subtitleKey": "Magazine covers for your everyday",
+      "kind": "photo",
+      "galleryCategory": "Editorial",
+      "itemIDs": [
+        "editorial-issue",
+        "editorial-cover",
+        "editorial-the-edit",
+        "editorial-before-after",
+        "minimal-white-space",
+        "minimal-frame-quote"
+      ]
+    },
+    {
+      "id": "photo-dump",
+      "titleKey": "Photo Dump",
+      "subtitleKey": "The whole weekend in one post",
+      "kind": "photo",
+      "galleryCategory": "Photo Dump",
+      "itemIDs": [
+        "dump-nine",
+        "dump-weekend-recap",
+        "dump-moodboard",
+        "dump-year-in-frames",
+        "grid-airy-nine",
+        "grid-six-airy"
       ]
     },
     {
@@ -184,6 +260,7 @@
         "birthday-bash",
         "birthday-confetti",
         "grid-celebrate",
+        "instant-booth",
         "minimal-sticker-accent",
         "seasonal-greeting"
       ]
@@ -195,12 +272,14 @@
       "kind": "photo",
       "galleryCategory": "Minimal",
       "itemIDs": [
+        "minimal-white-space",
+        "minimal-bubbles",
+        "minimal-cameo",
         "minimal-duo-offset",
         "minimal-solo-frame",
         "minimal-split-air",
         "minimal-tower",
-        "minimal-circle-focus",
-        "minimal-sticker-accent"
+        "minimal-circle-focus"
       ]
     },
     {
@@ -210,11 +289,13 @@
       "kind": "photo",
       "galleryCategory": "Travel",
       "itemIDs": [
+        "travel-boarding-pass",
         "travel-horizon-split",
         "travel-postcard-note",
         "travel-panorama-row",
         "travel-passport",
-        "travel-postcard"
+        "travel-postcard",
+        "film-contact-roll"
       ]
     },
     {
@@ -254,14 +335,14 @@
       "isPillar": true,
       "galleryCategory": "All",
       "itemIDs": [
-        "grid-mosaic-four",
+        "grid-soft-four",
+        "grid-rounded-trio",
+        "minimal-white-space",
         "minimal-duo-offset",
         "travel-postcard-note",
-        "grid-six-airy",
-        "minimal-circle-focus",
+        "grid-mosaic-four",
         "seasonal-bloom",
         "grid-filmstrip",
-        "minimal-gallery-trio",
         "birthday-confetti"
       ]
     },
@@ -288,15 +369,15 @@
       "kind": "carousel",
       "isPillar": true,
       "itemIDs": [
-        "carousel-matched-filmframes",
         "carousel-matched-menu",
+        "carousel-story-recipe",
+        "carousel-panoramic-sunset",
         "carousel-matched-contactsheet",
         "carousel-story-editorial",
-        "carousel-panoramic-sunset",
-        "carousel-story-recipe",
-        "carousel-matched-quotes",
         "carousel-gridpreview-travel",
-        "carousel-matched-product"
+        "carousel-matched-quotes",
+        "carousel-matched-product",
+        "carousel-story-lessons"
       ]
     }
   ]

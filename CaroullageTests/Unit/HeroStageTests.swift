@@ -133,6 +133,22 @@ final class HeroStageTests: XCTestCase {
         XCTAssertEqual(Stage.resolve(aspect: 0), .fill, "an unknown shape fills rather than vanishing")
     }
 
+    /// A designed collage (Instant Trio, Editorial Issue) stands whole from
+    /// 4:5 up: a fill would crop off the prints and the masthead. Only a real
+    /// 9:16 frame wears the story segments.
+    func testPortraitCollagesStandWholeAndOnlyStoriesWearTheSegments() {
+        typealias Stage = HeroShowcaseView.Page.Stage
+        XCTAssertEqual(Stage.resolveComposition(aspect: 4.0 / 5.0), .story(aspect: 4.0 / 5.0))
+        XCTAssertEqual(Stage.resolveComposition(aspect: 9.0 / 16.0), .story(aspect: 9.0 / 16.0))
+        XCTAssertEqual(Stage.resolveComposition(aspect: 1), .fill)
+        XCTAssertEqual(Stage.resolveComposition(aspect: 16.0 / 9.0), .fill)
+        XCTAssertEqual(Stage.resolveComposition(aspect: 0), .fill)
+
+        XCTAssertTrue(Stage.story(aspect: 9.0 / 16.0).isNineSixteenStory)
+        XCTAssertFalse(Stage.story(aspect: 4.0 / 5.0).isNineSixteenStory)
+        XCTAssertFalse(Stage.fill.isNineSixteenStory)
+    }
+
     // MARK: - Before grade
 
     func testBeforeGradeIsTheSamePhotoWithTheColourTakenOut() throws {

@@ -70,6 +70,71 @@ final class HomeCollectionCatalogTests: XCTestCase {
         }
     }
 
+    /// The 2026-11-21 re-curation: Home hooks with what the Collage tab now
+    /// leads with. All year, for every onboarding answer, a "Trending Now"
+    /// strip of the tab's new looks is on Home, and the hero stages at least
+    /// one of them — never only the legacy catalog again.
+    func testHomeFeaturesTheCollageTabsNewLooksAllYear() throws {
+        let catalog = HomeCollectionCatalog(bundle: appBundle)
+        let service = makeTemplateService()
+        let sample = SampleContentCatalog(bundle: appBundle)
+        let newLooks = Set(CollageGalleryCuration.bundled(in: appBundle).newTemplateIDs)
+        XCTAssertFalse(newLooks.isEmpty, "collage_gallery.json names its new looks")
+
+        let trending = try XCTUnwrap(catalog.authored.first { $0.id == "trending" })
+        XCTAssertTrue(trending.isNew, "Trending is pinned and badged")
+        for id in trending.itemIDs {
+            XCTAssertTrue(newLooks.contains(id), "trending: \(id) is not one of the Collage tab's new looks")
+        }
+        let heroTemplates = HomeCollectionCatalog.heroItems(sample)[.photo] ?? []
+        XCTAssertTrue(heroTemplates.contains(where: newLooks.contains), "The hero stages a new look")
+
+        let calendar = HomeCollectionPlanner.calendar
+        let start = try XCTUnwrap(calendar.date(from: DateComponents(year: 2026, month: 1, day: 1, hour: 12)))
+        for kind in [nil] + CreatorKind.allCases.map(Optional.some) {
+            for week in 0 ..< 53 {
+                let now = try XCTUnwrap(calendar.date(byAdding: .day, value: week * 7, to: start))
+                let plan = catalog.plannedForHome(
+                    now: now, creatorKind: kind, sampleContent: sample, templates: service)
+                XCTAssertTrue(plan.contains { $0.id == "trending" },
+                              "week \(week), \(kind.map { "\($0)" } ?? "no answer"): Trending Now is missing")
+            }
+        }
+    }
+
+    /// The pillars' first card is the one a newcomer — and the UI suites —
+    /// tap first: it must open, not raise the paywall, whichever strips
+    /// claimed cards above it that week.
+    func testEveryPillarLeadsWithAFreeCardAllYear() throws {
+        let catalog = HomeCollectionCatalog(bundle: appBundle)
+        let service = makeTemplateService()
+        let sample = SampleContentCatalog(bundle: appBundle)
+        let calendar = HomeCollectionPlanner.calendar
+        let start = try XCTUnwrap(calendar.date(from: DateComponents(year: 2026, month: 1, day: 1, hour: 12)))
+
+        for kind in [nil] + CreatorKind.allCases.map(Optional.some) {
+            for week in 0 ..< 53 {
+                let now = try XCTUnwrap(calendar.date(byAdding: .day, value: week * 7, to: start))
+                let plan = catalog.plannedForHome(
+                    now: now, creatorKind: kind, sampleContent: sample, templates: service)
+                let label = "week \(week), \(kind.map { "\($0)" } ?? "no answer")"
+                for pillar in plan where pillar.isPillar {
+                    let first = try XCTUnwrap(pillar.itemIDs.first, "\(label): \(pillar.id) is empty")
+                    switch pillar.kind {
+                    case .photo:
+                        let template = try XCTUnwrap(service.templates.first { $0.id == first })
+                        XCTAssertFalse(template.isPremium, "\(label): \(pillar.id) leads with locked \(first)")
+                    case .carousel:
+                        let template = try XCTUnwrap(service.carouselTemplates.first { $0.id == first })
+                        XCTAssertFalse(template.isPremium, "\(label): \(pillar.id) leads with locked \(first)")
+                    case .video:
+                        break
+                    }
+                }
+            }
+        }
+    }
+
     func testEveryItemResolvesToADressedCatalogEntry() throws {
         let catalog = HomeCollectionCatalog(bundle: appBundle)
         let service = makeTemplateService()

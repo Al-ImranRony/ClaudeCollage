@@ -687,7 +687,7 @@ final class HomeViewController: UIViewController {
                     title: template.name,
                     subtitle: String(localized: "Photo collage · Tap to create"),
                     identifier: "heroPage-\(template.id)",
-                    stage: .resolve(aspect: canvas.width / max(canvas.height, 1)),
+                    stage: .resolveComposition(aspect: canvas.width / max(canvas.height, 1)),
                     preview: {
                         await TemplateService.shared.loadShowcasePreview(for: template, maxDimension: 900)
                     },
