@@ -260,7 +260,45 @@ final class AccessibilityAuditUITests: XCTestCase {
         // Adding text opens its styling sheet straight away.
         app.buttons["addTextButton"].tap()
         XCTAssertTrue(app.buttons["textStyleDoneButton"].waitForExistence(timeout: 8), "text style sheet")
+        // A NEW caption focuses its field, so the sheet opens with the keyboard
+        // up, grown from the medium to the large detent. Audited in that state,
+        // the full audit reported the font chips and "Bold" at their
+        // medium-detent frames (~340pt below where they were drawn: XCUI's own
+        // frames were right), sampled keyboard pixels there and failed them on
+        // contrast, every run, though their ink is a pinned Theme pair. So
+        // audit the same sheet reopened for an existing caption: every control
+        // the same, no keyboard, no detent change for the audit to straddle.
+        app.buttons["textStyleDoneButton"].tap()
+        // Select the caption (adding one does not), which puts its tools on the rail.
+        let caption = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Text: '")).firstMatch
+        XCTAssertTrue(caption.waitForExistence(timeout: 5), "the new caption on the canvas")
+        caption.tap()
+        let edit = app.buttons["editTextTool"]
+        XCTAssertTrue(edit.waitForExistence(timeout: 5), "the caption's Edit tool")
+        edit.tap()
+        XCTAssertTrue(app.buttons["textStyleDoneButton"].waitForExistence(timeout: 8), "text style sheet, reopened")
+        XCTAssertFalse(app.keyboards.firstMatch.exists, "an existing caption opens without the keyboard")
+        // `.any`: a vertical-axis SwiftUI field may surface as a text view.
+        waitUntilSettled(app.descendants(matching: .any)["textStyleTextField"].firstMatch)
         audit(app, "Text style sheet")
+    }
+
+    /// Waits until `element` reports the same frame on three reads in a row,
+    /// i.e. any sheet or keyboard animation moving it has finished.
+    @MainActor
+    private func waitUntilSettled(_ element: XCUIElement, timeout: TimeInterval = 5,
+                                  file: StaticString = #filePath, line: UInt = #line) {
+        let deadline = Date().addingTimeInterval(timeout)
+        var last = element.frame
+        var steady = 0
+        while Date() < deadline {
+            usleep(200_000)
+            let frame = element.frame
+            steady = frame == last ? steady + 1 : 0
+            last = frame
+            if steady >= 2 { return }
+        }
+        XCTFail("\(element) never stopped moving", file: file, line: line)
     }
 
     @MainActor

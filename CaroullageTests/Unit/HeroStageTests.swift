@@ -40,10 +40,18 @@ final class HeroStageTests: XCTestCase {
 
     /// Two loops back to back waste the motion: the eye stops noticing it. Videos
     /// are spread through the rotation instead.
+    /// Checked on the order each onboarding answer actually shows, and around
+    /// the loop (the last page rotates back to the first): a reels maker once
+    /// got both videos back to back because the hero pulled every video to
+    /// the front.
     func testHeroNeverRunsTwoVideosInARow() {
-        let kinds = makeCatalog().heroRefs.map(\.kind)
-        for (a, b) in zip(kinds, kinds.dropFirst()) {
-            XCTAssertFalse(a == .video && b == .video, "two hero videos in a row")
+        let refs = makeCatalog().heroRefs
+        for creatorKind in [nil] + CreatorKind.allCases.map(Optional.some) {
+            let kinds = HeroOrdering.order(refs, for: creatorKind).map(\.kind)
+            for (a, b) in zip(kinds, kinds.dropFirst() + kinds.prefix(1)) {
+                XCTAssertFalse(a == .video && b == .video,
+                               "two hero videos in a row for \(creatorKind.map { "\($0)" } ?? "no answer")")
+            }
         }
     }
 
